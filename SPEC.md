@@ -1,0 +1,164 @@
+# Specifiche editor di testo da terminale
+
+Nov 7, 2026 · @David
+
+## Obiettivi e vincoli
+
+Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 300 KB, avvio sotto 50 ms.
+
+- **Zero dipendenze**: niente ncurses, niente librerie esterne; controllo del terminale via termios e sequenze ANSI/VT100 scritte a mano.
+- **Linguaggio**: C99 (alternativa: Rust senza crate esterni, ma binario più grande).
+- **Build**: un solo `Makefile`, compilabile con `gcc` o `clang`, opzione di link statico (`-static`, es. con musl).
+- **Licenza e nome**: da decidere (es. nome provvisorio `ked`).
+- **Ispirazione**: kilo/antirez per la base, nano per la semplicità, micro per i comandi familiari (Ctrl+C/Ctrl+V).
+
+## Architettura e terminale
+
+Il nucleo è un buffer di testo indipendente dalla UI, con rendering differenziale sul terminale in raw mode.
+
+- **Raw mode** con termios; ripristino garantito del terminale all'uscita, su crash (SIGSEGV, SIGABRT) e su SIGTERM.
+- **Alternate screen buffer** (`ESC[?1049h`): all'uscita il terminale torna com'era.
+- **Ridimensionamento** della finestra gestito con SIGWINCH e `ioctl(TIOCGWINSZ)`.
+- **Struttura dati del buffer**: array di righe con gap buffer per riga, o piece table (consigliata per undo e file grandi).
+- **Rendering differenziale**: ridisegna solo le righe cambiate; output in un unico `write()` per frame per evitare sfarfallio.
+- **UTF-8 completo**: cursore per carattere, larghezza dei caratteri larghi (CJK, emoji) tramite tabella `wcwidth` interna.
+- **Colori**: 16, 256 e truecolor, rilevati da `$COLORTERM` e `$TERM`, con degradazione automatica.
+- **Input**: decodifica di tasti speciali e combinazioni (Ctrl, Alt, Shift+frecce), bracketed paste, mouse SGR opzionale (click, selezione, rotella).
+- **Fine riga**: rileva e preserva LF o CRLF; preserva l'assenza di newline finale.
+- **Modularità**: file separati per terminale, buffer, rendering, sintassi, comandi, configurazione.
+
+## Gestione file e multifile
+
+Più file aperti contemporaneamente come buffer, mostrati in tab e affiancabili in split.
+
+- **Apertura da riga di comando**: `ked file1 file2 ...`, anche `ked file.c:120` per saltare alla riga 120; `ked -` legge da stdin.
+- **Buffer multipli**: apri, chiudi, passa al successivo/precedente, lista dei buffer aperti con selezione rapida.
+- **Tab bar** in alto con nome file e indicatore di modifica (`*`).
+- **Split** orizzontale e verticale, anche dello stesso file; spostamento del focus tra i pannelli.
+- **File browser** integrato (albero della directory corrente) in un pannello laterale attivabile.
+- **Apertura rapida** con ricerca fuzzy dei file nel progetto (stile Ctrl+P).
+- **Salvataggio**: salva, salva con nome, salva tutti; scrittura atomica (file temporaneo + `rename`) preservando i permessi.
+- **Protezione**: conferma prima di chiudere file non salvati; avviso se il file è cambiato su disco (ricarica o ignora).
+- **Backup e recupero**: file di swap/autosalvataggio periodico e recupero dopo crash.
+- **Sessione**: memorizza file aperti e posizione del cursore per ogni file, ripristinabili alla riapertura.
+- **File speciali**: gestione dei file in sola lettura, avviso sui file binari, supporto a file grandi (100 MB+) senza bloccare l'editor.
+
+## Editing di base
+
+Comandi non modali e scorciatoie familiari (Ctrl+S, Ctrl+C, Ctrl+V, Ctrl+Z), come negli editor grafici.
+
+- **Movimento**: frecce, Home/End, PgUp/PgDn, inizio/fine file, parola per parola (Ctrl+frecce), "smart home" (primo carattere non spazio).
+- **Selezione**: Shift+movimento, seleziona tutto, seleziona parola/riga, selezione a blocco (colonna).
+- **Copia, taglia, incolla**: clipboard interna con storico (kill ring); integrazione con la clipboard di sistema via OSC 52, senza dipendenze; copia/taglia riga intera se non c'è selezione.
+- **Undo/redo** illimitato, con raggruppamento delle modifiche consecutive.
+- **Operazioni sulle righe**: duplica, cancella, sposta su/giù (Alt+frecce), unisci righe.
+- **Indentazione**: Tab/Shift+Tab su selezione per indentare/deindentare blocchi.
+- **Commento**: attiva/disattiva commento su riga o selezione in base al linguaggio.
+- **Multi-cursore**: aggiungi cursore alla prossima occorrenza della parola (Ctrl+D) e su righe adiacenti.
+- **Varie**: overwrite mode (Ins), maiuscole/minuscole della selezione, cancellazione parola precedente/successiva, inserimento di caratteri per codice Unicode.
+
+## Funzioni per la programmazione
+
+Evidenziazione, indentazione e suggerimenti sono tutti interni: nessun language server obbligatorio.
+
+### Evidenziazione della sintassi
+
+- Motore a regole definite in file di sintassi testuali (parole chiave, tipi, stringhe, numeri, commenti, preprocessore, operatori).
+- Stato per riga per gestire costrutti multiriga (commenti `/* */`, stringhe `"""`, heredoc).
+- Rilevamento del linguaggio da estensione, shebang (`#!/usr/bin/env python`) e modeline.
+- Linguaggi iniziali: C/C++, Python, JavaScript/TypeScript, Go, Rust, Java, Shell, HTML, CSS, JSON, YAML, Markdown, Makefile, SQL, Lua, PHP.
+- Temi colore intercambiabili (almeno uno scuro e uno chiaro).
+
+### Indentazione
+
+- **Autoindent**: la nuova riga eredita l'indentazione della precedente.
+- **Smart indent**: indentazione in più dopo `{`, `:` (Python), `(`, e deindentazione automatica alla chiusura `}`.
+- Tab o spazi configurabili per linguaggio, larghezza del tab; rilevamento automatico dello stile del file aperto.
+- Supporto a `.editorconfig` (indentazione, fine riga, charset).
+
+### Aiuti alla scrittura
+
+- **Parentesi**: evidenziazione della coppia corrispondente, salto alla parentesi corrispondente, chiusura automatica di parentesi e virgolette.
+- **Autosuggest/autocompletamento**: popup con parole presenti in tutti i buffer aperti, parole chiave del linguaggio e snippet; filtro fuzzy, selezione con Tab/Invio.
+- **Snippet** con segnaposti navigabili (es. `for` → ciclo completo).
+- **Code folding** basato su indentazione o parentesi.
+- **Rimozione spazi finali** e newline finale al salvataggio (opzionale).
+- **Guide di indentazione** e visualizzazione opzionale di tab e spazi.
+
+### Integrazione con gli strumenti
+
+- **Esecuzione comandi**: lancia un comando di shell (es. `make`) e mostra l'output in un pannello.
+- **Errori del compilatore**: analizza l'output `file:riga:colonna` e permette di saltare all'errore.
+- **Filtro**: passa la selezione a un comando esterno e sostituiscila con l'output (es. `sort`, formattatori).
+- **Git**: indicatori nel margine delle righe aggiunte/modificate/cancellate (usando il comando `git` se presente, senza linkare librerie).
+- **Tag**: salto alla definizione tramite file `ctags`, se presente.
+- **LSP opzionale** (fase avanzata): client Language Server su stdin/stdout per completamento e diagnostica, solo se un server è installato.
+
+## Ricerca e navigazione
+
+Ricerca incrementale nel file e ricerca globale nel progetto, con un motore regex interno.
+
+- **Ricerca incrementale** (Ctrl+F): evidenzia tutte le occorrenze mentre si digita; avanti/indietro tra i risultati.
+- **Opzioni**: maiuscole/minuscole, parola intera, espressioni regolari (motore regex scritto internamente o `regex.h` di POSIX, che fa parte della libc).
+- **Sostituisci**: singola, tutte, con conferma; gruppi di cattura nelle regex; limitata alla selezione.
+- **Cerca nei file** del progetto con lista dei risultati navigabile.
+- **Vai alla riga** (Ctrl+G) e alla colonna.
+- **Lista dei simboli** del file (funzioni, classi) ricavata dalle regole di sintassi, con salto rapido.
+- **Segnalibri** su righe e cronologia delle posizioni (indietro/avanti tra i salti).
+- **Command palette**: tutti i comandi cercabili per nome, con la loro scorciatoia.
+
+## Interfaccia, configurazione, prestazioni
+
+L'interfaccia è minimale ma informativa; tutto è configurabile da un file di testo semplice.
+
+### Interfaccia
+
+- **Numeri di riga** (assoluti o relativi) ed evidenziazione della riga corrente.
+- **Barra di stato**: nome file, stato modificato, linguaggio, riga:colonna, encoding, fine riga, tab/spazi.
+- **Riga messaggi/prompt** per input dei comandi, conferme ed errori.
+- **Righello** a colonna configurabile (es. 80) e a capo visivo (soft wrap) attivabile.
+- **Scorrimento** con margine (il cursore non tocca il bordo) e scorrimento orizzontale per righe lunghe.
+- **Help integrato** (F1) con l'elenco delle scorciatoie.
+
+### Configurazione
+
+- File `~/.config/ked/config` in formato chiave = valore, con override per linguaggio.
+- Scorciatoie da tastiera rimappabili.
+- Cartella `~/.config/ked/syntax/` per aggiungere linguaggi senza ricompilare.
+- Temi in `~/.config/ked/themes/`.
+- Valori predefiniti sensati: l'editor funziona senza alcun file di configurazione.
+
+### Prestazioni e qualità
+
+- Memoria a riposo sotto 5 MB con un file piccolo aperto.
+- Apertura di un file da 10 MB in meno di 1 secondo; evidenziazione calcolata solo sulle righe visibili più lo stato necessario.
+- Nessun lavoro in background inutile; il ciclo principale attende input con `poll()`.
+- Compilazione senza warning con `-Wall -Wextra -pedantic`; verifica con AddressSanitizer e Valgrind.
+- Test automatici sul buffer, undo/redo, ricerca e parser di sintassi.
+- Pagina `man` e `README` con l'elenco dei comandi.
+
+## Roadmap a fasi e istruzioni per Claude Code
+
+Conviene chiedere a Claude Code una fase alla volta, verificando che compili e funzioni prima di passare alla successiva.
+
+1. **Nucleo**: raw mode, rendering, apertura/salvataggio di un file, movimento, inserimento/cancellazione, UTF-8, barra di stato.
+2. **Editing**: selezione, copia/taglia/incolla, undo/redo, operazioni sulle righe, autoindent.
+3. **Sintassi**: motore di evidenziazione, primi 5 linguaggi (C, Python, JS, Shell, Markdown), temi, parentesi corrispondenti.
+4. **Multifile**: buffer multipli, tab, split, apertura fuzzy, file browser, sessioni.
+5. **Ricerca**: ricerca incrementale, regex, sostituzione, cerca nei file, vai alla riga.
+6. **Produttività**: autosuggest, snippet, multi-cursore, commenti, folding, command palette.
+7. **Strumenti**: esecuzione comandi, salto agli errori, indicatori Git, configurazione e keybinding personalizzabili.
+8. **Avanzato (opzionale)**: client LSP, mouse, linguaggi aggiuntivi.
+
+### Come passare il documento a Claude Code
+
+- Salva questo documento come `SPEC.md` nella cartella del progetto e chiedi a Claude Code di leggerlo prima di iniziare.
+- Primo prompt suggerito: *"Leggi SPEC.md. Proponi la struttura dei file e le strutture dati principali, poi implementa solo la Fase 1. Nessuna dipendenza oltre la libc."*
+- Chiedi di creare un `CLAUDE.md` con i vincoli fissi (C99, zero dipendenze, stile del codice) così restano validi in tutte le sessioni.
+- A fine di ogni fase chiedi test, verifica con `-Wall -Wextra` e un commit Git.
+
+### Decisioni ancora aperte
+
+- Nome definitivo dell'editor.
+- C oppure Rust.
+- Scorciatoie stile moderno (Ctrl+C/V) oppure stile nano/emacs come predefinite.

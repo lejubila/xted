@@ -1,0 +1,356 @@
+#include "term.h"
+#include "utf8.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <unistd.h>
+
+#define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H"
+#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?1049l"
+
+/* How long to wait for the rest of an escape sequence before deciding
+ * that ESC was a keypress on its own. */
+#define ESC_TIMEOUT_MS 50
+
+static struct termios orig_tio;
+static volatile sig_atomic_t raw_active;
+static int wake_pipe[2] = { -1, -1 };
+
+static unsigned char inbuf[4096];
+static size_t inpos, inlen;
+static int in_eof;
+
+void term_restore(void)
+{
+    ssize_t r;
+
+    if (!raw_active)
+        return;
+    raw_active = 0;
+    r = write(STDOUT_FILENO, SEQ_LEAVE, sizeof SEQ_LEAVE - 1);
+    (void)r;
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_tio);
+}
+
+static void on_fatal(int sig)
+{
+    term_restore();
+    raise(sig);
+}
+
+/* Wakes poll() through a self-pipe: no race between the signal and the wait. */
+static void on_winch(int sig)
+{
+    int saved = errno;
+    ssize_t r;
+
+    (void)sig;
+    r = write(wake_pipe[1], "w", 1);
+    (void)r;
+    errno = saved;
+}
+
+static void set_signals(void)
+{
+    static const int fatal[] = { SIGSEGV, SIGABRT, SIGBUS, SIGFPE, SIGILL,
+                                 SIGTERM, SIGHUP, SIGINT, SIGQUIT };
+    struct sigaction sa;
+    size_t i;
+
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESETHAND | SA_NODEFER;
+    sa.sa_handler = on_fatal;
+    for (i = 0; i < sizeof fatal / sizeof fatal[0]; i++)
+        sigaction(fatal[i], &sa, NULL);
+
+    sa.sa_flags = 0;
+    sa.sa_handler = on_winch;
+    sigaction(SIGWINCH, &sa, NULL);
+}
+
+int term_init(void)
+{
+    struct termios raw;
+    int i;
+
+    if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO))
+        return -1;
+    if (tcgetattr(STDIN_FILENO, &orig_tio) < 0 || pipe(wake_pipe) < 0)
+        return -1;
+    for (i = 0; i < 2; i++) {
+        fcntl(wake_pipe[i], F_SETFD, FD_CLOEXEC);
+        fcntl(wake_pipe[i], F_SETFL, fcntl(wake_pipe[i], F_GETFL) | O_NONBLOCK);
+    }
+
+    raw = orig_tio;
+    raw.c_iflag &= (tcflag_t)~(BRKINT | ICRNL | INPCK | ISTRIP | IXON | INLCR | IGNCR);
+    raw.c_oflag &= (tcflag_t)~OPOST;
+    raw.c_cflag |= CS8;
+    raw.c_lflag &= (tcflag_t)~(ECHO | ICANON | IEXTEN | ISIG);
+    raw.c_cc[VMIN] = 1;     /* reads happen only after poll(), so never block */
+    raw.c_cc[VTIME] = 0;
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) < 0)
+        return -1;
+    raw_active = 1;
+
+    set_signals();
+    atexit(term_restore);
+    term_write(SEQ_ENTER, sizeof SEQ_ENTER - 1);
+    return 0;
+}
+
+void term_size(int *rows, int *cols)
+{
+    struct winsize ws;
+
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) < 0 || ws.ws_col == 0 || ws.ws_row == 0) {
+        *rows = 24;
+        *cols = 80;
+    } else {
+        *rows = ws.ws_row;
+        *cols = ws.ws_col;
+    }
+}
+
+void term_write(const char *s, size_t n)
+{
+    while (n > 0) {
+        ssize_t w = write(STDOUT_FILENO, s, n);
+
+        if (w < 0) {
+            if (errno == EINTR)
+                continue;
+            if (errno == EAGAIN) {
+                struct pollfd p = { STDOUT_FILENO, POLLOUT, 0 };
+
+                poll(&p, 1, -1);
+                continue;
+            }
+            return;
+        }
+        s += w;
+        n -= (size_t)w;
+    }
+}
+
+/* Reads from stdin into the (empty) input buffer; the caller has
+ * already seen the descriptor become readable. */
+static void fill_input(void)
+{
+    ssize_t n;
+
+    do
+        n = read(STDIN_FILENO, inbuf, sizeof inbuf);
+    while (n < 0 && errno == EINTR);
+    if (n < 0 && errno == EAGAIN)
+        return;
+    if (n <= 0) {
+        in_eof = 1;
+        return;
+    }
+    inpos = 0;
+    inlen = (size_t)n;
+}
+
+int term_has_input(void)
+{
+    return inpos < inlen;
+}
+
+int term_wait(int timeout_ms)
+{
+    struct pollfd fds[2];
+    int r, ev = 0;
+
+    if (inpos < inlen || in_eof)
+        return TERM_EV_KEY;
+
+    fds[0].fd = STDIN_FILENO;
+    fds[0].events = POLLIN;
+    fds[1].fd = wake_pipe[0];
+    fds[1].events = POLLIN;
+    do
+        r = poll(fds, 2, timeout_ms);
+    while (r < 0 && errno == EINTR);
+    if (r <= 0)
+        return 0;
+
+    if (fds[1].revents & POLLIN) {
+        char tmp[16];
+
+        while (read(wake_pipe[0], tmp, sizeof tmp) > 0) {
+        }
+        ev |= TERM_EV_RESIZE;
+    }
+    if (fds[0].revents & (POLLIN | POLLHUP | POLLERR)) {
+        fill_input();
+        ev |= TERM_EV_KEY;
+    }
+    return ev;
+}
+
+/* Next input byte, waiting up to timeout_ms for it; -1 if none. */
+static int next_byte(int timeout_ms)
+{
+    if (inpos >= inlen && !in_eof) {
+        struct pollfd p = { STDIN_FILENO, POLLIN, 0 };
+        int r;
+
+        do
+            r = poll(&p, 1, timeout_ms);
+        while (r < 0 && errno == EINTR);
+        if (r <= 0)
+            return -1;
+        fill_input();
+    }
+    if (inpos < inlen)
+        return inbuf[inpos++];
+    return -1;
+}
+
+static uint32_t read_utf8(int lead)
+{
+    int need, n = 1;
+    char b[4];
+    uint32_t cp;
+
+    if (lead >= 0xF0 && lead <= 0xF4)
+        need = 3;
+    else if (lead >= 0xE0 && lead <= 0xEF)
+        need = 2;
+    else if (lead >= 0xC2 && lead <= 0xDF)
+        need = 1;
+    else
+        return KEY_NONE;
+
+    b[0] = (char)lead;
+    while (n <= need) {
+        int c = next_byte(ESC_TIMEOUT_MS);
+
+        if (c < 0)
+            return KEY_NONE;
+        if ((c & 0xC0) != 0x80) {
+            inpos--;    /* not ours: push it back */
+            return KEY_NONE;
+        }
+        b[n++] = (char)c;
+    }
+    if (utf8_decode(b, (size_t)n, &cp) != n)
+        return KEY_NONE;
+    return cp;
+}
+
+static int xterm_mods(int m)
+{
+    int mods = 0;
+
+    if (m > 1) {
+        m -= 1;
+        if (m & 1)
+            mods |= MOD_SHIFT;
+        if (m & 2)
+            mods |= MOD_ALT;
+        if (m & 4)
+            mods |= MOD_CTRL;
+    }
+    return mods;
+}
+
+static uint32_t final_key(int c)
+{
+    switch (c) {
+    case 'A': return KEY_UP;
+    case 'B': return KEY_DOWN;
+    case 'C': return KEY_RIGHT;
+    case 'D': return KEY_LEFT;
+    case 'H': return KEY_HOME;
+    case 'F': return KEY_END;
+    default: return KEY_NONE;
+    }
+}
+
+static void parse_csi(Key *k)
+{
+    int params[2] = { 0, 0 }, idx = 0, c;
+
+    for (;;) {
+        c = next_byte(ESC_TIMEOUT_MS);
+        if (c < 0)
+            return;
+        if (c >= '0' && c <= '9') {
+            if (params[idx] < 10000)
+                params[idx] = params[idx] * 10 + (c - '0');
+        } else if (c == ';') {
+            if (idx < 1)
+                idx++;
+        } else if (c >= 0x20 && c <= 0x3F) {
+            continue;
+        } else if (c >= 0x40 && c <= 0x7E) {
+            break;
+        } else {
+            return;
+        }
+    }
+
+    k->mods = xterm_mods(params[1]);
+    if (c == '~') {
+        switch (params[0]) {
+        case 1: case 7: k->code = KEY_HOME; break;
+        case 2: k->code = KEY_INS; break;
+        case 3: k->code = KEY_DEL; break;
+        case 4: case 8: k->code = KEY_END; break;
+        case 5: k->code = KEY_PGUP; break;
+        case 6: k->code = KEY_PGDN; break;
+        default: break;
+        }
+    } else {
+        k->code = final_key(c);
+    }
+}
+
+static void parse_escape(Key *k)
+{
+    int c = next_byte(ESC_TIMEOUT_MS);
+
+    if (c < 0) {
+        k->code = KEY_ESC;
+        return;
+    }
+    if (c == '[') {
+        parse_csi(k);
+    } else if (c == 'O') {
+        c = next_byte(ESC_TIMEOUT_MS);
+        if (c >= 0)
+            k->code = final_key(c);
+    } else if (c == 27) {
+        k->code = KEY_NONE;
+    } else {
+        k->mods = MOD_ALT;
+        k->code = c < 0x80 ? (uint32_t)c : read_utf8(c);
+    }
+}
+
+void term_read_key(Key *k)
+{
+    int c;
+
+    k->code = KEY_NONE;
+    k->mods = 0;
+    c = next_byte(0);
+    if (c < 0) {
+        if (in_eof)
+            k->code = KEY_EOF;
+        return;
+    }
+    if (c == 27)
+        parse_escape(k);
+    else if (c < 0x80)
+        k->code = (uint32_t)c;
+    else
+        k->code = read_utf8(c);
+}
