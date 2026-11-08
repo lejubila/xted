@@ -148,6 +148,24 @@ static void set_br(SBuf *o, int *br, int on)
     *br = on;
 }
 
+/* Search matches: the theme's background, or an underline without colours. */
+static void set_mt(SBuf *o, const Editor *e, int *mt, int on)
+{
+    if (on == *mt)
+        return;
+    if (e->color_depth != COLOR_NONE) {
+        if (on)
+            theme_bg(o, e->color_depth, e->theme->match);
+        else if (e->theme->has_bg)
+            theme_bg(o, e->color_depth, e->theme->bg);
+        else
+            sbuf_adds(o, "\x1b[49m");
+    } else {
+        sbuf_adds(o, on ? "\x1b[4m" : "\x1b[24m");
+    }
+    *mt = on;
+}
+
 /* One line of a pane's text, exactly w->w cells wide. */
 static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int active)
 {
@@ -158,6 +176,9 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     size_t left = v->coloff, right = left + (size_t)w->w;
     size_t i = 0, col = 0, sel_from = 0, sel_to = 0;
     int colors, cur = SC_NORMAL, br = 0, prev_visible = 0, hl = 0, sel_nl = 0, has_sel;
+    Matcher *hm = e->find.hl && e->find.m && e->find.m->valid ? e->find.m : NULL;
+    size_t mr[32][2], nm = 0, mk = 0;
+    int mt = 0;
     int bg_row = e->color_depth != COLOR_NONE && e->theme->has_bg;
 
     if (y >= d->buf.nlines) {
@@ -178,6 +199,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     }
     cls = colors ? syn_classes(d->syn, &d->buf, y) : NULL;
     has_sel = active && edit_view_sel_line(&d->buf, v, y, &sel_from, &sel_to, &sel_nl);
+    if (hm)
+        nm = sm_line_matches(hm, l->s, l->len, mr, 32);
 
     while (i < l->len && col < right) {
         uint32_t cp;
@@ -188,7 +211,11 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         int mark = active && e->match_on &&
                    ((y == e->by && i == e->bx) || (y == e->my && i == e->mx));
         int cc = cls ? cls[i] : SC_NORMAL;
+        int inm;
 
+        while (mk < nm && mr[mk][1] <= i)
+            mk++;
+        inm = mk < nm && i >= mr[mk][0];
         i += (size_t)n;
         if (cw == 0) {
             /* a combining mark belongs to the character before it */
@@ -202,6 +229,7 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
             continue;
         }
         set_hl(o, &hl, selected);
+        set_mt(o, e, &mt, inm && !selected);
         set_br(o, &br, mark);
         if (colors)
             set_cls(o, e, &cur, cc);
@@ -228,6 +256,7 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         }
     }
     set_hl(o, &hl, 0);
+    set_mt(o, e, &mt, 0);
     set_br(o, &br, 0);
     /* a selection running past the end of the line shows the newline as one cell */
     if (has_sel && sel_nl && col >= left && col < right) {
@@ -399,6 +428,19 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
         }
         fit_cols(o, t + start, tl - start, avail);
         *pcol = (int)(lw + tw);
+        if (e->prompt_info[0]) {
+            size_t iw = utf8_cols(e->prompt_info, strlen(e->prompt_info), strlen(e->prompt_info), 8);
+            size_t used = lw + (tw < avail ? tw : avail);
+
+            if (cols > used + iw + 2) {
+                spaces(o, cols - used - iw - 1);
+                sbuf_adds(o, "\x1b[2m");
+                sbuf_adds(o, e->prompt_info);
+                sbuf_adds(o, "\x1b[22m");
+                sbuf_adds(o, "\x1b[K");
+                return;
+            }
+        }
     } else {
         fit_cols(o, e->msg, strlen(e->msg), cols);
     }

@@ -8,6 +8,7 @@
 #include "picker.h"
 #include "clip.h"
 #include "render.h"
+#include "search.h"
 #include "syntax.h"
 #include "theme.h"
 #include "term.h"
@@ -18,7 +19,35 @@
 #define MSG_TTL_MS 5000
 #define SIDEBAR_W 28
 
-enum { PK_BUFFERS = 1, PK_FILES };
+enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS };
+
+enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
+
+#define FIND_MAX_RESULTS 2000
+
+/* Search and replace state (see find.c). */
+typedef struct {
+    int mode;               /* FIND_* */
+    Matcher *m;             /* the current pattern (NULL until the first search) */
+    char pat[512];          /* last accepted pattern */
+    char repl[512];         /* last replacement text */
+    int regex, cs, word;    /* options */
+    int hl;                 /* highlight the matches of m */
+    int replace;            /* the bar is for replacing */
+    size_t oy, ox;          /* where the search started */
+    int osel;               /* the selection at that moment */
+    size_t oay, oax;
+    int hit_valid;
+    Hit hit;                /* the match shown */
+    int has_span;
+    Span span;              /* replace only inside this part of the text */
+    size_t sy, sx;          /* where the replacement started */
+    int passed_end;
+    size_t nrepl;
+    int undo_open;
+    FileHits files;         /* results of the last search in files */
+} Find;
+
 
 typedef struct Editor {
     Doc **docs;             /* open documents, in tab order */
@@ -33,6 +62,7 @@ typedef struct Editor {
     Tree tree;
     int tree_ready;
     Picker picker;
+    Find find;
     int picker_kind;        /* PK_* */
 
     /* the active pane's view, live: it is copied into the pane when focus moves */
@@ -66,6 +96,7 @@ typedef struct Editor {
     char prompt_label[64];
     char prompt_text[512];
     size_t prompt_len;
+    char prompt_info[64];   /* shown at the right end of the prompt row */
 
     int quit;
     Render *render;
@@ -93,6 +124,9 @@ int editor_split(Editor *e, int vertical);
 void editor_activate(Editor *e, Doc *d);
 /* Moves the cursor of the active pane to a 1-based line and column. */
 void editor_goto(Editor *e, size_t line, size_t col);
+/* Single-line text input on the message row (init is the starting text).
+ * Returns the length, 0 if cancelled. */
+size_t editor_prompt(Editor *e, const char *label, const char *init, char *out, size_t outsz);
 /* Display column of a cursor of any pane. */
 size_t editor_view_col(const Buffer *b, const View *v, int tabw);
 /* Makes the live view and the pane's copy agree. */

@@ -284,6 +284,10 @@ static uint32_t final_key(int c)
     case 'D': return KEY_LEFT;
     case 'H': return KEY_HOME;
     case 'F': return KEY_END;
+    case 'P': return KEY_F1;
+    case 'Q': return KEY_F2;
+    case 'R': return KEY_F3;
+    case 'S': return KEY_F4;
     default: return KEY_NONE;
     }
 }
@@ -354,6 +358,12 @@ static void parse_csi(Key *k)
         case 4: case 8: k->code = KEY_END; break;
         case 5: k->code = KEY_PGUP; break;
         case 6: k->code = KEY_PGDN; break;
+        case 11: case 12: case 13: case 14: k->code = KEY_F1 + (uint32_t)(params[0] - 11); break;
+        case 15: k->code = KEY_F5; break;
+        case 17: case 18: case 19: case 20: case 21:
+            k->code = KEY_F6 + (uint32_t)(params[0] - 17);
+            break;
+        case 23: case 24: k->code = KEY_F11 + (uint32_t)(params[0] - 23); break;
         case 200:
             read_paste();
             k->code = KEY_PASTE;

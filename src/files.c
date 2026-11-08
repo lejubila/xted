@@ -48,7 +48,7 @@ static size_t list_dir(const char *path, char ***out, int include_hidden)
     return n;
 }
 
-static char *join(const char *dir, const char *name)
+char *files_join(const char *dir, const char *name)
 {
     size_t dl = strlen(dir), nl = strlen(name);
     char *p;
@@ -72,13 +72,13 @@ typedef struct {
 
 static void scan_dir(Scan *s, const char *root, const char *rel, int depth)
 {
-    char *dir = rel[0] ? join(root, rel) : xstrdup(root);
+    char *dir = rel[0] ? files_join(root, rel) : xstrdup(root);
     char **names;
     size_t n = list_dir(dir, &names, 0), i;
 
     for (i = 0; i < n && s->count < SCAN_MAX_FILES; i++) {
-        char *r = rel[0] ? join(rel, names[i]) : xstrdup(names[i]);
-        char *full = join(root, r);
+        char *r = rel[0] ? files_join(rel, names[i]) : xstrdup(names[i]);
+        char *full = files_join(root, r);
         struct stat st;
 
         if (lstat(full, &st) == 0) {
@@ -153,7 +153,7 @@ static void expand(Tree *t, size_t i)
     /* folders first, then files; hidden entries are shown in the browser */
     for (pass = 0; pass < 2; pass++)
         for (k = 0; k < n; k++) {
-            char *p = join(t->e[i].path, names[k]);
+            char *p = files_join(t->e[i].path, names[k]);
             TreeEntry ent = make_entry(p, names[k], t->e[i].depth + 1);
 
             free(p);

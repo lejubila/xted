@@ -6,6 +6,7 @@
 #include "fuzzy.h"
 #include "langs.h"
 #include "layout.h"
+#include "search.h"
 #include "picker.h"
 #include "session.h"
 #include "editor.h"
@@ -1190,6 +1191,248 @@ static void test_session_layout(void)
     rm_rf(dir);
 }
 
+/* ---- phase 5: search ------------------------------------------------------ */
+
+static int find1(Matcher *m, const char *s, size_t from, size_t *a, size_t *b)
+{
+    return sm_find(m, s, strlen(s), from, a, b, NULL);
+}
+
+static void test_fold(void)
+{
+    CHECK(cp_fold('A') == 'a' && cp_fold('z') == 'z' && cp_fold('1') == '1');
+    CHECK(cp_fold(0xC9) == 0xE9);                       /* É -> é */
+    CHECK(cp_fold(0xD7) == 0xD7);                       /* multiplication sign untouched */
+    CHECK(cp_fold(0x416) == 0x436);                     /* Ж -> ж */
+    CHECK(cp_fold(0x401) == 0x451);                     /* Ё -> ё */
+    CHECK(cp_fold(0x3A3) == 0x3C3);                     /* Σ -> σ */
+    CHECK(cp_fold(0x100) == 0x101);
+}
+
+static void test_search_lines(void)
+{
+    Matcher m;
+    size_t a, b;
+    regmatch_t g[10];
+    size_t rng[8][2];
+
+    memset(&m, 0, sizeof m);
+    CHECK(sm_compile(&m, "", 0, 0, 0, 0) < 0 && !m.valid);
+    CHECK(sm_compile(&m, "foo", 3, 0, 0, 0) == 0);
+    CHECK(find1(&m, "a Foo b FOO", 0, &a, &b) && a == 2 && b == 5);
+    CHECK(find1(&m, "a Foo b FOO", 3, &a, &b) && a == 8 && b == 11);
+    CHECK(!find1(&m, "a Foo b FOO", 9, &a, &b));
+    CHECK(sm_compile(&m, "foo", 3, 0, 1, 0) == 0);
+    CHECK(find1(&m, "a Foo b foo", 0, &a, &b) && a == 8);   /* match case */
+    CHECK(sm_compile(&m, "caf\xC3\x89", 5, 0, 0, 0) == 0);  /* "cafÉ" finds "café" */
+    CHECK(find1(&m, "un caf\xC3\xA9 ok", 0, &a, &b) && a == 3 && b == 8);
+    CHECK(sm_compile(&m, "\xD0\x96\xD0\xA3", 4, 0, 0, 0) == 0);       /* ЖУ */
+    CHECK(find1(&m, "x \xD0\xB6\xD1\x83 y", 0, &a, &b) && a == 2 && b == 6);
+
+    CHECK(sm_compile(&m, "cat", 3, 0, 0, 1) == 0);                    /* whole word */
+    CHECK(find1(&m, "concat cat cats", 0, &a, &b) && a == 7 && b == 10);
+    CHECK(!find1(&m, "concat cats", 0, &a, &b));
+    CHECK(find1(&m, "(cat)", 0, &a, &b) && a == 1);
+
+    CHECK(sm_compile(&m, "a*", 2, 1, 0, 0) == 0);                     /* no empty matches */
+    CHECK(!find1(&m, "xyz", 0, &a, &b));
+    CHECK(find1(&m, "xaay", 0, &a, &b) && a == 1 && b == 3);
+
+    CHECK(sm_compile(&m, "\\d+", 3, 1, 0, 0) == 0);
+    CHECK(find1(&m, "ab 123 c4", 0, &a, &b) && a == 3 && b == 6);
+    CHECK(find1(&m, "ab 123 c4", 6, &a, &b) && a == 8 && b == 9);
+    CHECK(sm_compile(&m, "\\w+@\\w+", 7, 1, 0, 0) == 0);
+    CHECK(find1(&m, "mail a_b@cd now", 0, &a, &b) && a == 5 && b == 11);
+    CHECK(sm_compile(&m, "[\\d]+", 5, 1, 0, 0) == 0);                 /* brackets are literal */
+    CHECK(find1(&m, "x\\d9", 0, &a, &b) && a == 1 && b == 3);
+    CHECK(sm_compile(&m, "^ab", 3, 1, 0, 0) == 0);
+    CHECK(find1(&m, "ab ab", 0, &a, &b) && a == 0);
+    CHECK(!find1(&m, "ab ab", 1, &a, &b));                            /* ^ only at line start */
+    CHECK(sm_compile(&m, "(a+)-(b+)", 9, 1, 0, 0) == 0);
+    CHECK(sm_find(&m, "xx aa-bbb", 9, 0, &a, &b, g) && g[1].rm_so == 3 && g[1].rm_eo == 5 &&
+          g[2].rm_so == 6 && g[2].rm_eo == 9);
+    CHECK(sm_compile(&m, "(", 1, 1, 0, 0) < 0 && !m.valid && m.err[0] != '\0');
+    CHECK(sm_compile(&m, "[a", 2, 1, 0, 0) < 0);
+
+    CHECK(sm_compile(&m, "ab", 2, 0, 0, 0) == 0);
+    CHECK(sm_find_last(&m, "ab ab ab", 8, 8, &a, &b) && a == 6);
+    CHECK(sm_find_last(&m, "ab ab ab", 8, 6, &a, &b) && a == 3);
+    CHECK(!sm_find_last(&m, "ab ab ab", 8, 0, &a, &b));
+    CHECK(sm_line_matches(&m, "ab ab ab", 8, rng, 8) == 3 && rng[1][0] == 3 && rng[2][1] == 8);
+    CHECK(sm_line_matches(&m, "ab ab ab", 8, rng, 2) == 2);
+    CHECK(sm_line_matches(&m, "", 0, rng, 8) == 0);
+    sm_free(&m);
+}
+
+static Buffer *buf_of(const char *text)
+{
+    Buffer *b = xmalloc(sizeof *b);
+    size_t y = 0, x = 0;
+
+    buf_init(b);
+    buf_insert_text(b, &y, &x, text, strlen(text));
+    buf_undo_close(b);
+    return b;
+}
+
+static void test_search_buffer(void)
+{
+    Buffer *b = buf_of("one two\nthree two\nfour\ntwo");
+    Matcher m;
+    Hit h;
+    int wr;
+    size_t before, total;
+    Span lim;
+
+    memset(&m, 0, sizeof m);
+    sm_compile(&m, "two", 3, 0, 0, 0);
+    CHECK(search_next(&m, b, 0, 0, 1, 1, NULL, &h, &wr) && h.y == 0 && h.x == 4 && !wr);
+    CHECK(search_next(&m, b, 0, 5, 1, 1, NULL, &h, &wr) && h.y == 1 && h.x == 6);
+    CHECK(search_next(&m, b, 1, 7, 1, 1, NULL, &h, &wr) && h.y == 3 && h.x == 0 && !wr);
+    CHECK(search_next(&m, b, 3, 1, 1, 1, NULL, &h, &wr) && h.y == 0 && h.x == 4 && wr);
+    CHECK(!search_next(&m, b, 3, 1, 1, 0, NULL, &h, &wr));
+    CHECK(search_next(&m, b, 3, 0, 0, 1, NULL, &h, &wr) && h.y == 1 && h.x == 6 && !wr);
+    CHECK(search_next(&m, b, 0, 4, 0, 1, NULL, &h, &wr) && h.y == 3 && wr);
+    CHECK(!search_next(&m, b, 0, 4, 0, 0, NULL, &h, &wr));
+    CHECK(search_next(&m, b, 1, 6, 1, 1, NULL, &h, &wr) && h.y == 1 && h.x == 6);   /* at the cursor */
+    search_stats(&m, b, 1, 6, 1000, &before, &total);
+    CHECK(total == 3 && before == 1);
+    search_stats(&m, b, 0, 0, 2, &before, &total);
+    CHECK(total == 2);
+
+    lim.y0 = 1; lim.x0 = 0; lim.y1 = 1; lim.x1 = 9;                 /* only "three two" */
+    CHECK(search_next(&m, b, 1, 0, 1, 1, &lim, &h, &wr) && h.y == 1);
+    CHECK(search_next(&m, b, 1, 7, 1, 1, &lim, &h, &wr) && h.y == 1 && h.x == 6 && wr);
+    lim.x1 = 8;                                                      /* cuts the match in half */
+    CHECK(!search_next(&m, b, 1, 0, 1, 1, &lim, &h, &wr));
+    sm_free(&m);
+    buf_free(b);
+    free(b);
+}
+
+static void test_search_replace(void)
+{
+    Buffer *b = buf_of("a1 b22\nc333 a4\nnone");
+    Matcher m;
+    Span lim;
+    SBuf o = SBUF_INIT;
+    regmatch_t g[10];
+    size_t a, e;
+
+    memset(&m, 0, sizeof m);
+    sm_compile(&m, "(\\w)(\\d+)", 9, 1, 0, 0);
+    CHECK(sm_find(&m, "xx b22", 6, 0, &a, &e, g));
+    search_expand(&m, "xx b22", g, "<\\2\\1\\0\\\\\\t>", &o);
+    CHECK(o.len == 10 && memcmp(o.p, "<22bb22\\\t>", 10) == 0);
+    sbuf_free(&o);
+
+    buf_undo_begin(b, 0, 0);
+    CHECK(search_replace_all(b, &m, "\\2\\1", NULL) == 4);
+    buf_undo_close(b);
+    CHECK(buf_is(b, "1a 22b\n333c 4a\nnone"));
+    CHECK(buf_undo(b, &a, &e) == 1 && buf_is(b, "a1 b22\nc333 a4\nnone"));   /* one undo step */
+    CHECK(buf_redo(b, &a, &e) == 1 && buf_is(b, "1a 22b\n333c 4a\nnone"));
+    sm_free(&m);
+
+    sm_compile(&m, "a", 1, 0, 1, 0);                                  /* limited to a span */
+    lim.y0 = 0; lim.x0 = 0; lim.y1 = 1; lim.x1 = 7;
+    buf_undo_begin(b, 0, 0);
+    CHECK(search_replace_all(b, &m, "AAA", &lim) == 2);
+    buf_undo_close(b);
+    CHECK(buf_is(b, "1AAA 22b\n333c 4AAA\nnone") && lim.x1 == 9);
+    sm_free(&m);
+
+    sm_compile(&m, "o", 1, 0, 0, 0);                                  /* replacement may be empty */
+    buf_undo_begin(b, 0, 0);
+    CHECK(search_replace_all(b, &m, "", NULL) == 1);
+    buf_undo_close(b);
+    CHECK(b->lines[2].len == 3 && memcmp(b->lines[2].s, "nne", 3) == 0);
+    sm_free(&m);
+    sm_compile(&m, "e", 1, 0, 0, 0);                                  /* longer text, no loop */
+    buf_undo_begin(b, 0, 0);
+    CHECK(search_replace_all(b, &m, "ee", NULL) == 1);
+    buf_undo_close(b);
+    CHECK(b->lines[2].len == 4 && memcmp(b->lines[2].s, "nnee", 4) == 0);
+    sm_free(&m);
+    buf_free(b);
+    free(b);
+}
+
+static void test_search_files(void)
+{
+    char dir[64];
+    Matcher m;
+    FileHits h;
+    size_t i;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    {
+        char sub[600];
+
+        snprintf(sub, sizeof sub, "%s/src", dir);
+        mkdir(sub, 0755);
+        snprintf(sub, sizeof sub, "%s/.git", dir);
+        mkdir(sub, 0755);
+    }
+    put_file(dir, "a.txt", "nothing\n  Needle here\nmore needle\n");
+    put_file(dir, "src/b.c", "int needle;\r\nint x;\r\n");
+    put_file(dir, ".git/c", "needle\n");
+    put_file(dir, "bin.dat", "needle\n");
+    {
+        char path[700];
+        FILE *f;
+
+        snprintf(path, sizeof path, "%s/bin.dat", dir);
+        f = fopen(path, "wb");
+        fwrite("needle\0\0", 1, 8, f);
+        fclose(f);
+    }
+    memset(&m, 0, sizeof m);
+    sm_compile(&m, "needle", 6, 0, 0, 0);
+    memset(&h, 0, sizeof h);
+    search_dir(&m, dir, NULL, NULL, &h, 100);
+    CHECK(h.n == 3 && !h.truncated);
+    for (i = 0; i < h.n; i++)
+        CHECK(strstr(h.v[i].path, "/.git/") == NULL && strstr(h.v[i].path, "bin.dat") == NULL);
+    CHECK(h.n == 3 && h.v[0].line == 1 && h.v[0].col == 2 && strcmp(h.v[0].text, "Needle here") == 0);
+    CHECK(h.n == 3 && h.v[1].line == 2 && strcmp(h.v[1].text, "more needle") == 0);
+    CHECK(h.n == 3 && strcmp(h.v[2].text, "int needle;") == 0);      /* CRLF stripped */
+    filehits_free(&h);
+
+    memset(&h, 0, sizeof h);
+    search_dir(&m, dir, NULL, NULL, &h, 2);
+    CHECK(h.n == 2 && h.truncated);
+    filehits_free(&h);
+
+    sm_free(&m);
+    {
+        Buffer *b = buf_of("x\nneedle y\nz");
+
+        sm_compile(&m, "needle", 6, 0, 0, 0);
+        memset(&h, 0, sizeof h);
+        search_buffer(&m, "mem", b, &h, 10);
+        CHECK(h.n == 1 && h.v[0].line == 1 && strcmp(h.v[0].path, "mem") == 0);
+        filehits_free(&h);
+        buf_free(b);
+        free(b);
+    }
+    sm_free(&m);
+    rm_rf(dir);
+}
+
+static void test_goto_parse(void)
+{
+    size_t l, c;
+
+    CHECK(search_parse_goto("12", &l, &c) == 0 && l == 12 && c == 0);
+    CHECK(search_parse_goto(" 12:5 ", &l, &c) == 0 && l == 12 && c == 5);
+    CHECK(search_parse_goto(":7", &l, &c) == 0 && l == 0 && c == 7);
+    CHECK(search_parse_goto("", &l, &c) < 0);
+    CHECK(search_parse_goto("abc", &l, &c) < 0);
+    CHECK(search_parse_goto("12:", &l, &c) < 0);
+    CHECK(search_parse_goto("12x", &l, &c) < 0);
+}
+
 int main(void)
 {
     test_utf8();
@@ -1212,6 +1455,12 @@ int main(void)
     test_files_tree();
     test_session();
     test_session_layout();
+    test_fold();
+    test_search_lines();
+    test_search_buffer();
+    test_search_replace();
+    test_search_files();
+    test_goto_parse();
     if (failures) {
         fprintf(stderr, "%d test falliti\n", failures);
         return 1;

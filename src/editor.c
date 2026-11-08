@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "edit.h"
+#include "find.h"
 #include "session.h"
 #include "utf8.h"
 #include "util.h"
@@ -210,6 +211,7 @@ void editor_free(Editor *e)
         doc_free(e->docs[i]);
     free(e->docs);
     picker_free(&e->picker);
+    find_free(e);
     tree_free(&e->tree);
     free(e->root);
     clip_free(&e->clip);
@@ -500,6 +502,11 @@ static size_t prompt(Editor *e, const char *label, const char *init, char *out, 
         return 0;
     snprintf(out, outsz, "%s", e->prompt_text);
     return e->prompt_len;
+}
+
+size_t editor_prompt(Editor *e, const char *label, const char *init, char *out, size_t outsz)
+{
+    return prompt(e, label, init, out, outsz);
 }
 
 /* ---- movement ---------------------------------------------------------- */
@@ -952,6 +959,8 @@ static void picker_accept(Editor *e)
     if (kind == PK_BUFFERS) {
         if ((size_t)idx < e->ndocs)
             switch_doc(e, e->docs[idx]);
+    } else if (kind == PK_RESULTS) {
+        find_open_result(e, (size_t)idx);
     } else if (kind == PK_FILES) {
         char err[256], *path = under_root(e, e->picker.items[idx]);
 
@@ -1371,6 +1380,15 @@ static int handle_alt(Editor *e, Key k, int shift)
     case ',':
         cycle_doc(e, -1);
         break;
+    case 'n':
+        find_next(e, 1);
+        break;
+    case 'p':
+        find_next(e, 0);
+        break;
+    case 'f':
+        find_files_open(e);
+        break;
     case 'm':
         if (e->match_on) {
             e->sel_on = 0;
@@ -1476,6 +1494,19 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         break;
     case KEY_ESC:
         e->sel_on = 0;
+        e->find.hl = 0;
+        break;
+    case KEY_F3:
+        find_next(e, !shift);
+        break;
+    case CTRL('f'):
+        find_open(e, 0);
+        break;
+    case CTRL('r'):
+        find_open(e, 1);
+        break;
+    case CTRL('g'):
+        find_goto(e);
         break;
     case KEY_PASTE: {
         size_t n;
@@ -1571,6 +1602,10 @@ static void handle_key(Editor *e, Key k)
     }
     if (k.code == KEY_FOCUS_OUT)
         return;
+    if (e->find.mode != FIND_OFF) {
+        find_handle_key(e, k);
+        return;
+    }
     if (e->picker.on) {
         handle_picker(e, k);
         return;

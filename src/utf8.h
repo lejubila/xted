@@ -31,4 +31,8 @@ size_t utf8_prev(const char *s, size_t i);
 size_t grapheme_next(const char *s, size_t len, size_t i);
 size_t grapheme_prev(const char *s, size_t len, size_t i);
 
+/* Simple lower-casing of a code point (ASCII, Latin-1/Extended-A, Greek,
+ * Cyrillic), independent of the locale. */
+uint32_t cp_fold(uint32_t cp);
+
 #endif

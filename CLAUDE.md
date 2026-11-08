@@ -38,6 +38,8 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/fuzzy.[ch]`, `src/picker.[ch]` | Punteggio fuzzy e lista filtrabile (elenco buffer, apertura rapida) |
 | `src/files.[ch]` | Scansione dei file del progetto e modello ad albero del file browser |
 | `src/session.[ch]` | File di sessione per cartella (`$XDG_STATE_HOME/ked/sessions/`) |
+| `src/search.[ch]` | Nucleo della ricerca: `Matcher` (testo o regex POSIX ERE, per riga), ricerca nel buffer, sostituzione, ricerca nei file; senza terminale |
+| `src/find.[ch]` | Comandi di ricerca/sostituzione/vai alla riga sull'`Editor`: barra di ricerca come macchina a stati |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 

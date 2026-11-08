@@ -239,3 +239,37 @@ size_t grapheme_prev(const char *s, size_t len, size_t i)
     }
     return i;
 }
+
+uint32_t cp_fold(uint32_t cp)
+{
+    if (cp < 0x80)
+        return cp >= 'A' && cp <= 'Z' ? cp + 32 : cp;
+    if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7)
+        return cp + 32;
+    if ((cp >= 0x100 && cp <= 0x137) || (cp >= 0x14A && cp <= 0x177))
+        return cp & 1 ? cp : cp + 1;
+    if ((cp >= 0x139 && cp <= 0x148) || (cp >= 0x179 && cp <= 0x17E))
+        return cp & 1 ? cp + 1 : cp;
+    if (cp == 0x178)
+        return 0xFF;
+    /* Greek */
+    if (cp == 0x386)
+        return 0x3AC;
+    if (cp >= 0x388 && cp <= 0x38A)
+        return cp + 37;
+    if (cp == 0x38C)
+        return 0x3CC;
+    if (cp == 0x38E || cp == 0x38F)
+        return cp + 63;
+    if ((cp >= 0x391 && cp <= 0x3A1) || (cp >= 0x3A3 && cp <= 0x3AB))
+        return cp + 32;
+    /* Cyrillic */
+    if (cp >= 0x410 && cp <= 0x42F)
+        return cp + 32;
+    if (cp >= 0x400 && cp <= 0x40F)
+        return cp + 80;
+    if ((cp >= 0x460 && cp <= 0x481) || (cp >= 0x48A && cp <= 0x4BF) ||
+        (cp >= 0x4D0 && cp <= 0x52F))
+        return cp & 1 ? cp : cp + 1;
+    return cp;
+}

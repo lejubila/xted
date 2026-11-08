@@ -13,6 +13,7 @@ typedef struct {
     int has_bg;             /* 0: leave the terminal's own background */
     Rgb fg, bg;
     Rgb cls[SC_COUNT];
+    Rgb match;              /* background of search matches */
 } Theme;
 
 enum { COLOR_NONE = 0, COLOR_16 = 16, COLOR_256 = 256, COLOR_TRUE = 24 };

@@ -12,6 +12,9 @@
  * SCAN_MAX_FILES; returns the number of files reported. */
 size_t files_scan(const char *root, void (*add)(const char *rel, void *ctx), void *ctx);
 
+/* dir + "/" + name (just name when dir is "."); malloc'ed. */
+char *files_join(const char *dir, const char *name);
+
 /* Visible rows of the file browser: a flat list in which an open folder is
  * followed by its (deeper) children. */
 typedef struct {

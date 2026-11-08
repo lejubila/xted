@@ -19,6 +19,8 @@ enum {
     KEY_HOME, KEY_END, KEY_PGUP, KEY_PGDN,
     KEY_DEL, KEY_INS,
     KEY_FOCUS_IN, KEY_FOCUS_OUT,    /* the terminal window gained / lost focus */
+    KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
+    KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12,
     KEY_PASTE,      /* bracketed paste: the text is in term_paste_text() */
     KEY_EOF
 };
