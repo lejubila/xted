@@ -2,6 +2,7 @@
 #include "edit.h"
 #include "editor.h"
 #include "term.h"
+#include "theme.h"
 #include "utf8.h"
 #include "util.h"
 
@@ -127,18 +128,56 @@ static void set_hl(SBuf *o, int *hl, int on)
     *hl = on;
 }
 
+/* Selects the foreground colour of a syntax class, only emitting it on a change. */
+static void set_cls(SBuf *o, const Editor *e, int *cur, int cls)
+{
+    if (cls == *cur)
+        return;
+    theme_fg(o, e->color_depth, e->theme->cls[cls]);
+    *cur = cls;
+}
+
+/* Bold + underline marks a bracket and its partner, without needing colours. */
+static void set_br(SBuf *o, int *br, int on)
+{
+    if (on == *br)
+        return;
+    sbuf_adds(o, on ? "\x1b[1;4m" : "\x1b[22;24m");
+    *br = on;
+}
+
+/* Starts a row with the theme's default colours, if it asks for any. */
+static int row_colors(SBuf *o, const Editor *e)
+{
+    if (e->color_depth == COLOR_NONE || (!e->syn && !e->theme->has_bg))
+        return 0;
+    theme_fg(o, e->color_depth, e->theme->fg);
+    if (e->theme->has_bg)
+        theme_bg(o, e->color_depth, e->theme->bg);
+    return 1;
+}
+
 static void text_row(SBuf *o, const Editor *e, size_t y)
 {
     const Line *l;
+    const uint8_t *cls;
+    int colors, cur = SC_NORMAL, br = 0;
     size_t left = e->coloff, right = left + (size_t)e->cols;
     size_t i = 0, col = 0, sel_from = 0, sel_to = 0;
     int prev_visible = 0, hl = 0, sel_nl = 0, has_sel;
 
     if (y >= e->buf.nlines) {
-        sbuf_adds(o, "\x1b[2m~\x1b[0m\x1b[K");
+        if (e->color_depth != COLOR_NONE && e->theme->has_bg) {
+            theme_bg(o, e->color_depth, e->theme->bg);
+            sbuf_adds(o, "\x1b[2m~\x1b[K\x1b[0m");
+        } else {
+            sbuf_adds(o, "\x1b[2m~\x1b[0m\x1b[K");
+        }
         return;
     }
     l = &e->buf.lines[y];
+    colors = row_colors(o, e);
+    cls = colors ? syn_classes(e->syn, &e->buf, y) : NULL;
     has_sel = edit_sel_line(e, y, &sel_from, &sel_to, &sel_nl);
 
     while (i < l->len && col < right) {
@@ -147,6 +186,8 @@ static void text_row(SBuf *o, const Editor *e, size_t y)
         size_t w = (size_t)char_cols(cp, col, e->tabw);
         size_t start = col, stop = col + w;
         int selected = has_sel && i >= sel_from && i < sel_to;
+        int mark = e->match_on && ((y == e->by && i == e->bx) || (y == e->my && i == e->mx));
+        int cc = cls ? cls[i] : SC_NORMAL;
 
         i += (size_t)n;
         if (w == 0) {
@@ -161,6 +202,9 @@ static void text_row(SBuf *o, const Editor *e, size_t y)
             continue;
         }
         set_hl(o, &hl, selected);
+        set_br(o, &br, mark);
+        if (colors)
+            set_cls(o, e, &cur, cc);
         if (start >= left && stop <= right) {
             if (cp == '\t') {
                 spaces(o, w);
@@ -184,10 +228,13 @@ static void text_row(SBuf *o, const Editor *e, size_t y)
         }
     }
     set_hl(o, &hl, 0);
+    set_br(o, &br, 0);
     /* a selection running past the end of the line shows the newline as one cell */
     if (has_sel && sel_nl && col >= left && col < right)
         sbuf_adds(o, "\x1b[7m \x1b[27m");
     sbuf_adds(o, "\x1b[K");
+    if (colors)
+        sbuf_adds(o, "\x1b[0m");
 }
 
 static void status_row(SBuf *o, const Editor *e)
@@ -197,8 +244,8 @@ static void status_row(SBuf *o, const Editor *e)
     const char *mark = e->buf.modified ? " [+]" : "";
     size_t cols = (size_t)e->cols, lmax, used = 0, marklen = strlen(mark);
 
-    sbuf_addf(&right, " %s  UTF-8  Ln %zu, Col %zu ", e->buf.crlf ? "CRLF" : "LF",
-              e->cy + 1, editor_cursor_col(e) + 1);
+    sbuf_addf(&right, " %s  %s  UTF-8  Ln %zu, Col %zu ", syn_name(e->syn),
+              e->buf.crlf ? "CRLF" : "LF", e->cy + 1, editor_cursor_col(e) + 1);
 
     /* left part is " name [+]"; the modified mark wins over the name when space is tight */
     lmax = cols > right.len ? cols - right.len : cols;

@@ -18,7 +18,7 @@ ALLFLAGS = $(WARN) $(DEFS) $(CFLAGS) -ffunction-sections -fdata-sections -MMD -M
 LINK     = $(LDFLAGS) -Wl,--gc-sections
 
 LIBSRC   = src/util.c src/utf8.c src/term.c src/undo.c src/clip.c src/buffer.c \
-           src/render.c src/edit.c src/editor.c
+           src/syntax.c src/langs.c src/theme.c src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=build/%.o) build/main.o
 
 all: ked

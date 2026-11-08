@@ -4,6 +4,8 @@
 #include "buffer.h"
 #include "clip.h"
 #include "render.h"
+#include "syntax.h"
+#include "theme.h"
 #include "term.h"
 #include "util.h"
 
@@ -28,6 +30,13 @@ typedef struct Editor {
     size_t paste_y0, paste_x0, paste_y1, paste_x1;
     size_t paste_idx;       /* kill ring entry that was pasted */
 
+    Syntax *syn;            /* NULL: plain text */
+    size_t theme_idx;
+    const Theme *theme;
+    int color_depth;
+    int match_on;           /* the bracket at/before the cursor has a partner */
+    size_t by, bx, my, mx;  /* that bracket and its partner */
+
     char msg[256];
     long msg_until;         /* monotonic ms when msg expires; 0 = sticky */
 
@@ -45,6 +54,9 @@ void editor_free(Editor *e);
 /* Loads path into the buffer (before the terminal is initialised). */
 int editor_open(Editor *e, const char *path, char *err, size_t errlen);
 void editor_run(Editor *e);
+
+/* Replaces the language (takes ownership of syn, which may be NULL). */
+void editor_set_syntax(Editor *e, Syntax *syn);
 
 /* Shows a message on the last row; ttl_ms == 0 keeps it until replaced. */
 void editor_set_msg(Editor *e, long ttl_ms, const char *fmt, ...) KED_PRINTF(3, 4);

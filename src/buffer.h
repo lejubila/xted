@@ -4,11 +4,13 @@
 #include "undo.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* One line of raw UTF-8 bytes, without terminator. */
 typedef struct {
     char *s;
     size_t len, cap;
+    uint16_t hl;        /* opaque derived state (syntax), valid below Buffer.stable */
 } Line;
 
 /* Text of one file. There is always at least one (possibly empty) line.
@@ -24,6 +26,7 @@ typedef struct {
     int final_newline;  /* file ends with a newline */
     int has_nul;        /* loaded data contained NUL bytes */
     int is_new;         /* path named a file that does not exist yet */
+    size_t stable;      /* lines [0, stable) unchanged since their derived state was computed */
     int empty_origin;   /* started as a new or 0-byte file: an empty buffer saves as 0 bytes */
     Undo undo;
 } Buffer;

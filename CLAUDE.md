@@ -30,12 +30,16 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/render.[ch]` | Rendering differenziale, un solo `write()` per frame |
 | `src/editor.[ch]` | Stato dell'editor, ciclo eventi, prompt, movimento, dispatch dei tasti |
 | `src/edit.[ch]` | Comandi di modifica: selezione, appunti, operazioni sulle righe, indentazione, autoindent |
+| `src/syntax.[ch]` | Motore di evidenziazione a regioni (parser delle definizioni, stato per riga, rilevamento del linguaggio, parentesi corrispondenti) |
+| `src/langs.[ch]` | Definizioni dei linguaggi incorporate, come dati testuali: un nuovo linguaggio è solo una voce qui |
+| `src/theme.[ch]` | Temi colore e codifica SGR con ripiego truecolor → 256 → 16 colori |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 
 - Ogni fase aggiunge i moduli previsti da `SPEC.md` (sintassi, comandi, configurazione, …).
 - Un modulo non deve dipendere da quelli di livello più alto: `buffer` e `utf8` non conoscono terminale né UI.
 - Ogni modifica al testo passa dalle primitive di `buffer.c` (`buf_insert/delete/split/join`) o dagli helper costruiti su di esse, così undo e rappresentazione interna restano isolati. Un comando che modifica il testo apre un gruppo undo (`buf_undo_begin`) e lo chiude a fine comando.
+- Lo stato derivato dal testo (evidenziazione) vive in `Line.hl` e vale per le righe `< Buffer.stable`: le `raw_*` di `buffer.c` lo invalidano, nessun altro codice deve farlo.
 
 ## Stile del codice
 

@@ -1,7 +1,11 @@
 #include "buffer.h"
 #include "clip.h"
 #include "edit.h"
+#include "langs.h"
 #include "editor.h"
+#include "syntax.h"
+#include "theme.h"
+#include "util.h"
 #include "utf8.h"
 
 #include <stdio.h>
@@ -579,6 +583,280 @@ static void test_edit_cmds(void)
     editor_free(&e);
 }
 
+/* ---- syntax ------------------------------------------------------------ */
+
+static Syntax *lang(const char *name)
+{
+    Buffer b;
+    Syntax *s;
+    char path[64];
+
+    buf_init(&b);
+    snprintf(path, sizeof path, "x.%s", name);
+    b.path = xstrdup(path);
+    s = syn_detect(&b);
+    buf_free(&b);
+    return s;
+}
+
+/* One letter per byte: the class of each byte of text. */
+static const char *cls_str(const Syntax *s, uint16_t *state, const char *text)
+{
+    static char out[256];
+    uint8_t cls[256];
+    static const char letters[] = ".cskTCnpfovhedl";
+    size_t i, n = strlen(text);
+
+    *state = syn_line(s, *state, text, n, cls);
+    for (i = 0; i < n; i++)
+        out[i] = letters[cls[i]];
+    out[n] = '\0';
+    return out;
+}
+
+#define CLS(s, st, text, want) CHECK(strcmp(cls_str((s), &(st), (text)), (want)) == 0)
+
+static void test_syntax_lines(void)
+{
+    Syntax *c = lang("c"), *py = lang("py"), *sh = lang("sh"), *md = lang("md"), *js = lang("js");
+    uint16_t st = 0;
+
+    CHECK(c && py && sh && md && js);
+    CLS(c, st, "if (a) return 1;", "kk.....kkkkkk.n.");
+    CLS(c, st, "a=b", ".o.");
+    CLS(c, st, "iffy int", ".....TTT");
+    CLS(c, st, "foo(1)", "fff.n.");
+    CLS(c, st, "1.5e3f 0xFF", "nnnnnn.nnnn");
+    CLS(c, st, "\"a\\\"b\" x", "ssssss..");
+    CLS(c, st, "  #include <x>", "..pppppppppppp");
+    CLS(c, st, "x // y", "..cccc");
+    CLS(c, st, "x #y", "....");               /* # is only a directive at line start */
+    CHECK(st == 0);
+    CLS(c, st, "x /* a", "..cccc");
+    CHECK(st != 0);
+    CLS(c, st, " b */ c", "ccccc..");
+    CHECK(st == 0);
+    CLS(c, st, "'\\'' z", "ssss..");
+    CLS(c, st, "NULL", "CCCC");
+
+    CLS(py, st, "x = \"\"\"a", "..o.ssss");
+    CHECK(st != 0);
+    CLS(py, st, "b\"\"\" + 1", "ssss.o.n");
+    CHECK(st == 0);
+    CLS(py, st, "@dec", "pppp");
+    CLS(py, st, "# c", "ccc");
+    CLS(py, st, "def f(self):", "kkk.f.vvvv.o");
+    CLS(py, st, "a @ b", ".....");
+
+    CLS(sh, st, "echo $HOME ${x} # c", "TTTT.vvvvv.vvvv.ccc");
+    CLS(sh, st, "echo $# \"a b\"", "TTTT.vv.sssss");
+    CLS(sh, st, "if [ 1 ]; then", "kk...n..o.kkkk");
+
+    CLS(md, st, "# Title", "hhhhhhh");
+    CLS(md, st, "- *a* `b`", "..eee.ddd");
+    CLS(md, st, "* item", "......");
+    CLS(md, st, "```c", "dddd");
+    CHECK(st != 0);
+    CLS(md, st, "# not a heading", "ddddddddddddddd");
+    CLS(md, st, "```", "ddd");
+    CHECK(st == 0);
+    CLS(md, st, "[a](b)", "lll...");
+
+    CLS(js, st, "let s = 'a';", "kkk...o.sss.");
+    CLS(js, st, "$el.x", ".....");
+    CLS(js, st, "a = `x", "..o.ss");
+    CHECK(st != 0);
+    CLS(js, st, "y`;", "ss.");
+    CHECK(st == 0);
+
+    syn_free(c); syn_free(py); syn_free(sh); syn_free(md); syn_free(js);
+}
+
+static void test_syntax_parse(void)
+{
+    char err[128];
+    size_t i;
+    Syntax *s;
+
+    CHECK(syn_parse("name X\nregion bogus a b\n", 24, err, sizeof err) == NULL);
+    CHECK(strstr(err, "riga 2") != NULL);
+    CHECK(syn_parse("region comment a b\n", 19, err, sizeof err) == NULL);
+    CHECK(syn_parse("name X\nfoo\n", 11, err, sizeof err) == NULL);
+    CHECK(syn_parse("name X\nregion comment a $ ml\n", 29, err, sizeof err) == NULL);
+    CHECK(syn_parse("name X\nregion comment a b zzz\n", 30, err, sizeof err) == NULL);
+    s = syn_parse("# note\nname Due Parole\nwords keyword a b\n", 41, err, sizeof err);
+    CHECK(s && strcmp(syn_name(s), "Due Parole") == 0);
+    syn_free(s);
+
+    /* every built-in definition must parse */
+    for (i = 0; i < lang_ndefs; i++) {
+        SBuf t = SBUF_INIT;
+        const char *const *d;
+
+        for (d = lang_defs[i].def; *d; d++) {
+            sbuf_adds(&t, *d);
+            sbuf_add(&t, "\n", 1);
+        }
+        s = syn_parse(t.p, t.len, err, sizeof err);
+        CHECK(s != NULL);
+        if (s) {
+            CHECK(strcmp(syn_name(s), lang_defs[i].name) == 0);
+            syn_free(s);
+        } else {
+            fprintf(stderr, "%s: %s\n", lang_defs[i].name, err);
+        }
+        sbuf_free(&t);
+    }
+}
+
+static const char *detect_name(const char *path, const char *text)
+{
+    static char name[32];
+    Buffer b;
+    Syntax *s;
+    size_t y = 0, x = 0;
+
+    buf_init(&b);
+    buf_insert_text(&b, &y, &x, text, strlen(text));
+    if (path)
+        b.path = xstrdup(path);
+    s = syn_detect(&b);
+    snprintf(name, sizeof name, "%s", s ? syn_name(s) : "-");
+    syn_free(s);
+    buf_free(&b);
+    return name;
+}
+
+static void test_syntax_detect(void)
+{
+    CHECK(strcmp(detect_name("a/b.c", ""), "C") == 0);
+    CHECK(strcmp(detect_name("x.h", ""), "C") == 0);
+    CHECK(strcmp(detect_name("x.PY", ""), "Python") == 0);
+    CHECK(strcmp(detect_name("x.tsx", ""), "JavaScript") == 0);
+    CHECK(strcmp(detect_name("README.MD", ""), "Markdown") == 0);
+    CHECK(strcmp(detect_name("/home/u/.bashrc", ""), "Shell") == 0);
+    CHECK(strcmp(detect_name("run", "#!/usr/bin/env python3\nx"), "Python") == 0);
+    CHECK(strcmp(detect_name("run", "#!/bin/bash\n"), "Shell") == 0);
+    CHECK(strcmp(detect_name("run", "#!/usr/bin/python3.11\n"), "Python") == 0);
+    CHECK(strcmp(detect_name(NULL, "#!/bin/sh\n"), "Shell") == 0);
+    CHECK(strcmp(detect_name("a.txt", "x\n# vim: set ft=markdown :\n"), "Markdown") == 0);
+    CHECK(strcmp(detect_name("a.txt", "// ked: ft=c++\n"), "C") == 0);
+    CHECK(strcmp(detect_name("a.c", "# ked: filetype=python\n"), "Python") == 0);
+    CHECK(strcmp(detect_name("a.txt", "plain\n"), "-") == 0);
+    CHECK(strcmp(detect_name(NULL, ""), "-") == 0);
+    CHECK(strcmp(detect_name("Makefile", ""), "-") == 0);
+}
+
+static void test_syntax_incremental(void)
+{
+    Syntax *c = lang("c");
+    Buffer b;
+    size_t y = 0, x = 0, cy, cx;
+    const char *text = "a\nb\nc\nd\ne";
+    const uint8_t *k;
+
+    buf_init(&b);
+    buf_insert_text(&b, &y, &x, text, strlen(text));
+    buf_undo_close(&b);
+    syn_update(c, &b, 4);
+    CHECK(b.stable == 5 && b.lines[4].hl == 0);
+
+    buf_undo_begin(&b, 0, 0);
+    buf_insert(&b, 1, 0, "/*", 2);
+    buf_undo_close(&b);
+    CHECK(b.stable == 1);
+    syn_update(c, &b, 4);
+    CHECK(b.lines[1].hl != 0 && b.lines[4].hl != 0);
+    k = syn_classes(c, &b, 3);
+    CHECK(k && k[0] == SC_COMMENT);
+
+    CHECK(buf_undo(&b, &cy, &cx) == 1);
+    CHECK(b.stable <= 1);
+    syn_update(c, &b, 4);
+    CHECK(b.lines[4].hl == 0);
+    k = syn_classes(c, &b, 3);
+    CHECK(k && k[0] == SC_NORMAL);
+
+    /* line operations shift the lines but keep the states consistent */
+    buf_undo_begin(&b, 0, 0);
+    buf_insert(&b, 0, 0, "/*", 2);
+    buf_split(&b, 2, 0);
+    buf_undo_close(&b);
+    CHECK(b.stable <= 2);
+    syn_update(c, &b, b.nlines - 1);
+    CHECK(b.lines[b.nlines - 1].hl != 0);
+    buf_join(&b, 2);
+    CHECK(b.stable <= 2);
+    syn_update(c, &b, b.nlines - 1);
+    CHECK(b.lines[b.nlines - 1].hl != 0);
+
+    buf_free(&b);
+    syn_free(c);
+}
+
+static int match_at(Syntax *s, const char *text, size_t y, size_t x, size_t *my, size_t *mx)
+{
+    Buffer b;
+    size_t ty = 0, tx = 0, py, px;
+    int r;
+
+    buf_init(&b);
+    buf_insert_text(&b, &ty, &tx, text, strlen(text));
+    r = syn_match_bracket(s, &b, y, x, &py, &px, my, mx);
+    buf_free(&b);
+    return r;
+}
+
+static void test_syntax_brackets(void)
+{
+    Syntax *c = lang("c");
+    const char *t = "f(a,\n  (b)) \")\" ;";
+    size_t my, mx;
+
+    CHECK(match_at(c, t, 0, 1, &my, &mx) == 1 && my == 1 && mx == 5);
+    CHECK(match_at(c, t, 0, 2, &my, &mx) == 1 && my == 1 && mx == 5);   /* just after */
+    CHECK(match_at(c, t, 1, 5, &my, &mx) == 1 && my == 0 && mx == 1);
+    CHECK(match_at(c, t, 1, 2, &my, &mx) == 1 && my == 1 && mx == 4);
+    CHECK(match_at(c, t, 1, 8, &my, &mx) == 0);                       /* inside a string */
+    CHECK(match_at(c, t, 0, 0, &my, &mx) == 0);                       /* not a bracket */
+    CHECK(match_at(c, "(a", 0, 0, &my, &mx) == 0);                    /* unbalanced */
+    CHECK(match_at(c, "{ \"}\" }", 0, 0, &my, &mx) == 1 && mx == 6);  /* skips the string */
+    CHECK(match_at(c, "[ ( ]", 0, 0, &my, &mx) == 1 && mx == 4);
+    CHECK(match_at(NULL, "{ \"}\" }", 0, 0, &my, &mx) == 1 && mx == 3);   /* plain text */
+    syn_free(c);
+}
+
+static void test_theme(void)
+{
+    SBuf o = SBUF_INIT;
+    Rgb red = { 255, 0, 0 }, black = { 0, 0, 0 }, grey = { 128, 128, 128 };
+
+    CHECK(theme_to_256(red) == 196);
+    CHECK(theme_to_256(black) == 16);
+    CHECK(theme_to_256(grey) == 244);
+    CHECK(theme_to_16(red) == 9);
+    CHECK(theme_to_16(black) == 0);
+
+    theme_fg(&o, COLOR_TRUE, red);
+    CHECK(o.len == 15 && memcmp(o.p, "\x1b[38;2;255;0;0m", 15) == 0);
+    o.len = 0;
+    theme_bg(&o, COLOR_256, red);
+    CHECK(o.len == 11 && memcmp(o.p, "\x1b[48;5;196m", 11) == 0);
+    o.len = 0;
+    theme_fg(&o, COLOR_16, red);
+    CHECK(o.len == 5 && memcmp(o.p, "\x1b[91m", 5) == 0);
+    o.len = 0;
+    theme_bg(&o, COLOR_16, black);
+    CHECK(o.len == 5 && memcmp(o.p, "\x1b[40m", 5) == 0);
+    o.len = 0;
+    theme_fg(&o, COLOR_NONE, red);
+    CHECK(o.len == 0);
+    sbuf_free(&o);
+
+    CHECK(theme_count() >= 2);
+    CHECK(theme_get(0) != theme_get(1) && theme_get(theme_count()) == theme_get(0));
+}
+
 int main(void)
 {
     test_utf8();
@@ -589,6 +867,12 @@ int main(void)
     test_ranges();
     test_clip();
     test_edit_cmds();
+    test_syntax_lines();
+    test_syntax_parse();
+    test_syntax_detect();
+    test_syntax_incremental();
+    test_syntax_brackets();
+    test_theme();
     if (failures) {
         fprintf(stderr, "%d test falliti\n", failures);
         return 1;

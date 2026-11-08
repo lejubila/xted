@@ -51,11 +51,22 @@ void editor_init(Editor *e)
     e->rows = 24;
     e->cols = 80;
     e->clipboard_osc52 = 1;
+    e->theme = theme_get(0);
+    e->color_depth = theme_detect_depth();
     e->render = render_create();
+}
+
+void editor_set_syntax(Editor *e, Syntax *syn)
+{
+    syn_free(e->syn);
+    e->syn = syn;
+    e->buf.stable = 0;
 }
 
 void editor_free(Editor *e)
 {
+    syn_free(e->syn);
+    e->syn = NULL;
     buf_free(&e->buf);
     clip_free(&e->clip);
     render_free(e->render);
@@ -66,6 +77,7 @@ int editor_open(Editor *e, const char *path, char *err, size_t errlen)
 {
     if (buf_load(&e->buf, path, err, errlen) < 0)
         return -1;
+    editor_set_syntax(e, syn_detect(&e->buf));
     if (e->buf.is_new)
         editor_set_msg(e, MSG_TTL_MS, "Nuovo file");
     else if (e->buf.has_nul)
@@ -129,6 +141,9 @@ static int next_key(Editor *e, Key *k)
                 }
             }
             scroll(e);
+            syn_update(e->syn, &e->buf, e->rowoff + text_rows(e));
+            e->match_on = syn_match_bracket(e->syn, &e->buf, e->cy, e->cx,
+                                            &e->by, &e->bx, &e->my, &e->mx);
             render_frame(e->render, e);
             ev = term_wait(timeout);
             if (ev & TERM_EV_RESIZE)
@@ -350,9 +365,10 @@ static int cmd_save(Editor *e)
 {
     char name[sizeof e->prompt_text], err[256];
     const char *target = NULL;
+    int had_path = e->buf.path != NULL;
     long n;
 
-    if (!e->buf.path) {
+    if (!had_path) {
         if (prompt(e, "Salva con nome: ", name, sizeof name) == 0) {
             editor_set_msg(e, MSG_TTL_MS, "Salvataggio annullato");
             return -1;
@@ -364,6 +380,8 @@ static int cmd_save(Editor *e)
         editor_set_msg(e, MSG_TTL_MS, "Errore di salvataggio: %s", err);
         return -1;
     }
+    if (!had_path)
+        editor_set_syntax(e, syn_detect(&e->buf));
     editor_set_msg(e, MSG_TTL_MS, "%zu righe, %ld byte scritti", e->buf.nlines, n);
     return 0;
 }
@@ -425,6 +443,21 @@ static int handle_alt(Editor *e, Key k, int shift)
         break;
     case 'v':
         edit_paste_older(e);
+        break;
+    case 'm':
+        if (e->match_on) {
+            e->sel_on = 0;
+            e->cy = e->my;
+            e->cx = e->mx;
+        } else {
+            editor_set_msg(e, MSG_TTL_MS, "Nessuna parentesi corrispondente");
+        }
+        break;
+    case 't':
+        e->theme_idx++;
+        e->theme = theme_get(e->theme_idx);
+        render_invalidate(e->render);
+        editor_set_msg(e, MSG_TTL_MS, "Tema: %s", e->theme->name);
         break;
     default:
         break;

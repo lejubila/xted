@@ -46,6 +46,7 @@ static void lines_clear(Buffer *b)
     for (i = 0; i < b->nlines; i++)
         free(b->lines[i].s);
     b->nlines = 0;
+    b->stable = 0;
 }
 
 static void push_line(Buffer *b, const char *s, size_t n)
@@ -56,6 +57,7 @@ static void push_line(Buffer *b, const char *s, size_t n)
     l = &b->lines[b->nlines++];
     l->len = l->cap = n;
     l->s = NULL;
+    l->hl = 0;
     if (n > 0) {
         l->s = xmalloc(n);
         memcpy(l->s, s, n);
@@ -311,6 +313,13 @@ fail:
 
 /* Raw mutations: no undo recording. */
 
+static void touch(Buffer *b, size_t y)
+{
+    if (b->stable > y)
+        b->stable = y;
+    b->modified = 1;
+}
+
 static void raw_insert(Buffer *b, size_t y, size_t x, const char *s, size_t n)
 {
     Line *l = &b->lines[y];
@@ -319,7 +328,7 @@ static void raw_insert(Buffer *b, size_t y, size_t x, const char *s, size_t n)
     memmove(l->s + x + n, l->s + x, l->len - x);
     memcpy(l->s + x, s, n);
     l->len += n;
-    b->modified = 1;
+    touch(b, y);
 }
 
 static void raw_delete(Buffer *b, size_t y, size_t x, size_t n)
@@ -328,7 +337,7 @@ static void raw_delete(Buffer *b, size_t y, size_t x, size_t n)
 
     memmove(l->s + x, l->s + x + n, l->len - x - n);
     l->len -= n;
-    b->modified = 1;
+    touch(b, y);
 }
 
 static void raw_split(Buffer *b, size_t y, size_t x)
@@ -343,13 +352,14 @@ static void raw_split(Buffer *b, size_t y, size_t x)
     nl = &b->lines[y + 1];
     tail = l->len - x;
     nl->s = NULL;
+    nl->hl = 0;
     nl->len = nl->cap = tail;
     if (tail > 0) {
         nl->s = xmalloc(tail);
         memcpy(nl->s, l->s + x, tail);
     }
     l->len = x;
-    b->modified = 1;
+    touch(b, y);
 }
 
 static void raw_join(Buffer *b, size_t y)
@@ -364,7 +374,7 @@ static void raw_join(Buffer *b, size_t y)
     free(next->s);
     memmove(next, next + 1, (b->nlines - y - 2) * sizeof(Line));
     b->nlines--;
-    b->modified = 1;
+    touch(b, y);
 }
 
 void buf_insert(Buffer *b, size_t y, size_t x, const char *s, size_t n)

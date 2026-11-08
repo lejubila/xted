@@ -23,6 +23,8 @@ typedef struct {
 #define SBUF_INIT { NULL, 0, 0 }
 
 void sbuf_free(SBuf *b);
+/* Returns the bytes and leaves b empty; the caller frees them. */
+char *sbuf_steal(SBuf *b);
 void sbuf_reserve(SBuf *b, size_t extra);
 void sbuf_add(SBuf *b, const char *s, size_t n);
 void sbuf_adds(SBuf *b, const char *s);

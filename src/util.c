@@ -50,6 +50,15 @@ void sbuf_free(SBuf *b)
     b->len = b->cap = 0;
 }
 
+char *sbuf_steal(SBuf *b)
+{
+    char *p = b->p;
+
+    b->p = NULL;
+    b->len = b->cap = 0;
+    return p;
+}
+
 void sbuf_reserve(SBuf *b, size_t extra)
 {
     size_t nc;
