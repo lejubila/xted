@@ -12,8 +12,8 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H\x1b[?2004h"
-#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?2004l\x1b[?1049l"
+#define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H\x1b[?2004h\x1b[?1004h"
+#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?1004l\x1b[?2004l\x1b[?1049l"
 #define PASTE_END "\x1b[201~"
 
 /* How long to wait for the rest of an escape sequence before deciding
@@ -27,6 +27,7 @@ static volatile sig_atomic_t raw_active;
 static int wake_pipe[2] = { -1, -1 };
 
 static unsigned char inbuf[4096];
+static int in_fd = STDIN_FILENO;    /* the terminal: /dev/tty when stdin is a pipe */
 static size_t inpos, inlen;
 static int in_eof;
 static SBuf paste_buf;
@@ -40,7 +41,7 @@ void term_restore(void)
     raw_active = 0;
     r = write(STDOUT_FILENO, SEQ_LEAVE, sizeof SEQ_LEAVE - 1);
     (void)r;
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_tio);
+    tcsetattr(in_fd, TCSAFLUSH, &orig_tio);
 }
 
 static void on_fatal(int sig)
@@ -84,9 +85,16 @@ int term_init(void)
     struct termios raw;
     int i;
 
-    if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO))
+    if (!isatty(STDOUT_FILENO))
         return -1;
-    if (tcgetattr(STDIN_FILENO, &orig_tio) < 0 || pipe(wake_pipe) < 0)
+    if (!isatty(STDIN_FILENO)) {
+        in_fd = open("/dev/tty", O_RDONLY | O_CLOEXEC);
+        if (in_fd < 0) {
+            in_fd = STDIN_FILENO;
+            return -1;
+        }
+    }
+    if (tcgetattr(in_fd, &orig_tio) < 0 || pipe(wake_pipe) < 0)
         return -1;
     for (i = 0; i < 2; i++) {
         fcntl(wake_pipe[i], F_SETFD, FD_CLOEXEC);
@@ -100,7 +108,7 @@ int term_init(void)
     raw.c_lflag &= (tcflag_t)~(ECHO | ICANON | IEXTEN | ISIG);
     raw.c_cc[VMIN] = 1;     /* reads happen only after poll(), so never block */
     raw.c_cc[VTIME] = 0;
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) < 0)
+    if (tcsetattr(in_fd, TCSAFLUSH, &raw) < 0)
         return -1;
     raw_active = 1;
 
@@ -151,7 +159,7 @@ static void fill_input(void)
     ssize_t n;
 
     do
-        n = read(STDIN_FILENO, inbuf, sizeof inbuf);
+        n = read(in_fd, inbuf, sizeof inbuf);
     while (n < 0 && errno == EINTR);
     if (n < 0 && errno == EAGAIN)
         return;
@@ -176,7 +184,7 @@ int term_wait(int timeout_ms)
     if (inpos < inlen || in_eof)
         return TERM_EV_KEY;
 
-    fds[0].fd = STDIN_FILENO;
+    fds[0].fd = in_fd;
     fds[0].events = POLLIN;
     fds[1].fd = wake_pipe[0];
     fds[1].events = POLLIN;
@@ -204,7 +212,7 @@ int term_wait(int timeout_ms)
 static int next_byte(int timeout_ms)
 {
     if (inpos >= inlen && !in_eof) {
-        struct pollfd p = { STDIN_FILENO, POLLIN, 0 };
+        struct pollfd p = { in_fd, POLLIN, 0 };
         int r;
 
         do
@@ -310,7 +318,7 @@ const char *term_paste_text(size_t *n)
 
 static void parse_csi(Key *k)
 {
-    int params[2] = { 0, 0 }, idx = 0, c;
+    int params[3] = { 0, 0, 0 }, idx = 0, c;
 
     for (;;) {
         c = next_byte(ESC_TIMEOUT_MS);
@@ -320,7 +328,7 @@ static void parse_csi(Key *k)
             if (params[idx] < 10000)
                 params[idx] = params[idx] * 10 + (c - '0');
         } else if (c == ';') {
-            if (idx < 1)
+            if (idx < 2)
                 idx++;
         } else if (c >= 0x20 && c <= 0x3F) {
             continue;
@@ -332,7 +340,13 @@ static void parse_csi(Key *k)
     }
 
     k->mods = xterm_mods(params[1]);
-    if (c == '~') {
+    if (c == 'u' && params[0] == '\t') {
+        /* Tab with modifiers, in the "CSI u" encoding (kitty, foot, WezTerm, ...) */
+        k->code = KEY_TAB;
+    } else if (c == '~' && params[0] == 27 && params[2] == '\t') {
+        /* the same in xterm's modifyOtherKeys encoding */
+        k->code = KEY_TAB;
+    } else if (c == '~') {
         switch (params[0]) {
         case 1: case 7: k->code = KEY_HOME; break;
         case 2: k->code = KEY_INS; break;
@@ -346,6 +360,10 @@ static void parse_csi(Key *k)
             break;
         default: break;
         }
+    } else if (c == 'I' && idx == 0 && params[0] == 0) {
+        k->code = KEY_FOCUS_IN;
+    } else if (c == 'O' && idx == 0 && params[0] == 0) {
+        k->code = KEY_FOCUS_OUT;
     } else if (c == 'Z') {
         k->code = KEY_TAB;
         k->mods |= MOD_SHIFT;

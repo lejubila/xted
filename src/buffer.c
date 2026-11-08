@@ -109,42 +109,22 @@ static int read_all(int fd, size_t hint, char **out, size_t *outlen)
     return 0;
 }
 
-int buf_load(Buffer *b, const char *path, char *err, size_t errlen)
+/* Replaces the contents with the bytes read from fd, which stays open. */
+int buf_load_fd(Buffer *b, int fd, char *err, size_t errlen)
 {
-    int fd;
     struct stat st;
     char *data;
     size_t len, nl_count = 0;
     const char *p, *end, *first_nl;
 
-    fd = open(path, O_RDONLY);
-    if (fd < 0) {
-        if (errno == ENOENT) {
-            free(b->path);
-            b->path = xstrdup(path);
-            b->is_new = 1;
-            return 0;
-        }
-        snprintf(err, errlen, "%s", strerror(errno));
-        return -1;
-    }
     if (fstat(fd, &st) < 0) {
         snprintf(err, errlen, "%s", strerror(errno));
-        close(fd);
         return -1;
     }
-    if (!S_ISREG(st.st_mode)) {
-        snprintf(err, errlen, "%s", S_ISDIR(st.st_mode) ? "è una directory"
-                                                        : "non è un file regolare");
-        close(fd);
-        return -1;
-    }
-    if (read_all(fd, (size_t)st.st_size, &data, &len) < 0) {
+    if (read_all(fd, S_ISREG(st.st_mode) ? (size_t)st.st_size : 0, &data, &len) < 0) {
         snprintf(err, errlen, "%s", strerror(errno));
-        close(fd);
         return -1;
     }
-    close(fd);
 
     lines_clear(b);
     undo_free(&b->undo);
@@ -178,9 +158,44 @@ int buf_load(Buffer *b, const char *path, char *err, size_t errlen)
     free(data);
 
     free(b->path);
-    b->path = xstrdup(path);
+    b->path = NULL;
     b->modified = 0;
     b->is_new = 0;
+    return 0;
+}
+
+int buf_load(Buffer *b, const char *path, char *err, size_t errlen)
+{
+    int fd, r;
+    struct stat st;
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        if (errno == ENOENT) {
+            free(b->path);
+            b->path = xstrdup(path);
+            b->is_new = 1;
+            return 0;
+        }
+        snprintf(err, errlen, "%s", strerror(errno));
+        return -1;
+    }
+    if (fstat(fd, &st) < 0) {
+        snprintf(err, errlen, "%s", strerror(errno));
+        close(fd);
+        return -1;
+    }
+    if (!S_ISREG(st.st_mode)) {
+        snprintf(err, errlen, "%s", S_ISDIR(st.st_mode) ? "è una directory"
+                                                        : "non è un file regolare");
+        close(fd);
+        return -1;
+    }
+    r = buf_load_fd(b, fd, err, errlen);
+    close(fd);
+    if (r < 0)
+        return -1;
+    b->path = xstrdup(path);
     return 0;
 }
 

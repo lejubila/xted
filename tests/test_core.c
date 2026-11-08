@@ -1,7 +1,13 @@
 #include "buffer.h"
 #include "clip.h"
+#include "doc.h"
 #include "edit.h"
+#include "files.h"
+#include "fuzzy.h"
 #include "langs.h"
+#include "layout.h"
+#include "picker.h"
+#include "session.h"
 #include "editor.h"
 #include "syntax.h"
 #include "theme.h"
@@ -12,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 static int failures;
@@ -407,10 +414,10 @@ static void ed_load(Editor *e, const char *text)
 
     editor_init(e);
     e->clipboard_osc52 = 0;
-    buf_insert_text(&e->buf, &y, &x, text, strlen(text));
-    buf_undo_close(&e->buf);
-    undo_free(&e->buf.undo);
-    e->buf.modified = 0;
+    buf_insert_text(e->buf, &y, &x, text, strlen(text));
+    buf_undo_close(e->buf);
+    undo_free(&e->buf->undo);
+    e->buf->modified = 0;
 }
 
 static void ed_sel(Editor *e, size_t ay, size_t ax, size_t cy, size_t cx)
@@ -432,11 +439,11 @@ static void test_edit_cmds(void)
     ed_load(&e, "\tfoo");
     e.cx = 4;
     edit_newline(&e);
-    CHECK(buf_is(&e.buf, "\tfoo\n\t") && e.cy == 1 && e.cx == 1);
+    CHECK(buf_is(e.buf, "\tfoo\n\t") && e.cy == 1 && e.cx == 1);
     e.cy = 0;
     e.cx = 1;
     edit_newline(&e);                    /* cursor inside the indentation */
-    CHECK(buf_is(&e.buf, "\t\n\tfoo\n\t") && e.cy == 1 && e.cx == 1);
+    CHECK(buf_is(e.buf, "\t\n\tfoo\n\t") && e.cy == 1 && e.cx == 1);
     editor_free(&e);
 
     /* typing over a selection replaces it, as one undo step */
@@ -445,11 +452,11 @@ static void test_edit_cmds(void)
     CHECK(edit_sel_active(&e));
     edit_insert_cp(&e, 'X');
     edit_insert_cp(&e, 'Y');
-    CHECK(buf_is(&e.buf, "XYlo") && !e.sel_on && e.cx == 2);
+    CHECK(buf_is(e.buf, "XYlo") && !e.sel_on && e.cx == 2);
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "hello") && e.cy == 0 && e.cx == 0);
+    CHECK(buf_is(e.buf, "hello") && e.cy == 0 && e.cx == 0);
     edit_redo(&e);
-    CHECK(buf_is(&e.buf, "XYlo"));
+    CHECK(buf_is(e.buf, "XYlo"));
     editor_free(&e);
 
     /* selection geometry and collapse */
@@ -483,21 +490,21 @@ static void test_edit_cmds(void)
     CHECK(e.clip.count == 1 && e.clip.e[0].whole_line && e.clip.e[0].n == 2);
     e.cy = 2;
     edit_paste(&e);                     /* whole line goes above the cursor line */
-    CHECK(buf_is(&e.buf, "a\nb\nb\nc") && e.cy == 3 && e.cx == 0);
+    CHECK(buf_is(e.buf, "a\nb\nb\nc") && e.cy == 3 && e.cx == 0);
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "a\nb\nc"));
+    CHECK(buf_is(e.buf, "a\nb\nc"));
     e.cy = 0;
     edit_cut(&e);
-    CHECK(buf_is(&e.buf, "b\nc") && e.cy == 0 && e.clip.count == 2);
+    CHECK(buf_is(e.buf, "b\nc") && e.cy == 0 && e.clip.count == 2);
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "a\nb\nc"));
+    CHECK(buf_is(e.buf, "a\nb\nc"));
     ed_sel(&e, 0, 0, 1, 1);
     edit_cut(&e);
-    CHECK(buf_is(&e.buf, "\nc") && !e.clip.e[0].whole_line && e.clip.e[0].n == 3);
+    CHECK(buf_is(e.buf, "\nc") && !e.clip.e[0].whole_line && e.clip.e[0].n == 3);
     e.cy = 1;
     e.cx = 1;
     edit_paste(&e);
-    CHECK(buf_is(&e.buf, "\nca\nb") && e.cy == 2 && e.cx == 1);
+    CHECK(buf_is(e.buf, "\nca\nb") && e.cy == 2 && e.cx == 1);
     editor_free(&e);
 
     /* Alt+V walks back through the kill ring */
@@ -506,80 +513,80 @@ static void test_edit_cmds(void)
     clip_push(&e.clip, strdup("new"), 3, 0);
     e.cx = 1;
     edit_paste(&e);
-    CHECK(buf_is(&e.buf, "xnew"));
+    CHECK(buf_is(e.buf, "xnew"));
     edit_paste_older(&e);
-    CHECK(buf_is(&e.buf, "xold"));
+    CHECK(buf_is(e.buf, "xold"));
     edit_paste_older(&e);
-    CHECK(buf_is(&e.buf, "xnew"));
+    CHECK(buf_is(e.buf, "xnew"));
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "xold"));
+    CHECK(buf_is(e.buf, "xold"));
     editor_free(&e);
 
     /* bracketed paste: no autoindent, \r\n normalised, controls dropped */
     ed_load(&e, "\tq");
     e.cx = 2;
     edit_paste_text(&e, "a\r\nb\rc\x01\td", 9);
-    CHECK(buf_is(&e.buf, "\tqa\nb\nc\td"));
+    CHECK(buf_is(e.buf, "\tqa\nb\nc\td"));
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "\tq"));
+    CHECK(buf_is(e.buf, "\tq"));
     editor_free(&e);
 
     /* move, duplicate, delete, join */
     ed_load(&e, "1\n2\n3");
     e.cy = 1;
     edit_move_lines(&e, 0);
-    CHECK(buf_is(&e.buf, "2\n1\n3") && e.cy == 0);
+    CHECK(buf_is(e.buf, "2\n1\n3") && e.cy == 0);
     edit_move_lines(&e, 0);             /* already first: nothing happens */
-    CHECK(buf_is(&e.buf, "2\n1\n3") && e.cy == 0);
+    CHECK(buf_is(e.buf, "2\n1\n3") && e.cy == 0);
     edit_move_lines(&e, 1);
-    CHECK(buf_is(&e.buf, "1\n2\n3") && e.cy == 1);
+    CHECK(buf_is(e.buf, "1\n2\n3") && e.cy == 1);
     e.cy = 2;
     edit_move_lines(&e, 1);             /* already last */
-    CHECK(buf_is(&e.buf, "1\n2\n3"));
+    CHECK(buf_is(e.buf, "1\n2\n3"));
     ed_sel(&e, 0, 0, 1, 1);
     edit_move_lines(&e, 1);
-    CHECK(buf_is(&e.buf, "3\n1\n2") && e.ay == 1 && e.cy == 2);
+    CHECK(buf_is(e.buf, "3\n1\n2") && e.ay == 1 && e.cy == 2);
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "1\n2\n3"));
+    CHECK(buf_is(e.buf, "1\n2\n3"));
     e.sel_on = 0;
     e.cy = 0;
     edit_duplicate_lines(&e, 1);
-    CHECK(buf_is(&e.buf, "1\n1\n2\n3") && e.cy == 1);
+    CHECK(buf_is(e.buf, "1\n1\n2\n3") && e.cy == 1);
     edit_duplicate_lines(&e, 0);
-    CHECK(buf_is(&e.buf, "1\n1\n1\n2\n3") && e.cy == 1);
+    CHECK(buf_is(e.buf, "1\n1\n1\n2\n3") && e.cy == 1);
     e.cy = 4;
     edit_delete_lines(&e);
-    CHECK(buf_is(&e.buf, "1\n1\n1\n2") && e.cy == 3);
+    CHECK(buf_is(e.buf, "1\n1\n1\n2") && e.cy == 3);
     editor_free(&e);
 
     ed_load(&e, "foo\n   bar\nbaz");
     edit_join_lines(&e);
-    CHECK(buf_is(&e.buf, "foo bar\nbaz") && e.cy == 0 && e.cx == 3);
+    CHECK(buf_is(e.buf, "foo bar\nbaz") && e.cy == 0 && e.cx == 3);
     e.cy = 1;
     edit_join_lines(&e);                /* last line: nothing to join */
-    CHECK(buf_is(&e.buf, "foo bar\nbaz"));
+    CHECK(buf_is(e.buf, "foo bar\nbaz"));
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "foo\n   bar\nbaz"));
+    CHECK(buf_is(e.buf, "foo\n   bar\nbaz"));
     editor_free(&e);
 
     /* indent and dedent a selection */
     ed_load(&e, "a\n  b\n        c\nd");
     ed_sel(&e, 0, 0, 2, 3);
     edit_tab(&e);
-    CHECK(buf_is(&e.buf, "\ta\n\t  b\n\t        c\nd") && e.cx == 4);
+    CHECK(buf_is(e.buf, "\ta\n\t  b\n\t        c\nd") && e.cx == 4);
     edit_dedent(&e);
-    CHECK(buf_is(&e.buf, "a\n  b\n        c\nd"));
+    CHECK(buf_is(e.buf, "a\n  b\n        c\nd"));
     edit_dedent(&e);                    /* spaces: up to tabw of them */
-    CHECK(buf_is(&e.buf, "a\nb\nc\nd"));
+    CHECK(buf_is(e.buf, "a\nb\nc\nd"));
     edit_undo(&e);
     edit_undo(&e);
     edit_undo(&e);
-    CHECK(buf_is(&e.buf, "a\n  b\n        c\nd"));
+    CHECK(buf_is(e.buf, "a\n  b\n        c\nd"));
     e.sel_on = 0;
     e.cy = 3;
     e.cx = 0;
     edit_tab(&e);                       /* no selection: a tab character */
-    CHECK(buf_is(&e.buf, "a\n  b\n        c\n\td"));
+    CHECK(buf_is(e.buf, "a\n  b\n        c\n\td"));
     editor_free(&e);
 }
 
@@ -857,6 +864,332 @@ static void test_theme(void)
     CHECK(theme_get(0) != theme_get(1) && theme_get(theme_count()) == theme_get(0));
 }
 
+/* ---- phase 4: documents, layout, fuzzy, files, session -------------------- */
+
+static void put_file(const char *dir, const char *name, const char *text)
+{
+    char path[512];
+    FILE *f;
+
+    snprintf(path, sizeof path, "%s/%s", dir, name);
+    f = fopen(path, "w");
+    if (f) {
+        fputs(text, f);
+        fclose(f);
+    }
+}
+
+static char *make_dir(char *buf, size_t n)
+{
+    snprintf(buf, n, "/tmp/ked-test-XXXXXX");
+    return mkdtemp(buf);
+}
+
+static void rm_rf(const char *dir)
+{
+    char cmd[600];
+
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
+    if (system(cmd) != 0)
+        fprintf(stderr, "rm -rf failed\n");
+}
+
+static void test_fuzzy_picker(void)
+{
+    Picker p;
+
+    CHECK(fuzzy_score("", "anything") == 0);
+    CHECK(fuzzy_score("xyz", "src/main.c") < 0);
+    CHECK(fuzzy_score("mc", "src/main.c") >= 0);
+    CHECK(fuzzy_score("MAIN", "src/main.c") >= 0);             /* case-insensitive */
+    CHECK(fuzzy_score("main", "src/main.c") > fuzzy_score("main", "src/domain/xin.c"));
+    CHECK(fuzzy_score("ed", "src/editor.c") > fuzzy_score("ed", "src/render.c"));
+    CHECK(fuzzy_score("main", "main.c") > fuzzy_score("main", "a/b/c/d/main.c"));
+
+    memset(&p, 0, sizeof p);
+    picker_open(&p, "Test");
+    picker_add(&p, "src/render.c");
+    picker_add(&p, "src/editor.c");
+    picker_add(&p, "README.md");
+    picker_filter(&p);
+    CHECK(p.nshown == 3 && picker_chosen(&p) == 0);            /* no query: original order */
+    picker_move(&p, 2);
+    CHECK(picker_chosen(&p) == 2);
+    picker_move(&p, 5);
+    CHECK(picker_chosen(&p) == 2);                             /* clamped */
+    picker_type(&p, 'e');
+    picker_type(&p, 'd');
+    picker_type(&p, 'i');
+    CHECK(p.nshown == 1 && picker_chosen(&p) == 1);            /* only editor.c has e..d */
+    picker_backspace(&p);
+    picker_backspace(&p);
+    picker_backspace(&p);
+    CHECK(p.nshown == 3 && p.qlen == 0);
+    picker_type(&p, 'z');
+    CHECK(p.nshown == 0 && picker_chosen(&p) == -1);
+    picker_free(&p);
+}
+
+static void test_layout(void)
+{
+    Doc *d = doc_new();
+    Layout l;
+    Win *a, *b, *c, *w[8];
+
+    layout_init(&l, d);
+    layout_compute(&l, 0, 1, 80, 22);
+    a = l.active;
+    CHECK(layout_count(&l) == 1 && a->x == 0 && a->y == 1 && a->w == 80 && a->h == 22);
+
+    b = layout_split(&l, 1);                                   /* side by side */
+    CHECK(b && l.active == b && layout_count(&l) == 2);
+    layout_compute(&l, 0, 1, 80, 22);
+    CHECK(a->x == 0 && a->w + 1 + b->w == 80 && b->x == a->w + 1 && a->h == 22 && b->h == 22);
+    CHECK(layout_at(&l, 0, 1) == a && layout_at(&l, a->w, 1) == NULL && layout_at(&l, 79, 5) == b);
+
+    c = layout_split(&l, 0);                                   /* stack b */
+    CHECK(c && layout_count(&l) == 3);
+    layout_compute(&l, 0, 1, 80, 22);
+    CHECK(b->w == c->w && b->x == c->x && c->y == b->y + b->h && b->h + c->h == 22);
+    CHECK(layout_wins(&l, w, 8) == 3 && w[0] == a && w[1] == b && w[2] == c);
+    CHECK(layout_uses(&l, d) == 3);
+
+    layout_cycle(&l, 1);
+    CHECK(l.active == a);
+    layout_cycle(&l, -1);
+    CHECK(l.active == c);
+
+    CHECK(layout_close(&l, b) == 0 && layout_count(&l) == 2);
+    layout_compute(&l, 0, 1, 80, 22);
+    CHECK(c->h == 22);
+    CHECK(a->w + 1 + c->w == 80);
+    CHECK(layout_close(&l, c) == 0 && layout_count(&l) == 1 && l.active == a);
+    layout_compute(&l, 0, 1, 80, 22);
+    CHECK(a->w == 80 && layout_close(&l, a) == -1);
+
+    /* too small to split */
+    layout_compute(&l, 0, 1, 20, 5);
+    CHECK(layout_split(&l, 1) == NULL && layout_split(&l, 0) == NULL);
+    layout_free(&l);
+    doc_free(d);
+}
+
+static void test_docs(void)
+{
+    char dir[64], p1[600], p2[600], err[256];
+    Doc *d;
+    Editor e;
+    struct timespec ts = { 0, 50000000 };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "a.c", "int a;\nint b;\n");
+    put_file(dir, "b.txt", "hello\n");
+    snprintf(p1, sizeof p1, "%s/a.c", dir);
+    snprintf(p2, sizeof p2, "%s/b.txt", dir);
+
+    d = doc_new();
+    CHECK(doc_load(d, p1, err, sizeof err) == 0 && d->buf.nlines == 2);
+    CHECK(d->syn && strcmp(syn_name(d->syn), "C") == 0 && !d->readonly && d->disk_known);
+    CHECK(doc_disk_changed(d) == DISK_SAME);
+    nanosleep(&ts, NULL);
+    put_file(dir, "a.c", "int a;\n");
+    CHECK(doc_disk_changed(d) == DISK_CHANGED);
+    CHECK(doc_reload(d, err, sizeof err) == 0 && d->buf.nlines == 1 && !d->buf.modified);
+    CHECK(doc_disk_changed(d) == DISK_SAME);
+    CHECK(doc_save(d, NULL, err, sizeof err) >= 0 && doc_disk_changed(d) == DISK_SAME);
+    CHECK(doc_save(d, p2, err, sizeof err) >= 0 && strcmp(doc_base_name(d), "b.txt") == 0);
+    CHECK(strcmp(syn_name(d->syn), "Testo") == 0 || d->syn == NULL);    /* language follows the name */
+    unlink(p2);
+    CHECK(doc_disk_changed(d) == DISK_MISSING);
+    doc_free(d);
+
+    chmod(p1, 0444);
+    d = doc_new();
+    CHECK(doc_load(d, p1, err, sizeof err) == 0);
+    CHECK(d->readonly == (geteuid() != 0));
+    doc_free(d);
+    chmod(p1, 0644);
+
+    put_file(dir, "b.txt", "hello\n");
+    put_file(dir, "a.c", "int a;\nint b;\n");
+    editor_init(&e);
+    CHECK(e.ndocs == 1);
+    CHECK(editor_open_doc(&e, p1, err, sizeof err) != NULL);
+    CHECK(e.ndocs == 1 && e.doc->buf.path != NULL);            /* the blank document was replaced */
+    CHECK(editor_open_doc(&e, p2, err, sizeof err) != NULL);
+    CHECK(e.ndocs == 2 && strcmp(doc_base_name(e.doc), "b.txt") == 0);
+    CHECK(editor_open_doc(&e, p1, err, sizeof err) == e.docs[0] && e.ndocs == 2);   /* no duplicate */
+    editor_goto(&e, 2, 4);
+    CHECK(e.cy == 1 && e.cx == 3);
+    editor_activate(&e, e.docs[1]);
+    editor_activate(&e, e.docs[0]);
+    CHECK(e.cy == 1 && e.cx == 3);                             /* each document keeps its cursor */
+    CHECK(editor_open_doc(&e, dir, err, sizeof err) == NULL);
+    editor_free(&e);
+    rm_rf(dir);
+}
+
+typedef struct {
+    char names[64][64];
+    size_t n;
+} Names;
+
+static void collect_name(const char *rel, void *ctx)
+{
+    Names *nm = ctx;
+
+    if (nm->n < 64)
+        snprintf(nm->names[nm->n++], 64, "%s", rel);
+}
+
+static void test_files_tree(void)
+{
+    char dir[64], sub[600];
+    Names nm;
+    Tree t;
+    size_t i;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(sub, sizeof sub, "%s/src", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/.git", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/build", dir);
+    mkdir(sub, 0755);
+    put_file(dir, "z.txt", "");
+    put_file(dir, "a.txt", "");
+    put_file(dir, "src/main.c", "");
+    put_file(dir, ".git/config", "");
+    put_file(dir, "build/out.o", "");
+    put_file(dir, ".hidden", "");
+
+    nm.n = 0;
+    CHECK(files_scan(dir, collect_name, &nm) == 3 && nm.n == 3);
+    CHECK(strcmp(nm.names[0], "a.txt") == 0 && strcmp(nm.names[1], "src/main.c") == 0 &&
+          strcmp(nm.names[2], "z.txt") == 0);
+
+    tree_init(&t, dir);
+    /* root, then folders first (.git, build, src), then files; hidden shown in the browser */
+    CHECK(t.n >= 5 && t.e[0].is_dir && t.e[0].open && t.e[0].depth == 0);
+    for (i = 1; i < t.n && t.e[i].is_dir; i++)
+        ;
+    CHECK(i >= 2);                                              /* at least one folder before files */
+    for (; i < t.n; i++)
+        CHECK(!t.e[i].is_dir);
+    for (i = 1; i < t.n && strcmp(t.e[i].name, "src") != 0; i++)
+        ;
+    CHECK(i < t.n && !t.e[i].open);
+    {
+        size_t before = t.n;
+
+        tree_toggle(&t, i);
+        CHECK(t.e[i].open && t.n == before + 1 && strcmp(t.e[i + 1].name, "main.c") == 0 &&
+              t.e[i + 1].depth == 2);
+        t.sel = i + 1;
+        tree_left(&t);                                          /* a file: goes to its folder */
+        CHECK(t.sel == i);
+        tree_left(&t);                                          /* an open folder: closes it */
+        CHECK(!t.e[i].open && t.n == before);
+    }
+    tree_free(&t);
+    rm_rf(dir);
+}
+
+static void test_session(void)
+{
+    char dir[64], file[600];
+    Session s, r;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(file, sizeof file, "%s/sub/deeper/sess", dir);
+    memset(&s, 0, sizeof s);
+    session_add(&s, "/tmp/a b.c", 3, 4, 1);
+    session_add(&s, "/tmp/x.txt", 0, 0, 0);
+    s.active = 1;
+    CHECK(session_save(file, &s) == 0);
+    CHECK(session_load(file, &r) == 0 && r.n == 2 && r.active == 1);
+    CHECK(strcmp(r.e[0].path, "/tmp/a b.c") == 0 && r.e[0].y == 3 && r.e[0].x == 4 &&
+          r.e[0].rowoff == 1 && strcmp(r.e[1].path, "/tmp/x.txt") == 0);
+    session_free(&r);
+    session_free(&s);
+
+    memset(&s, 0, sizeof s);
+    CHECK(session_save(file, &s) == 0);                         /* no entries: file removed */
+    CHECK(session_load(file, &r) < 0);
+    put_file(dir, "bad", "not a session\n");
+    snprintf(file, sizeof file, "%s/bad", dir);
+    CHECK(session_load(file, &r) < 0);
+
+    setenv("XDG_STATE_HOME", dir, 1);
+    {
+        char *f = session_file();
+
+        CHECK(f && strstr(f, "/ked/sessions/%") != NULL && strncmp(f, dir, strlen(dir)) == 0);
+        free(f);
+    }
+    unsetenv("XDG_STATE_HOME");
+    rm_rf(dir);
+}
+
+static void test_session_layout(void)
+{
+    char dir[64], p1[600], p2[600], cwd[600], err[256];
+    Editor e;
+    Win *w[8];
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "a.c", "int a;\nint b;\nint c;\n");
+    put_file(dir, "b.txt", "one\ntwo\n");
+    snprintf(p1, sizeof p1, "%s/a.c", dir);
+    snprintf(p2, sizeof p2, "%s/b.txt", dir);
+    setenv("XDG_STATE_HOME", dir, 1);
+    CHECK(getcwd(cwd, sizeof cwd) != NULL);
+
+    editor_init(&e);
+    e.rows = 30;
+    e.cols = 100;
+    CHECK(editor_open_doc(&e, p1, err, sizeof err) != NULL);
+    CHECK(editor_open_doc(&e, p2, err, sizeof err) != NULL);
+    editor_activate(&e, e.docs[0]);
+    editor_goto(&e, 3, 1);
+    editor_save_session(&e);                                    /* single pane first */
+    editor_free(&e);
+
+    editor_init(&e);
+    e.rows = 30;
+    e.cols = 100;
+    CHECK(editor_restore_session(&e) == 2 && layout_count(&e.layout) == 1 && e.cy == 2);
+    editor_free(&e);
+
+    /* now with panes: a | (a over b), focus on the lower right one */
+    editor_init(&e);
+    e.rows = 30;
+    e.cols = 100;
+    CHECK(editor_open_doc(&e, p1, err, sizeof err) != NULL);
+    CHECK(editor_open_doc(&e, p2, err, sizeof err) != NULL);
+    editor_activate(&e, e.docs[0]);
+    editor_split(&e, 1);
+    editor_split(&e, 0);
+    editor_activate(&e, e.docs[1]);
+    editor_goto(&e, 2, 2);
+    CHECK(layout_count(&e.layout) == 3);
+    editor_save_session(&e);
+    editor_free(&e);
+
+    editor_init(&e);
+    e.rows = 30;
+    e.cols = 100;
+    CHECK(editor_restore_session(&e) == 2);
+    CHECK(layout_count(&e.layout) == 3 && layout_wins(&e.layout, w, 8) == 3);
+    CHECK(w[0]->doc == e.docs[0] && w[1]->doc == e.docs[0] && w[2]->doc == e.docs[1]);
+    CHECK(e.layout.active == w[2] && e.cy == 1 && e.cx == 1);
+    CHECK(e.layout.root->vertical && !e.layout.root->b->vertical);
+    editor_free(&e);
+
+    unsetenv("XDG_STATE_HOME");
+    rm_rf(dir);
+}
+
 int main(void)
 {
     test_utf8();
@@ -873,6 +1206,12 @@ int main(void)
     test_syntax_incremental();
     test_syntax_brackets();
     test_theme();
+    test_fuzzy_picker();
+    test_layout();
+    test_docs();
+    test_files_tree();
+    test_session();
+    test_session_layout();
     if (failures) {
         fprintf(stderr, "%d test falliti\n", failures);
         return 1;

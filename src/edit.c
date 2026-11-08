@@ -7,7 +7,7 @@
 
 static Line *cur_line(Editor *e)
 {
-    return &e->buf.lines[e->cy];
+    return &e->buf->lines[e->cy];
 }
 
 static int is_blank(char c)
@@ -32,18 +32,18 @@ static void begin(Editor *e)
 
     if (edit_sel_active(e))
         edit_sel_range(e, &y, &x, &y1, &x1);
-    buf_undo_begin(&e->buf, y, x);
+    buf_undo_begin(e->buf, y, x);
 }
 
 static void done(Editor *e)
 {
-    buf_undo_cursor(&e->buf, e->cy, e->cx);
+    buf_undo_cursor(e->buf, e->cy, e->cx);
 }
 
 static void finish(Editor *e)
 {
     done(e);
-    buf_undo_close(&e->buf);
+    buf_undo_close(e->buf);
 }
 
 /* ---- selection --------------------------------------------------------- */
@@ -68,19 +68,36 @@ void edit_sel_range(const Editor *e, size_t *y0, size_t *x0, size_t *y1, size_t 
     }
 }
 
-int edit_sel_line(const Editor *e, size_t y, size_t *from, size_t *to, int *nl)
+int edit_view_sel_line(const Buffer *b, const View *v, size_t y, size_t *from, size_t *to,
+                       int *nl)
 {
     size_t y0, x0, y1, x1;
 
-    if (!edit_sel_active(e))
+    if (!v->sel_on || (v->ay == v->cy && v->ax == v->cx))
         return 0;
-    edit_sel_range(e, &y0, &x0, &y1, &x1);
+    if (v->ay < v->cy || (v->ay == v->cy && v->ax <= v->cx)) {
+        y0 = v->ay; x0 = v->ax; y1 = v->cy; x1 = v->cx;
+    } else {
+        y0 = v->cy; x0 = v->cx; y1 = v->ay; x1 = v->ax;
+    }
     if (y < y0 || y > y1)
         return 0;
     *from = y == y0 ? x0 : 0;
-    *to = y == y1 ? x1 : e->buf.lines[y].len;
+    *to = y == y1 ? x1 : b->lines[y].len;
     *nl = y < y1;
     return 1;
+}
+
+int edit_sel_line(const Editor *e, size_t y, size_t *from, size_t *to, int *nl)
+{
+    View v;
+
+    v.cy = e->cy;
+    v.cx = e->cx;
+    v.sel_on = e->sel_on;
+    v.ay = e->ay;
+    v.ax = e->ax;
+    return edit_view_sel_line(e->buf, &v, y, from, to, nl);
 }
 
 void edit_sel_collapse(Editor *e, int to_end)
@@ -100,7 +117,7 @@ void edit_select_all(Editor *e)
     e->sel_on = 1;
     e->ay = 0;
     e->ax = 0;
-    e->cy = e->buf.nlines - 1;
+    e->cy = e->buf->nlines - 1;
     e->cx = cur_line(e)->len;
 }
 
@@ -109,7 +126,7 @@ void edit_select_line(Editor *e)
     e->sel_on = 1;
     e->ay = e->cy;
     e->ax = 0;
-    if (e->cy + 1 < e->buf.nlines) {
+    if (e->cy + 1 < e->buf->nlines) {
         e->cy++;
         e->cx = 0;
     } else {
@@ -149,7 +166,7 @@ static int delete_selection(Editor *e)
         return 0;
     }
     edit_sel_range(e, &y0, &x0, &y1, &x1);
-    buf_delete_range(&e->buf, y0, x0, y1, x1);
+    buf_delete_range(e->buf, y0, x0, y1, x1);
     e->cy = y0;
     e->cx = x0;
     e->sel_on = 0;
@@ -180,7 +197,7 @@ void edit_insert_cp(Editor *e, uint32_t cp)
 
     begin(e);
     delete_selection(e);
-    buf_insert(&e->buf, e->cy, e->cx, b, (size_t)n);
+    buf_insert(e->buf, e->cy, e->cx, b, (size_t)n);
     e->cx += (size_t)n;
     done(e);
 }
@@ -195,14 +212,14 @@ void edit_newline(Editor *e)
     l = cur_line(e);
     while (n < l->len && n < e->cx && is_blank(l->s[n]))
         n++;
-    buf_split(&e->buf, e->cy, e->cx);
+    buf_split(e->buf, e->cy, e->cx);
     e->cy++;
     e->cx = 0;
     if (n > 0) {
         /* the head of the old line keeps the indentation we copy from */
-        const Line *prev = &e->buf.lines[e->cy - 1];
+        const Line *prev = &e->buf->lines[e->cy - 1];
 
-        buf_insert(&e->buf, e->cy, 0, prev->s, n);
+        buf_insert(e->buf, e->cy, 0, prev->s, n);
         e->cx = n;
     }
     finish(e);
@@ -216,12 +233,12 @@ void edit_backspace(Editor *e)
             const Line *l = cur_line(e);
             size_t from = grapheme_prev(l->s, l->len, e->cx);
 
-            buf_delete(&e->buf, e->cy, from, e->cx - from);
+            buf_delete(e->buf, e->cy, from, e->cx - from);
             e->cx = from;
         } else if (e->cy > 0) {
             e->cy--;
             e->cx = cur_line(e)->len;
-            buf_join(&e->buf, e->cy);
+            buf_join(e->buf, e->cy);
         }
     }
     done(e);
@@ -236,9 +253,9 @@ void edit_delete(Editor *e)
         if (e->cx < l->len) {
             size_t to = grapheme_next(l->s, l->len, e->cx);
 
-            buf_delete(&e->buf, e->cy, e->cx, to - e->cx);
-        } else if (e->cy + 1 < e->buf.nlines) {
-            buf_join(&e->buf, e->cy);
+            buf_delete(e->buf, e->cy, e->cx, to - e->cx);
+        } else if (e->cy + 1 < e->buf->nlines) {
+            buf_join(e->buf, e->cy);
         }
     }
     done(e);
@@ -255,7 +272,7 @@ void edit_tab(Editor *e)
     sel_lines(e, &a, &b);
     begin(e);
     for (k = a; k <= b; k++)
-        buf_insert(&e->buf, k, 0, "\t", 1);
+        buf_insert(e->buf, k, 0, "\t", 1);
     /* keep the selection on the same text; an end at column 0 stays there */
     if (e->ay >= a && e->ay <= b && e->ax > 0)
         e->ax++;
@@ -271,7 +288,7 @@ void edit_dedent(Editor *e)
     sel_lines(e, &a, &b);
     begin(e);
     for (k = a; k <= b; k++) {
-        const Line *l = &e->buf.lines[k];
+        const Line *l = &e->buf->lines[k];
         size_t r = 0;
 
         if (l->len > 0 && l->s[0] == '\t')
@@ -281,7 +298,7 @@ void edit_dedent(Editor *e)
                 r++;
         if (r == 0)
             continue;
-        buf_delete(&e->buf, k, 0, r);
+        buf_delete(e->buf, k, 0, r);
         if (e->cy == k)
             e->cx = e->cx > r ? e->cx - r : 0;
         if (e->sel_on && e->ay == k)
@@ -320,7 +337,7 @@ static void copy_to_clip(Editor *e, const char *verb)
         size_t y0, x0, y1, x1;
 
         edit_sel_range(e, &y0, &x0, &y1, &x1);
-        text = buf_get_range(&e->buf, y0, x0, y1, x1, &n);
+        text = buf_get_range(e->buf, y0, x0, y1, x1, &n);
         store_clip(e, text, n, 0, verb);
     } else {
         const Line *l = cur_line(e);
@@ -339,8 +356,8 @@ static void settle_cursor(Editor *e, size_t y)
 {
     const Line *l;
 
-    if (y >= e->buf.nlines)
-        y = e->buf.nlines - 1;
+    if (y >= e->buf->nlines)
+        y = e->buf->nlines - 1;
     e->cy = y;
     l = cur_line(e);
     e->cx = utf8_byte_at_col(l->s, l->len, e->want_col, e->tabw);
@@ -360,7 +377,7 @@ void edit_cut(Editor *e)
     if (had_sel) {
         delete_selection(e);
     } else {
-        buf_delete_lines(&e->buf, e->cy, e->cy);
+        buf_delete_lines(e->buf, e->cy, e->cy);
         e->sel_on = 0;
         settle_cursor(e, e->cy);
     }
@@ -374,7 +391,7 @@ static void insert_entry(Editor *e, const ClipEntry *c, size_t idx)
 
     e->paste_y0 = y;
     e->paste_x0 = x;
-    buf_insert_text(&e->buf, &y, &x, c->text, c->n);
+    buf_insert_text(e->buf, &y, &x, c->text, c->n);
     e->cy = e->paste_y1 = y;
     e->cx = e->paste_x1 = x;
     e->paste_idx = idx;
@@ -416,7 +433,7 @@ void edit_paste_older(Editor *e)
     c = clip_get(&e->clip, idx);
 
     begin(e);
-    buf_delete_range(&e->buf, e->paste_y0, e->paste_x0, e->paste_y1, e->paste_x1);
+    buf_delete_range(e->buf, e->paste_y0, e->paste_x0, e->paste_y1, e->paste_x1);
     e->cy = e->paste_y0;
     e->cx = e->paste_x0;
     insert_entry(e, c, idx);
@@ -447,7 +464,7 @@ void edit_paste_text(Editor *e, const char *s, size_t n)
     delete_selection(e);
     y = e->cy;
     x = e->cx;
-    buf_insert_text(&e->buf, &y, &x, clean.p, clean.len);
+    buf_insert_text(e->buf, &y, &x, clean.p, clean.len);
     e->cy = y;
     e->cx = x;
     finish(e);
@@ -461,7 +478,7 @@ void edit_undo(Editor *e)
     size_t y, x;
 
     e->sel_on = 0;
-    if (!buf_undo(&e->buf, &y, &x)) {
+    if (!buf_undo(e->buf, &y, &x)) {
         editor_set_msg(e, MSG_TTL_MS, "Niente da annullare");
         return;
     }
@@ -474,7 +491,7 @@ void edit_redo(Editor *e)
     size_t y, x;
 
     e->sel_on = 0;
-    if (!buf_redo(&e->buf, &y, &x)) {
+    if (!buf_redo(e->buf, &y, &x)) {
         editor_set_msg(e, MSG_TTL_MS, "Niente da ripetere");
         return;
     }
@@ -491,22 +508,22 @@ void edit_move_lines(Editor *e, int down)
     const Line *l;
 
     sel_lines(e, &a, &b);
-    if (down ? b + 1 >= e->buf.nlines : a == 0)
+    if (down ? b + 1 >= e->buf->nlines : a == 0)
         return;
 
     /* the line the block jumps over moves to the other side of it */
     begin(e);
     ny = down ? b + 1 : a - 1;
-    l = &e->buf.lines[ny];
+    l = &e->buf->lines[ny];
     n = l->len;
     text = xmalloc(n + 1);
     if (n > 0)
         memcpy(text, l->s, n);
-    buf_delete_lines(&e->buf, ny, ny);
+    buf_delete_lines(e->buf, ny, ny);
     if (down)
-        buf_insert_lines(&e->buf, a, 0, text, n);
+        buf_insert_lines(e->buf, a, 0, text, n);
     else
-        buf_insert_lines(&e->buf, b - 1, 1, text, n);
+        buf_insert_lines(e->buf, b - 1, 1, text, n);
     free(text);
 
     if (down) {
@@ -525,14 +542,14 @@ void edit_duplicate_lines(Editor *e, int down)
     char *text;
 
     sel_lines(e, &a, &b);
-    text = buf_get_range(&e->buf, a, 0, b, e->buf.lines[b].len, &n);
+    text = buf_get_range(e->buf, a, 0, b, e->buf->lines[b].len, &n);
     begin(e);
     if (down) {
-        buf_insert_lines(&e->buf, b, 1, text, n);
+        buf_insert_lines(e->buf, b, 1, text, n);
         e->cy += b - a + 1;
         e->ay += b - a + 1;
     } else {
-        buf_insert_lines(&e->buf, a, 0, text, n);
+        buf_insert_lines(e->buf, a, 0, text, n);
     }
     free(text);
     finish(e);
@@ -544,7 +561,7 @@ void edit_delete_lines(Editor *e)
 
     sel_lines(e, &a, &b);
     begin(e);
-    buf_delete_lines(&e->buf, a, b);
+    buf_delete_lines(e->buf, a, b);
     e->sel_on = 0;
     settle_cursor(e, a);
     finish(e);
@@ -560,26 +577,26 @@ void edit_join_lines(Editor *e)
         y0 = y1 = e->cy;
     }
     count = y1 > y0 ? y1 - y0 : 1;
-    if (y0 + count >= e->buf.nlines)
-        count = e->buf.nlines - 1 - y0;
+    if (y0 + count >= e->buf->nlines)
+        count = e->buf->nlines - 1 - y0;
     if (count == 0)
         return;
 
     begin(e);
     y = y0;
     for (k = 0; k < count; k++) {
-        const Line *l, *next = &e->buf.lines[y + 1];
+        const Line *l, *next = &e->buf->lines[y + 1];
         size_t lead = 0;
 
         while (lead < next->len && is_blank(next->s[lead]))
             lead++;
-        buf_delete(&e->buf, y + 1, 0, lead);
-        l = &e->buf.lines[y];
-        next = &e->buf.lines[y + 1];
+        buf_delete(e->buf, y + 1, 0, lead);
+        l = &e->buf->lines[y];
+        next = &e->buf->lines[y + 1];
         e->cx = l->len;
         if (l->len > 0 && next->len > 0 && !is_blank(l->s[l->len - 1]))
-            buf_insert(&e->buf, y, l->len, " ", 1);
-        buf_join(&e->buf, y);
+            buf_insert(e->buf, y, l->len, " ", 1);
+        buf_join(e->buf, y);
     }
     e->cy = y;
     e->sel_on = 0;

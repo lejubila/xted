@@ -37,6 +37,8 @@ void buf_free(Buffer *b);
 /* Returns 0 on success (also for a nonexistent path: the buffer is then
  * empty and flagged is_new), -1 with a message in err. */
 int buf_load(Buffer *b, const char *path, char *err, size_t errlen);
+/* Like buf_load, from an open descriptor: the buffer gets no name. */
+int buf_load_fd(Buffer *b, int fd, char *err, size_t errlen);
 /* Atomic save (temp file + rename), keeping mode and, if possible, owner.
  * path == NULL saves to b->path. Returns bytes written, or -1 with err. */
 long buf_save(Buffer *b, const char *path, char *err, size_t errlen);

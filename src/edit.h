@@ -13,8 +13,10 @@
 int edit_sel_active(const Editor *e);
 /* Ordered ends of the selection; only meaningful when it is active. */
 void edit_sel_range(const Editor *e, size_t *y0, size_t *x0, size_t *y1, size_t *x1);
-/* The part of line y that is selected: bytes [from,to); *nl is set when the
- * selection goes on past the end of the line. Returns 0 if there is none. */
+/* The part of line y that is selected in a view: bytes [from,to); *nl is set
+ * when the selection goes on past the end of the line. Returns 0 if none. */
+int edit_view_sel_line(const Buffer *b, const View *v, size_t y, size_t *from, size_t *to,
+                       int *nl);
 int edit_sel_line(const Editor *e, size_t y, size_t *from, size_t *to, int *nl);
 /* Drops the selection, leaving the cursor at its start or end. */
 void edit_sel_collapse(Editor *e, int to_end);

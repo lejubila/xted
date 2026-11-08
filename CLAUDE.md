@@ -33,12 +33,18 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/syntax.[ch]` | Motore di evidenziazione a regioni (parser delle definizioni, stato per riga, rilevamento del linguaggio, parentesi corrispondenti) |
 | `src/langs.[ch]` | Definizioni dei linguaggi incorporate, come dati testuali: un nuovo linguaggio è solo una voce qui |
 | `src/theme.[ch]` | Temi colore e codifica SGR con ripiego truecolor → 256 → 16 colori |
+| `src/doc.[ch]` | `Doc`: buffer + linguaggio + stato su disco (cambiamenti, sola lettura) di un file aperto; `View` (cursore/scorrimento/selezione) |
+| `src/layout.[ch]` | Albero degli split e geometria dei pannelli; senza terminale |
+| `src/fuzzy.[ch]`, `src/picker.[ch]` | Punteggio fuzzy e lista filtrabile (elenco buffer, apertura rapida) |
+| `src/files.[ch]` | Scansione dei file del progetto e modello ad albero del file browser |
+| `src/session.[ch]` | File di sessione per cartella (`$XDG_STATE_HOME/ked/sessions/`) |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 
 - Ogni fase aggiunge i moduli previsti da `SPEC.md` (sintassi, comandi, configurazione, …).
 - Un modulo non deve dipendere da quelli di livello più alto: `buffer` e `utf8` non conoscono terminale né UI.
 - Ogni modifica al testo passa dalle primitive di `buffer.c` (`buf_insert/delete/split/join`) o dagli helper costruiti su di esse, così undo e rappresentazione interna restano isolati. Un comando che modifica il testo apre un gruppo undo (`buf_undo_begin`) e lo chiude a fine comando.
+- `Editor` espone i campi `cy, cx, rowoff, …` del **pannello attivo**; gli altri pannelli hanno la loro `View` in `Win`. Cambiare pannello o documento passa da `editor_store_view`/`load_win` (editor.c); `e->buf` e `e->doc` puntano sempre al documento attivo.
 - Lo stato derivato dal testo (evidenziazione) vive in `Line.hl` e vale per le righe `< Buffer.stable`: le `raw_*` di `buffer.c` lo invalidano, nessun altro codice deve farlo.
 
 ## Stile del codice
