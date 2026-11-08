@@ -1,4 +1,5 @@
 #include "edit.h"
+#include "cursors.h"
 #include "utf8.h"
 #include "util.h"
 
@@ -30,6 +31,8 @@ static void begin(Editor *e)
 {
     size_t y = e->cy, x = e->cx, y1, x1;
 
+    if (e->undo_hold)
+        return;
     if (edit_sel_active(e))
         edit_sel_range(e, &y, &x, &y1, &x1);
     buf_undo_begin(e->buf, y, x);
@@ -37,13 +40,16 @@ static void begin(Editor *e)
 
 static void done(Editor *e)
 {
+    if (e->undo_hold)
+        return;
     buf_undo_cursor(e->buf, e->cy, e->cx);
 }
 
 static void finish(Editor *e)
 {
     done(e);
-    buf_undo_close(e->buf);
+    if (!e->undo_hold)
+        buf_undo_close(e->buf);
 }
 
 /* ---- selection --------------------------------------------------------- */
@@ -478,6 +484,7 @@ void edit_undo(Editor *e)
     size_t y, x;
 
     e->sel_on = 0;
+    cur_clear(e);
     if (!buf_undo(e->buf, &y, &x)) {
         editor_set_msg(e, MSG_TTL_MS, "Niente da annullare");
         return;
@@ -491,6 +498,7 @@ void edit_redo(Editor *e)
     size_t y, x;
 
     e->sel_on = 0;
+    cur_clear(e);
     if (!buf_redo(e->buf, &y, &x)) {
         editor_set_msg(e, MSG_TTL_MS, "Niente da ripetere");
         return;
@@ -601,4 +609,229 @@ void edit_join_lines(Editor *e)
     e->cy = y;
     e->sel_on = 0;
     finish(e);
+}
+
+/* ---- comments ---------------------------------------------------------- */
+
+static size_t lead_blank(const Line *l)
+{
+    size_t n = 0;
+
+    while (n < l->len && is_blank(l->s[n]))
+        n++;
+    return n;
+}
+
+static int has_marker(const Line *l, size_t at, const char *m)
+{
+    size_t n = strlen(m);
+
+    return l->len >= at + n && memcmp(l->s + at, m, n) == 0;
+}
+
+/* Moves a byte offset of line y after n bytes were inserted (n > 0) or
+ * removed (n < 0) at column col of that line. */
+static void shift_x(size_t *x, size_t col, long n)
+{
+    if (n > 0) {
+        if (*x >= col)
+            *x += (size_t)n;
+    } else if (*x > col) {
+        size_t r = (size_t)-n;
+
+        *x = *x >= col + r ? *x - r : col;
+    }
+}
+
+static void shift_pos(Editor *e, size_t y, size_t col, long n)
+{
+    if (e->cy == y)
+        shift_x(&e->cx, col, n);
+    if (e->sel_on && e->ay == y)
+        shift_x(&e->ax, col, n);
+}
+
+void edit_toggle_comment(Editor *e)
+{
+    const char *open, *close;
+    size_t a, b, k, indent = (size_t)-1, olen, clen = 0;
+    int uncomment = 1, any = 0;
+
+    if (!syn_comment(e->doc->syn, &open, &close)) {
+        editor_set_msg(e, MSG_TTL_MS, "Nessun commento definito per questo linguaggio");
+        return;
+    }
+    olen = strlen(open);
+    if (close)
+        clen = strlen(close);
+    sel_lines(e, &a, &b);
+    for (k = a; k <= b; k++) {
+        const Line *l = &e->buf->lines[k];
+        size_t lead = lead_blank(l);
+
+        if (lead == l->len)
+            continue;
+        any = 1;
+        if (lead < indent)
+            indent = lead;
+        if (!has_marker(l, lead, open))
+            uncomment = 0;
+    }
+    if (!any) {
+        /* only blank lines: comment them at column 0 */
+        indent = 0;
+        uncomment = 0;
+    }
+
+    begin(e);
+    for (k = a; k <= b; k++) {
+        const Line *l = &e->buf->lines[k];
+        size_t lead = lead_blank(l);
+
+        if (any && lead == l->len)
+            continue;
+        if (uncomment) {
+            size_t r = olen, col = lead;
+
+            if (has_marker(l, col + r, " "))
+                r++;
+            buf_delete(e->buf, k, col, r);
+            shift_pos(e, k, col, -(long)r);
+            if (close) {
+                const Line *m = &e->buf->lines[k];
+                size_t end = m->len;
+
+                while (end > 0 && is_blank(m->s[end - 1]))
+                    end--;
+                if (end >= clen && memcmp(m->s + end - clen, close, clen) == 0) {
+                    size_t from = end - clen, n = clen + (m->len - end);
+
+                    if (from > 0 && is_blank(m->s[from - 1])) {
+                        from--;
+                        n++;
+                    }
+                    buf_delete(e->buf, k, from, n);
+                    shift_pos(e, k, from, -(long)n);
+                }
+            }
+        } else {
+            SBuf t = SBUF_INIT;
+
+            sbuf_add(&t, open, olen);
+            sbuf_adds(&t, " ");
+            buf_insert(e->buf, k, indent, t.p, t.len);
+            shift_pos(e, k, indent, (long)t.len);
+            if (close) {
+                const Line *m = &e->buf->lines[k];
+
+                t.len = 0;
+                sbuf_adds(&t, " ");
+                sbuf_add(&t, close, clen);
+                buf_insert(e->buf, k, m->len, t.p, t.len);
+            }
+            sbuf_free(&t);
+        }
+    }
+    finish(e);
+}
+
+void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n)
+{
+    if (from_x > e->cx)
+        return;
+    begin(e);
+    e->sel_on = 0;
+    buf_delete(e->buf, e->cy, from_x, e->cx - from_x);
+    buf_insert(e->buf, e->cy, from_x, s, n);
+    e->cx = from_x + n;
+    finish(e);
+}
+
+void edit_snip_goto(Editor *e, size_t idx)
+{
+    SnipSession *s = &e->snip;
+
+    if (!s->on || idx >= s->n)
+        return;
+    s->cur = idx;
+    e->cy = s->stop[idx].y;
+    e->cx = s->stop[idx].x;
+    e->sel_on = 0;
+    if (s->stop[idx].len > 0) {
+        e->sel_on = 1;
+        e->ay = e->cy;
+        e->ax = e->cx;
+        e->cx += s->stop[idx].len;
+    }
+    if (idx + 1 == s->n)
+        s->on = 0;
+}
+
+void edit_expand_snippet(Editor *e, size_t from_x, const SnipDef *d)
+{
+    SBuf raw = SBUF_INIT, text = SBUF_INIT;
+    SnipStops st;
+    size_t indent, y0 = e->cy, y, x, i, k;
+    const Line *l = cur_line(e);
+
+    if (from_x > e->cx)
+        return;
+    indent = lead_blank(l);
+    if (indent > from_x)
+        indent = from_x;
+    {
+        char *ind = xmalloc(indent + 1);
+
+        memcpy(ind, l->s, indent);
+        snip_parse(d->body, &raw, &st);
+        /* each line after the first starts with the indentation of the first */
+        for (i = 0; i < raw.len; i++) {
+            sbuf_add(&text, raw.p + i, 1);
+            if (raw.p[i] == '\n')
+                sbuf_add(&text, ind, indent);
+        }
+        begin(e);
+        e->sel_on = 0;
+        buf_delete(e->buf, e->cy, from_x, e->cx - from_x);
+        y = e->cy;
+        x = from_x;
+        buf_insert_text(e->buf, &y, &x, text.p, text.len);
+        e->cy = y;
+        e->cx = x;
+        e->snip.n = 0;
+        for (k = 0; k < st.n; k++) {
+            size_t off = st.stop[k].off, nl = 0, last = 0;
+
+            for (i = 0; i < off && i < raw.len; i++)
+                if (raw.p[i] == '\n')
+                    nl++;
+            off += nl * indent;
+            nl = 0;
+            for (i = 0; i < off && i < text.len; i++)
+                if (text.p[i] == '\n') {
+                    nl++;
+                    last = i + 1;
+                }
+            e->snip.stop[k].y = y0 + nl;
+            e->snip.stop[k].x = (nl == 0 ? from_x : 0) + (off - last);
+            e->snip.stop[k].len = st.stop[k].len;
+            e->snip.n++;
+        }
+        free(ind);
+    }
+    sbuf_free(&raw);
+    sbuf_free(&text);
+    e->snip.on = e->snip.n > 1;
+    edit_snip_goto(e, 0);
+    if (e->snip.n == 1) {
+        e->snip.on = 0;
+        e->cy = e->snip.stop[0].y;
+        e->cx = e->snip.stop[0].x;
+    }
+    finish(e);
+}
+
+void edit_store_clip(Editor *e, char *text, size_t n, const char *verb)
+{
+    store_clip(e, text, n, 0, verb);
 }

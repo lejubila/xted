@@ -58,6 +58,7 @@ static void push_line(Buffer *b, const char *s, size_t n)
     l->len = l->cap = n;
     l->s = NULL;
     l->hl = 0;
+    l->fold = 0;
     if (n > 0) {
         l->s = xmalloc(n);
         memcpy(l->s, s, n);
@@ -368,6 +369,7 @@ static void raw_split(Buffer *b, size_t y, size_t x)
     tail = l->len - x;
     nl->s = NULL;
     nl->hl = 0;
+    nl->fold = 0;
     nl->len = nl->cap = tail;
     if (tail > 0) {
         nl->s = xmalloc(tail);
@@ -386,6 +388,8 @@ static void raw_join(Buffer *b, size_t y)
         memcpy(l->s + l->len, next->s, next->len);
         l->len += next->len;
     }
+    if (l->fold == 0)
+        l->fold = next->fold;
     free(next->s);
     memmove(next, next + 1, (b->nlines - y - 2) * sizeof(Line));
     b->nlines--;

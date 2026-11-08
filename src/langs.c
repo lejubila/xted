@@ -7,6 +7,7 @@
  *   name TEXT                 shown in the status bar
  *   ext / file / shebang / alias WORD...   how the language is detected
  *   words CLASS WORD...       keywords, types, constants (any class)
+ *   comment TOKEN [END]       markers used by the comment toggle (END for block-only languages)
  *   number                    highlight numeric literals
  *   calls CLASS               identifier followed by '(' gets CLASS
  *   sigil CLASS CHAR          CHAR followed by a name (shell $var, Python @decorator)
@@ -23,6 +24,7 @@
 
 static const char *const lang_c[] = {
     "name C",
+    "comment //",
     "ext c h cc cpp cxx hpp hh hxx",
     "alias c++ cpp",
     "words keyword if else for while do switch case default break continue return goto "
@@ -46,6 +48,7 @@ static const char *const lang_c[] = {
 
 static const char *const lang_python[] = {
     "name Python",
+    "comment #",
     "ext py pyw pyi",
     "file SConstruct SConscript",
     "shebang python pypy",
@@ -70,6 +73,7 @@ static const char *const lang_python[] = {
 
 static const char *const lang_js[] = {
     "name JavaScript",
+    "comment //",
     "ext js mjs cjs jsx ts tsx",
     "shebang node deno bun",
     "alias javascript typescript js ts",
@@ -95,6 +99,7 @@ static const char *const lang_js[] = {
 
 static const char *const lang_shell[] = {
     "name Shell",
+    "comment #",
     "ext sh bash zsh ksh",
     "file .bashrc .bash_profile .bash_aliases .profile .zshrc .zprofile",
     "shebang sh bash zsh dash ash ksh",
@@ -116,6 +121,7 @@ static const char *const lang_shell[] = {
 
 static const char *const lang_markdown[] = {
     "name Markdown",
+    "comment <!-- -->",
     "ext md markdown mdown",
     "alias md markdown",
     "region code ``` ``` ml bol",

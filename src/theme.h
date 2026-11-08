@@ -14,6 +14,7 @@ typedef struct {
     Rgb fg, bg;
     Rgb cls[SC_COUNT];
     Rgb match;              /* background of search matches */
+    Rgb popup, popup_sel;   /* suggestion popup: rows and the highlighted row */
 } Theme;
 
 enum { COLOR_NONE = 0, COLOR_16 = 16, COLOR_256 = 256, COLOR_TRUE = 24 };

@@ -2,6 +2,7 @@
 #include "doc.h"
 #include "edit.h"
 #include "editor.h"
+#include "fold.h"
 #include "term.h"
 #include "theme.h"
 #include "utf8.h"
@@ -166,8 +167,94 @@ static void set_mt(SBuf *o, const Editor *e, int *mt, int on)
     *mt = on;
 }
 
+/* The suggestion popup as seen from one pane row: a "hole" in the line where
+ * the popup's cells go instead of the text. */
+typedef struct {
+    int on;
+    int row0, h;            /* screen rows of the popup */
+    int cx, w;              /* first column inside the pane, width in cells */
+} PopupGeom;
+
+typedef struct {
+    size_t c0, c1;          /* line columns [c0, c1) covered */
+    const Cand *cand;
+    int sel;
+} Ovl;
+
+/* Appends one popup row, exactly w cells wide, in its own colours. */
+static void emit_popup(SBuf *o, const Editor *e, const Ovl *ov)
+{
+    size_t w = ov->c1 - ov->c0, used = 0;
+    const char *name = ov->cand->text;
+
+    if (e->color_depth != COLOR_NONE) {
+        sbuf_adds(o, "\x1b[0m");
+        theme_fg(o, e->color_depth, e->theme->fg);
+        theme_bg(o, e->color_depth, ov->sel ? e->theme->popup_sel : e->theme->popup);
+    } else {
+        sbuf_adds(o, ov->sel ? "\x1b[0;1m" : "\x1b[0;7m");
+    }
+    sbuf_adds(o, ov->sel ? ">" : " ");
+    used = 1;
+    used += fit_cols(o, name, strlen(name), w > used ? w - used : 0);
+    if (ov->cand->kind == CAND_SNIPPET && w > used + 9) {
+        spaces(o, w - used - 7 - 1);
+        sbuf_adds(o, "snippet");
+        used = w - 1;
+    }
+    spaces(o, w > used ? w - used : 0);
+    sbuf_adds(o, "\x1b[0m");
+}
+
+static void popup_geom(const Editor *e, PopupGeom *g)
+{
+    const Win *aw = e->layout.active;
+    const Complete *c = &e->comp;
+    const Line *l;
+    size_t i, wmax = 0, h;
+    int r, w, cx;
+
+    memset(g, 0, sizeof *g);
+    if (!c->on || c->n == 0 || e->picker.on || e->prompt_on || c->y >= e->buf->nlines)
+        return;
+    l = &e->buf->lines[c->y];
+    h = c->n - c->top < COMPLETE_ROWS ? c->n - c->top : COMPLETE_ROWS;
+    for (i = c->top; i < c->top + h; i++) {
+        size_t n = utf8_cols(c->v[i].text, strlen(c->v[i].text), strlen(c->v[i].text), 8);
+
+        if (c->v[i].kind == CAND_SNIPPET)
+            n += 9;
+        if (n > wmax)
+            wmax = n;
+    }
+    w = (int)wmax + 2;
+    if (w > 32)
+        w = 32;
+    if (w < 8)
+        w = 8;
+    if (w > aw->w)
+        w = aw->w;
+    r = aw->y + (int)fold_count(e->buf, e->rowoff, e->cy);
+    if (r + (int)h <= aw->y + aw->h - 2)
+        g->row0 = r + 1;
+    else if (r - (int)h >= aw->y)
+        g->row0 = r - (int)h;
+    else
+        return;
+    cx = (int)utf8_cols(l->s, l->len, c->x < l->len ? c->x : l->len, e->tabw) - (int)e->coloff;
+    if (cx < 0)
+        cx = 0;
+    if (cx + w > aw->w)
+        cx = aw->w - w;
+    g->on = 1;
+    g->h = (int)h;
+    g->cx = cx;
+    g->w = w;
+}
+
 /* One line of a pane's text, exactly w->w cells wide. */
-static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int active)
+static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int active,
+                     const Ovl *ov)
 {
     const Doc *d = w->doc;
     const View *v = &w->view;
@@ -178,14 +265,28 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     int colors, cur = SC_NORMAL, br = 0, prev_visible = 0, hl = 0, sel_nl = 0, has_sel;
     Matcher *hm = e->find.hl && e->find.m && e->find.m->valid ? e->find.m : NULL;
     size_t mr[32][2], nm = 0, mk = 0;
-    int mt = 0;
+    int mt = 0, ov_done = 0, xeol = 0;
+    size_t xr[64][2], nxr = 0, xi;
     int bg_row = e->color_depth != COLOR_NONE && e->theme->has_bg;
 
     if (y >= d->buf.nlines) {
         if (bg_row)
             theme_bg(o, e->color_depth, e->theme->bg);
-        sbuf_adds(o, "\x1b[2m~\x1b[22m");
-        spaces(o, (size_t)w->w - 1);
+        if (ov) {
+            size_t pc = ov->c0 - v->coloff;
+
+            if (pc >= 1) {
+                sbuf_adds(o, "\x1b[2m~\x1b[22m");
+                spaces(o, pc - 1);
+            }
+            emit_popup(o, e, ov);
+            if (bg_row)
+                theme_bg(o, e->color_depth, e->theme->bg);
+            spaces(o, (size_t)w->w - (ov->c1 - v->coloff));
+        } else {
+            sbuf_adds(o, "\x1b[2m~\x1b[22m");
+            spaces(o, (size_t)w->w - 1);
+        }
         if (bg_row)
             sbuf_adds(o, "\x1b[0m");
         return;
@@ -201,6 +302,36 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     has_sel = active && edit_view_sel_line(&d->buf, v, y, &sel_from, &sel_to, &sel_nl);
     if (hm)
         nm = sm_line_matches(hm, l->s, l->len, mr, 32);
+    /* the other cursors of multi-cursor mode: their selections and a cell at each cursor */
+    if (active)
+        for (xi = 0; xi < e->nxc && nxr < 64; xi++) {
+            const Cursor *c = &e->xc[xi];
+            View cv;
+            size_t f, t;
+            int nl;
+
+            cv.cy = c->cy;
+            cv.cx = c->cx;
+            cv.sel_on = c->sel_on;
+            cv.ay = c->ay;
+            cv.ax = c->ax;
+            if (edit_view_sel_line(&d->buf, &cv, y, &f, &t, &nl)) {
+                xr[nxr][0] = f;
+                xr[nxr][1] = t;
+                nxr++;
+                if (nl)
+                    xeol = 1;
+            }
+            if (c->cy == y && nxr < 64) {
+                if (c->cx < l->len) {
+                    xr[nxr][0] = c->cx;
+                    xr[nxr][1] = utf8_next(l->s, l->len, c->cx);
+                    nxr++;
+                } else {
+                    xeol = 1;
+                }
+            }
+        }
 
     while (i < l->len && col < right) {
         uint32_t cp;
@@ -208,10 +339,16 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         size_t cw = (size_t)char_cols(cp, col, e->tabw);
         size_t start = col, stop = col + cw;
         int selected = has_sel && i >= sel_from && i < sel_to;
+        size_t xk;
+
         int mark = active && e->match_on &&
                    ((y == e->by && i == e->bx) || (y == e->my && i == e->mx));
         int cc = cls ? cls[i] : SC_NORMAL;
         int inm;
+
+        for (xk = 0; xk < nxr; xk++)
+            if (i >= xr[xk][0] && i < xr[xk][1])
+                selected = 1;
 
         while (mk < nm && mr[mk][1] <= i)
             mk++;
@@ -222,6 +359,30 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
             if (prev_visible)
                 emit_cp(o, cp);
             continue;
+        }
+        if (ov && (ov_done || stop > ov->c0)) {
+            /* the popup replaces the columns [c0, c1) of the line */
+            if (!ov_done) {
+                if (start < ov->c0 && start >= left)
+                    spaces(o, ov->c0 - start);
+                set_hl(o, &hl, 0);
+                set_mt(o, e, &mt, 0);
+                set_br(o, &br, 0);
+                emit_popup(o, e, ov);
+                if (colors) {
+                    theme_fg(o, e->color_depth, e->theme->fg);
+                    if (e->theme->has_bg)
+                        theme_bg(o, e->color_depth, e->theme->bg);
+                }
+                cur = SC_NORMAL;
+                ov_done = 1;
+            }
+            if (start < ov->c1) {
+                col = stop;
+                if (stop > ov->c1)
+                    spaces(o, stop - ov->c1);
+                continue;
+            }
         }
         col = stop;
         if (stop <= left) {
@@ -258,13 +419,37 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     set_hl(o, &hl, 0);
     set_mt(o, e, &mt, 0);
     set_br(o, &br, 0);
+    if (ov && !ov_done) {
+        /* the line ends before the popup */
+        if (col < ov->c0)
+            spaces(o, ov->c0 - (col > left ? col : left));
+        emit_popup(o, e, ov);
+        if (colors) {
+            theme_fg(o, e->color_depth, e->theme->fg);
+            if (e->theme->has_bg)
+                theme_bg(o, e->color_depth, e->theme->bg);
+        }
+        col = ov->c1;
+        ov_done = 1;
+    }
     /* a selection running past the end of the line shows the newline as one cell */
-    if (has_sel && sel_nl && col >= left && col < right) {
+    if (((has_sel && sel_nl) || xeol) && !ov && col >= left && col < right) {
         sbuf_adds(o, "\x1b[7m \x1b[27m");
         col++;
     }
     if (col < left)
         col = left;
+    if (l->fold > 0 && !ov && col + 2 < right) {
+        char lab[40];
+        size_t hid = l->fold;
+
+        if (y + 1 + hid > d->buf.nlines)
+            hid = d->buf.nlines - 1 - y;
+        snprintf(lab, sizeof lab, " \xe2\x8b\xaf %zu righe", hid);
+        sbuf_adds(o, "\x1b[2m");
+        col += fit_cols(o, lab, strlen(lab), right - col);
+        sbuf_adds(o, "\x1b[22m");
+    }
     if (col < right)
         spaces(o, right - col);
     if (colors)
@@ -500,7 +685,8 @@ static int picker_height(const Editor *e)
 }
 
 /* A screen row inside the pane area: sidebar, panes and the separators between them. */
-static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, int y)
+static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, int y,
+                     const PopupGeom *pg)
 {
     int x = 0;
 
@@ -520,8 +706,20 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
             x++;
             continue;
         }
-        if (y - w->y < w->h - 1)
-            text_row(o, e, w, w->view.rowoff + (size_t)(y - w->y), w == e->layout.active);
+        if (y - w->y < w->h - 1) {
+            Ovl ov;
+            int use = pg->on && w == e->layout.active && y >= pg->row0 && y < pg->row0 + pg->h;
+
+            if (use) {
+                ov.c0 = w->view.coloff + (size_t)pg->cx;
+                ov.c1 = ov.c0 + (size_t)pg->w;
+                ov.cand = &e->comp.v[e->comp.top + (size_t)(y - pg->row0)];
+                ov.sel = e->comp.top + (size_t)(y - pg->row0) == e->comp.sel;
+            }
+            text_row(o, e, w, fold_nth(&w->doc->buf, w->view.rowoff, (size_t)(y - w->y)),
+                     w == e->layout.active,
+                     use ? &ov : NULL);
+        }
         else
             status_row(o, e, w, w == e->layout.active);
         x += w->w;
@@ -531,6 +729,7 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
 void render_frame(Render *r, const Editor *e)
 {
     int y, changed = 0, cr, cc, pcol;
+    PopupGeom pg;
     Win *wins[64];
     size_t nwins;
     const Win *aw = e->layout.active;
@@ -559,6 +758,7 @@ void render_frame(Render *r, const Editor *e)
         r->need_clear = 0;
     }
 
+    popup_geom(e, &pg);
     pcol = -1;
     for (y = 0; y < e->rows; y++) {
         SBuf *row = &r->row;
@@ -571,7 +771,7 @@ void render_frame(Render *r, const Editor *e)
         else if (e->text_y == 1 && y == 0)
             tab_row(row, e);
         else
-            pane_row(row, e, wins, nwins, y);
+            pane_row(row, e, wins, nwins, y, &pg);
 
         if (r->prev[y] && r->prevlen[y] == row->len &&
             memcmp(r->prev[y], row->p, row->len) == 0)
@@ -598,7 +798,7 @@ void render_frame(Render *r, const Editor *e)
         cr = e->rows;
         cc = pcol + 1;
     } else {
-        cr = aw->y + (int)(e->cy - e->rowoff) + 1;
+        cr = aw->y + (int)fold_count(e->buf, e->rowoff, e->cy) + 1;
         cc = aw->x + (int)(editor_cursor_col(e) - e->coloff) + 1;
     }
     if (changed || cr != r->cur_r || cc != r->cur_c) {

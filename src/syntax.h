@@ -21,6 +21,12 @@ typedef struct Syntax Syntax;
 Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen);
 void syn_free(Syntax *s);
 const char *syn_name(const Syntax *s);
+/* Comment markers of the language: *close is NULL for line comments.
+ * Returns 0 if it has none (or s is NULL). */
+int syn_comment(const Syntax *s, const char **open, const char **close);
+/* Calls fn for every keyword/type/constant of the language. */
+void syn_each_word(const Syntax *s, void (*fn)(const char *w, size_t n, int cls, void *ctx),
+                   void *ctx);
 
 /* Picks the language for a file from its name, first line (shebang) and
  * modelines in the first/last 5 lines. NULL means plain text. */

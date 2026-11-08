@@ -30,6 +30,7 @@ struct Syntax {
     size_t tabsize;
     char *pool;             /* storage for the words */
     int number, calls, sigil;
+    char *cmt, *cmt_end;    /* comment markers for the toggle command; cmt_end may be NULL */
     uint8_t call_cls, sigil_cls;
     uint8_t opch[256], idstart[256], idch[256];
     uint8_t *scratch;
@@ -152,6 +153,8 @@ void syn_free(Syntax *s)
     free(s->tab);
     free(s->pool);
     free(s->name);
+    free(s->cmt);
+    free(s->cmt_end);
     free(s->scratch);
     free(s);
 }
@@ -159,6 +162,27 @@ void syn_free(Syntax *s)
 const char *syn_name(const Syntax *s)
 {
     return s ? s->name : "Testo";
+}
+
+int syn_comment(const Syntax *s, const char **open, const char **close)
+{
+    if (!s || !s->cmt)
+        return 0;
+    *open = s->cmt;
+    *close = s->cmt_end;
+    return 1;
+}
+
+void syn_each_word(const Syntax *s, void (*fn)(const char *w, size_t n, int cls, void *ctx),
+                   void *ctx)
+{
+    size_t i;
+
+    if (!s || !s->tab)
+        return;
+    for (i = 0; i < s->tabsize; i++)
+        if (s->tab[i].w)
+            fn(s->tab[i].w, s->tab[i].len, s->tab[i].cls, ctx);
 }
 
 static void set_chars(uint8_t *table, const char *p, size_t n)
@@ -245,6 +269,20 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                     }
                     q = e;
                 }
+            }
+        } else if (tok_is(t[0], "comment")) {
+            if (nt < 2)
+                PERR("riga %zu: comment richiede un simbolo", lineno);
+            free(s->cmt);
+            free(s->cmt_end);
+            s->cmt = xmalloc(t[1].n + 1);
+            memcpy(s->cmt, t[1].p, t[1].n);
+            s->cmt[t[1].n] = '\0';
+            s->cmt_end = NULL;
+            if (nt > 2) {
+                s->cmt_end = xmalloc(t[2].n + 1);
+                memcpy(s->cmt_end, t[2].p, t[2].n);
+                s->cmt_end[t[2].n] = '\0';
             }
         } else if (tok_is(t[0], "number")) {
             s->number = 1;

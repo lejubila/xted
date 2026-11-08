@@ -58,4 +58,20 @@ void edit_delete_lines(Editor *e);
 /* Joins each line of the selection with the next one (the cursor line if none). */
 void edit_join_lines(Editor *e);
 
+/* Replaces the text from byte from_x of the cursor line up to the cursor with s. */
+void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n);
+
+/* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */
+void edit_store_clip(Editor *e, char *text, size_t n, const char *verb);
+
+/* Replaces the word before the cursor (from byte from_x) with a snippet and
+ * starts its session at the first stop. */
+void edit_expand_snippet(Editor *e, size_t from_x, const SnipDef *d);
+/* Moves to stop idx of the running session; the last one ends the session. */
+void edit_snip_goto(Editor *e, size_t idx);
+
+/* Comments (or uncomments) the selected lines, or the cursor line, with the
+ * markers of the document's language. */
+void edit_toggle_comment(Editor *e);
+
 #endif

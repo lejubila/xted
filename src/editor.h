@@ -7,8 +7,10 @@
 #include "layout.h"
 #include "picker.h"
 #include "clip.h"
+#include "complete.h"
 #include "render.h"
 #include "search.h"
+#include "snippet.h"
 #include "syntax.h"
 #include "theme.h"
 #include "term.h"
@@ -19,7 +21,7 @@
 #define MSG_TTL_MS 5000
 #define SIDEBAR_W 28
 
-enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS };
+enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS, PK_COMMANDS };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -49,6 +51,14 @@ typedef struct {
 } Find;
 
 
+/* An extra cursor (multi-cursor mode); the primary one lives in Editor.cy/cx/sel_*. */
+typedef struct {
+    size_t cy, cx;
+    size_t want_col;
+    int sel_on;
+    size_t ay, ax;
+} Cursor;
+
 typedef struct Editor {
     Doc **docs;             /* open documents, in tab order */
     size_t ndocs, docs_cap;
@@ -63,6 +73,11 @@ typedef struct Editor {
     int tree_ready;
     Picker picker;
     Find find;
+    Complete comp;          /* suggestion popup */
+    SnipSession snip;       /* running snippet: Tab visits its stops */
+    Cursor *xc;             /* extra cursors, in text order; see cursors.c */
+    size_t nxc, xc_cap;
+    int undo_hold;          /* inside cur_each: one undo group for all cursors */
     int picker_kind;        /* PK_* */
 
     /* the active pane's view, live: it is copied into the pane when focus moves */
@@ -136,5 +151,27 @@ void editor_store_view(Editor *e);
 void editor_set_msg(Editor *e, long ttl_ms, const char *fmt, ...) KED_PRINTF(3, 4);
 /* Display column of the cursor within its line. */
 size_t editor_cursor_col(const Editor *e);
+
+/* Commands that live in editor.c, available to the palette (see commands.c). */
+void editor_cmd_save(Editor *e);
+void editor_cmd_save_as(Editor *e);
+void editor_cmd_save_all(Editor *e);
+void editor_cmd_open(Editor *e);
+void editor_cmd_quick_open(Editor *e);
+void editor_cmd_buffers(Editor *e);
+void editor_cmd_close_buffer(Editor *e);
+void editor_cmd_quit(Editor *e);
+void editor_cmd_next_buffer(Editor *e);
+void editor_cmd_prev_buffer(Editor *e);
+void editor_cmd_split_v(Editor *e);
+void editor_cmd_split_h(Editor *e);
+void editor_cmd_close_win(Editor *e);
+void editor_cmd_next_win(Editor *e);
+void editor_cmd_prev_win(Editor *e);
+void editor_cmd_toggle_tree(Editor *e);
+void editor_cmd_match(Editor *e);
+void editor_cmd_theme(Editor *e);
+/* Alt+X: the list of all commands. */
+void editor_cmd_palette(Editor *e);
 
 #endif

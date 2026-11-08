@@ -40,6 +40,11 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/session.[ch]` | File di sessione per cartella (`$XDG_STATE_HOME/ked/sessions/`) |
 | `src/search.[ch]` | Nucleo della ricerca: `Matcher` (testo o regex POSIX ERE, per riga), ricerca nel buffer, sostituzione, ricerca nei file; senza terminale |
 | `src/find.[ch]` | Comandi di ricerca/sostituzione/vai alla riga sull'`Editor`: barra di ricerca come macchina a stati |
+| `src/commands.[ch]` | Tabella dei comandi (nome, scorciatoia come testo, funzione): alimenta la command palette (Alt+X) |
+| `src/complete.[ch]` | Candidati dell'autosuggest (parole dei buffer aperti, parole chiave, snippet) e stato del popup; senza terminale |
+| `src/snippet.[ch]` | Snippet incorporati per linguaggio, analisi del corpo (`$1`, `${2:x}`, `$0`) e sessione dei segnaposti |
+| `src/cursors.[ch]` | Multi-cursore: cursori extra dell'`Editor`, `cur_each` esegue un comando a cursore singolo su ciascuno (posizioni tenute come distanza dalla fine del testo), Ctrl+D / Alt+D |
+| `src/fold.[ch]` | Folding: `Line.fold` righe nascoste dopo la riga piegata, intervalli per parentesi o indentazione, passaggi sulle righe visibili |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 
@@ -47,6 +52,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 - Un modulo non deve dipendere da quelli di livello più alto: `buffer` e `utf8` non conoscono terminale né UI.
 - Ogni modifica al testo passa dalle primitive di `buffer.c` (`buf_insert/delete/split/join`) o dagli helper costruiti su di esse, così undo e rappresentazione interna restano isolati. Un comando che modifica il testo apre un gruppo undo (`buf_undo_begin`) e lo chiude a fine comando.
 - `Editor` espone i campi `cy, cx, rowoff, …` del **pannello attivo**; gli altri pannelli hanno la loro `View` in `Win`. Cambiare pannello o documento passa da `editor_store_view`/`load_win` (editor.c); `e->buf` e `e->doc` puntano sempre al documento attivo.
+- I campi extra del multi-cursore (`Editor.xc`) vengono svuotati cambiando pannello/documento e con undo/redo; i comandi di `edit.c` restano a cursore singolo e `cur_each` li ripete per ogni cursore. `Line.fold`/`Buffer.folded` sono lo stato del folding: dopo un'azione che sposta il cursore, `fold_reveal` riapre ciò che lo nasconde; le funzioni di movimento e rendering contano le righe *visibili* (`fold_next/prev/advance/back/nth/count`), mai `cy + 1`.
 - Lo stato derivato dal testo (evidenziazione) vive in `Line.hl` e vale per le righe `< Buffer.stable`: le `raw_*` di `buffer.c` lo invalidano, nessun altro codice deve farlo.
 
 ## Stile del codice

@@ -1,6 +1,9 @@
 #include "editor.h"
 #include "edit.h"
+#include "commands.h"
+#include "cursors.h"
 #include "find.h"
+#include "fold.h"
 #include "session.h"
 #include "utf8.h"
 #include "util.h"
@@ -122,6 +125,9 @@ static void load_win(Editor *e, Win *w)
     e->ax = v->ax;
     e->paste_valid = 0;
     e->match_on = 0;
+    e->snip.on = 0;
+    complete_close(&e->comp);
+    cur_clear(e);
 }
 
 /* Shows d in the active pane. */
@@ -212,6 +218,8 @@ void editor_free(Editor *e)
     free(e->docs);
     picker_free(&e->picker);
     find_free(e);
+    complete_free(&e->comp);
+    cur_clear(e);
     tree_free(&e->tree);
     free(e->root);
     clip_free(&e->clip);
@@ -327,10 +335,12 @@ static void scroll_view(const Buffer *b, View *v, size_t th, size_t cw, int tabw
     const Line *l = &b->lines[v->cy];
     size_t col = editor_view_col(b, v, tabw), w = 1;
 
+    if (b->folded && v->rowoff < b->nlines)
+        v->rowoff = fold_head(b, v->rowoff);
     if (v->cy < v->rowoff)
         v->rowoff = v->cy;
-    if (v->cy >= v->rowoff + th)
-        v->rowoff = v->cy - th + 1;
+    else if (fold_count(b, v->rowoff, v->cy) >= th)
+        v->rowoff = fold_back(b, v->cy, th - 1);
 
     if (v->cx < l->len) {
         uint32_t cp;
@@ -371,6 +381,7 @@ static void prepare_frame(Editor *e)
     relayout(e);
     if (e->tree_ready)
         tree_fit(&e->tree, (size_t)(e->rows - e->text_y - 1));
+    fold_reveal(e);
     scroll(e);
     editor_store_view(e);
     n = layout_wins(&e->layout, w, 64);
@@ -531,7 +542,7 @@ static void move_left(Editor *e)
 
         e->cx = grapheme_prev(l->s, l->len, e->cx);
     } else if (e->cy > 0) {
-        e->cy--;
+        e->cy = fold_prev(e->buf, e->cy);
         e->cx = cur_line(e)->len;
     }
 }
@@ -542,22 +553,20 @@ static void move_right(Editor *e)
 
     if (e->cx < l->len) {
         e->cx = grapheme_next(l->s, l->len, e->cx);
-    } else if (e->cy + 1 < e->buf->nlines) {
-        e->cy++;
+    } else if (fold_next(e->buf, e->cy) < e->buf->nlines) {
+        e->cy = fold_next(e->buf, e->cy);
         e->cx = 0;
     }
 }
 
 static void move_vertical(Editor *e, long delta)
 {
-    long ny = (long)e->cy + delta;
     Line *l;
 
-    if (ny < 0)
-        ny = 0;
-    if (ny >= (long)e->buf->nlines)
-        ny = (long)e->buf->nlines - 1;
-    e->cy = (size_t)ny;
+    if (delta > 0)
+        e->cy = fold_advance(e->buf, e->cy, (size_t)delta);
+    else if (delta < 0)
+        e->cy = fold_back(e->buf, e->cy, (size_t)-delta);
     l = cur_line(e);
     e->cx = utf8_byte_at_col(l->s, l->len, e->want_col, e->tabw);
 }
@@ -565,15 +574,15 @@ static void move_vertical(Editor *e, long delta)
 static void move_page(Editor *e, int down)
 {
     size_t th = text_rows(e), page = th > 1 ? th - 1 : 1;
-    size_t maxoff = e->buf->nlines > th ? e->buf->nlines - th : 0;
+    size_t maxoff = fold_back(e->buf, fold_head(e->buf, e->buf->nlines - 1), th - 1);
 
     if (down) {
-        e->rowoff += page;
+        e->rowoff = fold_advance(e->buf, e->rowoff, page);
         if (e->rowoff > maxoff)
             e->rowoff = maxoff;
         move_vertical(e, (long)page);
     } else {
-        e->rowoff = e->rowoff > page ? e->rowoff - page : 0;
+        e->rowoff = fold_back(e->buf, e->rowoff, page);
         move_vertical(e, -(long)page);
     }
 }
@@ -603,8 +612,8 @@ static void move_word_right(Editor *e)
     size_t i = e->cx;
 
     if (i >= l->len) {
-        if (e->cy + 1 < e->buf->nlines) {
-            e->cy++;
+        if (fold_next(e->buf, e->cy) < e->buf->nlines) {
+            e->cy = fold_next(e->buf, e->cy);
             e->cx = 0;
         }
         return;
@@ -623,7 +632,7 @@ static void move_word_left(Editor *e)
 
     if (i == 0) {
         if (e->cy > 0) {
-            e->cy--;
+            e->cy = fold_prev(e->buf, e->cy);
             e->cx = cur_line(e)->len;
         }
         return;
@@ -961,6 +970,20 @@ static void picker_accept(Editor *e)
             switch_doc(e, e->docs[idx]);
     } else if (kind == PK_RESULTS) {
         find_open_result(e, (size_t)idx);
+    } else if (kind == PK_COMMANDS) {
+        if ((size_t)idx < ncommands) {
+            const Command *c = &commands[idx];
+
+            if (c->modifies && e->doc->readonly) {
+                editor_set_msg(e, MSG_TTL_MS,
+                               "File in sola lettura (Alt+S per salvare con un altro nome)");
+                return;
+            }
+            buf_undo_close(e->buf);
+            e->paste_valid = 0;
+            c->fn(e);
+            e->want_col = editor_cursor_col(e);
+        }
     } else if (kind == PK_FILES) {
         char err[256], *path = under_root(e, e->picker.items[idx]);
 
@@ -1326,7 +1349,17 @@ static int is_typing(Key k)
 /* Returns 1 for vertical movement, which keeps the wanted column. */
 static int handle_alt(Editor *e, Key k, int shift)
 {
+    if ((k.mods & MOD_CTRL) && (k.code == KEY_UP || k.code == KEY_DOWN)) {
+        cur_add_vertical(e, k.code == KEY_DOWN);
+        return 1;
+    }
     switch (k.code) {
+    case 'd':
+        cur_add_all(e);
+        break;
+    case 'z':
+        fold_toggle(e);
+        break;
     case KEY_UP:
         if (shift)
             edit_duplicate_lines(e, 0);
@@ -1355,6 +1388,9 @@ static int handle_alt(Editor *e, Key k, int shift)
         break;
     case 'v':
         edit_paste_older(e);
+        break;
+    case '/':
+        edit_toggle_comment(e);
         break;
     case '\\':
         cmd_split(e, 1);
@@ -1390,19 +1426,13 @@ static int handle_alt(Editor *e, Key k, int shift)
         find_files_open(e);
         break;
     case 'm':
-        if (e->match_on) {
-            e->sel_on = 0;
-            e->cy = e->my;
-            e->cx = e->mx;
-        } else {
-            editor_set_msg(e, MSG_TTL_MS, "Nessuna parentesi corrispondente");
-        }
+        editor_cmd_match(e);
         break;
     case 't':
-        e->theme_idx++;
-        e->theme = theme_get(e->theme_idx);
-        render_invalidate(e->render);
-        editor_set_msg(e, MSG_TTL_MS, "Tema: %s", e->theme->name);
+        editor_cmd_theme(e);
+        break;
+    case 'x':
+        editor_cmd_palette(e);
         break;
     default:
         break;
@@ -1515,6 +1545,9 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         edit_paste_text(e, s, n);
         break;
     }
+    case CTRL('d'):
+        cur_add_next(e);
+        break;
     case CTRL('a'):
         edit_select_all(e);
         break;
@@ -1579,7 +1612,7 @@ static int modifies(Key k)
     if (k.code == KEY_PASTE)
         return 1;
     if (alt)
-        return k.code == KEY_UP || k.code == KEY_DOWN || k.code == 'v';
+        return k.code == KEY_UP || k.code == KEY_DOWN || k.code == 'v' || k.code == '/';
     if (k.code == KEY_TAB && ctrl)
         return 0;
     if (ctrl || k.code < 0x20) {
@@ -1592,6 +1625,215 @@ static int modifies(Key k)
         }
     }
     return k.code == KEY_BACKSPACE || k.code == KEY_DEL || is_printable(k.code);
+}
+
+/* ---- multi-cursor keys -------------------------------------------------- */
+
+typedef struct {
+    Key k;
+    int shift, ctrl;
+} KeyCtx;
+
+static void run_key(Editor *e, void *a, size_t idx)
+{
+    const KeyCtx *c = a;
+
+    (void)idx;
+    if (!handle_plain(e, c->k, c->shift, c->ctrl))
+        e->want_col = editor_cursor_col(e);
+}
+
+static void cut_one(Editor *e, void *a, size_t idx)
+{
+    (void)a;
+    (void)idx;
+    if (edit_sel_active(e))
+        edit_delete(e);
+}
+
+typedef struct {
+    const char *text;
+    size_t n;
+    size_t nlines;
+    int split;              /* one line per cursor */
+} PasteCtx;
+
+static void paste_one(Editor *e, void *a, size_t idx)
+{
+    const PasteCtx *p = a;
+    const char *s = p->text;
+    size_t n = p->n;
+
+    if (p->split) {
+        size_t line = 0, i = 0;
+
+        while (line < idx) {
+            while (i < p->n && s[i] != '\n')
+                i++;
+            i++;
+            line++;
+        }
+        s += i;
+        n = 0;
+        while (i + n < p->n && s[n] != '\n')
+            n++;
+    }
+    edit_paste_text(e, s, n);
+}
+
+static void multi_paste(Editor *e, const char *text, size_t n)
+{
+    PasteCtx p;
+    size_t i, lines = 1;
+
+    p.text = text;
+    p.n = n;
+    if (n > 0 && text[n - 1] == '\n')
+        p.n = n - 1;            /* a whole-line copy ends with a newline of its own */
+    for (i = 0; i < p.n; i++)
+        if (text[i] == '\n')
+            lines++;
+    p.nlines = lines;
+    p.split = lines == cur_count(e);
+    cur_each(e, paste_one, &p);
+    buf_undo_close(e->buf);
+}
+
+/* Handles a key while there are several cursors. Returns 1 if it was used;
+ * 0 means the key goes on to the normal single-cursor commands (the extra
+ * cursors are dropped first, except for the ones that add cursors). */
+static int handle_multi(Editor *e, Key k)
+{
+    int alt = (k.mods & MOD_ALT) != 0, ctrl = (k.mods & MOD_CTRL) != 0;
+    int shift = (k.mods & MOD_SHIFT) != 0, vertical_add;
+    KeyCtx c;
+
+    vertical_add = alt && ctrl && (k.code == KEY_UP || k.code == KEY_DOWN);
+    if (vertical_add || (alt && k.code == 'd') || (!alt && k.code == CTRL('d')))
+        return 0;
+    if (!alt && (k.code == CTRL('c') || k.code == CTRL('x'))) {
+        size_t n;
+        char *t = cur_selected_text(e, &n);
+
+        if (t) {
+            edit_store_clip(e, t, n, k.code == CTRL('c') ? "Copiato" : "Tagliato");
+            if (k.code == CTRL('x')) {
+                cur_each(e, cut_one, NULL);
+                buf_undo_close(e->buf);
+            }
+            return 1;
+        }
+    }
+    if (!alt && (k.code == CTRL('v') || k.code == KEY_PASTE)) {
+        if (k.code == KEY_PASTE) {
+            size_t n;
+            const char *s = term_paste_text(&n);
+
+            multi_paste(e, s, n);
+            return 1;
+        }
+        {
+            const ClipEntry *ce = clip_get(&e->clip, 0);
+
+            if (ce) {
+                multi_paste(e, ce->text, ce->n);
+                return 1;
+            }
+        }
+    }
+    if (!alt && (!ctrl || k.code == KEY_LEFT || k.code == KEY_RIGHT || k.code == KEY_UP ||
+                 k.code == KEY_DOWN || k.code == KEY_HOME || k.code == KEY_END)) {
+        switch (k.code) {
+        case KEY_ENTER: case KEY_BACKSPACE: case 8: case KEY_DEL: case KEY_TAB:
+        case KEY_UP: case KEY_DOWN: case KEY_LEFT: case KEY_RIGHT:
+        case KEY_HOME: case KEY_END: case KEY_PGUP: case KEY_PGDN:
+            break;
+        default:
+            if (!is_printable(k.code))
+                goto collapse;
+        }
+        if (k.code == KEY_TAB && ctrl)
+            goto collapse;
+        c.k = k;
+        c.shift = shift;
+        c.ctrl = ctrl;
+        cur_each(e, run_key, &c);
+        if (!is_typing(k))
+            buf_undo_close(e->buf);
+        return 1;
+    }
+collapse:
+    cur_clear(e);
+    return 0;
+}
+
+/* ---- suggestion popup --------------------------------------------------- */
+
+static void complete_accept(Editor *e)
+{
+    const Cand *c = &e->comp.v[e->comp.sel];
+    char *text = xstrdup(c->text);
+    size_t from = e->comp.x, i, ns;
+    int snippet = c->kind == CAND_SNIPPET;
+    const SnipDef *sd = snip_lang(e->doc->syn ? syn_name(e->doc->syn) : NULL, &ns);
+
+    complete_close(&e->comp);
+    if (snippet)
+        for (i = 0; i < ns; i++)
+            if (strcmp(sd[i].name, text) == 0) {
+                edit_expand_snippet(e, from, &sd[i]);
+                free(text);
+                return;
+            }
+    edit_replace_word(e, from, text, strlen(text));
+    free(text);
+}
+
+/* Keys that belong to an open popup. Returns 1 if the key was used. */
+static int handle_complete(Editor *e, Key k)
+{
+    if (k.mods & (MOD_ALT | MOD_CTRL | MOD_SHIFT))
+        return 0;
+    switch (k.code) {
+    case KEY_UP:
+        complete_move(&e->comp, -1);
+        return 1;
+    case KEY_DOWN:
+        complete_move(&e->comp, 1);
+        return 1;
+    case KEY_ENTER:
+        /* Enter only accepts a choice made with the arrows: typed or pasted
+         * text with newlines must not be rewritten under the user's hands */
+        if (!e->comp.picked) {
+            complete_close(&e->comp);
+            return 0;
+        }
+        /* fall through */
+    case KEY_TAB:
+        buf_undo_close(e->buf);
+        complete_accept(e);
+        return 1;
+    case KEY_ESC:
+        complete_close(&e->comp);
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+/* After a key was handled: open or refresh the popup while a word is being
+ * typed, close it for anything else. */
+static void update_complete(Editor *e, Key k)
+{
+    int word = !(k.mods & (MOD_ALT | MOD_CTRL)) && is_printable(k.code) && cp_is_word(k.code);
+    int bs = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == KEY_BACKSPACE || k.code == 8);
+
+    /* keys already waiting (fast typing, a paste without bracketing) are not worth a scan each */
+    if ((word || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&
+        !e->snip.on && !cur_multi(e) && !term_has_input())
+        complete_open(&e->comp, e->docs, e->ndocs, e->doc, e->cy, e->cx);
+    else
+        complete_close(&e->comp);
 }
 
 static void handle_key(Editor *e, Key k)
@@ -1616,28 +1858,114 @@ static void handle_key(Editor *e, Key k)
         editor_set_msg(e, MSG_TTL_MS, "File in sola lettura (Alt+S per salvare con un altro nome)");
         return;
     }
+    /* editing a folded line opens it: the edit must not leave the cursor in a fold */
+    if (e->buf->folded && modifies(k))
+        e->buf->lines[e->cy].fold = 0;
     int alt = (k.mods & MOD_ALT) != 0, shift = (k.mods & MOD_SHIFT) != 0;
     int vertical;
+    size_t snip_y = 0, snip_nl = 0, snip_len = 0;
 
+    if (cur_multi(e) && handle_multi(e, k)) {
+        e->want_col = editor_cursor_col(e);
+        complete_close(&e->comp);
+        return;
+    }
+    if (e->comp.on && handle_complete(e, k)) {
+        e->want_col = editor_cursor_col(e);
+        return;
+    }
+    if (e->snip.on) {
+        if (alt || (k.mods & MOD_CTRL)) {
+            e->snip.on = 0;
+        } else if (k.code == KEY_TAB) {
+            buf_undo_close(e->buf);
+            edit_snip_goto(e, shift ? (e->snip.cur > 0 ? e->snip.cur - 1 : 0) : e->snip.cur + 1);
+            e->want_col = editor_cursor_col(e);
+            return;
+        } else if (k.code == KEY_ESC) {
+            e->snip.on = 0;
+        }
+    }
     if (!is_typing(k))
         buf_undo_close(e->buf);
     if (!(alt && k.code == 'v'))
         e->paste_valid = 0;
 
+    if (e->snip.on) {
+        snip_y = e->snip.stop[e->snip.cur].y;
+        snip_nl = e->buf->nlines;
+        snip_len = e->buf->lines[snip_y].len;
+    }
     if (alt)
         vertical = handle_alt(e, k, shift);
     else
         vertical = handle_plain(e, k, shift, (k.mods & MOD_CTRL) != 0);
+    if (e->snip.on)
+        snip_adjust(&e->snip, snip_nl, e->buf->nlines, snip_len,
+                    snip_y < e->buf->nlines ? e->buf->lines[snip_y].len : 0, e->cy, e->cx);
 
     if (!vertical)
         e->want_col = editor_cursor_col(e);
+    update_complete(e, k);
+}
+
+/* ---- command entry points (the palette and, later, key maps use them) --- */
+
+void editor_cmd_save(Editor *e) { cmd_save(e); }
+void editor_cmd_save_as(Editor *e) { cmd_save_as(e); }
+void editor_cmd_save_all(Editor *e) { cmd_save_all(e); }
+void editor_cmd_open(Editor *e) { cmd_open(e); }
+void editor_cmd_quick_open(Editor *e) { cmd_quick_open(e); }
+void editor_cmd_buffers(Editor *e) { cmd_buffers(e); }
+void editor_cmd_close_buffer(Editor *e) { cmd_close_buffer(e); }
+void editor_cmd_quit(Editor *e) { cmd_quit(e); }
+void editor_cmd_next_buffer(Editor *e) { cycle_doc(e, 1); }
+void editor_cmd_prev_buffer(Editor *e) { cycle_doc(e, -1); }
+void editor_cmd_split_v(Editor *e) { cmd_split(e, 1); }
+void editor_cmd_split_h(Editor *e) { cmd_split(e, 0); }
+void editor_cmd_close_win(Editor *e) { cmd_close_win(e); }
+void editor_cmd_next_win(Editor *e) { cmd_cycle_win(e, 1); }
+void editor_cmd_prev_win(Editor *e) { cmd_cycle_win(e, -1); }
+void editor_cmd_toggle_tree(Editor *e) { cmd_toggle_tree(e); }
+
+void editor_cmd_match(Editor *e)
+{
+    if (e->match_on) {
+        e->sel_on = 0;
+        e->cy = e->my;
+        e->cx = e->mx;
+    } else {
+        editor_set_msg(e, MSG_TTL_MS, "Nessuna parentesi corrispondente");
+    }
+}
+
+void editor_cmd_theme(Editor *e)
+{
+    e->theme_idx++;
+    e->theme = theme_get(e->theme_idx);
+    render_invalidate(e->render);
+    editor_set_msg(e, MSG_TTL_MS, "Tema: %s", e->theme->name);
+}
+
+void editor_cmd_palette(Editor *e)
+{
+    size_t i;
+    char item[160];
+
+    picker_open(&e->picker, "Comando");
+    e->picker_kind = PK_COMMANDS;
+    for (i = 0; i < ncommands; i++) {
+        snprintf(item, sizeof item, "%-30s %s", commands[i].name, commands[i].keys);
+        picker_add(&e->picker, item);
+    }
+    picker_filter(&e->picker);
 }
 
 void editor_run(Editor *e)
 {
     resize(e);
     if (!e->msg[0])
-        editor_set_msg(e, MSG_TTL_MS, "Ctrl+S salva  Ctrl+Q esci");
+        editor_set_msg(e, MSG_TTL_MS, "Ctrl+S salva  Ctrl+Q esci  Alt+X comandi");
 
     while (!e->quit) {
         Key k;

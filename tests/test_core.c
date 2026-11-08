@@ -1,14 +1,19 @@
 #include "buffer.h"
 #include "clip.h"
+#include "commands.h"
+#include "cursors.h"
+#include "complete.h"
 #include "doc.h"
 #include "edit.h"
 #include "files.h"
+#include "fold.h"
 #include "fuzzy.h"
 #include "langs.h"
 #include "layout.h"
 #include "search.h"
 #include "picker.h"
 #include "session.h"
+#include "snippet.h"
 #include "editor.h"
 #include "syntax.h"
 #include "theme.h"
@@ -1433,6 +1438,432 @@ static void test_goto_parse(void)
     CHECK(search_parse_goto("12x", &l, &c) < 0);
 }
 
+static void test_comments(void)
+{
+    Editor e;
+    const char *o, *c;
+
+    {
+        Syntax *sc = lang("c"), *sm = lang("md");
+
+        CHECK(syn_comment(sc, &o, &c) && strcmp(o, "//") == 0 && !c);
+        CHECK(syn_comment(sm, &o, &c) && strcmp(o, "<!--") == 0 && strcmp(c, "-->") == 0);
+        syn_free(sc);
+        syn_free(sm);
+    }
+    CHECK(!syn_comment(NULL, &o, &c));
+
+    /* single line, then back */
+    ed_load(&e, "int x;\n    y = 1;");
+    doc_set_syntax(e.doc, lang("c"));
+    e.cx = 3;
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "// int x;\n    y = 1;") && e.cx == 6);
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "int x;\n    y = 1;") && e.cx == 3);
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "// int x;\n    y = 1;"));
+    editor_free(&e);
+
+    /* a selection: common indent, blank lines skipped, mixed state comments all */
+    ed_load(&e, "  a\n\n    b\n// c");
+    doc_set_syntax(e.doc, lang("c"));
+    ed_sel(&e, 0, 0, 3, 0);
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "  // a\n\n  //   b\n// c"));
+    ed_sel(&e, 0, 0, 3, 3);
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "  a\n\n    b\nc"));
+    editor_free(&e);
+
+    ed_load(&e, "  // a\n\n  //   b");
+    doc_set_syntax(e.doc, lang("c"));
+    ed_sel(&e, 0, 0, 2, 5);
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "  a\n\n    b"));
+    editor_free(&e);
+
+    /* block markers per line, and a line comment in Python */
+    ed_load(&e, "text");
+    doc_set_syntax(e.doc, lang("md"));
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "<!-- text -->"));
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "text"));
+    editor_free(&e);
+
+    ed_load(&e, "");
+    doc_set_syntax(e.doc, lang("py"));
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "# "));
+    editor_free(&e);
+
+    /* no language: nothing happens */
+    ed_load(&e, "abc");
+    edit_toggle_comment(&e);
+    CHECK(buf_is(e.buf, "abc") && !e.buf->modified);
+    editor_free(&e);
+}
+
+static void test_commands(void)
+{
+    size_t i, j;
+    Editor e;
+
+    CHECK(ncommands > 20);
+    for (i = 0; i < ncommands; i++) {
+        CHECK(commands[i].name && commands[i].name[0] && commands[i].keys && commands[i].fn);
+        for (j = i + 1; j < ncommands; j++)
+            CHECK(strcmp(commands[i].name, commands[j].name) != 0);
+    }
+    /* the palette lists them all, in order, so the chosen index is the table index */
+    ed_load(&e, "x");
+    editor_cmd_palette(&e);
+    CHECK(e.picker.on && e.picker_kind == PK_COMMANDS && e.picker.nitems == ncommands);
+    CHECK(strstr(e.picker.items[0], commands[0].name) != NULL);
+    picker_close(&e.picker);
+    editor_free(&e);
+}
+
+static void test_complete(void)
+{
+    Editor e;
+    Complete c;
+    size_t start;
+
+    memset(&c, 0, sizeof c);
+    ed_load(&e, "alpha_beta alphabet\nint al\nAlbatross");
+    doc_set_syntax(e.doc, lang("c"));
+    CHECK(complete_prefix(e.buf, 1, 6, &start) == 2 && start == 4);
+    CHECK(complete_prefix(e.buf, 1, 4, &start) == 0 && start == 4);
+
+    /* words of the buffer and keywords; the word being typed is not offered */
+    CHECK(complete_open(&c, e.docs, e.ndocs, e.doc, 1, 6) && c.on);
+    CHECK(c.n >= 2 && c.y == 1 && c.x == 4);
+    {
+        size_t i, nbeta = 0, nself = 0;
+
+        for (i = 0; i < c.n; i++) {
+            if (strcmp(c.v[i].text, "alpha_beta") == 0 || strcmp(c.v[i].text, "alphabet") == 0)
+                nbeta++;
+            if (strcmp(c.v[i].text, "al") == 0)
+                nself++;
+        }
+        CHECK(nbeta == 2 && nself == 0);
+    }
+    /* first letter must agree: "Albatross" matches, "int" does not */
+    {
+        size_t i, alb = 0, in = 0;
+
+        for (i = 0; i < c.n; i++) {
+            if (strcmp(c.v[i].text, "Albatross") == 0)
+                alb = 1;
+            if (strcmp(c.v[i].text, "int") == 0)
+                in = 1;
+        }
+        CHECK(alb == 1 && in == 0);
+    }
+    /* keywords come from the language, marked as such */
+    complete_close(&c);
+    {
+        size_t y = 0, x = 0;
+        Editor k;
+
+        ed_load(&k, "");
+        doc_set_syntax(k.doc, lang("c"));
+        buf_insert_text(&k.doc->buf, &y, &x, "retu", 4);
+        CHECK(complete_open(&c, k.docs, k.ndocs, k.doc, 0, 4));
+        CHECK(c.n == 1 && strcmp(c.v[0].text, "return") == 0 && c.v[0].kind == CAND_KEYWORD);
+        complete_close(&c);
+        editor_free(&k);
+    }
+    complete_close(&c);
+    CHECK(!c.on && c.n == 0);
+
+    /* too short a prefix opens nothing */
+    CHECK(!complete_open(&c, e.docs, e.ndocs, e.doc, 1, 5));
+
+    /* selection cycles */
+    CHECK(complete_open(&c, e.docs, e.ndocs, e.doc, 1, 6));
+    complete_move(&c, -1);
+    CHECK(c.sel == c.n - 1);
+    complete_move(&c, 1);
+    CHECK(c.sel == 0);
+    complete_free(&c);
+
+    /* accepting replaces the prefix, as one undo step */
+    e.cy = 1;
+    e.cx = 6;
+    edit_replace_word(&e, 4, "alphabet", 8);
+    CHECK(line_is(e.buf, 1, "int alphabet") && e.cx == 12);
+    edit_undo(&e);
+    CHECK(line_is(e.buf, 1, "int al"));
+    editor_free(&e);
+
+    /* other documents contribute their words; keywords are suggested by kind */
+    {
+        Editor f;
+        Doc *d2 = doc_new();
+        size_t y = 0, x = 0;
+        char *txt = "zebra_crossing";
+
+        ed_load(&f, "ze");
+        buf_insert_text(&d2->buf, &y, &x, txt, strlen(txt));
+        f.docs = xrealloc(f.docs, 2 * sizeof *f.docs);
+        f.docs[1] = d2;
+        f.ndocs = 2;
+        memset(&c, 0, sizeof c);
+        CHECK(complete_open(&c, f.docs, f.ndocs, f.doc, 0, 2));
+        CHECK(c.n == 1 && strcmp(c.v[0].text, "zebra_crossing") == 0 && c.v[0].kind == CAND_WORD);
+        complete_free(&c);
+        f.ndocs = 1;
+        doc_free(d2);
+        editor_free(&f);
+    }
+}
+
+static void test_snippets(void)
+{
+    SBuf t = SBUF_INIT;
+    SnipStops st;
+    SnipDef def;
+    Editor e;
+    size_t n;
+
+    /* parsing: order 1..9 then 0, defaults, escaped dollar, implicit end */
+    snip_parse("a ${2:bb} $1 $$ ${3:c} $0 z", &t, &st);
+    CHECK(t.len == 12 && memcmp(t.p, "a bb  $ c  z", 12) == 0);
+    CHECK(st.n == 4);
+    CHECK(st.stop[0].off == 5 && st.stop[0].len == 0);     /* $1 */
+    CHECK(st.stop[1].off == 2 && st.stop[1].len == 2);     /* ${2:bb} */
+    CHECK(st.stop[2].off == 8 && st.stop[2].len == 1);     /* ${3:c} */
+    CHECK(st.stop[3].off == 10 && st.stop[3].len == 0);    /* $0 */
+    sbuf_free(&t);
+    snip_parse("x $1 $1", &t, &st);
+    CHECK(st.n == 2 && st.stop[0].off == 2 && st.stop[1].off == t.len);
+    sbuf_free(&t);
+    CHECK(snip_lang("C", &n) != NULL && n > 5);
+    CHECK(snip_lang("Markdown", &n) == NULL && n == 0);
+
+    /* expansion keeps the indentation and selects the first stop */
+    ed_load(&e, "  if (x) {\n    fo\n  }");
+    def.name = "for";
+    def.body = "for (${1:i}) {\n\t$0\n}";
+    e.cy = 1;
+    e.cx = 6;
+    edit_expand_snippet(&e, 4, &def);
+    CHECK(buf_is(e.buf, "  if (x) {\n    for (i) {\n    \t\n    }\n  }"));
+    CHECK(e.snip.on && e.snip.n == 2 && e.sel_on);
+    CHECK(e.ay == 1 && e.ax == 9 && e.cy == 1 && e.cx == 10);
+    edit_insert_cp(&e, 'k');
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "  if (x) {\n    for (i) {\n    \t\n    }\n  }"));
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "  if (x) {\n    fo\n  }"));
+    editor_free(&e);
+
+    /* adjust: typing in a stop grows it and shifts the following ones; leaving ends it */
+    {
+        SnipSession s;
+
+        memset(&s, 0, sizeof s);
+        s.on = 1;
+        s.n = 3;
+        s.stop[0].y = 2; s.stop[0].x = 4; s.stop[0].len = 3;
+        s.stop[1].y = 2; s.stop[1].x = 10; s.stop[1].len = 1;
+        s.stop[2].y = 4; s.stop[2].x = 0; s.stop[2].len = 0;
+        CHECK(snip_adjust(&s, 6, 6, 20, 22, 2, 9));
+        CHECK(s.stop[0].len == 5 && s.stop[1].x == 12 && s.stop[2].x == 0);
+        CHECK(snip_adjust(&s, 6, 6, 22, 21, 2, 8));
+        CHECK(s.stop[0].len == 4 && s.stop[1].x == 11);
+        CHECK(!snip_adjust(&s, 6, 6, 21, 21, 2, 3));        /* cursor left the stop */
+        CHECK(!s.on);
+        s.on = 1;
+        CHECK(!snip_adjust(&s, 6, 7, 21, 21, 2, 6));        /* a line was added */
+    }
+}
+
+static void fn_insert(Editor *e, void *a, size_t idx)
+{
+    (void)idx;
+    edit_insert_cp(e, *(uint32_t *)a);
+}
+
+static void fn_newline(Editor *e, void *a, size_t idx)
+{
+    (void)a;
+    (void)idx;
+    edit_newline(e);
+    buf_undo_close(e->buf);
+}
+
+static void fn_backspace(Editor *e, void *a, size_t idx)
+{
+    (void)a;
+    (void)idx;
+    edit_backspace(e);
+}
+
+static void test_cursors(void)
+{
+    Editor e;
+    uint32_t cp = 'Z';
+    size_t n;
+    char *t;
+
+    /* Ctrl+D: first press selects the word, the next ones add occurrences, wrapping */
+    ed_load(&e, "foo bar foo\nxx foo\nlast");
+    cur_add_next(&e);
+    CHECK(e.sel_on && e.cx == 3 && !cur_multi(&e));
+    cur_add_next(&e);
+    CHECK(cur_count(&e) == 2 && e.cy == 0 && e.cx == 11);
+    cur_add_next(&e);
+    CHECK(cur_count(&e) == 3 && e.cy == 1 && e.cx == 6);
+    cur_add_next(&e);                                  /* all taken */
+    CHECK(cur_count(&e) == 3);
+    t = cur_selected_text(&e, &n);
+    CHECK(t && n == 11 && memcmp(t, "foo\nfoo\nfoo", 11) == 0);
+    free(t);
+
+    /* typing replaces every selection; one undo step restores all */
+    cur_each(&e, fn_insert, &cp);
+    buf_undo_close(e.buf);
+    CHECK(buf_is(e.buf, "Z bar Z\nxx Z\nlast") && cur_count(&e) == 3);
+    cur_each(&e, fn_insert, &cp);
+    CHECK(buf_is(e.buf, "ZZ bar ZZ\nxx ZZ\nlast"));
+    buf_undo_close(e.buf);
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "Z bar Z\nxx Z\nlast"));      /* each key run is one step for all cursors */
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "foo bar foo\nxx foo\nlast") && !cur_multi(&e));
+    editor_free(&e);
+
+    /* Alt+D takes them all at once */
+    ed_load(&e, "ab ab ab\nab");
+    cur_add_all(&e);
+    CHECK(cur_count(&e) == 4);
+    cur_each(&e, fn_newline, NULL);
+    CHECK(buf_is(e.buf, "\n \n \n\n\n") && e.buf->nlines == 6);
+    editor_free(&e);
+
+    /* several cursors on one line, and lines splitting: positions stay right */
+    ed_load(&e, "abcdef\nxyz");
+    e.cx = 2;
+    {
+        Cursor c;
+
+        memset(&c, 0, sizeof c);
+        c.cy = 0;
+        c.cx = 4;
+        e.xc = xmalloc(sizeof c);
+        e.xc[0] = c;
+        e.nxc = e.xc_cap = 1;
+        c.cy = 1;
+        c.cx = 1;
+        e.xc = xrealloc(e.xc, 2 * sizeof c);
+        e.xc[1] = c;
+        e.nxc = e.xc_cap = 2;
+    }
+    cur_each(&e, fn_newline, NULL);
+    CHECK(buf_is(e.buf, "ab\ncd\nef\nx\nyz"));
+    CHECK(cur_count(&e) == 3 && e.cy == 0 + 1 && e.cx == 0);
+    cur_each(&e, fn_backspace, NULL);
+    CHECK(buf_is(e.buf, "abcdef\nxyz") && cur_count(&e) == 3);
+    editor_free(&e);
+
+    /* cursors that meet merge */
+    ed_load(&e, "abc");
+    e.cx = 2;
+    e.xc = xmalloc(sizeof *e.xc);
+    memset(e.xc, 0, sizeof *e.xc);
+    e.xc[0].cx = 1;
+    e.nxc = e.xc_cap = 1;
+    cur_each(&e, fn_backspace, NULL);
+    CHECK(buf_is(e.buf, "c") && !cur_multi(&e) && e.cx == 0);
+    editor_free(&e);
+
+    /* vertical: same column, skipping lines that are too short does not move it */
+    ed_load(&e, "abcdef\nab\nabcdef");
+    e.cx = 4;
+    e.want_col = 4;
+    cur_add_vertical(&e, 1);
+    cur_add_vertical(&e, 1);
+    CHECK(cur_count(&e) == 3 && e.cy == 2 && e.cx == 4);
+    cur_add_vertical(&e, 1);                           /* no line below: nothing */
+    CHECK(cur_count(&e) == 3);
+    editor_free(&e);
+}
+
+static void test_folding(void)
+{
+    Editor e;
+    size_t last = 0;
+    const char *c_text = "int f(void)\n{\n    if (x) {\n        a();\n        b();\n    }\n"
+                         "    return 0;\n}\n\nint g;";
+    const char *py_text = "def f():\n    a = 1\n\n    b = 2\n\nx = 3\n";
+
+    /* by bracket: the closing line stays visible; Allman braces fold from the brace line */
+    ed_load(&e, c_text);
+    doc_set_syntax(e.doc, lang("c"));
+    CHECK(fold_range(e.doc->syn, e.buf, 1, &last) && last == 6);
+    CHECK(fold_range(e.doc->syn, e.buf, 2, &last) && last == 4);
+    CHECK(!fold_range(e.doc->syn, e.buf, 0, &last));          /* "{" is on the next line */
+    CHECK(!fold_range(e.doc->syn, e.buf, 3, &last));
+    CHECK(!fold_range(e.doc->syn, e.buf, 9, &last));
+    editor_free(&e);
+
+    /* by indentation; blank lines inside count, trailing ones do not */
+    ed_load(&e, py_text);
+    doc_set_syntax(e.doc, lang("py"));
+    CHECK(fold_range(e.doc->syn, e.buf, 0, &last) && last == 3);
+    CHECK(!fold_range(e.doc->syn, e.buf, 5, &last));
+    editor_free(&e);
+
+    /* folding hides lines from every walk; the cursor goes to the head */
+    ed_load(&e, c_text);
+    doc_set_syntax(e.doc, lang("c"));
+    e.cy = 4;
+    fold_toggle(&e);                                   /* innermost block containing line 4 */
+    CHECK(e.cy == 2 && e.buf->lines[2].fold == 2 && e.buf->folded);
+    CHECK(fold_next(e.buf, 2) == 5 && fold_prev(e.buf, 5) == 2);
+    CHECK(fold_head(e.buf, 3) == 2 && fold_head(e.buf, 4) == 2 && fold_head(e.buf, 5) == 5);
+    CHECK(fold_count(e.buf, 0, 6) == 4 && fold_count(e.buf, 0, 10) == 8);
+    CHECK(fold_nth(e.buf, 0, 3) == 5 && fold_nth(e.buf, 0, 20) == e.buf->nlines);
+    CHECK(fold_advance(e.buf, 1, 2) == 5 && fold_back(e.buf, 5, 2) == 1);
+    CHECK(fold_back(e.buf, 5, 100) == 0 && fold_advance(e.buf, 8, 5) == 9);
+
+    /* an outer fold hides the inner one, which stays folded when the outer opens */
+    e.cy = 1;
+    fold_toggle(&e);
+    CHECK(e.buf->lines[1].fold == 5 && fold_next(e.buf, 1) == 7);
+    e.buf->lines[1].fold = 0;
+    CHECK(e.buf->lines[2].fold == 2);
+
+    /* something that moves the cursor into a fold opens it */
+    e.cy = 3;
+    fold_reveal(&e);
+    CHECK(e.buf->lines[2].fold == 0);
+    fold_all(&e);
+    CHECK(e.buf->lines[1].fold == 5 && e.buf->lines[8].fold == 0);
+    unfold_all(&e);
+    CHECK(!e.buf->folded && e.buf->lines[1].fold == 0);
+    e.cy = 3;
+    fold_toggle(&e);                                   /* cursor on line 3: the "if" block */
+    CHECK(e.buf->lines[2].fold == 2);
+    fold_toggle(&e);
+    CHECK(e.buf->lines[2].fold == 0);
+    editor_free(&e);
+
+    /* a folded line keeps its fold across line insertion above it */
+    ed_load(&e, "a {\n  b\n}\nc");
+    doc_set_syntax(e.doc, lang("c"));
+    fold_toggle(&e);
+    CHECK(e.buf->lines[0].fold == 1);
+    buf_split(e.buf, 0, 0);
+    CHECK(e.buf->lines[0].fold == 1 && e.buf->lines[1].fold == 0);
+    editor_free(&e);
+}
+
 int main(void)
 {
     test_utf8();
@@ -1461,6 +1892,12 @@ int main(void)
     test_search_replace();
     test_search_files();
     test_goto_parse();
+    test_comments();
+    test_commands();
+    test_complete();
+    test_snippets();
+    test_cursors();
+    test_folding();
     if (failures) {
         fprintf(stderr, "%d test falliti\n", failures);
         return 1;
