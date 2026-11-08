@@ -23,16 +23,19 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 |---|---|
 | `src/main.c` | Argomenti da riga di comando e avvio |
 | `src/term.[ch]` | Raw mode, alternate screen, segnali, `poll()`, decodifica dei tasti |
-| `src/buffer.[ch]` | Testo (indipendente dalla UI), caricamento e salvataggio, primitive di modifica |
+| `src/buffer.[ch]` | Testo (indipendente dalla UI), caricamento e salvataggio, primitive di modifica, helper multi-riga, undo/redo |
+| `src/undo.[ch]` | Log delle operazioni e gruppi di undo; non conosce `Buffer` |
+| `src/clip.[ch]` | Kill ring e codifica base64/OSC 52 per gli appunti di sistema |
 | `src/utf8.[ch]` | Decodifica/codifica UTF-8, `wcwidth` interna |
 | `src/render.[ch]` | Rendering differenziale, un solo `write()` per frame |
-| `src/editor.[ch]` | Stato dell'editor, comandi, prompt, dispatch dei tasti |
+| `src/editor.[ch]` | Stato dell'editor, ciclo eventi, prompt, movimento, dispatch dei tasti |
+| `src/edit.[ch]` | Comandi di modifica: selezione, appunti, operazioni sulle righe, indentazione, autoindent |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 
 - Ogni fase aggiunge i moduli previsti da `SPEC.md` (sintassi, comandi, configurazione, …).
 - Un modulo non deve dipendere da quelli di livello più alto: `buffer` e `utf8` non conoscono terminale né UI.
-- Ogni modifica al testo passa dalle primitive di `buffer.c`, così undo e rappresentazione interna restano isolati.
+- Ogni modifica al testo passa dalle primitive di `buffer.c` (`buf_insert/delete/split/join`) o dagli helper costruiti su di esse, così undo e rappresentazione interna restano isolati. Un comando che modifica il testo apre un gruppo undo (`buf_undo_begin`) e lo chiude a fine comando.
 
 ## Stile del codice
 

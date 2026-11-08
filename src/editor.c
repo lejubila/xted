@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "edit.h"
 #include "utf8.h"
 #include "util.h"
 
@@ -6,8 +7,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
-#define MSG_TTL_MS 5000
 
 static long now_ms(void)
 {
@@ -17,9 +16,7 @@ static long now_ms(void)
     return (long)ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
 }
 
-static void set_msg(Editor *e, long ttl_ms, const char *fmt, ...) KED_PRINTF(3, 4);
-
-static void set_msg(Editor *e, long ttl_ms, const char *fmt, ...)
+void editor_set_msg(Editor *e, long ttl_ms, const char *fmt, ...)
 {
     va_list ap;
 
@@ -53,12 +50,14 @@ void editor_init(Editor *e)
     e->tabw = 8;
     e->rows = 24;
     e->cols = 80;
+    e->clipboard_osc52 = 1;
     e->render = render_create();
 }
 
 void editor_free(Editor *e)
 {
     buf_free(&e->buf);
+    clip_free(&e->clip);
     render_free(e->render);
     e->render = NULL;
 }
@@ -68,9 +67,9 @@ int editor_open(Editor *e, const char *path, char *err, size_t errlen)
     if (buf_load(&e->buf, path, err, errlen) < 0)
         return -1;
     if (e->buf.is_new)
-        set_msg(e, MSG_TTL_MS, "Nuovo file");
+        editor_set_msg(e, MSG_TTL_MS, "Nuovo file");
     else if (e->buf.has_nul)
-        set_msg(e, MSG_TTL_MS, "Attenzione: il file contiene byte NUL (binario?)");
+        editor_set_msg(e, MSG_TTL_MS, "Attenzione: il file contiene byte NUL (binario?)");
     return 0;
 }
 
@@ -153,7 +152,7 @@ static int next_key(Editor *e, Key *k)
  * insensitive). Returns it in lowercase, or 0 on Esc. */
 static int ask(Editor *e, const char *question, const char *keys)
 {
-    set_msg(e, 0, "%s", question);
+    editor_set_msg(e, 0, "%s", question);
     for (;;) {
         Key k;
         uint32_t c;
@@ -188,7 +187,7 @@ static size_t prompt(Editor *e, const char *label, char *out, size_t outsz)
 
         if (next_key(e, &k) < 0)
             break;
-        if (k.code == KEY_ENTER || k.code == '\n') {
+        if (k.code == KEY_ENTER) {
             if (e->prompt_len) {
                 ok = 1;
                 break;
@@ -220,6 +219,19 @@ static size_t prompt(Editor *e, const char *label, char *out, size_t outsz)
 }
 
 /* ---- movement ---------------------------------------------------------- */
+
+/* Called before a movement key: Shift starts or extends the selection,
+ * anything else drops it. */
+static void sel_begin(Editor *e, int shift)
+{
+    if (!shift) {
+        e->sel_on = 0;
+    } else if (!edit_sel_active(e)) {
+        e->sel_on = 1;
+        e->ay = e->cy;
+        e->ax = e->cx;
+    }
+}
 
 static void move_left(Editor *e)
 {
@@ -286,18 +298,12 @@ static void move_home(Editor *e)
     e->cx = (e->cx == fnb) ? 0 : fnb;
 }
 
-static int is_word(uint32_t cp)
-{
-    return cp >= 0x80 || cp == '_' || (cp >= '0' && cp <= '9') ||
-           (cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z');
-}
-
 static int word_at(const Line *l, size_t i)
 {
     uint32_t cp;
 
     utf8_decode(l->s + i, l->len - i, &cp);
-    return is_word(cp);
+    return cp_is_word(cp);
 }
 
 static void move_word_right(Editor *e)
@@ -338,52 +344,6 @@ static void move_word_left(Editor *e)
     e->cx = i;
 }
 
-/* ---- editing ----------------------------------------------------------- */
-
-static void insert_cp(Editor *e, uint32_t cp)
-{
-    char b[4];
-    int n = utf8_encode(cp, b);
-
-    buf_insert(&e->buf, e->cy, e->cx, b, (size_t)n);
-    e->cx += (size_t)n;
-}
-
-static void insert_newline(Editor *e)
-{
-    buf_split(&e->buf, e->cy, e->cx);
-    e->cy++;
-    e->cx = 0;
-}
-
-static void delete_backward(Editor *e)
-{
-    if (e->cx > 0) {
-        Line *l = cur_line(e);
-        size_t from = grapheme_prev(l->s, l->len, e->cx);
-
-        buf_delete(&e->buf, e->cy, from, e->cx - from);
-        e->cx = from;
-    } else if (e->cy > 0) {
-        e->cy--;
-        e->cx = cur_line(e)->len;
-        buf_join(&e->buf, e->cy);
-    }
-}
-
-static void delete_forward(Editor *e)
-{
-    Line *l = cur_line(e);
-
-    if (e->cx < l->len) {
-        size_t to = grapheme_next(l->s, l->len, e->cx);
-
-        buf_delete(&e->buf, e->cy, e->cx, to - e->cx);
-    } else if (e->cy + 1 < e->buf.nlines) {
-        buf_join(&e->buf, e->cy);
-    }
-}
-
 /* ---- file commands ----------------------------------------------------- */
 
 static int cmd_save(Editor *e)
@@ -394,17 +354,17 @@ static int cmd_save(Editor *e)
 
     if (!e->buf.path) {
         if (prompt(e, "Salva con nome: ", name, sizeof name) == 0) {
-            set_msg(e, MSG_TTL_MS, "Salvataggio annullato");
+            editor_set_msg(e, MSG_TTL_MS, "Salvataggio annullato");
             return -1;
         }
         target = name;
     }
     n = buf_save(&e->buf, target, err, sizeof err);
     if (n < 0) {
-        set_msg(e, MSG_TTL_MS, "Errore di salvataggio: %s", err);
+        editor_set_msg(e, MSG_TTL_MS, "Errore di salvataggio: %s", err);
         return -1;
     }
-    set_msg(e, MSG_TTL_MS, "%zu righe, %ld byte scritti", e->buf.nlines, n);
+    editor_set_msg(e, MSG_TTL_MS, "%zu righe, %ld byte scritti", e->buf.nlines, n);
     return 0;
 }
 
@@ -423,43 +383,98 @@ static void cmd_quit(Editor *e)
 
 /* ---- dispatch ---------------------------------------------------------- */
 
-static void handle_key(Editor *e, Key k)
+static int is_printable(uint32_t code)
 {
-    int vertical = 0, ctrl = (k.mods & MOD_CTRL) != 0;
+    return code >= 0x20 && code < KEY_SPECIAL && code != 0x7F && !(code >= 0x80 && code < 0xA0);
+}
 
-    if (k.mods & MOD_ALT)
-        return;
+/* Typing, Backspace and Delete keep one undo group open, so a run of them
+ * is undone in one step; every other key closes it. */
+static int is_typing(Key k)
+{
+    if (k.mods & (MOD_ALT | MOD_CTRL))
+        return 0;
+    if (k.code == KEY_BACKSPACE || k.code == 8 || k.code == KEY_DEL)
+        return 1;
+    if (k.code == KEY_TAB)
+        return !(k.mods & MOD_SHIFT);
+    return is_printable(k.code);
+}
 
+/* Returns 1 for vertical movement, which keeps the wanted column. */
+static int handle_alt(Editor *e, Key k, int shift)
+{
     switch (k.code) {
     case KEY_UP:
-        move_vertical(e, -1);
-        vertical = 1;
-        break;
+        if (shift)
+            edit_duplicate_lines(e, 0);
+        else
+            edit_move_lines(e, 0);
+        return 1;
     case KEY_DOWN:
+        if (shift)
+            edit_duplicate_lines(e, 1);
+        else
+            edit_move_lines(e, 1);
+        return 1;
+    case 'l':
+        edit_select_line(e);
+        break;
+    case 'w':
+        edit_select_word(e);
+        break;
+    case 'v':
+        edit_paste_older(e);
+        break;
+    default:
+        break;
+    }
+    return 0;
+}
+
+static int handle_plain(Editor *e, Key k, int shift, int ctrl)
+{
+    switch (k.code) {
+    case KEY_UP:
+        sel_begin(e, shift);
+        move_vertical(e, -1);
+        return 1;
+    case KEY_DOWN:
+        sel_begin(e, shift);
         move_vertical(e, 1);
-        vertical = 1;
-        break;
+        return 1;
     case KEY_PGUP:
+        sel_begin(e, shift);
         move_page(e, 0);
-        vertical = 1;
-        break;
+        return 1;
     case KEY_PGDN:
+        sel_begin(e, shift);
         move_page(e, 1);
-        vertical = 1;
-        break;
+        return 1;
     case KEY_LEFT:
+        if (!shift && edit_sel_active(e)) {
+            edit_sel_collapse(e, 0);
+            break;
+        }
+        sel_begin(e, shift);
         if (ctrl)
             move_word_left(e);
         else
             move_left(e);
         break;
     case KEY_RIGHT:
+        if (!shift && edit_sel_active(e)) {
+            edit_sel_collapse(e, 1);
+            break;
+        }
+        sel_begin(e, shift);
         if (ctrl)
             move_word_right(e);
         else
             move_right(e);
         break;
     case KEY_HOME:
+        sel_begin(e, shift);
         if (ctrl) {
             e->cy = 0;
             e->cx = 0;
@@ -468,23 +483,60 @@ static void handle_key(Editor *e, Key k)
         }
         break;
     case KEY_END:
+        sel_begin(e, shift);
         if (ctrl)
             e->cy = e->buf.nlines - 1;
         e->cx = cur_line(e)->len;
         break;
     case KEY_ENTER:
-    case '\n':
-        insert_newline(e);
+        edit_newline(e);
         break;
     case KEY_BACKSPACE:
     case 8:
-        delete_backward(e);
+        edit_backspace(e);
         break;
     case KEY_DEL:
-        delete_forward(e);
+        edit_delete(e);
         break;
     case KEY_TAB:
-        insert_cp(e, '\t');
+        if (shift)
+            edit_dedent(e);
+        else
+            edit_tab(e);
+        break;
+    case KEY_ESC:
+        e->sel_on = 0;
+        break;
+    case KEY_PASTE: {
+        size_t n;
+        const char *s = term_paste_text(&n);
+
+        edit_paste_text(e, s, n);
+        break;
+    }
+    case CTRL('a'):
+        edit_select_all(e);
+        break;
+    case CTRL('c'):
+        edit_copy(e);
+        break;
+    case CTRL('x'):
+        edit_cut(e);
+        break;
+    case CTRL('v'):
+        edit_paste(e);
+        break;
+    case CTRL('z'):
+        edit_undo(e);
+        break;
+    case CTRL('y'):
+        edit_redo(e);
+        break;
+    case CTRL('k'):
+        edit_delete_lines(e);
+        break;
+    case CTRL('j'):
+        edit_join_lines(e);
         break;
     case CTRL('s'):
         cmd_save(e);
@@ -496,11 +548,27 @@ static void handle_key(Editor *e, Key k)
         render_invalidate(e->render);
         break;
     default:
-        if (k.code >= 0x20 && k.code < KEY_SPECIAL && k.code != 0x7F &&
-            !(k.code >= 0x80 && k.code < 0xA0))
-            insert_cp(e, k.code);
+        if (is_printable(k.code))
+            edit_insert_cp(e, k.code);
         break;
     }
+    return 0;
+}
+
+static void handle_key(Editor *e, Key k)
+{
+    int alt = (k.mods & MOD_ALT) != 0, shift = (k.mods & MOD_SHIFT) != 0;
+    int vertical;
+
+    if (!is_typing(k))
+        buf_undo_close(&e->buf);
+    if (!(alt && k.code == 'v'))
+        e->paste_valid = 0;
+
+    if (alt)
+        vertical = handle_alt(e, k, shift);
+    else
+        vertical = handle_plain(e, k, shift, (k.mods & MOD_CTRL) != 0);
 
     if (!vertical)
         e->want_col = editor_cursor_col(e);
@@ -510,7 +578,7 @@ void editor_run(Editor *e)
 {
     resize(e);
     if (!e->msg[0])
-        set_msg(e, MSG_TTL_MS, "Ctrl+S salva  Ctrl+Q esci");
+        editor_set_msg(e, MSG_TTL_MS, "Ctrl+S salva  Ctrl+Q esci");
 
     while (!e->quit) {
         Key k;

@@ -75,6 +75,7 @@ void buf_free(Buffer *b)
     lines_clear(b);
     free(b->lines);
     free(b->path);
+    undo_free(&b->undo);
     memset(b, 0, sizeof *b);
 }
 
@@ -144,6 +145,7 @@ int buf_load(Buffer *b, const char *path, char *err, size_t errlen)
     close(fd);
 
     lines_clear(b);
+    undo_free(&b->undo);
     b->has_nul = len > 0 && memchr(data, 0, len) != NULL;
     first_nl = memchr(data, '\n', len);
     b->crlf = first_nl && first_nl > data && first_nl[-1] == '\r';
@@ -288,6 +290,8 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
     }
     b->modified = 0;
     b->is_new = 0;
+    undo_close(&b->undo);
+    b->undo.saved_at = b->undo.cur;
     sbuf_free(&out);
     free(tmp);
     free(real);
@@ -305,12 +309,12 @@ fail:
     return -1;
 }
 
-void buf_insert(Buffer *b, size_t y, size_t x, const char *s, size_t n)
+/* Raw mutations: no undo recording. */
+
+static void raw_insert(Buffer *b, size_t y, size_t x, const char *s, size_t n)
 {
     Line *l = &b->lines[y];
 
-    if (n == 0)
-        return;
     line_reserve(l, l->len + n);
     memmove(l->s + x + n, l->s + x, l->len - x);
     memcpy(l->s + x, s, n);
@@ -318,18 +322,16 @@ void buf_insert(Buffer *b, size_t y, size_t x, const char *s, size_t n)
     b->modified = 1;
 }
 
-void buf_delete(Buffer *b, size_t y, size_t x, size_t n)
+static void raw_delete(Buffer *b, size_t y, size_t x, size_t n)
 {
     Line *l = &b->lines[y];
 
-    if (n == 0)
-        return;
     memmove(l->s + x, l->s + x + n, l->len - x - n);
     l->len -= n;
     b->modified = 1;
 }
 
-void buf_split(Buffer *b, size_t y, size_t x)
+static void raw_split(Buffer *b, size_t y, size_t x)
 {
     Line *l, *nl;
     size_t tail;
@@ -350,7 +352,7 @@ void buf_split(Buffer *b, size_t y, size_t x)
     b->modified = 1;
 }
 
-void buf_join(Buffer *b, size_t y)
+static void raw_join(Buffer *b, size_t y)
 {
     Line *l = &b->lines[y], *next = &b->lines[y + 1];
 
@@ -363,4 +365,209 @@ void buf_join(Buffer *b, size_t y)
     memmove(next, next + 1, (b->nlines - y - 2) * sizeof(Line));
     b->nlines--;
     b->modified = 1;
+}
+
+void buf_insert(Buffer *b, size_t y, size_t x, const char *s, size_t n)
+{
+    if (n == 0)
+        return;
+    raw_insert(b, y, x, s, n);
+    undo_record(&b->undo, OP_INSERT, y, x, s, n);
+}
+
+void buf_delete(Buffer *b, size_t y, size_t x, size_t n)
+{
+    if (n == 0)
+        return;
+    undo_record(&b->undo, OP_DELETE, y, x, b->lines[y].s + x, n);
+    raw_delete(b, y, x, n);
+}
+
+void buf_split(Buffer *b, size_t y, size_t x)
+{
+    raw_split(b, y, x);
+    undo_record(&b->undo, OP_SPLIT, y, x, NULL, 0);
+}
+
+void buf_join(Buffer *b, size_t y)
+{
+    size_t x = b->lines[y].len;
+
+    raw_join(b, y);
+    undo_record(&b->undo, OP_JOIN, y, x, NULL, 0);
+}
+
+/* ---- undo -------------------------------------------------------------- */
+
+void buf_undo_begin(Buffer *b, size_t cy, size_t cx)
+{
+    undo_begin(&b->undo, cy, cx);
+}
+
+void buf_undo_cursor(Buffer *b, size_t cy, size_t cx)
+{
+    undo_cursor(&b->undo, cy, cx);
+}
+
+void buf_undo_close(Buffer *b)
+{
+    undo_close(&b->undo);
+}
+
+static void apply_op(Buffer *b, const Op *op, int inverse)
+{
+    switch (op->kind) {
+    case OP_INSERT:
+        if (inverse)
+            raw_delete(b, op->y, op->x, op->n);
+        else
+            raw_insert(b, op->y, op->x, op->text, op->n);
+        break;
+    case OP_DELETE:
+        if (inverse)
+            raw_insert(b, op->y, op->x, op->text, op->n);
+        else
+            raw_delete(b, op->y, op->x, op->n);
+        break;
+    case OP_SPLIT:
+        if (inverse)
+            raw_join(b, op->y);
+        else
+            raw_split(b, op->y, op->x);
+        break;
+    case OP_JOIN:
+        if (inverse)
+            raw_split(b, op->y, op->x);
+        else
+            raw_join(b, op->y);
+        break;
+    }
+}
+
+int buf_undo(Buffer *b, size_t *cy, size_t *cx)
+{
+    Undo *u = &b->undo;
+    UndoGroup *g;
+    size_t i;
+
+    undo_close(u);
+    if (u->cur == 0)
+        return 0;
+    g = &u->groups[--u->cur];
+    for (i = g->nops; i-- > 0;)
+        apply_op(b, &g->ops[i], 1);
+    *cy = g->cy_before;
+    *cx = g->cx_before;
+    b->modified = u->cur != u->saved_at;
+    return 1;
+}
+
+int buf_redo(Buffer *b, size_t *cy, size_t *cx)
+{
+    Undo *u = &b->undo;
+    UndoGroup *g;
+    size_t i;
+
+    undo_close(u);
+    if (u->cur >= u->ngroups)
+        return 0;
+    g = &u->groups[u->cur++];
+    for (i = 0; i < g->nops; i++)
+        apply_op(b, &g->ops[i], 0);
+    *cy = g->cy_after;
+    *cx = g->cx_after;
+    b->modified = u->cur != u->saved_at;
+    return 1;
+}
+
+/* ---- multi-line helpers, built on the primitives ----------------------- */
+
+char *buf_get_range(const Buffer *b, size_t y0, size_t x0, size_t y1, size_t x1, size_t *n)
+{
+    SBuf out = SBUF_INIT;
+    size_t y;
+
+    for (y = y0; y <= y1; y++) {
+        const Line *l = &b->lines[y];
+        size_t from = y == y0 ? x0 : 0;
+        size_t to = y == y1 ? x1 : l->len;
+
+        if (to > from)
+            sbuf_add(&out, l->s + from, to - from);
+        if (y < y1)
+            sbuf_add(&out, "\n", 1);
+    }
+    *n = out.len;
+    return out.p ? out.p : xmalloc(1);
+}
+
+void buf_delete_range(Buffer *b, size_t y0, size_t x0, size_t y1, size_t x1)
+{
+    size_t y;
+
+    if (y0 == y1) {
+        buf_delete(b, y0, x0, x1 - x0);
+        return;
+    }
+    /* empty the middle lines first, so that the joins below only splice
+     * the head of the first line onto the tail of the last */
+    buf_delete(b, y1, 0, x1);
+    for (y = y0 + 1; y < y1; y++)
+        buf_delete(b, y, 0, b->lines[y].len);
+    buf_delete(b, y0, x0, b->lines[y0].len - x0);
+    for (y = y0; y < y1; y++)
+        buf_join(b, y0);
+}
+
+void buf_insert_text(Buffer *b, size_t *y, size_t *x, const char *s, size_t n)
+{
+    while (n > 0) {
+        const char *nl = memchr(s, '\n', n);
+        size_t seg = nl ? (size_t)(nl - s) : n;
+
+        buf_insert(b, *y, *x, s, seg);
+        *x += seg;
+        s += seg;
+        n -= seg;
+        if (nl) {
+            buf_split(b, *y, *x);
+            (*y)++;
+            *x = 0;
+            s++;
+            n--;
+        }
+    }
+}
+
+void buf_delete_lines(Buffer *b, size_t y0, size_t y1)
+{
+    size_t y, i, count = y1 - y0 + 1;
+
+    /* empty every line, then join the empty ones away: each join removes one line */
+    for (y = y0; y <= y1; y++)
+        buf_delete(b, y, 0, b->lines[y].len);
+    if (y1 + 1 < b->nlines) {
+        for (i = 0; i < count; i++)
+            buf_join(b, y0);
+    } else if (y0 > 0) {
+        for (i = 0; i < count; i++)
+            buf_join(b, y0 - 1);
+    } else {
+        for (i = 1; i < count; i++)
+            buf_join(b, 0);
+    }
+}
+
+void buf_insert_lines(Buffer *b, size_t y, int after, const char *s, size_t n)
+{
+    size_t yy, xx = 0;
+
+    if (after) {
+        buf_split(b, y, b->lines[y].len);
+        yy = y + 1;
+    } else {
+        buf_split(b, y, 0);
+        yy = y;
+    }
+    buf_insert_text(b, &yy, &xx, s, n);
 }

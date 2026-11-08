@@ -131,6 +131,12 @@ int cp_is_combining(uint32_t cp)
     return cp >= 0x300 && in_table(combining, NELEM(combining), cp);
 }
 
+int cp_is_word(uint32_t cp)
+{
+    return cp >= 0x80 || cp == '_' || (cp >= '0' && cp <= '9') ||
+           (cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z');
+}
+
 int cp_width(uint32_t cp)
 {
     if (cp < 0x300)

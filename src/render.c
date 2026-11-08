@@ -1,4 +1,5 @@
 #include "render.h"
+#include "edit.h"
 #include "editor.h"
 #include "term.h"
 #include "utf8.h"
@@ -117,24 +118,35 @@ static size_t fit_tail(SBuf *o, const char *s, size_t len, size_t maxcols)
     return 1 + fit_cols(o, s + start, len - start, maxcols - 1);
 }
 
+/* Turns reverse video on or off, only emitting it on a change. */
+static void set_hl(SBuf *o, int *hl, int on)
+{
+    if (on == *hl)
+        return;
+    sbuf_adds(o, on ? "\x1b[7m" : "\x1b[27m");
+    *hl = on;
+}
+
 static void text_row(SBuf *o, const Editor *e, size_t y)
 {
     const Line *l;
     size_t left = e->coloff, right = left + (size_t)e->cols;
-    size_t i = 0, col = 0;
-    int prev_visible = 0;
+    size_t i = 0, col = 0, sel_from = 0, sel_to = 0;
+    int prev_visible = 0, hl = 0, sel_nl = 0, has_sel;
 
     if (y >= e->buf.nlines) {
         sbuf_adds(o, "\x1b[2m~\x1b[0m\x1b[K");
         return;
     }
     l = &e->buf.lines[y];
+    has_sel = edit_sel_line(e, y, &sel_from, &sel_to, &sel_nl);
 
     while (i < l->len && col < right) {
         uint32_t cp;
         int n = utf8_decode(l->s + i, l->len - i, &cp);
         size_t w = (size_t)char_cols(cp, col, e->tabw);
         size_t start = col, stop = col + w;
+        int selected = has_sel && i >= sel_from && i < sel_to;
 
         i += (size_t)n;
         if (w == 0) {
@@ -148,13 +160,16 @@ static void text_row(SBuf *o, const Editor *e, size_t y)
             prev_visible = 0;
             continue;
         }
+        set_hl(o, &hl, selected);
         if (start >= left && stop <= right) {
             if (cp == '\t') {
                 spaces(o, w);
             } else if (w == 2 && (cp < 0x20 || (cp >= 0x7F && cp < 0xA0))) {
-                sbuf_adds(o, "\x1b[7m^");
+                /* ^X is drawn in reverse video; inside a selection that is already on */
+                sbuf_adds(o, hl ? "^" : "\x1b[7m^");
                 emit_cp(o, cp < 0x20 ? cp + 64 : '?');
-                sbuf_adds(o, "\x1b[27m");
+                if (!hl)
+                    sbuf_adds(o, "\x1b[27m");
             } else {
                 emit_cp(o, cp);
             }
@@ -168,6 +183,10 @@ static void text_row(SBuf *o, const Editor *e, size_t y)
             prev_visible = 0;
         }
     }
+    set_hl(o, &hl, 0);
+    /* a selection running past the end of the line shows the newline as one cell */
+    if (has_sel && sel_nl && col >= left && col < right)
+        sbuf_adds(o, "\x1b[7m \x1b[27m");
     sbuf_adds(o, "\x1b[K");
 }
 

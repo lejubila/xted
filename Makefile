@@ -17,7 +17,8 @@ DEFS     = -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700
 ALLFLAGS = $(WARN) $(DEFS) $(CFLAGS) -ffunction-sections -fdata-sections -MMD -MP
 LINK     = $(LDFLAGS) -Wl,--gc-sections
 
-LIBSRC   = src/util.c src/utf8.c src/term.c src/buffer.c src/render.c src/editor.c
+LIBSRC   = src/util.c src/utf8.c src/term.c src/undo.c src/clip.c src/buffer.c \
+           src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=build/%.o) build/main.o
 
 all: ked
@@ -32,7 +33,7 @@ build/%.o: src/%.c
 	@mkdir -p build
 	$(CC) $(ALLFLAGS) -c -o $@ $<
 
-build/test_core: tests/test_core.c src/util.c src/utf8.c src/term.c src/buffer.c
+build/test_core: tests/test_core.c $(LIBSRC)
 	@mkdir -p build
 	$(CC) $(WARN) $(DEFS) $(CFLAGS) -Isrc -o $@ $^ $(LDFLAGS)
 

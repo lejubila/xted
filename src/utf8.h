@@ -11,6 +11,8 @@ int utf8_decode(const char *s, size_t len, uint32_t *cp);
 int utf8_encode(uint32_t cp, char *out);
 
 int cp_is_combining(uint32_t cp);
+/* Part of a word: ASCII letters, digits, '_' and any non-ASCII character. */
+int cp_is_word(uint32_t cp);
 /* Terminal cells of a printable code point: 0, 1 or 2. */
 int cp_width(uint32_t cp);
 /* Cells a code point occupies when drawn at display column col

@@ -18,6 +18,7 @@ enum {
     KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT,
     KEY_HOME, KEY_END, KEY_PGUP, KEY_PGDN,
     KEY_DEL, KEY_INS,
+    KEY_PASTE,      /* bracketed paste: the text is in term_paste_text() */
     KEY_EOF
 };
 
@@ -44,6 +45,8 @@ int term_has_input(void);
 /* Reads one key from the buffered input; code is KEY_NONE for sequences
  * that are ignored, KEY_EOF when stdin is closed. */
 void term_read_key(Key *k);
+/* Text of the last KEY_PASTE; valid until the next one. Never NULL. */
+const char *term_paste_text(size_t *n);
 void term_write(const char *s, size_t n);
 
 #endif

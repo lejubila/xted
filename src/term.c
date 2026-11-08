@@ -1,21 +1,26 @@
 #include "term.h"
 #include "utf8.h"
+#include "util.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
-#define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H"
-#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?1049l"
+#define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H\x1b[?2004h"
+#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?2004l\x1b[?1049l"
+#define PASTE_END "\x1b[201~"
 
 /* How long to wait for the rest of an escape sequence before deciding
  * that ESC was a keypress on its own. */
 #define ESC_TIMEOUT_MS 50
+/* A paste is data in flight, not a keypress: only give up if it stalls. */
+#define PASTE_TIMEOUT_MS 2000
 
 static struct termios orig_tio;
 static volatile sig_atomic_t raw_active;
@@ -24,6 +29,7 @@ static int wake_pipe[2] = { -1, -1 };
 static unsigned char inbuf[4096];
 static size_t inpos, inlen;
 static int in_eof;
+static SBuf paste_buf;
 
 void term_restore(void)
 {
@@ -274,6 +280,34 @@ static uint32_t final_key(int c)
     }
 }
 
+/* Reads up to the closing ESC[201~, which is dropped from the text. */
+static void read_paste(void)
+{
+    size_t endlen = sizeof PASTE_END - 1;
+
+    paste_buf.len = 0;
+    for (;;) {
+        int c = next_byte(PASTE_TIMEOUT_MS);
+        char ch;
+
+        if (c < 0)
+            break;
+        ch = (char)c;
+        sbuf_add(&paste_buf, &ch, 1);
+        if (paste_buf.len >= endlen &&
+            memcmp(paste_buf.p + paste_buf.len - endlen, PASTE_END, endlen) == 0) {
+            paste_buf.len -= endlen;
+            break;
+        }
+    }
+}
+
+const char *term_paste_text(size_t *n)
+{
+    *n = paste_buf.len;
+    return paste_buf.p ? paste_buf.p : "";
+}
+
 static void parse_csi(Key *k)
 {
     int params[2] = { 0, 0 }, idx = 0, c;
@@ -306,8 +340,15 @@ static void parse_csi(Key *k)
         case 4: case 8: k->code = KEY_END; break;
         case 5: k->code = KEY_PGUP; break;
         case 6: k->code = KEY_PGDN; break;
+        case 200:
+            read_paste();
+            k->code = KEY_PASTE;
+            break;
         default: break;
         }
+    } else if (c == 'Z') {
+        k->code = KEY_TAB;
+        k->mods |= MOD_SHIFT;
     } else {
         k->code = final_key(c);
     }
