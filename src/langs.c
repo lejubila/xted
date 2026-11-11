@@ -9,13 +9,14 @@
  *   words CLASS WORD...       keywords, types, constants (any class)
  *   comment TOKEN [END]       markers used by the comment toggle (END for block-only languages)
  *   number                    highlight numeric literals
+ *   nocase                    word lists ignore case (SQL)
  *   calls CLASS               identifier followed by '(' gets CLASS
  *   sigil CLASS CHAR          CHAR followed by a name (shell $var, Python @decorator)
  *   operators CHARS           characters of class operator
  *   idchars CHARS             extra identifier characters
  *   region CLASS START END [ml] [bol] [ns] [esc=C]
- *                             END "$" = end of line; ml = continues on the next
- *                             lines; bol = only at line start; ns = START not
+ *                             END "$" = end of line, "-" = the START token alone; ml = continues
+ *                             on the next lines; bol = only at line start; ns = START not
  *                             followed by a blank. The first region that matches wins.
  * Classes: normal comment string keyword type constant number preproc function
  *          operator variable heading emphasis code link
@@ -74,18 +75,47 @@ static const char *const lang_python[] = {
 static const char *const lang_js[] = {
     "name JavaScript",
     "comment //",
-    "ext js mjs cjs jsx ts tsx",
+    "ext js mjs cjs jsx",
     "shebang node deno bun",
-    "alias javascript typescript js ts",
-    "words keyword break case catch class const continue debugger default delete do else "
-        "export extends finally for function if import in instanceof let new of return "
-        "super switch this throw try typeof var void while with yield async await static "
-        "get set interface implements enum namespace declare abstract readonly private "
-        "public protected as from type",
-    "words type string number boolean any unknown never object symbol bigint Array "
-        "Object Promise Map Set Date RegExp Error",
+    "alias javascript js jsx node",
+    "words keyword async await break case catch class const continue debugger default delete "
+        "do else export extends finally for from function get if import in instanceof let new "
+        "of return set static super switch this throw try typeof var void while with yield as",
+    "words type Array Object Promise Map Set WeakMap WeakSet Date RegExp Error TypeError "
+        "RangeError Symbol Number String Boolean BigInt JSON Math Intl Proxy Reflect Function",
     "words constant true false null undefined NaN Infinity",
+    "words variable console document window globalThis process require module exports "
+        "arguments",
     "idchars $",
+    "region comment /* */ ml",
+    "region comment // $",
+    "region string \" \" esc=\\",
+    "region string ' ' esc=\\",
+    "region string ` ` ml esc=\\",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!&|^~?:",
+    NULL
+};
+
+static const char *const lang_ts[] = {
+    "name TypeScript",
+    "comment //",
+    "ext ts tsx mts cts",
+    "alias typescript ts tsx",
+    "words keyword abstract as asserts async await break case catch class const continue "
+        "debugger declare default delete do else enum export extends finally for from function "
+        "get if implements import in infer instanceof interface is keyof let namespace new of "
+        "override private protected public readonly return satisfies set static super switch "
+        "this throw try type typeof var void while with yield module",
+    "words type string number boolean any unknown never object symbol bigint void Array "
+        "Object Promise Map Set WeakMap WeakSet Date RegExp Error Record Partial Required "
+        "Readonly Pick Omit Function",
+    "words constant true false null undefined NaN Infinity",
+    "words variable console document window globalThis process require module exports "
+        "arguments",
+    "idchars $",
+    "sigil preproc @",
     "region comment /* */ ml",
     "region comment // $",
     "region string \" \" esc=\\",
@@ -136,12 +166,362 @@ static const char *const lang_markdown[] = {
     NULL
 };
 
+static const char *const lang_php[] = {
+    "name PHP",
+    "comment //",
+    "ext php phtml php3 php4 php5 php7 php8 phps",
+    "shebang php",
+    "alias php",
+    "words keyword abstract and as break callable case catch class clone const continue "
+        "declare default do echo else elseif empty enddeclare endfor endforeach endif "
+        "endswitch endwhile enum exit die extends final finally fn for foreach function global "
+        "goto if implements include include_once instanceof insteadof interface isset list "
+        "match namespace new or print private protected public readonly require require_once "
+        "return static switch throw trait try unset use var while xor yield parent self",
+    "words type int float bool string array object iterable mixed void never callable "
+        "Closure Exception Throwable stdClass",
+    "words constant true false null TRUE FALSE NULL PHP_EOL PHP_INT_MAX PHP_INT_MIN "
+        "PHP_VERSION __FILE__ __DIR__ __LINE__ __CLASS__ __FUNCTION__ __METHOD__ "
+        "__NAMESPACE__ E_ALL E_ERROR E_WARNING E_NOTICE",
+    "region preproc <?php -",
+    "region preproc <?= -",
+    "region normal ?> <? ml",
+    "region preproc #[ ] ml",
+    "region comment /* */ ml",
+    "region comment // $",
+    "region comment # $",
+    "region string \" \" ml esc=\\",
+    "region string ' ' ml esc=\\",
+    "sigil variable $",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!&|^~?:.@",
+    NULL
+};
+
+static const char *const lang_html[] = {
+    "name HTML",
+    "comment <!-- -->",
+    "ext html htm xhtml vue svelte",
+    "alias html htm xhtml vue svelte",
+    "region comment <!-- --> ml",
+    "region code <script </script> ml",
+    "region code <style </style> ml",
+    "region preproc <! > ml",
+    "region keyword < > ml ns",
+    NULL
+};
+
+static const char *const lang_xml[] = {
+    "name XML",
+    "comment <!-- -->",
+    "ext xml xsd xsl xslt svg plist rss atom xaml csproj",
+    "alias xml svg",
+    "region comment <!-- --> ml",
+    "region string <![CDATA[ ]]> ml",
+    "region preproc <? ?> ml",
+    "region preproc <! > ml",
+    "region keyword < > ml ns",
+    NULL
+};
+
+static const char *const lang_css[] = {
+    "name CSS",
+    "comment /* */",
+    "ext css scss less",
+    "alias css scss less",
+    "words keyword important color background background-color background-image border "
+        "border-radius margin margin-top margin-right margin-bottom margin-left padding "
+        "padding-top padding-right padding-bottom padding-left font font-family font-size "
+        "font-weight line-height text-align text-decoration display position top right bottom "
+        "left width height min-width max-width min-height max-height overflow opacity z-index "
+        "flex flex-direction justify-content align-items gap grid transition transform "
+        "box-shadow cursor content float clear visibility white-space",
+    "words constant none auto inherit initial unset block inline inline-block flex grid "
+        "absolute relative fixed sticky solid dashed dotted transparent bold normal center "
+        "hidden visible pointer",
+    "words type html body div span a p ul ol li h1 h2 h3 h4 h5 h6 table tr td th form input "
+        "button img nav header footer section article main label select option textarea "
+        "pre code",
+    "idchars -",
+    "sigil preproc @",
+    "region comment /* */ ml",
+    "region string \" \" esc=\\",
+    "region string ' ' esc=\\",
+    "number",
+    "calls function",
+    "operators +*/=<>!:",
+    NULL
+};
+
+static const char *const lang_json[] = {
+    "name JSON",
+    "comment //",
+    "ext json jsonc json5 geojson webmanifest",
+    "file .eslintrc .prettierrc .babelrc composer.lock",
+    "alias json jsonc",
+    "words constant true false null",
+    "region comment /* */ ml",
+    "region comment // $",
+    "region string \" \" esc=\\",
+    "number",
+    "operators :,",
+    NULL
+};
+
+static const char *const lang_yaml[] = {
+    "name YAML",
+    "comment #",
+    "ext yml yaml",
+    "file .clang-format",
+    "alias yaml yml",
+    "words constant true false yes no null True False Yes No Null",
+    "region preproc --- - bol",
+    "region preproc ... - bol",
+    "region comment # $",
+    "region string \" \" esc=\\",
+    "region string ' ' esc=\\",
+    "number",
+    "operators :-",
+    NULL
+};
+
+static const char *const lang_toml[] = {
+    "name TOML",
+    "comment #",
+    "ext toml",
+    "file Cargo.lock Pipfile",
+    "alias toml",
+    "words constant true false",
+    "region heading [[ ]] bol",
+    "region heading [ ] bol",
+    "region comment # $",
+    "region string \"\"\" \"\"\" ml esc=\\",
+    "region string ''' ''' ml",
+    "region string \" \" esc=\\",
+    "region string ' '",
+    "number",
+    "operators =",
+    NULL
+};
+
+static const char *const lang_sql[] = {
+    "name SQL",
+    "comment --",
+    "ext sql ddl dml",
+    "alias sql mysql pgsql plsql",
+    "nocase",
+    "words keyword select from where and or not insert into values update set delete create "
+        "alter drop table index view database schema join inner left right outer full cross on "
+        "as group by order having limit offset union all distinct case when then else end is "
+        "in like ilike between exists primary key foreign references default unique check "
+        "constraint begin commit rollback transaction with returning asc desc add column "
+        "truncate grant revoke trigger function procedure if",
+    "words type int integer bigint smallint tinyint serial varchar char text date datetime "
+        "timestamp time boolean bool float double decimal numeric real blob json jsonb uuid",
+    "words constant null true false",
+    "region comment /* */ ml",
+    "region comment -- $",
+    "region string ' ' ml",
+    "region string \" \"",
+    "region string ` `",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!|:",
+    NULL
+};
+
+static const char *const lang_go[] = {
+    "name Go",
+    "comment //",
+    "ext go",
+    "file go.mod go.sum",
+    "alias go golang",
+    "words keyword break case chan const continue default defer else fallthrough for func go "
+        "goto if import interface map package range return select struct switch type var",
+    "words type bool byte complex64 complex128 error float32 float64 int int8 int16 int32 "
+        "int64 rune string uint uint8 uint16 uint32 uint64 uintptr any comparable",
+    "words constant nil true false iota",
+    "region comment /* */ ml",
+    "region comment // $",
+    "region string \" \" esc=\\",
+    "region string ` ` ml",
+    "region string ' ' esc=\\",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!&|^:",
+    NULL
+};
+
+static const char *const lang_rust[] = {
+    "name Rust",
+    "comment //",
+    "ext rs",
+    "alias rust rs",
+    "words keyword as async await break const continue crate dyn else enum extern fn for if "
+        "impl in let loop match mod move mut pub ref return self static struct super trait "
+        "type unsafe use where while",
+    "words type i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64 bool char str "
+        "String Vec Option Result Box Rc Arc Self HashMap HashSet",
+    "words constant true false None Some Ok Err",
+    "region comment /* */ ml",
+    "region comment // $",
+    "region preproc #![ ] ml",
+    "region preproc #[ ] ml",
+    "region string \" \" ml esc=\\",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!&|^?:",
+    NULL
+};
+
+static const char *const lang_java[] = {
+    "name Java",
+    "comment //",
+    "ext java",
+    "alias java",
+    "words keyword abstract assert break case catch class const continue default do else "
+        "enum extends final finally for goto if implements import instanceof interface native "
+        "new package permits private protected public record return sealed static strictfp "
+        "super switch synchronized this throw throws transient try var volatile while yield",
+    "words type boolean byte char short int long float double void String Object Integer "
+        "Long Double Boolean List Map Set ArrayList HashMap Optional",
+    "words constant true false null",
+    "sigil preproc @",
+    "region comment /* */ ml",
+    "region comment // $",
+    "region string \"\"\" \"\"\" ml esc=\\",
+    "region string \" \" esc=\\",
+    "region string ' ' esc=\\",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!&|^~?:",
+    NULL
+};
+
+static const char *const lang_csharp[] = {
+    "name C#",
+    "comment //",
+    "ext cs csx",
+    "alias csharp cs c#",
+    "words keyword abstract as async await base break case catch checked class const "
+        "continue default delegate do else enum event explicit extern finally fixed for "
+        "foreach goto if implicit in init interface internal is lock namespace new operator "
+        "out override params private protected public readonly record ref return sealed "
+        "sizeof stackalloc static struct switch this throw try typeof unchecked unsafe using "
+        "var virtual volatile while yield get set",
+    "words type bool byte char decimal double float int long object sbyte short string uint "
+        "ulong ushort void dynamic String List Dictionary Task",
+    "words constant true false null",
+    "region comment /* */ ml",
+    "region comment // $",
+    "region preproc # $ bol",
+    "region string @\" \" ml",
+    "region string \" \" esc=\\",
+    "region string ' ' esc=\\",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!&|^~?:",
+    NULL
+};
+
+static const char *const lang_ruby[] = {
+    "name Ruby",
+    "comment #",
+    "ext rb rake gemspec ru",
+    "file Rakefile Gemfile Vagrantfile Podfile",
+    "shebang ruby",
+    "alias ruby rb",
+    "words keyword alias and begin break case class def defined? do else elsif end ensure "
+        "for if in module next not or redo rescue retry return self super then undef unless "
+        "until when while yield require require_relative include extend attr_accessor "
+        "attr_reader attr_writer raise lambda proc private protected public",
+    "words constant true false nil",
+    "idchars ?",
+    "sigil variable @",
+    "region comment =begin =end ml bol",
+    "region comment # $",
+    "region string \" \" ml esc=\\",
+    "region string ' ' ml esc=\\",
+    "number",
+    "calls function",
+    "operators +-*/%=<>!&|^~:",
+    NULL
+};
+
+static const char *const lang_make[] = {
+    "name Makefile",
+    "comment #",
+    "ext mk mak",
+    "file Makefile makefile GNUmakefile",
+    "alias make makefile",
+    "words keyword ifeq ifneq ifdef ifndef else endif include sinclude define endef export "
+        "unexport override vpath",
+    "region variable $( ) ",
+    "region variable ${ }",
+    "region comment # $",
+    "region string \" \" esc=\\",
+    "region string ' '",
+    "sigil variable $",
+    "operators :=+?!|",
+    NULL
+};
+
+static const char *const lang_docker[] = {
+    "name Dockerfile",
+    "comment #",
+    "ext dockerfile",
+    "file Dockerfile Containerfile",
+    "alias dockerfile docker",
+    "words keyword FROM RUN CMD LABEL EXPOSE ENV ADD COPY ENTRYPOINT VOLUME USER WORKDIR ARG "
+        "ONBUILD STOPSIGNAL HEALTHCHECK SHELL MAINTAINER AS",
+    "region variable ${ }",
+    "region comment # $ bol",
+    "region string \" \" esc=\\",
+    "region string ' '",
+    "sigil variable $",
+    "number",
+    "operators =|&;",
+    NULL
+};
+
+static const char *const lang_diff[] = {
+    "name Diff",
+    "ext diff patch",
+    "alias diff patch",
+    "region heading +++ $ bol",
+    "region heading --- $ bol",
+    "region heading diff $ bol",
+    "region heading index $ bol",
+    "region preproc @@ $ bol",
+    "region comment + $ bol",
+    "region string - $ bol",
+    NULL
+};
+
 const LangDef lang_defs[] = {
     { "C", lang_c },
     { "Python", lang_python },
     { "JavaScript", lang_js },
     { "Shell", lang_shell },
     { "Markdown", lang_markdown },
+    { "TypeScript", lang_ts },
+    { "PHP", lang_php },
+    { "HTML", lang_html },
+    { "XML", lang_xml },
+    { "CSS", lang_css },
+    { "JSON", lang_json },
+    { "YAML", lang_yaml },
+    { "TOML", lang_toml },
+    { "SQL", lang_sql },
+    { "Go", lang_go },
+    { "Rust", lang_rust },
+    { "Java", lang_java },
+    { "C#", lang_csharp },
+    { "Ruby", lang_ruby },
+    { "Makefile", lang_make },
+    { "Dockerfile", lang_docker },
+    { "Diff", lang_diff },
 };
 
 const size_t lang_ndefs = sizeof lang_defs / sizeof lang_defs[0];

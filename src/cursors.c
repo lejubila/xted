@@ -298,6 +298,29 @@ void cur_add_vertical(Editor *e, int down)
     }
 }
 
+void cur_add_at(Editor *e, size_t y, size_t x)
+{
+    Cursor old = primary(e), c;
+    const Line *l;
+    size_t i;
+
+    if (y >= e->buf->nlines || x > e->buf->lines[y].len)
+        return;
+    if (y == e->cy && x == e->cx)
+        return;
+    for (i = 0; i < e->nxc; i++)
+        if (e->xc[i].cy == y && e->xc[i].cx == x)
+            return;
+    l = &e->buf->lines[y];
+    push(e, &old);
+    c = old;
+    c.cy = y;
+    c.cx = x;
+    c.sel_on = 0;
+    c.want_col = utf8_cols(l->s, l->len, x, e->tabw);
+    load(e, &c);
+}
+
 char *cur_selected_text(const Editor *e, size_t *n)
 {
     Cursor *all = xmalloc((e->nxc + 1) * sizeof *all);

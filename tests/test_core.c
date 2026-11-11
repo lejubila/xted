@@ -21,6 +21,7 @@
 #include "shell.h"
 #include "snippet.h"
 #include "editor.h"
+#include "mouse.h"
 #include "syntax.h"
 #include "tags.h"
 #include "theme.h"
@@ -753,7 +754,7 @@ static void test_syntax_detect(void)
     CHECK(strcmp(detect_name("a/b.c", ""), "C") == 0);
     CHECK(strcmp(detect_name("x.h", ""), "C") == 0);
     CHECK(strcmp(detect_name("x.PY", ""), "Python") == 0);
-    CHECK(strcmp(detect_name("x.tsx", ""), "JavaScript") == 0);
+    CHECK(strcmp(detect_name("x.tsx", ""), "TypeScript") == 0);
     CHECK(strcmp(detect_name("README.MD", ""), "Markdown") == 0);
     CHECK(strcmp(detect_name("/home/u/.bashrc", ""), "Shell") == 0);
     CHECK(strcmp(detect_name("run", "#!/usr/bin/env python3\nx"), "Python") == 0);
@@ -765,7 +766,231 @@ static void test_syntax_detect(void)
     CHECK(strcmp(detect_name("a.c", "# ked: filetype=python\n"), "Python") == 0);
     CHECK(strcmp(detect_name("a.txt", "plain\n"), "-") == 0);
     CHECK(strcmp(detect_name(NULL, ""), "-") == 0);
-    CHECK(strcmp(detect_name("Makefile", ""), "-") == 0);
+    CHECK(strcmp(detect_name("Makefile", ""), "Makefile") == 0);
+}
+
+static void test_syntax_langs(void)
+{
+    Syntax *php = lang("php"), *html = lang("html"), *sql = lang("sql"), *json = lang("json");
+    Syntax *ts = lang("ts"), *go = lang("go"), *diff = lang("diff"), *yaml = lang("yml");
+    Syntax *css = lang("css"), *rb = lang("rb");
+    uint16_t st = 0;
+
+    CHECK(php && html && sql && json && ts && go && diff && yaml && css && rb);
+
+    /* PHP: tag tokens, variables, HTML between ?> and <? */
+    CLS(php, st, "<?php echo $a->b(\"x\"); // c", "ppppp.kkkk.vvoof.sss...cccc");
+    CHECK(st == 0);
+    CLS(php, st, "$y = 1; #[Attr] // z", "vv.o.n..ppppppp.cccc");
+    CLS(php, st, "?> it's <b>", "...........");
+    CHECK(st != 0);
+    CLS(php, st, "x <?= $x; ?>", "....o.vv....");     /* back in PHP at <?, in HTML again at ?> */
+    CHECK(st != 0);
+
+    /* HTML: tags, comments, script bodies are left alone */
+    st = 0;
+    CLS(html, st, "<a href=\"x\">t < u</a>", "kkkkkkkkkkkk.....kkkk");
+    CLS(html, st, "<script>", "dddddddd");
+    CHECK(st != 0);
+    CLS(html, st, "if (a<b) {", "dddddddddd");
+    CLS(html, st, "</script> <b>", "ddddddddd.kkk");
+    CHECK(st == 0);
+
+    /* SQL ignores case */
+    CLS(sql, st, "SELECT a FROM t", "kkkkkk...kkkk..");
+    CLS(sql, st, "select a from t", "kkkkkk...kkkk..");
+    CLS(sql, st, "x = 'it''s' -- c", "..o.sssssss.cccc");
+
+    st = 0;
+    CLS(json, st, "{\"a\": [1, true]}", ".ssso..no.CCCC..");
+    CLS(ts, st, "interface A { x: number }", "kkkkkkkkk......o.TTTTTT..");
+    CLS(ts, st, "@Component() class B {}", "pppppppppp...kkkkk.....");
+    CLS(go, st, "x := `r`", "..oo.sss");
+    CLS(yaml, st, "key: \"v\" # c", "...o.sss.ccc");
+    CLS(css, st, "a { margin: 10px; }", "T...kkkkkko.nnnn...");
+    CLS(rb, st, "def foo?(x)", "kkk.ffff...");
+
+    st = 0;
+    CLS(diff, st, "--- a/x", "hhhhhhh");
+    CLS(diff, st, "+new", "cccc");
+    CLS(diff, st, "-old", "ssss");
+    CLS(diff, st, " ctx", "....");
+    CLS(diff, st, "@@ -1 +1 @@", "ppppppppppp");
+
+    syn_free(php); syn_free(html); syn_free(sql); syn_free(json); syn_free(ts); syn_free(go);
+    syn_free(diff); syn_free(yaml); syn_free(css); syn_free(rb);
+}
+
+static void test_syntax_detect_langs(void)
+{
+    static const struct { const char *path, *first, *want; } t[] = {
+        { "a.php", "", "PHP" }, { "a.phtml", "", "PHP" }, { "run", "#!/usr/bin/php\n", "PHP" },
+        { "a.ts", "", "TypeScript" }, { "a.js", "", "JavaScript" }, { "a.jsx", "", "JavaScript" },
+        { "a.html", "", "HTML" }, { "a.svg", "", "XML" }, { "a.css", "", "CSS" },
+        { "a.json", "", "JSON" }, { ".eslintrc", "", "JSON" }, { "a.yml", "", "YAML" },
+        { "a.toml", "", "TOML" }, { "a.sql", "", "SQL" }, { "a.go", "", "Go" },
+        { "a.rs", "", "Rust" }, { "A.java", "", "Java" }, { "a.cs", "", "C#" },
+        { "a.rb", "", "Ruby" }, { "Rakefile", "", "Ruby" }, { "run", "#!/usr/bin/env ruby\n", "Ruby" },
+        { "Makefile", "", "Makefile" }, { "rules.mk", "", "Makefile" },
+        { "Dockerfile", "", "Dockerfile" }, { "a.patch", "", "Diff" },
+        { "a.txt", "// ked: ft=typescript\n", "TypeScript" },
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        if (strcmp(detect_name(t[i].path, t[i].first), t[i].want) != 0)
+            fprintf(stderr, "detect %s: got %s, want %s\n", t[i].path,
+                    detect_name(t[i].path, t[i].first), t[i].want);
+        CHECK(strcmp(detect_name(t[i].path, t[i].first), t[i].want) == 0);
+    }
+}
+
+/* ---- mouse ------------------------------------------------------------- */
+
+static void put_file(const char *dir, const char *name, const char *text);
+
+static void mclick(Editor *e, int kind, int x, int y, int mods, int button)
+{
+    MouseEv ev;
+
+    ev.kind = (MouseKind)kind;
+    ev.button = button;
+    ev.x = x;
+    ev.y = y;
+    ev.mods = mods;
+    mouse_event(e, &ev);
+}
+
+static void mouse_screen(Editor *e, int tabs)
+{
+    e->rows = 24;
+    e->cols = 80;
+    e->text_x = 0;
+    e->text_y = tabs ? 1 : 0;
+    e->sidebar_w = 0;
+    layout_compute(&e->layout, 0, e->text_y, 80, 23 - e->text_y);
+}
+
+static void test_mouse(void)
+{
+    Editor e;
+    MouseHit h;
+    char dir[] = "/tmp/ked_mouse_XXXXXX";
+    char p1[300], p2[300], err[128];
+    SBuf text = SBUF_INIT;
+    size_t i;
+
+    /* clicks: cells map to lines and bytes, tabs and wide characters included */
+    ed_load(&e, "one\ntwo\n\tx \xc3\xa9 y\nlast");
+    mouse_screen(&e, 0);
+    mouse_locate(&e, 8, 2, &h);
+    CHECK(h.kind == MH_TEXT && h.y == 2 && h.x == 1);
+    mouse_locate(&e, 3, 2, &h);
+    CHECK(h.kind == MH_TEXT && h.y == 2 && h.x == 0);       /* inside the tab */
+    mouse_locate(&e, 10, 2, &h);
+    CHECK(h.kind == MH_TEXT && h.x == 3);
+    mouse_locate(&e, 70, 1, &h);
+    CHECK(h.kind == MH_TEXT && h.y == 1 && h.x == 3);       /* past the end of the line */
+    mouse_locate(&e, 5, 15, &h);
+    CHECK(h.kind == MH_TEXT && h.y == 3);                   /* below the text: the last line */
+    mouse_locate(&e, 5, 23, &h);
+    CHECK(h.kind == MH_NONE);                               /* the message row */
+    mouse_locate(&e, 5, 22, &h);
+    CHECK(h.kind == MH_STATUS);
+
+    mclick(&e, MOUSE_PRESS, 8, 2, 0, 0);
+    CHECK(e.cy == 2 && e.cx == 1 && !e.sel_on && e.want_col == 8);
+    mclick(&e, MOUSE_RELEASE, 8, 2, 0, 0);
+
+    /* drag selects from the press to the pointer, also past the pane's edge */
+    mclick(&e, MOUSE_PRESS, 1, 0, 0, 0);
+    mclick(&e, MOUSE_DRAG, 2, 1, 0, 0);
+    CHECK(e.sel_on && e.ay == 0 && e.ax == 1 && e.cy == 1 && e.cx == 2);
+    mclick(&e, MOUSE_RELEASE, 2, 1, 0, 0);
+    mclick(&e, MOUSE_DRAG, 0, 0, 0, 0);                     /* no drag running: ignored */
+    CHECK(e.cy == 1 && e.cx == 2);
+
+    /* double click: word; triple: line */
+    e.mouse.t = 0;
+    mclick(&e, MOUSE_PRESS, 1, 0, 0, 0);
+    mclick(&e, MOUSE_RELEASE, 1, 0, 0, 0);
+    mclick(&e, MOUSE_PRESS, 1, 0, 0, 0);
+    CHECK(e.sel_on && e.ay == 0 && e.ax == 0 && e.cy == 0 && e.cx == 3);
+    mclick(&e, MOUSE_PRESS, 1, 0, 0, 0);
+    CHECK(e.sel_on && e.ay == 0 && e.ax == 0 && e.cy == 1 && e.cx == 0);
+    mclick(&e, MOUSE_PRESS, 2, 1, 0, 0);                    /* another cell: a single click */
+    CHECK(!e.sel_on && e.cy == 1 && e.cx == 2);
+
+    /* Alt+click adds a cursor; a plain click drops it again */
+    mclick(&e, MOUSE_PRESS, 1, 3, MOD_ALT, 0);
+    CHECK(e.nxc == 1 && e.cy == 3 && e.cx == 1);
+    mclick(&e, MOUSE_PRESS, 1, 3, MOD_ALT, 0);              /* the same place: nothing new */
+    CHECK(e.nxc == 1);
+    e.mouse.t = 0;
+    mclick(&e, MOUSE_PRESS, 0, 0, 0, 0);
+    CHECK(e.nxc == 0 && e.cy == 0 && e.cx == 0);
+
+    /* turned off: nothing happens */
+    e.mouse_on = 0;
+    mclick(&e, MOUSE_PRESS, 2, 2, 0, 0);
+    CHECK(e.cy == 0);
+    e.mouse_on = 1;
+
+    /* the picker and the prompt row */
+    picker_open(&e.picker, "Prova");
+    picker_add(&e.picker, "uno");
+    picker_add(&e.picker, "due");
+    picker_filter(&e.picker);
+    e.picker.on = 1;
+    mouse_locate(&e, 3, e.rows - 1 - render_picker_height(&e) + 2, &h);
+    CHECK(h.kind == MH_PICKER && h.index == 2);
+    mouse_locate(&e, 3, 2, &h);
+    CHECK(h.kind == MH_NONE);
+    e.picker.on = 0;
+    editor_free(&e);
+
+    /* the wheel scrolls a long text and keeps the cursor in the window */
+    for (i = 0; i < 100; i++)
+        sbuf_addf(&text, "line %zu\n", i);
+    ed_load(&e, text.p);
+    sbuf_free(&text);
+    mouse_screen(&e, 0);
+    mclick(&e, MOUSE_WHEEL_DOWN, 5, 5, 0, 0);
+    CHECK(e.rowoff == 3 && e.cy == 3);
+    mclick(&e, MOUSE_WHEEL_DOWN, 5, 5, 0, 0);
+    CHECK(e.rowoff == 6 && e.cy == 6);
+    mclick(&e, MOUSE_WHEEL_UP, 5, 5, 0, 0);
+    CHECK(e.rowoff == 3 && e.cy == 6);
+    mclick(&e, MOUSE_WHEEL_UP, 5, 5, 0, 0);
+    mclick(&e, MOUSE_WHEEL_UP, 5, 5, 0, 0);
+    CHECK(e.rowoff == 0);
+    for (i = 0; i < 100; i++)
+        mclick(&e, MOUSE_WHEEL_DOWN, 5, 5, 0, 0);
+    CHECK(e.rowoff == 79 && e.cy >= 79);                    /* the last line ends the window */
+    editor_free(&e);
+
+    /* the tab bar: a click selects, a middle click closes */
+    CHECK(mkdtemp(dir) != NULL);
+    put_file(dir, "a.c", "int a;\n");
+    put_file(dir, "b.txt", "bee\n");
+    snprintf(p1, sizeof p1, "%s/a.c", dir);
+    snprintf(p2, sizeof p2, "%s/b.txt", dir);
+    editor_init(&e);
+    CHECK(editor_open_doc(&e, p1, err, sizeof err) != NULL);
+    CHECK(editor_open_doc(&e, p2, err, sizeof err) != NULL);
+    mouse_screen(&e, 1);
+    CHECK(e.ndocs == 2 && e.doc == e.docs[1]);
+    mouse_locate(&e, 2, 0, &h);
+    CHECK(h.kind == MH_TAB && h.index == 0);
+    mouse_locate(&e, 7, 0, &h);
+    CHECK(h.kind == MH_TAB && h.index == 1);
+    mouse_locate(&e, 60, 0, &h);
+    CHECK(h.kind == MH_NONE);
+    mclick(&e, MOUSE_PRESS, 2, 0, 0, 0);
+    CHECK(e.doc == e.docs[0]);
+    mclick(&e, MOUSE_PRESS, 7, 0, 0, 1);
+    CHECK(e.ndocs == 1 && strstr(e.doc->buf.path, "a.c") != NULL);
+    editor_free(&e);
 }
 
 static void test_syntax_incremental(void)
@@ -1655,6 +1880,8 @@ static void test_snippets(void)
     sbuf_free(&t);
     CHECK(snip_lang("C", &n) != NULL && n > 5);
     CHECK(snip_lang("Markdown", &n) == NULL && n == 0);
+    CHECK(snip_lang("PHP", &n) != NULL && n > 5);
+    CHECK(snip_lang("TypeScript", &n) == snip_lang("JavaScript", &n) && n > 5);
 
     /* expansion keeps the indentation and selects the first stop */
     ed_load(&e, "  if (x) {\n    fo\n  }");
@@ -2704,7 +2931,10 @@ int main(void)
     test_edit_cmds();
     test_syntax_lines();
     test_syntax_parse();
+    test_mouse();
     test_syntax_detect();
+    test_syntax_langs();
+    test_syntax_detect_langs();
     test_syntax_incremental();
     test_syntax_brackets();
     test_theme();

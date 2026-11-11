@@ -71,6 +71,7 @@ const Command commands[] = {
     { "fold", "Piega/espandi blocco", "alt+z", fold_toggle, 0, 0 },
     { "fold_all", "Piega tutto", "", fold_all, 0, 0 },
     { "unfold_all", "Espandi tutto", "", unfold_all, 0, 0 },
+    { "toggle_mouse", "Attiva/disattiva il mouse", "", editor_cmd_toggle_mouse, 0, 0 },
     { "git_refresh", "Aggiorna gli indicatori Git", "", editor_cmd_git, 0, 0 },
     { "goto_tag", "Vai alla definizione", "f12", c_tag, 0, 0 },
     { "match", "Parentesi corrispondente", "alt+m", editor_cmd_match, 0, 0 },

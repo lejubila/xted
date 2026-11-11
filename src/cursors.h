@@ -19,6 +19,9 @@ void cur_clear(Editor *e);
  * the selected text as a new cursor. Alt+D: adds all of them. */
 void cur_add_next(Editor *e);
 void cur_add_all(Editor *e);
+/* Adds a cursor at byte x of line y and makes it the primary one (Alt+click). Does nothing
+ * if a cursor is already there. */
+void cur_add_at(Editor *e, size_t y, size_t x);
 /* Adds a cursor on the line above/below the primary, in the same column. */
 void cur_add_vertical(Editor *e, int down);
 

@@ -80,6 +80,13 @@ typedef struct {
     size_t err_line;        /* output line of the last error visited, plus one */
 } Run;
 
+/* Mouse state kept between events (see mouse.c). */
+typedef struct {
+    long t;                 /* monotonic ms of the last press */
+    int x, y, n;            /* where it was, and how many presses in a row (1..3) */
+    int drag;               /* a drag that started in a text pane is running */
+} MouseState;
+
 typedef struct Editor {
     Doc **docs;             /* open documents, in tab order */
     size_t ndocs, docs_cap;
@@ -98,6 +105,8 @@ typedef struct Editor {
     Keymap km;              /* which key runs which command */
     Config cfg;             /* the user's settings */
     int git_off;            /* git could not be run: the margin is off for this session */
+    int mouse_on;           /* the terminal reports clicks and the wheel */
+    MouseState mouse;
     char *cfgdir;           /* where they were read from (NULL: unknown) */
     Complete comp;          /* suggestion popup */
     SnipSession snip;       /* running snippet: Tab visits its stops */
@@ -164,6 +173,8 @@ void editor_save_session(Editor *e);
 int editor_restore_session(Editor *e);
 /* Splits the active pane (side by side if vertical). Returns 0 on success. */
 int editor_split(Editor *e, int vertical);
+/* Handles one key as if typed (the mouse uses it to press Enter in lists). */
+void editor_key(Editor *e, Key k);
 /* Shows an open document in the active pane. */
 void editor_activate(Editor *e, Doc *d);
 /* Moves the cursor of the active pane to a 1-based line and column. */
@@ -210,6 +221,7 @@ void editor_cmd_match(Editor *e);
 void editor_cmd_theme(Editor *e);
 void editor_cmd_redraw(Editor *e);
 void editor_cmd_git(Editor *e);
+void editor_cmd_toggle_mouse(Editor *e);
 /* Alt+X: the list of all commands. */
 void editor_cmd_palette(Editor *e);
 

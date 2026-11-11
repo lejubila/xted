@@ -22,6 +22,7 @@ enum {
     KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
     KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12,
     KEY_PASTE,      /* bracketed paste: the text is in term_paste_text() */
+    KEY_MOUSE,      /* a mouse event: see term_mouse_event() */
     KEY_EOF
 };
 
@@ -31,6 +32,15 @@ typedef struct {
     uint32_t code;
     int mods;
 } Key;
+
+typedef enum { MOUSE_PRESS, MOUSE_RELEASE, MOUSE_DRAG, MOUSE_WHEEL_UP, MOUSE_WHEEL_DOWN } MouseKind;
+
+typedef struct {
+    MouseKind kind;
+    int button;         /* 0 left, 1 middle, 2 right (not meaningful for the wheel) */
+    int x, y;           /* 0-based cell */
+    int mods;           /* MOD_* */
+} MouseEv;
 
 enum { TERM_EV_KEY = 1, TERM_EV_RESIZE = 2, TERM_EV_FD = 4 };
 
@@ -52,6 +62,10 @@ void term_watch(int fd);
 void term_read_key(Key *k);
 /* Text of the last KEY_PASTE; valid until the next one. Never NULL. */
 const char *term_paste_text(size_t *n);
+/* Reports clicks, drags and the wheel (xterm SGR protocol) as KEY_MOUSE; off by default. */
+void term_mouse(int on);
+/* The event of the last KEY_MOUSE. */
+MouseEv term_mouse_event(void);
 void term_write(const char *s, size_t n);
 
 #endif

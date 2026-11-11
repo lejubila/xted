@@ -31,6 +31,7 @@ struct Syntax {
     size_t tabsize;
     char *pool;             /* storage for the words */
     int number, calls, sigil;
+    int nocase;             /* word lists ignore case */
     char *cmt, *cmt_end;    /* comment markers for the toggle command; cmt_end may be NULL */
     uint8_t call_cls, sigil_cls;
     uint8_t opch[256], idstart[256], idch[256];
@@ -94,13 +95,26 @@ typedef struct {
     uint8_t len, cls;
 } PendWord;
 
-static uint32_t hash_word(const char *w, size_t n)
+static uint32_t hash_word(const char *w, size_t n, int fold)
 {
     uint32_t h = 2166136261u;
 
-    while (n-- > 0)
-        h = (h ^ (uint8_t)*w++) * 16777619u;
+    while (n-- > 0) {
+        uint8_t c = (uint8_t)*w++;
+
+        h = (h ^ (fold ? (uint8_t)tolower(c) : c)) * 16777619u;
+    }
     return h;
+}
+
+static int same_word(const char *a, const char *b, size_t n, int fold)
+{
+    if (!fold)
+        return memcmp(a, b, n) == 0;
+    while (n-- > 0)
+        if (tolower((uint8_t)*a++) != tolower((uint8_t)*b++))
+            return 0;
+    return 1;
 }
 
 static void build_table(Syntax *s, const PendWord *pw, size_t npw)
@@ -114,10 +128,10 @@ static void build_table(Syntax *s, const PendWord *pw, size_t npw)
     s->tabsize = size;
     for (i = 0; i < npw; i++) {
         const char *w = s->pool + pw[i].off;
-        size_t h = hash_word(w, pw[i].len) & (size - 1);
+        size_t h = hash_word(w, pw[i].len, s->nocase) & (size - 1);
 
         while (s->tab[h].w &&
-               !(s->tab[h].len == pw[i].len && memcmp(s->tab[h].w, w, pw[i].len) == 0))
+               !(s->tab[h].len == pw[i].len && same_word(s->tab[h].w, w, pw[i].len, s->nocase)))
             h = (h + 1) & (size - 1);
         s->tab[h].w = w;
         s->tab[h].len = pw[i].len;
@@ -131,9 +145,9 @@ static int lookup(const Syntax *s, const char *w, size_t n)
 
     if (!s->tab || n > 255)
         return -1;
-    h = hash_word(w, n) & (s->tabsize - 1);
+    h = hash_word(w, n, s->nocase) & (s->tabsize - 1);
     while (s->tab[h].w) {
-        if (s->tab[h].len == n && memcmp(s->tab[h].w, w, n) == 0)
+        if (s->tab[h].len == n && same_word(s->tab[h].w, w, n, s->nocase))
             return s->tab[h].cls;
         h = (h + 1) & (s->tabsize - 1);
     }
@@ -287,6 +301,8 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             }
         } else if (tok_is(t[0], "number")) {
             s->number = 1;
+        } else if (tok_is(t[0], "nocase")) {
+            s->nocase = 1;
         } else if (tok_is(t[0], "calls")) {
             int cl = nt > 1 ? class_by_name(t[1].p, t[1].n) : -1;
 
@@ -332,7 +348,10 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             r->start = xmalloc(r->sl + 1);
             memcpy(r->start, t[2].p, r->sl);
             r->start[r->sl] = '\0';
-            if (!tok_is(t[3], "$")) {
+            if (tok_is(t[3], "-")) {
+                r->end = xmalloc(1);        /* a token only: the region ends where it starts */
+                r->end[0] = '\0';
+            } else if (!tok_is(t[3], "$")) {
                 r->el = t[3].n;
                 r->end = xmalloc(r->el + 1);
                 memcpy(r->end, t[3].p, r->el);
@@ -388,6 +407,10 @@ static size_t find_end(const Region *r, const char *s, size_t len, size_t from, 
     if (!r->end) {
         *closed = 1;
         return len;
+    }
+    if (r->el == 0) {
+        *closed = 1;
+        return from;
     }
     while (i < len) {
         if (r->esc && s[i] == r->esc) {

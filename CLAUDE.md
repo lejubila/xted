@@ -31,7 +31,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/editor.[ch]` | Stato dell'editor, ciclo eventi, prompt, movimento, dispatch dei tasti |
 | `src/edit.[ch]` | Comandi di modifica: selezione, appunti, operazioni sulle righe, indentazione, autoindent |
 | `src/syntax.[ch]` | Motore di evidenziazione a regioni (parser delle definizioni, stato per riga, rilevamento del linguaggio, parentesi corrispondenti, linguaggi dell'utente da `syntax/`) |
-| `src/langs.[ch]` | Definizioni dei linguaggi incorporate, come dati testuali: un nuovo linguaggio è solo una voce qui |
+| `src/langs.[ch]` | Definizioni dei linguaggi incorporate, come dati testuali: un nuovo linguaggio è solo una voce qui (direttive in testa al file, anche `nocase` e le regioni a soli token `END = -`) |
 | `src/theme.[ch]` | Temi colore e codifica SGR con ripiego truecolor → 256 → 16 colori |
 | `src/doc.[ch]` | `Doc`: buffer + linguaggio + stato su disco (cambiamenti, sola lettura) di un file aperto; `View` (cursore/scorrimento/selezione) |
 | `src/layout.[ch]` | Albero degli split e geometria dei pannelli; senza terminale |
@@ -52,6 +52,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/config.[ch]` | File `~/.config/ked/config` (chiave = valore, `[linguaggio]`, `[keys]`); non conosce l'`Editor` |
 | `src/git.[ch]` | Indicatori Git: `git diff -U0` analizzato in `Line.git`; senza librerie |
 | `src/tags.[ch]` | File `tags` di ctags: ricerca (binaria se ordinato) e risoluzione dell'indirizzo; senza terminale |
+| `src/mouse.[ch]` | Mouse: `mouse_locate` (cella → tab, browser, picker, riga/byte di un pannello) e `mouse_event` (clic, doppio/triplo clic, trascinamento, rotella, Alt+clic); gli eventi SGR vengono decodificati da `term.c` (`KEY_MOUSE`) |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 
@@ -62,6 +63,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 - Un comando nuovo si aggiunge a `commands[]` (id inglese stabile, scorciatoia predefinita come testo di configurazione): palette, tasti e `[keys]` lo vedono da lì. In `editor.c` restano cablati solo digitazione, movimenti e selezione; non aggiungere `case` per tasti di comando.
 - `Doc.tabw`, `expand_tab`, … vengono da `config` per linguaggio (`apply_cfg`); `e->tabw` è lo specchio del documento attivo, per gli altri pannelli il renderer usa `d->tabw`. Con il margine Git (`Doc.gutter`) la larghezza del testo è `win_text_w(w)`, non `w->w`.
 - I campi extra del multi-cursore (`Editor.xc`) vengono svuotati cambiando pannello/documento e con undo/redo; i comandi di `edit.c` restano a cursore singolo e `cur_each` li ripete per ogni cursore. `Line.fold`/`Buffer.folded` sono lo stato del folding: dopo un'azione che sposta il cursore, `fold_reveal` riapre ciò che lo nasconde; le funzioni di movimento e rendering contano le righe *visibili* (`fold_next/prev/advance/back/nth/count`), mai `cy + 1`.
+- Il mouse passa da `KEY_MOUSE` (`term_mouse_event`) a `mouse_event`; la geometria dello schermo si ricava con `mouse_locate`/`render_tab_at`/`render_picker_height`, non si ricalcola altrove. Per far agire il mouse come un tasto in una lista si usa `editor_key`.
 - Lo stato derivato dal testo (evidenziazione) vive in `Line.hl` e vale per le righe `< Buffer.stable`: le `raw_*` di `buffer.c` lo invalidano, nessun altro codice deve farlo.
 
 ## Stile del codice

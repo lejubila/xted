@@ -511,10 +511,11 @@ static void tab_label(const Editor *e, size_t i, char *out, size_t outsz)
     snprintf(out, outsz, "%s%s", base, d->buf.modified ? "*" : "");
 }
 
-static void tab_row(SBuf *o, const Editor *e)
+/* Width of every tab (wd, one entry per document) and the first one shown: the bar scrolls so
+ * that the active tab is the last one that has to fit. */
+static size_t tab_widths(const Editor *e, size_t *wd)
 {
-    size_t cols = (size_t)e->cols, used = 0, i, start = 0, act = 0;
-    size_t *wd = xmalloc(e->ndocs * sizeof *wd);
+    size_t cols = (size_t)e->cols, i, start = 0, act = 0;
     char label[300];
 
     for (i = 0; i < e->ndocs; i++) {
@@ -526,7 +527,6 @@ static void tab_row(SBuf *o, const Editor *e)
         if (e->docs[i] == e->doc)
             act = i;
     }
-    /* scroll the bar so that the active tab is the last one that has to fit */
     for (;;) {
         size_t sum = 0;
 
@@ -536,6 +536,35 @@ static void tab_row(SBuf *o, const Editor *e)
             break;
         start++;
     }
+    return start;
+}
+
+size_t render_tab_at(const Editor *e, int x)
+{
+    size_t *wd, i, start, pos = 0, found = (size_t)-1;
+
+    if (e->ndocs == 0 || x < 0 || x >= e->cols)
+        return found;
+    wd = xmalloc(e->ndocs * sizeof *wd);
+    start = tab_widths(e, wd);
+    for (i = start; i < e->ndocs && pos < (size_t)e->cols; i++) {
+        if ((size_t)x < pos + wd[i]) {
+            found = i;
+            break;
+        }
+        pos += wd[i];
+    }
+    free(wd);
+    return found;
+}
+
+static void tab_row(SBuf *o, const Editor *e)
+{
+    size_t cols = (size_t)e->cols, used = 0, i, start;
+    size_t *wd = xmalloc(e->ndocs * sizeof *wd);
+    char label[300];
+
+    start = tab_widths(e, wd);
     sbuf_adds(o, "\x1b[7m");
     for (i = start; i < e->ndocs && used < cols; i++) {
         int on = e->docs[i] == e->doc;
@@ -702,7 +731,7 @@ static void picker_row(SBuf *o, const Editor *e, int k)
 }
 
 /* Rows taken by the picker, query line included. */
-static int picker_height(const Editor *e)
+int render_picker_height(const Editor *e)
 {
     int n = (int)e->picker.nshown;
 
@@ -795,8 +824,8 @@ void render_frame(Render *r, const Editor *e)
         row->len = 0;
         if (y == e->rows - 1)
             message_row(row, e, &pcol);
-        else if (e->picker.on && y >= e->rows - 1 - picker_height(e))
-            picker_row(row, e, y - (e->rows - 1 - picker_height(e)));
+        else if (e->picker.on && y >= e->rows - 1 - render_picker_height(e))
+            picker_row(row, e, y - (e->rows - 1 - render_picker_height(e)));
         else if (e->text_y == 1 && y == 0)
             tab_row(row, e);
         else
@@ -817,7 +846,7 @@ void render_frame(Render *r, const Editor *e)
     }
 
     if (e->picker.on) {
-        cr = e->rows - picker_height(e);
+        cr = e->rows - render_picker_height(e);
         cc = 1 + 1 + (int)utf8_cols(e->picker.title, strlen(e->picker.title),
                                      strlen(e->picker.title), 8) + 3 +
              (int)utf8_cols(e->picker.query, e->picker.qlen, e->picker.qlen, 8);

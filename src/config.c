@@ -22,6 +22,7 @@ void config_init(Config *c)
     c->base = unset();
     c->clipboard = -1;
     c->git = -1;
+    c->mouse = -1;
 }
 
 void config_free(Config *c)
@@ -254,7 +255,8 @@ int config_parse(Config *c, const char *text, size_t n)
                     else
                         snprintf(c->theme, sizeof c->theme, "%s", val);
                     r = 0;
-                } else if (!strcmp(key, "clipboard") || !strcmp(key, "git")) {
+                } else if (!strcmp(key, "clipboard") || !strcmp(key, "git") ||
+                           !strcmp(key, "mouse")) {
                     int b = parse_bool(lv);
 
                     if (b < 0) {
@@ -262,8 +264,10 @@ int config_parse(Config *c, const char *text, size_t n)
                     } else {
                         if (key[0] == 'c')
                             c->clipboard = b;
-                        else
+                        else if (key[0] == 'g')
                             c->git = b;
+                        else
+                            c->mouse = b;
                         r = 0;
                     }
                 }

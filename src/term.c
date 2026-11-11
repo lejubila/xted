@@ -13,7 +13,8 @@
 #include <unistd.h>
 
 #define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H\x1b[?2004h\x1b[?1004h"
-#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?1004l\x1b[?2004l\x1b[?1049l"
+#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?1006l\x1b[?1002l\x1b[?1000l" \
+                  "\x1b[?1004l\x1b[?2004l\x1b[?1049l"
 #define PASTE_END "\x1b[201~"
 
 /* How long to wait for the rest of an escape sequence before deciding
@@ -32,6 +33,7 @@ static int in_fd = STDIN_FILENO;    /* the terminal: /dev/tty when stdin is a pi
 static size_t inpos, inlen;
 static int in_eof;
 static SBuf paste_buf;
+static MouseEv last_mouse;
 
 void term_restore(void)
 {
@@ -130,6 +132,24 @@ void term_size(int *rows, int *cols)
         *rows = ws.ws_row;
         *cols = ws.ws_col;
     }
+}
+
+void term_mouse(int on)
+{
+    static const char enable[] = "\x1b[?1000h\x1b[?1002h\x1b[?1006h";
+    static const char disable[] = "\x1b[?1006l\x1b[?1002l\x1b[?1000l";
+
+    if (!raw_active)
+        return;
+    if (on)
+        term_write(enable, sizeof enable - 1);
+    else
+        term_write(disable, sizeof disable - 1);
+}
+
+MouseEv term_mouse_event(void)
+{
+    return last_mouse;
 }
 
 void term_write(const char *s, size_t n)
@@ -336,7 +356,7 @@ const char *term_paste_text(size_t *n)
 
 static void parse_csi(Key *k)
 {
-    int params[3] = { 0, 0, 0 }, idx = 0, c;
+    int params[3] = { 0, 0, 0 }, idx = 0, c, sgr = 0;
 
     for (;;) {
         c = next_byte(ESC_TIMEOUT_MS);
@@ -349,6 +369,8 @@ static void parse_csi(Key *k)
             if (idx < 2)
                 idx++;
         } else if (c >= 0x20 && c <= 0x3F) {
+            if (c == '<')
+                sgr = 1;
             continue;
         } else if (c >= 0x40 && c <= 0x7E) {
             break;
@@ -357,6 +379,31 @@ static void parse_csi(Key *k)
         }
     }
 
+    if (sgr) {
+        /* mouse, "CSI < button ; x ; y M" (press, motion) or "m" (release) */
+        int b = params[0];
+
+        if ((c != 'M' && c != 'm') || idx != 2 || params[1] < 1 || params[2] < 1)
+            return;
+        k->mods = ((b & 4) ? MOD_SHIFT : 0) | ((b & 8) ? MOD_ALT : 0) | ((b & 16) ? MOD_CTRL : 0);
+        last_mouse.x = params[1] - 1;
+        last_mouse.y = params[2] - 1;
+        last_mouse.mods = k->mods;
+        last_mouse.button = b & 3;
+        if (b & 64) {
+            if ((b & 3) > 1)
+                return;                 /* horizontal wheel */
+            last_mouse.kind = (b & 3) == 0 ? MOUSE_WHEEL_UP : MOUSE_WHEEL_DOWN;
+        } else if (b & 32) {
+            if ((b & 3) == 3)
+                return;                 /* motion without a button */
+            last_mouse.kind = MOUSE_DRAG;
+        } else {
+            last_mouse.kind = c == 'm' ? MOUSE_RELEASE : MOUSE_PRESS;
+        }
+        k->code = KEY_MOUSE;
+        return;
+    }
     k->mods = xterm_mods(params[1]);
     if (c == 'u' && params[0] == '\t') {
         /* Tab with modifiers, in the "CSI u" encoding (kitty, foot, WezTerm, ...) */

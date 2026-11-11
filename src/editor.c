@@ -6,6 +6,7 @@
 #include "find.h"
 #include "fold.h"
 #include "git.h"
+#include "mouse.h"
 #include "run.h"
 #include "session.h"
 #include "utf8.h"
@@ -207,6 +208,7 @@ void editor_init(Editor *e)
     e->rows = 24;
     e->cols = 80;
     e->clipboard_osc52 = 1;
+    e->mouse_on = 1;
     e->theme = theme_get(0);
     e->color_depth = theme_detect_depth();
     e->render = render_create();
@@ -311,6 +313,8 @@ void editor_load_config(Editor *e)
     }
     if (e->cfg.clipboard >= 0)
         e->clipboard_osc52 = e->cfg.clipboard;
+    if (e->cfg.mouse >= 0)
+        e->mouse_on = e->cfg.mouse;
     if (e->cfg.theme[0]) {
         int t = theme_by_name(e->cfg.theme);
 
@@ -1826,6 +1830,12 @@ static void handle_key(Editor *e, Key k)
 {
     int cmd, mod, vertical;
     int alt = (k.mods & MOD_ALT) != 0, shift = (k.mods & MOD_SHIFT) != 0;
+    if (k.code == KEY_MOUSE) {
+        MouseEv ev = term_mouse_event();
+
+        mouse_event(e, &ev);
+        return;
+    }
     if (k.code == KEY_FOCUS_IN) {
         on_disk_change(e, e->doc);
         git_refresh_doc(e, e->doc);
@@ -1971,9 +1981,22 @@ void editor_cmd_palette(Editor *e)
     picker_filter(&e->picker);
 }
 
+void editor_key(Editor *e, Key k)
+{
+    handle_key(e, k);
+}
+
+void editor_cmd_toggle_mouse(Editor *e)
+{
+    e->mouse_on = !e->mouse_on;
+    term_mouse(e->mouse_on);
+    editor_set_msg(e, MSG_TTL_MS, e->mouse_on ? "Mouse attivo" : "Mouse disattivato");
+}
+
 void editor_run(Editor *e)
 {
     resize(e);
+    term_mouse(e->mouse_on);
     if (!e->msg[0])
         editor_set_msg(e, MSG_TTL_MS, "Ctrl+S salva  Ctrl+Q esci  Alt+X comandi");
 
