@@ -1,0 +1,58 @@
+#ifndef KED_CONFIG_H
+#define KED_CONFIG_H
+
+#include <stddef.h>
+
+/* The user's settings file (~/.config/ked/config): "key = value" lines, "#" comments,
+ * "[language]" sections that override the language-dependent settings, and a "[keys]"
+ * section of "key = command" lines. Parsing never fails: a bad line is skipped and
+ * counted, and the first problem is kept as a message with its line number. -1 means
+ * "not set" in every field below. */
+
+typedef struct {
+    int tab_width;              /* 1..16 */
+    int expand_tab;             /* Tab inserts spaces */
+    int trim_trailing_space;    /* on save */
+    int final_newline;          /* on save: 0 keep as it was, 1 always end with a newline */
+    int autosuggest;
+    int suggest_min;            /* letters typed before the popup shows, 1..10 */
+} LangCfg;
+
+typedef struct {
+    char *name;                 /* language name, lower case */
+    LangCfg c;
+} LangSection;
+
+typedef struct {
+    char *key, *cmd;            /* "ctrl+s" = "save" */
+    int line;
+} KeyLine;
+
+typedef struct {
+    LangCfg base;               /* settings outside any section, over the defaults */
+    char theme[64];             /* "" when not set */
+    int clipboard;              /* copies also go to the system clipboard (OSC 52) */
+    int git;                    /* Git indicators in the margin */
+    LangSection *lang;
+    size_t nlang, langcap;
+    KeyLine *keys;
+    size_t nkeys, keycap;
+    int nerrors;
+    char first_error[160];      /* "riga 3: ..." */
+} Config;
+
+void config_init(Config *c);
+void config_free(Config *c);
+/* Parses text; returns the number of bad lines (also in c->nerrors). */
+int config_parse(Config *c, const char *text, size_t n);
+/* Records a problem found while applying the settings (counted like a bad line). */
+void config_error(Config *c, int line, const char *msg);
+/* $XDG_CONFIG_HOME/ked or ~/.config/ked (malloc'ed), NULL if neither is known. */
+char *config_dir(void);
+/* Reads dir/config if it exists. Returns 1 if a file was read. */
+int config_load(Config *c, const char *dir);
+/* The settings that apply to a language (any case; NULL = plain text): the defaults, then the
+ * top-level values, then the language's own section. */
+LangCfg config_lang(const Config *c, const char *lang);
+
+#endif

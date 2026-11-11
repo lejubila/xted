@@ -18,6 +18,10 @@ void find_next(Editor *e, int forward);
 void find_goto(Editor *e);
 /* Opens result idx of the last search in files. */
 void find_open_result(Editor *e, size_t idx);
+/* F12: the definition of the word under the cursor, from the tags file. */
+void find_tag(Editor *e);
+/* Opens definition idx of the last F12. */
+void find_open_tag(Editor *e, size_t idx);
 void find_free(Editor *e);
 
 #endif

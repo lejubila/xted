@@ -4,12 +4,16 @@
 #include "buffer.h"
 #include "doc.h"
 #include "files.h"
+#include "keymap.h"
 #include "layout.h"
 #include "picker.h"
 #include "clip.h"
+#include "config.h"
 #include "complete.h"
 #include "render.h"
 #include "search.h"
+#include "shell.h"
+#include "tags.h"
 #include "snippet.h"
 #include "syntax.h"
 #include "theme.h"
@@ -21,7 +25,7 @@
 #define MSG_TTL_MS 5000
 #define SIDEBAR_W 28
 
-enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS, PK_COMMANDS };
+enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS, PK_COMMANDS, PK_TAGS };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -48,6 +52,9 @@ typedef struct {
     size_t nrepl;
     int undo_open;
     FileHits files;         /* results of the last search in files */
+    TagHits tags;           /* definitions offered by the last F12 */
+    char *tags_dir;         /* the folder of the tags file they came from */
+    char tag_name[128];
 } Find;
 
 
@@ -58,6 +65,20 @@ typedef struct {
     int sel_on;
     size_t ay, ax;
 } Cursor;
+
+/* The command running in the background and its output (see run.c). */
+typedef struct {
+    Doc *out;               /* the "[Output]" document, NULL until the first run */
+    Job job;
+    int on;                 /* a command runs (its pipe may be closed already) */
+    char cmd[512];          /* the last command */
+    char filter[512];       /* the last filter */
+    long t0;                /* when it started, monotonic ms */
+    size_t bytes;           /* output kept so far */
+    int trunc;
+    int ansi;               /* inside an escape sequence we are stripping */
+    size_t err_line;        /* output line of the last error visited, plus one */
+} Run;
 
 typedef struct Editor {
     Doc **docs;             /* open documents, in tab order */
@@ -73,6 +94,11 @@ typedef struct Editor {
     int tree_ready;
     Picker picker;
     Find find;
+    Run run;
+    Keymap km;              /* which key runs which command */
+    Config cfg;             /* the user's settings */
+    int git_off;            /* git could not be run: the margin is off for this session */
+    char *cfgdir;           /* where they were read from (NULL: unknown) */
     Complete comp;          /* suggestion popup */
     SnipSession snip;       /* running snippet: Tab visits its stops */
     Cursor *xc;             /* extra cursors, in text order; see cursors.c */
@@ -121,6 +147,9 @@ void editor_init(Editor *e);
 void editor_free(Editor *e);
 /* Loads path into the buffer (before the terminal is initialised). */
 int editor_open(Editor *e, const char *path, char *err, size_t errlen);
+/* Reads the settings, themes and languages of the user and applies them (before the terminal
+ * is started; a problem becomes the first message on screen). */
+void editor_load_config(Editor *e);
 void editor_run(Editor *e);
 
 /* Opens a file in the active pane (or shows it if already open). Returns the
@@ -139,6 +168,14 @@ int editor_split(Editor *e, int vertical);
 void editor_activate(Editor *e, Doc *d);
 /* Moves the cursor of the active pane to a 1-based line and column. */
 void editor_goto(Editor *e, size_t line, size_t col);
+/* Splits the active pane giving the original pct percent; the new pane becomes active. */
+int editor_split_at(Editor *e, int vertical, int pct);
+/* Moves the keyboard focus to pane w. */
+void editor_focus(Editor *e, Win *w);
+/* Re-reads the active pane's view into the live fields (after the run code edited it). */
+void editor_reload_view(Editor *e);
+/* One-key question on the message row: returns the lowercase key of keys, 0 on Esc. */
+int editor_ask(Editor *e, const char *question, const char *keys);
 /* Single-line text input on the message row (init is the starting text).
  * Returns the length, 0 if cancelled. */
 size_t editor_prompt(Editor *e, const char *label, const char *init, char *out, size_t outsz);
@@ -171,6 +208,8 @@ void editor_cmd_prev_win(Editor *e);
 void editor_cmd_toggle_tree(Editor *e);
 void editor_cmd_match(Editor *e);
 void editor_cmd_theme(Editor *e);
+void editor_cmd_redraw(Editor *e);
+void editor_cmd_git(Editor *e);
 /* Alt+X: the list of all commands. */
 void editor_cmd_palette(Editor *e);
 

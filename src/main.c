@@ -11,7 +11,8 @@
 static void usage(FILE *f)
 {
     fputs("uso: ked [file[:riga[:colonna]] ...]\n"
-          "     ked -        legge il testo da stdin\n", f);
+          "     ked -        legge il testo da stdin\n"
+          "configurazione: $XDG_CONFIG_HOME/ked (o ~/.config/ked): config, syntax/, themes/\n", f);
 }
 
 /* Splits "name:12:3" into the name and a line/column, but only when the
@@ -78,6 +79,7 @@ int main(int argc, char **argv)
     }
 
     editor_init(&e);
+    editor_load_config(&e);
     for (i = 1; i < argc; i++) {
         Doc *d;
         size_t line, col;

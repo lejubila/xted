@@ -3,6 +3,7 @@
 #include "util.h"
 
 #include <ctype.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -704,12 +705,32 @@ static int def_has(const char *const *def, const char *key, const char *word, si
     return 0;
 }
 
+/* User languages come before the built-in ones in one numbering. */
+typedef struct {
+    LangDef def;
+    char *name;
+    char **lines;               /* NULL-terminated */
+} UserLang;
+
+static UserLang *user;
+static size_t nuser, usercap;
+
+static size_t lang_count(void)
+{
+    return nuser + lang_ndefs;
+}
+
+static const LangDef *lang_at(size_t i)
+{
+    return i < nuser ? &user[i].def : &lang_defs[i - nuser];
+}
+
 static int find_lang_word(const char *key, const char *w, size_t n, int fold)
 {
     size_t i;
 
-    for (i = 0; i < lang_ndefs; i++)
-        if (def_has(lang_defs[i].def, key, w, n, fold))
+    for (i = 0; i < lang_count(); i++)
+        if (def_has(lang_at(i)->def, key, w, n, fold))
             return (int)i;
     return -1;
 }
@@ -735,8 +756,8 @@ static int by_modeline_text(const char *s, size_t n)
         {
             size_t li;
 
-            for (li = 0; li < lang_ndefs && idx < 0; li++) {
-                const char *nm = lang_defs[li].name;
+            for (li = 0; li < lang_count() && idx < 0; li++) {
+                const char *nm = lang_at(li)->name;
 
                 if (strlen(nm) == k - j) {
                     size_t q;
@@ -833,11 +854,138 @@ Syntax *syn_detect(const Buffer *b)
     if (idx < 0)
         return NULL;
 
-    for (d = lang_defs[idx].def; *d; d++) {
+    for (d = lang_at((size_t)idx)->def; *d; d++) {
         sbuf_adds(&text, *d);
         sbuf_add(&text, "\n", 1);
     }
     s = syn_parse(text.p ? text.p : "", text.len, err, sizeof err);
     sbuf_free(&text);
     return s;
+}
+
+/* ---- user languages --------------------------------------------------------- */
+
+static void free_user(UserLang *u)
+{
+    char **l;
+
+    for (l = u->lines; l && *l; l++)
+        free(*l);
+    free(u->lines);
+    free(u->name);
+}
+
+void syn_clear_user(void)
+{
+    size_t i;
+
+    for (i = 0; i < nuser; i++)
+        free_user(&user[i]);
+    free(user);
+    user = NULL;
+    nuser = usercap = 0;
+}
+
+int syn_add_user(const char *text, size_t n, char *err, size_t errlen)
+{
+    Syntax *s = syn_parse(text, n, err, errlen);
+    UserLang u;
+    size_t pos = 0, cnt = 0, cap = 16, k;
+
+    if (!s)
+        return -1;
+    memset(&u, 0, sizeof u);
+    u.name = xstrdup(syn_name(s));
+    syn_free(s);
+    u.lines = xmalloc(cap * sizeof *u.lines);
+    while (pos < n) {
+        size_t len = 0;
+
+        while (pos + len < n && text[pos + len] != '\n')
+            len++;
+        if (cnt + 2 > cap) {
+            cap *= 2;
+            u.lines = xrealloc(u.lines, cap * sizeof *u.lines);
+        }
+        u.lines[cnt] = xmalloc(len + 1);
+        memcpy(u.lines[cnt], text + pos, len);
+        u.lines[cnt][len] = '\0';
+        cnt++;
+        pos += len + 1;
+    }
+    u.lines[cnt] = NULL;
+    u.def.name = u.name;
+    u.def.def = (const char *const *)u.lines;
+    /* a later file with the same name replaces the earlier one */
+    for (k = 0; k < nuser; k++)
+        if (strcmp(user[k].name, u.name) == 0) {
+            free_user(&user[k]);
+            user[k] = u;
+            user[k].def.name = user[k].name;
+            user[k].def.def = (const char *const *)user[k].lines;
+            return 0;
+        }
+    if (nuser == usercap) {
+        usercap = usercap ? usercap * 2 : 8;
+        user = xrealloc(user, usercap * sizeof *user);
+    }
+    user[nuser] = u;
+    user[nuser].def.name = user[nuser].name;
+    user[nuser].def.def = (const char *const *)user[nuser].lines;
+    nuser++;
+    return 0;
+}
+
+static int name_cmp(const void *a, const void *b)
+{
+    return strcmp(*(char *const *)a, *(char *const *)b);
+}
+
+size_t syn_load_dir(const char *dir, void (*report)(const char *msg, void *ctx), void *ctx)
+{
+    DIR *d = opendir(dir);
+    struct dirent *de;
+    char **names = NULL;
+    size_t n = 0, cap = 0, i, added = 0;
+
+    if (!d)
+        return 0;
+    while ((de = readdir(d)) != NULL) {
+        if (de->d_name[0] == '.')
+            continue;
+        if (n == cap) {
+            cap = cap ? cap * 2 : 16;
+            names = xrealloc(names, cap * sizeof *names);
+        }
+        names[n++] = xstrdup(de->d_name);
+    }
+    closedir(d);
+    qsort(names, n, sizeof *names, name_cmp);
+    for (i = 0; i < n; i++) {
+        size_t pn = strlen(dir) + strlen(names[i]) + 2;
+        char *path = xmalloc(pn), err[160], msg[300];
+        FILE *f;
+        SBuf text = SBUF_INIT;
+        char buf[4096];
+        size_t got;
+
+        snprintf(path, pn, "%s/%s", dir, names[i]);
+        f = fopen(path, "r");
+        if (f) {
+            while ((got = fread(buf, 1, sizeof buf, f)) > 0 && text.len < (256u << 10))
+                sbuf_add(&text, buf, got);
+            fclose(f);
+            if (syn_add_user(text.p ? text.p : "", text.len, err, sizeof err) == 0) {
+                added++;
+            } else if (report) {
+                snprintf(msg, sizeof msg, "%s: %s", names[i], err);
+                report(msg, ctx);
+            }
+        }
+        sbuf_free(&text);
+        free(path);
+        free(names[i]);
+    }
+    free(names);
+    return added;
 }

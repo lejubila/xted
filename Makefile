@@ -10,6 +10,10 @@ LDFLAGS += -fsanitize=address,undefined
 endif
 ifdef STATIC
 LDFLAGS += -static
+# a static binary is meant to be small (SPEC: under 300 KB): -Os unless CFLAGS is given
+ifeq ($(origin CFLAGS),file)
+CFLAGS = -Os
+endif
 endif
 
 WARN     = -std=c99 -Wall -Wextra -pedantic
@@ -18,7 +22,7 @@ ALLFLAGS = $(WARN) $(DEFS) $(CFLAGS) -ffunction-sections -fdata-sections -MMD -M
 LINK     = $(LDFLAGS) -Wl,--gc-sections
 
 LIBSRC   = src/util.c src/utf8.c src/term.c src/undo.c src/clip.c src/buffer.c \
-           src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c \
+           src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c src/shell.c src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c \
            src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=build/%.o) build/main.o
 

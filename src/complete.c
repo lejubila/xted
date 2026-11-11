@@ -171,7 +171,7 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, const Doc *cur, s
 
     complete_close(c);
     plen = complete_prefix(b, y, x, &start);
-    if (plen < COMPLETE_MIN_PREFIX || plen >= sizeof g.prefix)
+    if (plen < (c->min_prefix ? c->min_prefix : COMPLETE_MIN_PREFIX) || plen >= sizeof g.prefix)
         return 0;
     memset(&g, 0, sizeof g);
     memcpy(g.prefix, b->lines[y].s + start, plen);

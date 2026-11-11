@@ -586,4 +586,138 @@ void find_free(Editor *e)
         e->find.m = NULL;
     }
     filehits_free(&e->find.files);
+    taghits_free(&e->find.tags);
+    free(e->find.tags_dir);
+    e->find.tags_dir = NULL;
+}
+
+/* ---- definitions (tags) ------------------------------------------------ */
+
+static int word_at(const Line *l, size_t i)
+{
+    uint32_t cp;
+
+    utf8_decode(l->s + i, l->len - i, &cp);
+    return cp_is_word(cp);
+}
+
+/* The identifier around the cursor; returns its length, 0 if there is none. */
+static size_t word_under_cursor(const Editor *e, char *out, size_t outsz)
+{
+    const Line *l = &e->buf->lines[e->cy];
+    size_t s = e->cx, t;
+
+    if (!(s < l->len && word_at(l, s))) {
+        if (s == 0 || !word_at(l, utf8_prev(l->s, s)))
+            return 0;
+        s = utf8_prev(l->s, s);                 /* just after a word */
+    }
+    t = s;
+    while (s > 0 && word_at(l, utf8_prev(l->s, s)))
+        s = utf8_prev(l->s, s);
+    while (t < l->len && word_at(l, t))
+        t = utf8_next(l->s, l->len, t);
+    if (t - s == 0 || t - s >= outsz)
+        return 0;
+    memcpy(out, l->s + s, t - s);
+    out[t - s] = '\0';
+    return t - s;
+}
+
+static void goto_hit(Editor *e, const TagHit *h)
+{
+    char *full, err[256];
+    size_t line;
+
+    if (h->file[0] == '/')
+        full = xstrdup(h->file);
+    else
+        full = files_join(e->find.tags_dir ? e->find.tags_dir : ".", h->file);
+    buf_undo_close(e->buf);
+    if (!editor_open_doc(e, full, err, sizeof err)) {
+        editor_set_msg(e, MSG_TTL_MS, "%s: %s", full, err);
+        free(full);
+        return;
+    }
+    free(full);
+    line = tag_resolve(h, e->find.tag_name, e->buf);
+    if (line == 0) {
+        editor_goto(e, 1, 1);
+        editor_set_msg(e, MSG_TTL_MS, "«%s» non si trova più dove dice il file tags", e->find.tag_name);
+    } else {
+        editor_goto(e, line, 1);
+    }
+    e->sel_on = 0;
+    e->want_col = editor_cursor_col(e);
+}
+
+void find_tag(Editor *e)
+{
+    Find *f = &e->find;
+    char name[sizeof f->tag_name], *file, *slash, item[600];
+    const char *from = e->doc->buf.path ? e->doc->buf.path : NULL;
+    char *dir;
+    long n;
+    size_t i;
+
+    if (word_under_cursor(e, name, sizeof name) == 0) {
+        editor_set_msg(e, MSG_TTL_MS, "Nessuna parola sotto il cursore");
+        return;
+    }
+    dir = from ? xstrdup(from) : xstrdup(e->root ? e->root : ".");
+    if (from) {
+        slash = strrchr(dir, '/');
+        if (slash) {
+            *slash = '\0';
+        } else {
+            free(dir);
+            dir = xstrdup(".");
+        }
+        if (!dir[0]) {
+            free(dir);
+            dir = xstrdup("/");
+        }
+    }
+    file = tags_find_file(dir);
+    free(dir);
+    if (!file) {
+        editor_set_msg(e, MSG_TTL_MS, "Nessun file tags (si crea con ctags -R)");
+        return;
+    }
+    taghits_free(&f->tags);
+    free(f->tags_dir);
+    f->tags_dir = xstrdup(file);
+    slash = strrchr(f->tags_dir, '/');
+    if (slash)
+        *slash = '\0';
+    snprintf(f->tag_name, sizeof f->tag_name, "%s", name);
+    n = tags_lookup(file, name, &f->tags);
+    free(file);
+    if (n < 0) {
+        editor_set_msg(e, MSG_TTL_MS, "Impossibile leggere il file tags");
+        return;
+    }
+    if (n == 0) {
+        editor_set_msg(e, MSG_TTL_MS, "Nessuna definizione di «%s»", name);
+        return;
+    }
+    if (n == 1) {
+        goto_hit(e, &f->tags.v[0]);
+        return;
+    }
+    picker_open(&e->picker, "Definizione");
+    e->picker_kind = PK_TAGS;
+    for (i = 0; i < f->tags.n; i++) {
+        const TagHit *h = &f->tags.v[i];
+
+        snprintf(item, sizeof item, "%s  %s  %s", h->file, h->kind[0] ? h->kind : "-", h->addr);
+        picker_add(&e->picker, item);
+    }
+    picker_filter(&e->picker);
+}
+
+void find_open_tag(Editor *e, size_t idx)
+{
+    if (idx < e->find.tags.n)
+        goto_hit(e, &e->find.tags.v[idx]);
 }

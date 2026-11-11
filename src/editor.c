@@ -1,9 +1,12 @@
 #include "editor.h"
 #include "edit.h"
 #include "commands.h"
+#include "config.h"
 #include "cursors.h"
 #include "find.h"
 #include "fold.h"
+#include "git.h"
+#include "run.h"
 #include "session.h"
 #include "utf8.h"
 #include "util.h"
@@ -13,6 +16,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <time.h>
 
@@ -51,7 +55,7 @@ static size_t text_cols(const Editor *e)
 {
     Win *w = e->layout.active;
 
-    return w && w->w >= 1 ? (size_t)w->w : 1;
+    return w ? (size_t)win_text_w(w) : 1;
 }
 
 size_t editor_view_col(const Buffer *b, const View *v, int tabw)
@@ -125,6 +129,7 @@ static void load_win(Editor *e, Win *w)
     e->ax = v->ax;
     e->paste_valid = 0;
     e->match_on = 0;
+    e->tabw = w->doc->tabw;
     e->snip.on = 0;
     complete_close(&e->comp);
     cur_clear(e);
@@ -205,6 +210,8 @@ void editor_init(Editor *e)
     e->theme = theme_get(0);
     e->color_depth = theme_detect_depth();
     e->render = render_create();
+    keymap_init(&e->km);
+    config_init(&e->cfg);
     relayout(e);
 }
 
@@ -220,6 +227,13 @@ void editor_free(Editor *e)
     find_free(e);
     complete_free(&e->comp);
     cur_clear(e);
+    run_kill(e);
+    keymap_free(&e->km);
+    config_free(&e->cfg);
+    free(e->cfgdir);
+    e->theme = theme_get(0);
+    theme_clear_user();
+    syn_clear_user();
     tree_free(&e->tree);
     free(e->root);
     clip_free(&e->clip);
@@ -253,8 +267,128 @@ static int is_blank_doc(const Doc *d)
     return !d->buf.path && !d->buf.modified && d->buf.nlines == 1 && d->buf.lines[0].len == 0;
 }
 
+/* The settings of the language the document turned out to be in. */
+static void apply_cfg(Editor *e, Doc *d)
+{
+    LangCfg l = config_lang(&e->cfg, d->syn ? syn_name(d->syn) : NULL);
+
+    d->tabw = l.tab_width;
+    d->expand_tab = l.expand_tab;
+    d->trim_space = l.trim_trailing_space;
+    d->final_nl = l.final_newline;
+    d->autosuggest = l.autosuggest;
+    d->suggest_min = l.suggest_min;
+    if (d == e->doc)
+        e->tabw = d->tabw;
+}
+
+static void report_cfg(const char *msg, void *ctx)
+{
+    config_error(&((Editor *)ctx)->cfg, 0, msg);
+}
+
+void editor_load_config(Editor *e)
+{
+    size_t i;
+    char msg[200];
+
+    free(e->cfgdir);
+    e->cfgdir = config_dir();
+    e->theme = theme_get(0);
+    e->theme_idx = 0;
+    theme_clear_user();
+    syn_clear_user();
+    if (e->cfgdir) {
+        size_t sn = strlen(e->cfgdir) + 16;
+        char *sub = xmalloc(sn);
+
+        config_load(&e->cfg, e->cfgdir);
+        snprintf(sub, sn, "%s/themes", e->cfgdir);
+        theme_load_dir(sub, report_cfg, e);
+        snprintf(sub, sn, "%s/syntax", e->cfgdir);
+        syn_load_dir(sub, report_cfg, e);
+        free(sub);
+    }
+    if (e->cfg.clipboard >= 0)
+        e->clipboard_osc52 = e->cfg.clipboard;
+    if (e->cfg.theme[0]) {
+        int t = theme_by_name(e->cfg.theme);
+
+        if (t >= 0) {
+            e->theme_idx = (size_t)t;
+            e->theme = theme_get((size_t)t);
+        } else {
+            snprintf(msg, sizeof msg, "tema «%s» sconosciuto", e->cfg.theme);
+            config_error(&e->cfg, 0, msg);
+        }
+    }
+    for (i = 0; i < e->cfg.nkeys; i++) {
+        const KeyLine *kl = &e->cfg.keys[i];
+        Key k;
+        int cmd = -1;
+
+        if (key_parse(kl->key, &k, msg, sizeof msg) < 0) {
+            config_error(&e->cfg, kl->line, msg);
+            continue;
+        }
+        if (strcmp(kl->cmd, "none") != 0) {
+            cmd = command_by_id(kl->cmd);
+            if (cmd < 0) {
+                snprintf(msg, sizeof msg, "comando «%s» sconosciuto", kl->cmd);
+                config_error(&e->cfg, kl->line, msg);
+                continue;
+            }
+        }
+        keymap_bind(&e->km, k, cmd);
+    }
+    for (i = 0; i < e->ndocs; i++)
+        apply_cfg(e, e->docs[i]);
+    if (e->cfg.nerrors > 0)
+        editor_set_msg(e, 0, "config: %s%s", e->cfg.first_error,
+                       e->cfg.nerrors > 1 ? " (e altri errori)" : "");
+}
+
+/* Marks the lines of d that differ from HEAD. Only for a document that matches its file on disk. */
+static void git_refresh_doc(Editor *e, Doc *d)
+{
+    uint8_t *marks = NULL;
+    struct stat st;
+    size_t i;
+    int r;
+
+    if (e->git_off || e->cfg.git == 0 || !d->buf.path || d->buf.modified || d->scratch)
+        return;
+    if (stat(d->buf.path, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > (20 << 20))
+        return;
+    r = git_file_marks(d->buf.path, d->buf.nlines, &marks);
+    if (r < 0) {
+        /* no git (or it failed): stop asking for this session */
+        e->git_off = 1;
+        r = 0;
+    }
+    for (i = 0; i < d->buf.nlines; i++)
+        d->buf.lines[i].git = r == 1 ? marks[i] : GIT_NONE;
+    d->gutter = r == 1;
+    free(marks);
+}
+
+void editor_cmd_git(Editor *e)
+{
+    if (e->doc->buf.modified)
+        editor_set_msg(e, MSG_TTL_MS, "Salva il file per aggiornare gli indicatori Git");
+    else {
+        e->git_off = 0;
+        git_refresh_doc(e, e->doc);
+        relayout(e);
+        editor_set_msg(e, MSG_TTL_MS, e->doc->gutter ? "Indicatori Git aggiornati"
+                                                      : "Il file non è in un repository Git");
+    }
+}
+
 static Doc *install_doc(Editor *e, Doc *d)
 {
+    apply_cfg(e, d);
+    git_refresh_doc(e, d);
     Doc *cur = e->doc;
 
     if (e->ndocs == 1 && is_blank_doc(cur)) {
@@ -391,7 +525,7 @@ static void prepare_frame(Editor *e)
 
         view_clamp(&d->buf, &w[i]->view);
         if (w[i] != e->layout.active)
-            scroll_view(&d->buf, &w[i]->view, th, w[i]->w >= 1 ? (size_t)w[i]->w : 1, e->tabw);
+            scroll_view(&d->buf, &w[i]->view, th, (size_t)win_text_w(w[i]), d->tabw);
         syn_update(d->syn, &d->buf, w[i]->view.rowoff + th);
     }
     e->match_on = syn_match_bracket(e->doc->syn, e->buf, e->cy, e->cx,
@@ -427,9 +561,14 @@ static int next_key(Editor *e, Key *k)
             }
             prepare_frame(e);
             render_frame(e->render, e);
+            term_watch(run_fd(e));
+            if (run_timeout(e) >= 0 && (timeout < 0 || run_timeout(e) < timeout))
+                timeout = run_timeout(e);
             ev = term_wait(timeout);
             if (ev & TERM_EV_RESIZE)
                 resize(e);
+            if ((ev & TERM_EV_FD) || (!ev && run_timeout(e) >= 0))
+                run_pump(e);
             if (!(ev & TERM_EV_KEY))
                 continue;
         }
@@ -708,11 +847,17 @@ static int save_doc_as(Editor *e, Doc *d, int force_prompt)
             return -1;
         }
     }
+    if (d->trim_space)
+        edit_trim_trailing(e, d);
+    if (d->final_nl)
+        d->buf.final_newline = 1;
     n = doc_save(d, target, err, sizeof err);
     if (n < 0) {
         editor_set_msg(e, MSG_TTL_MS, "Errore di salvataggio: %s", err);
         return -1;
     }
+    apply_cfg(e, d);
+    git_refresh_doc(e, d);
     editor_set_msg(e, MSG_TTL_MS, "%zu righe, %ld byte scritti", d->buf.nlines, n);
     return 0;
 }
@@ -810,6 +955,7 @@ static void remove_doc(Editor *e, Doc *d)
             w[k]->doc = repl;
             w[k]->view = repl->last;
         }
+    run_doc_removed(e, d);
     doc_free(d);
     load_win(e, e->layout.active);
 }
@@ -864,11 +1010,33 @@ static void cmd_quit(Editor *e)
     e->quit = 1;
 }
 
-int editor_split(Editor *e, int vertical)
+int editor_split_at(Editor *e, int vertical, int pct)
 {
     relayout(e);
     editor_store_view(e);
-    return layout_split(&e->layout, vertical) ? 0 : -1;
+    return layout_split_at(&e->layout, vertical, pct) ? 0 : -1;
+}
+
+int editor_split(Editor *e, int vertical)
+{
+    return editor_split_at(e, vertical, 50);
+}
+
+void editor_focus(Editor *e, Win *w)
+{
+    editor_store_view(e);
+    buf_undo_close(e->buf);
+    load_win(e, w);
+}
+
+void editor_reload_view(Editor *e)
+{
+    load_win(e, e->layout.active);
+}
+
+int editor_ask(Editor *e, const char *question, const char *keys)
+{
+    return ask(e, question, keys);
 }
 
 static void cmd_split(Editor *e, int vertical)
@@ -970,20 +1138,10 @@ static void picker_accept(Editor *e)
             switch_doc(e, e->docs[idx]);
     } else if (kind == PK_RESULTS) {
         find_open_result(e, (size_t)idx);
+    } else if (kind == PK_TAGS) {
+        find_open_tag(e, (size_t)idx);
     } else if (kind == PK_COMMANDS) {
-        if ((size_t)idx < ncommands) {
-            const Command *c = &commands[idx];
-
-            if (c->modifies && e->doc->readonly) {
-                editor_set_msg(e, MSG_TTL_MS,
-                               "File in sola lettura (Alt+S per salvare con un altro nome)");
-                return;
-            }
-            buf_undo_close(e->buf);
-            e->paste_valid = 0;
-            c->fn(e);
-            e->want_col = editor_cursor_col(e);
-        }
+        command_run(e, (int)idx);
     } else if (kind == PK_FILES) {
         char err[256], *path = under_root(e, e->picker.items[idx]);
 
@@ -1216,6 +1374,7 @@ static int build_layout(Editor *e, const PNode *n, Doc *const *opened, size_t no
 
 void editor_save_session(Editor *e)
 {
+    run_shutdown(e);
     Session s;
     char *file = session_file();
     size_t i;
@@ -1346,100 +1505,6 @@ static int is_typing(Key k)
     return is_printable(k.code);
 }
 
-/* Returns 1 for vertical movement, which keeps the wanted column. */
-static int handle_alt(Editor *e, Key k, int shift)
-{
-    if ((k.mods & MOD_CTRL) && (k.code == KEY_UP || k.code == KEY_DOWN)) {
-        cur_add_vertical(e, k.code == KEY_DOWN);
-        return 1;
-    }
-    switch (k.code) {
-    case 'd':
-        cur_add_all(e);
-        break;
-    case 'z':
-        fold_toggle(e);
-        break;
-    case KEY_UP:
-        if (shift)
-            edit_duplicate_lines(e, 0);
-        else
-            edit_move_lines(e, 0);
-        return 1;
-    case KEY_DOWN:
-        if (shift)
-            edit_duplicate_lines(e, 1);
-        else
-            edit_move_lines(e, 1);
-        return 1;
-    case KEY_RIGHT:
-        if (!shift)
-            cmd_cycle_win(e, 1);
-        return 0;
-    case KEY_LEFT:
-        if (!shift)
-            cmd_cycle_win(e, -1);
-        return 0;
-    case 'l':
-        edit_select_line(e);
-        break;
-    case 'w':
-        edit_select_word(e);
-        break;
-    case 'v':
-        edit_paste_older(e);
-        break;
-    case '/':
-        edit_toggle_comment(e);
-        break;
-    case '\\':
-        cmd_split(e, 1);
-        break;
-    case '-':
-        cmd_split(e, 0);
-        break;
-    case 'o':
-        cmd_cycle_win(e, 1);
-        break;
-    case 'q':
-        cmd_close_win(e);
-        break;
-    case 's':
-        cmd_save_as(e);
-        break;
-    case 'a':
-        cmd_save_all(e);
-        break;
-    case '.':
-        cycle_doc(e, 1);
-        break;
-    case ',':
-        cycle_doc(e, -1);
-        break;
-    case 'n':
-        find_next(e, 1);
-        break;
-    case 'p':
-        find_next(e, 0);
-        break;
-    case 'f':
-        find_files_open(e);
-        break;
-    case 'm':
-        editor_cmd_match(e);
-        break;
-    case 't':
-        editor_cmd_theme(e);
-        break;
-    case 'x':
-        editor_cmd_palette(e);
-        break;
-    default:
-        break;
-    }
-    return 0;
-}
-
 static int handle_plain(Editor *e, Key k, int shift, int ctrl)
 {
     switch (k.code) {
@@ -1452,18 +1517,10 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         move_vertical(e, 1);
         return 1;
     case KEY_PGUP:
-        if (ctrl) {
-            cycle_doc(e, -1);
-            break;
-        }
         sel_begin(e, shift);
         move_page(e, 0);
         return 1;
     case KEY_PGDN:
-        if (ctrl) {
-            cycle_doc(e, 1);
-            break;
-        }
         sel_begin(e, shift);
         move_page(e, 1);
         return 1;
@@ -1516,8 +1573,8 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         break;
     case KEY_TAB:
         if (ctrl)
-            cmd_cycle_win(e, shift ? -1 : 1);
-        else if (shift)
+            break;
+        if (shift)
             edit_dedent(e);
         else
             edit_tab(e);
@@ -1526,18 +1583,6 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         e->sel_on = 0;
         e->find.hl = 0;
         break;
-    case KEY_F3:
-        find_next(e, !shift);
-        break;
-    case CTRL('f'):
-        find_open(e, 0);
-        break;
-    case CTRL('r'):
-        find_open(e, 1);
-        break;
-    case CTRL('g'):
-        find_goto(e);
-        break;
     case KEY_PASTE: {
         size_t n;
         const char *s = term_paste_text(&n);
@@ -1545,57 +1590,6 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         edit_paste_text(e, s, n);
         break;
     }
-    case CTRL('d'):
-        cur_add_next(e);
-        break;
-    case CTRL('a'):
-        edit_select_all(e);
-        break;
-    case CTRL('c'):
-        edit_copy(e);
-        break;
-    case CTRL('x'):
-        edit_cut(e);
-        break;
-    case CTRL('v'):
-        edit_paste(e);
-        break;
-    case CTRL('z'):
-        edit_undo(e);
-        break;
-    case CTRL('y'):
-        edit_redo(e);
-        break;
-    case CTRL('k'):
-        edit_delete_lines(e);
-        break;
-    case CTRL('j'):
-        edit_join_lines(e);
-        break;
-    case CTRL('s'):
-        cmd_save(e);
-        break;
-    case CTRL('q'):
-        cmd_quit(e);
-        break;
-    case CTRL('o'):
-        cmd_open(e);
-        break;
-    case CTRL('p'):
-        cmd_quick_open(e);
-        break;
-    case CTRL('e'):
-        cmd_buffers(e);
-        break;
-    case CTRL('b'):
-        cmd_toggle_tree(e);
-        break;
-    case CTRL('w'):
-        cmd_close_buffer(e);
-        break;
-    case CTRL('l'):
-        render_invalidate(e->render);
-        break;
     default:
         if (is_printable(k.code))
             edit_insert_cp(e, k.code);
@@ -1604,26 +1598,15 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
     return 0;
 }
 
-/* Does the key change the text? Used to refuse it in a read-only document. */
+/* Does a key that is not a command change the text? Used to refuse it in a read-only document. */
 static int modifies(Key k)
 {
-    int alt = (k.mods & MOD_ALT) != 0, ctrl = (k.mods & MOD_CTRL) != 0;
-
     if (k.code == KEY_PASTE)
         return 1;
-    if (alt)
-        return k.code == KEY_UP || k.code == KEY_DOWN || k.code == 'v' || k.code == '/';
-    if (k.code == KEY_TAB && ctrl)
+    if (k.mods & (MOD_ALT | MOD_CTRL))
         return 0;
-    if (ctrl || k.code < 0x20) {
-        switch (k.code) {
-        case CTRL('x'): case CTRL('v'): case CTRL('k'): case CTRL('j'):
-        case CTRL('z'): case CTRL('y'): case KEY_ENTER: case KEY_TAB: case 8:
-            return 1;
-        default:
-            return 0;
-        }
-    }
+    if (k.code == KEY_ENTER || k.code == KEY_TAB || k.code == 8)
+        return 1;
     return k.code == KEY_BACKSPACE || k.code == KEY_DEL || is_printable(k.code);
 }
 
@@ -1705,26 +1688,28 @@ static void multi_paste(Editor *e, const char *text, size_t n)
 static int handle_multi(Editor *e, Key k)
 {
     int alt = (k.mods & MOD_ALT) != 0, ctrl = (k.mods & MOD_CTRL) != 0;
-    int shift = (k.mods & MOD_SHIFT) != 0, vertical_add;
+    int shift = (k.mods & MOD_SHIFT) != 0;
+    int cmd = keymap_find(&e->km, k);
+    const char *id = cmd >= 0 ? commands[cmd].id : "";
     KeyCtx c;
 
-    vertical_add = alt && ctrl && (k.code == KEY_UP || k.code == KEY_DOWN);
-    if (vertical_add || (alt && k.code == 'd') || (!alt && k.code == CTRL('d')))
+    if (strncmp(id, "cursor_", 7) == 0)
         return 0;
-    if (!alt && (k.code == CTRL('c') || k.code == CTRL('x'))) {
+    if (strcmp(id, "copy") == 0 || strcmp(id, "cut") == 0) {
         size_t n;
         char *t = cur_selected_text(e, &n);
+        int cut = id[1] == 'u';
 
         if (t) {
-            edit_store_clip(e, t, n, k.code == CTRL('c') ? "Copiato" : "Tagliato");
-            if (k.code == CTRL('x')) {
+            edit_store_clip(e, t, n, cut ? "Tagliato" : "Copiato");
+            if (cut) {
                 cur_each(e, cut_one, NULL);
                 buf_undo_close(e->buf);
             }
             return 1;
         }
     }
-    if (!alt && (k.code == CTRL('v') || k.code == KEY_PASTE)) {
+    if (strcmp(id, "paste") == 0 || k.code == KEY_PASTE) {
         if (k.code == KEY_PASTE) {
             size_t n;
             const char *s = term_paste_text(&n);
@@ -1741,8 +1726,9 @@ static int handle_multi(Editor *e, Key k)
             }
         }
     }
-    if (!alt && (!ctrl || k.code == KEY_LEFT || k.code == KEY_RIGHT || k.code == KEY_UP ||
-                 k.code == KEY_DOWN || k.code == KEY_HOME || k.code == KEY_END)) {
+    if (cmd < 0 && !alt && (!ctrl || k.code == KEY_LEFT || k.code == KEY_RIGHT ||
+                            k.code == KEY_UP || k.code == KEY_DOWN || k.code == KEY_HOME ||
+                            k.code == KEY_END)) {
         switch (k.code) {
         case KEY_ENTER: case KEY_BACKSPACE: case 8: case KEY_DEL: case KEY_TAB:
         case KEY_UP: case KEY_DOWN: case KEY_LEFT: case KEY_RIGHT:
@@ -1752,8 +1738,6 @@ static int handle_multi(Editor *e, Key k)
             if (!is_printable(k.code))
                 goto collapse;
         }
-        if (k.code == KEY_TAB && ctrl)
-            goto collapse;
         c.k = k;
         c.shift = shift;
         c.ctrl = ctrl;
@@ -1830,16 +1814,21 @@ static void update_complete(Editor *e, Key k)
 
     /* keys already waiting (fast typing, a paste without bracketing) are not worth a scan each */
     if ((word || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&
-        !e->snip.on && !cur_multi(e) && !term_has_input())
+        !e->snip.on && !cur_multi(e) && e->doc->autosuggest && !term_has_input()) {
+        e->comp.min_prefix = (size_t)e->doc->suggest_min;
         complete_open(&e->comp, e->docs, e->ndocs, e->doc, e->cy, e->cx);
+    }
     else
         complete_close(&e->comp);
 }
 
 static void handle_key(Editor *e, Key k)
 {
+    int cmd, mod, vertical;
+    int alt = (k.mods & MOD_ALT) != 0, shift = (k.mods & MOD_SHIFT) != 0;
     if (k.code == KEY_FOCUS_IN) {
         on_disk_change(e, e->doc);
+        git_refresh_doc(e, e->doc);
         return;
     }
     if (k.code == KEY_FOCUS_OUT)
@@ -1854,15 +1843,24 @@ static void handle_key(Editor *e, Key k)
     }
     if (e->sidebar_on && e->sidebar_focus && handle_tree(e, k))
         return;
-    if (e->doc->readonly && modifies(k)) {
+    if (e->doc == e->run.out && !(k.mods & (MOD_ALT | MOD_CTRL))) {
+        if (k.code == KEY_ENTER && run_enter(e))
+            return;
+        if (k.code == KEY_ESC && e->run.on) {
+            run_stop(e);
+            return;
+        }
+    }
+    cmd = keymap_find(&e->km, k);
+    mod = cmd >= 0 ? commands[cmd].modifies : modifies(k);
+    if (e->doc->readonly && mod) {
         editor_set_msg(e, MSG_TTL_MS, "File in sola lettura (Alt+S per salvare con un altro nome)");
         return;
     }
     /* editing a folded line opens it: the edit must not leave the cursor in a fold */
-    if (e->buf->folded && modifies(k))
+    if (e->buf->folded && mod)
         e->buf->lines[e->cy].fold = 0;
-    int alt = (k.mods & MOD_ALT) != 0, shift = (k.mods & MOD_SHIFT) != 0;
-    int vertical;
+
     size_t snip_y = 0, snip_nl = 0, snip_len = 0;
 
     if (cur_multi(e) && handle_multi(e, k)) {
@@ -1888,7 +1886,7 @@ static void handle_key(Editor *e, Key k)
     }
     if (!is_typing(k))
         buf_undo_close(e->buf);
-    if (!(alt && k.code == 'v'))
+    if (cmd < 0)
         e->paste_valid = 0;
 
     if (e->snip.on) {
@@ -1896,10 +1894,14 @@ static void handle_key(Editor *e, Key k)
         snip_nl = e->buf->nlines;
         snip_len = e->buf->lines[snip_y].len;
     }
-    if (alt)
-        vertical = handle_alt(e, k, shift);
-    else
+    if (cmd >= 0) {
+        command_run(e, cmd);
+        vertical = 1;               /* command_run settled the wanted column */
+    } else if (alt) {
+        vertical = 0;               /* an Alt key with no command */
+    } else {
         vertical = handle_plain(e, k, shift, (k.mods & MOD_CTRL) != 0);
+    }
     if (e->snip.on)
         snip_adjust(&e->snip, snip_nl, e->buf->nlines, snip_len,
                     snip_y < e->buf->nlines ? e->buf->lines[snip_y].len : 0, e->cy, e->cx);
@@ -1947,6 +1949,11 @@ void editor_cmd_theme(Editor *e)
     editor_set_msg(e, MSG_TTL_MS, "Tema: %s", e->theme->name);
 }
 
+void editor_cmd_redraw(Editor *e)
+{
+    render_invalidate(e->render);
+}
+
 void editor_cmd_palette(Editor *e)
 {
     size_t i;
@@ -1955,7 +1962,10 @@ void editor_cmd_palette(Editor *e)
     picker_open(&e->picker, "Comando");
     e->picker_kind = PK_COMMANDS;
     for (i = 0; i < ncommands; i++) {
-        snprintf(item, sizeof item, "%-30s %s", commands[i].name, commands[i].keys);
+        char label[40];
+
+        keymap_label(&e->km, (int)i, label, sizeof label);
+        snprintf(item, sizeof item, "%-42s %s", commands[i].name, label);
         picker_add(&e->picker, item);
     }
     picker_filter(&e->picker);

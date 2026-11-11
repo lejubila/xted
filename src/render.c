@@ -3,6 +3,7 @@
 #include "edit.h"
 #include "editor.h"
 #include "fold.h"
+#include "git.h"
 #include "term.h"
 #include "theme.h"
 #include "utf8.h"
@@ -232,8 +233,8 @@ static void popup_geom(const Editor *e, PopupGeom *g)
         w = 32;
     if (w < 8)
         w = 8;
-    if (w > aw->w)
-        w = aw->w;
+    if (w > win_text_w(aw))
+        w = win_text_w(aw);
     r = aw->y + (int)fold_count(e->buf, e->rowoff, e->cy);
     if (r + (int)h <= aw->y + aw->h - 2)
         g->row0 = r + 1;
@@ -244,15 +245,38 @@ static void popup_geom(const Editor *e, PopupGeom *g)
     cx = (int)utf8_cols(l->s, l->len, c->x < l->len ? c->x : l->len, e->tabw) - (int)e->coloff;
     if (cx < 0)
         cx = 0;
-    if (cx + w > aw->w)
-        cx = aw->w - w;
+    if (cx + w > win_text_w(aw))
+        cx = win_text_w(aw) - w;
     g->on = 1;
     g->h = (int)h;
     g->cx = cx;
     g->w = w;
 }
 
-/* One line of a pane's text, exactly w->w cells wide. */
+/* The Git margin cell: a coloured mark, or a blank. */
+static void emit_gutter(SBuf *o, const Editor *e, int mark, int colors)
+{
+    Rgb c;
+
+    if (mark == GIT_NONE || mark > GIT_DEL) {
+        sbuf_adds(o, " ");
+        return;
+    }
+    if (e->color_depth != COLOR_NONE) {
+        c = mark == GIT_ADD ? e->theme->git_add : mark == GIT_MOD ? e->theme->git_mod
+                                                                    : e->theme->git_del;
+        theme_fg(o, e->color_depth, c);
+    }
+    sbuf_adds(o, mark == GIT_ADD ? "+" : mark == GIT_MOD ? "~" : "_");
+    if (e->color_depth != COLOR_NONE) {
+        if (colors)
+            theme_fg(o, e->color_depth, e->theme->fg);
+        else
+            sbuf_adds(o, "\x1b[39m");
+    }
+}
+
+/* One line of a pane's text, exactly w->w cells wide (the Git margin included). */
 static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int active,
                      const Ovl *ov)
 {
@@ -260,7 +284,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     const View *v = &w->view;
     const Line *l;
     const uint8_t *cls;
-    size_t left = v->coloff, right = left + (size_t)w->w;
+    size_t tw = (size_t)win_text_w(w), left = v->coloff, right = left + tw;
+    int gut = win_gutter(w);
     size_t i = 0, col = 0, sel_from = 0, sel_to = 0;
     int colors, cur = SC_NORMAL, br = 0, prev_visible = 0, hl = 0, sel_nl = 0, has_sel;
     Matcher *hm = e->find.hl && e->find.m && e->find.m->valid ? e->find.m : NULL;
@@ -272,6 +297,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     if (y >= d->buf.nlines) {
         if (bg_row)
             theme_bg(o, e->color_depth, e->theme->bg);
+        if (gut)
+            sbuf_adds(o, " ");
         if (ov) {
             size_t pc = ov->c0 - v->coloff;
 
@@ -282,10 +309,10 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
             emit_popup(o, e, ov);
             if (bg_row)
                 theme_bg(o, e->color_depth, e->theme->bg);
-            spaces(o, (size_t)w->w - (ov->c1 - v->coloff));
+            spaces(o, tw - (ov->c1 - v->coloff));
         } else {
             sbuf_adds(o, "\x1b[2m~\x1b[22m");
-            spaces(o, (size_t)w->w - 1);
+            spaces(o, tw - 1);
         }
         if (bg_row)
             sbuf_adds(o, "\x1b[0m");
@@ -298,6 +325,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         if (e->theme->has_bg)
             theme_bg(o, e->color_depth, e->theme->bg);
     }
+    if (gut)
+        emit_gutter(o, e, l->git, colors);
     cls = colors ? syn_classes(d->syn, &d->buf, y) : NULL;
     has_sel = active && edit_view_sel_line(&d->buf, v, y, &sel_from, &sel_to, &sel_nl);
     if (hm)
@@ -336,7 +365,7 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     while (i < l->len && col < right) {
         uint32_t cp;
         int n = utf8_decode(l->s + i, l->len - i, &cp);
-        size_t cw = (size_t)char_cols(cp, col, e->tabw);
+        size_t cw = (size_t)char_cols(cp, col, d->tabw);
         size_t start = col, stop = col + cw;
         int selected = has_sel && i >= sel_from && i < sel_to;
         size_t xk;
@@ -527,23 +556,23 @@ static void tab_row(SBuf *o, const Editor *e)
     free(wd);
 }
 
-static void status_row(SBuf *o, const Editor *e, const Win *w, int active)
+static void status_row(SBuf *o, const Win *w, int active)
 {
     const Doc *d = w->doc;
     SBuf right = SBUF_INIT;
-    const char *name = d->buf.path ? d->buf.path : "[Senza nome]";
+    const char *name = d->title ? d->title : d->buf.path ? d->buf.path : "[Senza nome]";
     char mark[16];
     size_t cols = (size_t)w->w, lmax, used = 0, marklen;
 
-    snprintf(mark, sizeof mark, "%s%s", d->buf.modified ? " [+]" : "", d->readonly ? " [RO]" : "");
+    snprintf(mark, sizeof mark, "%s%s", d->buf.modified ? " [+]" : "", d->readonly && !d->scratch ? " [RO]" : "");
     marklen = strlen(mark);
     if (cols >= 48)
         sbuf_addf(&right, " %s  %s  UTF-8  Ln %zu, Col %zu ", syn_name(d->syn),
                   d->buf.crlf ? "CRLF" : "LF", w->view.cy + 1,
-                  editor_view_col(&d->buf, &w->view, e->tabw) + 1);
+                  editor_view_col(&d->buf, &w->view, d->tabw) + 1);
     else if (cols >= 20)
         sbuf_addf(&right, " Ln %zu, Col %zu ", w->view.cy + 1,
-                  editor_view_col(&d->buf, &w->view, e->tabw) + 1);
+                  editor_view_col(&d->buf, &w->view, d->tabw) + 1);
 
     /* left part is " name [+]"; the modified mark wins over the name when space is tight */
     lmax = cols > right.len ? cols - right.len : cols;
@@ -721,7 +750,7 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
                      use ? &ov : NULL);
         }
         else
-            status_row(o, e, w, w == e->layout.active);
+            status_row(o, w, w == e->layout.active);
         x += w->w;
     }
 }
@@ -799,7 +828,7 @@ void render_frame(Render *r, const Editor *e)
         cc = pcol + 1;
     } else {
         cr = aw->y + (int)fold_count(e->buf, e->rowoff, e->cy) + 1;
-        cc = aw->x + (int)(editor_cursor_col(e) - e->coloff) + 1;
+        cc = aw->x + win_gutter(aw) + (int)(editor_cursor_col(e) - e->coloff) + 1;
     }
     if (changed || cr != r->cur_r || cc != r->cur_c) {
         sbuf_addf(&r->frame, "\x1b[%d;%dH", cr, cc);

@@ -22,6 +22,15 @@ typedef struct Doc {
     Buffer buf;
     Syntax *syn;            /* NULL: plain text */
     int readonly;           /* the file exists and is not writable */
+    int gutter;             /* a margin column shows the Git marks of Line.git */
+    int tabw;               /* tab width, from the configuration for this language */
+    int expand_tab;         /* Tab inserts spaces */
+    int trim_space;         /* strip trailing blanks on save */
+    int final_nl;           /* always end the file with a newline on save */
+    int autosuggest;
+    int suggest_min;
+    char *title;            /* name shown instead of a file name (scratch documents) */
+    int scratch;            /* not a file: never saved, kept out of sessions and exit checks */
     int disk_known;         /* mtime/size/ino describe the file as we read or wrote it */
     struct timespec mtime;
     off_t size;

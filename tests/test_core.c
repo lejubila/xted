@@ -1,21 +1,28 @@
 #include "buffer.h"
 #include "clip.h"
 #include "commands.h"
+#include "config.h"
 #include "cursors.h"
 #include "complete.h"
 #include "doc.h"
+#include "keymap.h"
+#include "errors.h"
 #include "edit.h"
 #include "files.h"
 #include "fold.h"
 #include "fuzzy.h"
+#include "git.h"
 #include "langs.h"
 #include "layout.h"
 #include "search.h"
 #include "picker.h"
+#include "run.h"
 #include "session.h"
+#include "shell.h"
 #include "snippet.h"
 #include "editor.h"
 #include "syntax.h"
+#include "tags.h"
 #include "theme.h"
 #include "util.h"
 #include "utf8.h"
@@ -24,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -1512,9 +1520,12 @@ static void test_commands(void)
 
     CHECK(ncommands > 20);
     for (i = 0; i < ncommands; i++) {
-        CHECK(commands[i].name && commands[i].name[0] && commands[i].keys && commands[i].fn);
-        for (j = i + 1; j < ncommands; j++)
+        CHECK(commands[i].name && commands[i].name[0] && commands[i].id && commands[i].id[0] && commands[i].key && commands[i].fn);
+        for (j = i + 1; j < ncommands; j++) {
             CHECK(strcmp(commands[i].name, commands[j].name) != 0);
+            CHECK(strcmp(commands[i].id, commands[j].id) != 0);
+            CHECK(commands[i].key[0] == '\0' || strcmp(commands[i].key, commands[j].key) != 0);
+        }
     }
     /* the palette lists them all, in order, so the chosen index is the table index */
     ed_load(&e, "x");
@@ -1864,6 +1875,823 @@ static void test_folding(void)
     editor_free(&e);
 }
 
+static void msleep(long ms)
+{
+    struct timespec ts;
+
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000L;
+    nanosleep(&ts, NULL);
+}
+
+static int wait_job(Job *j, SBuf *out)
+{
+    int i;
+
+    for (i = 0; i < 500; i++) {
+        char buf[256];
+        long n = shell_read(j, buf, sizeof buf);
+
+        if (n > 0)
+            sbuf_add(out, buf, (size_t)n);
+        else if (n == 0 && shell_reap(j))
+            return 1;
+        else
+            msleep(10);
+    }
+    return 0;
+}
+
+static void test_shell(void)
+{
+    SBuf out = SBUF_INIT, err = SBUF_INIT;
+    const char *cat[] = { "/bin/sh", "-c", "cat", NULL };
+    const char *two[] = { "/bin/sh", "-c", "echo out; echo bad >&2; exit 3", NULL };
+    const char *slow[] = { "/bin/sh", "-c", "sleep 5", NULL };
+    const char *big[] = { "/bin/sh", "-c", "head -c 100000 /dev/zero", NULL };
+    const char *bad[] = { "/nonexistent/prog", NULL };
+    int st = 0;
+    Job j;
+    char e[128];
+    long t0;
+
+    /* stdin to stdout, with something bigger than a pipe buffer */
+    {
+        char *in = xmalloc(300000);
+
+        memset(in, 'x', 300000);
+        CHECK(shell_capture(cat, NULL, in, 300000, &out, &err, 5000, 1 << 20, &st) == 0);
+        CHECK(out.len == 300000 && WIFEXITED(st) && WEXITSTATUS(st) == 0);
+        free(in);
+    }
+    sbuf_free(&out);
+    sbuf_free(&err);
+
+    /* stdout and stderr apart, exit status */
+    CHECK(shell_capture(two, NULL, NULL, 0, &out, &err, 5000, 1 << 20, &st) == 0);
+    CHECK(out.len == 4 && memcmp(out.p, "out\n", 4) == 0);
+    CHECK(err.len == 4 && memcmp(err.p, "bad\n", 4) == 0);
+    CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 3);
+    sbuf_free(&out);
+    sbuf_free(&err);
+
+    /* a command that is too slow is killed */
+    t0 = (long)time(NULL);
+    CHECK(shell_capture(slow, NULL, NULL, 0, &out, NULL, 300, 1 << 20, &st) == -2);
+    CHECK((long)time(NULL) - t0 < 4);
+    sbuf_free(&out);
+
+    /* output over the cap is dropped, not an error */
+    CHECK(shell_capture(big, NULL, NULL, 0, &out, NULL, 5000, 1000, &st) == 0 && out.len == 1000);
+    sbuf_free(&out);
+
+    /* a program that does not exist: the shell-less exec fails with status 127 */
+    CHECK(shell_capture(bad, NULL, NULL, 0, &out, NULL, 2000, 100, &st) == 0);
+    CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 127);
+    sbuf_free(&out);
+
+    /* a background job: output on one pipe, working directory, exit code */
+    CHECK(shell_start(&j, "pwd; echo err >&2; exit 4", "/tmp", e, sizeof e) == 0);
+    CHECK(wait_job(&j, &out) && shell_exit_code(&j) == 4);
+    CHECK(out.len == 9 && memcmp(out.p, "/tmp\nerr\n", 9) == 0);
+    shell_close(&j);
+    sbuf_free(&out);
+
+    /* stop ends the whole group, including children of the shell */
+    CHECK(shell_start(&j, "sleep 30 & sleep 30", NULL, e, sizeof e) == 0);
+    msleep(50);
+    CHECK(!shell_reap(&j));
+    shell_stop(&j);
+    CHECK(wait_job(&j, &out) && shell_exit_code(&j) == 128 + 15);
+    shell_close(&j);
+    sbuf_free(&out);
+
+    /* closing a running job kills it */
+    CHECK(shell_start(&j, "sleep 30", NULL, e, sizeof e) == 0);
+    shell_close(&j);
+    CHECK(j.done && j.fd < 0);
+}
+
+static int parse_err(const char *line, const char *path, size_t ln, size_t col)
+{
+    size_t po, pl, l, c;
+
+    if (!err_parse(line, strlen(line), &po, &pl, &l, &c))
+        return 0;
+    return strlen(path) == pl && memcmp(line + po, path, pl) == 0 && l == ln && c == col;
+}
+
+static void test_errors_parse(void)
+{
+    size_t po, pl, l, c;
+
+    CHECK(parse_err("src/main.c:12:5: error: expected ';'", "src/main.c", 12, 5));
+    CHECK(parse_err("a.c:7: warning: unused", "a.c", 7, 0));
+    CHECK(parse_err("./lib/x.h:3:1: note: here", "./lib/x.h", 3, 1));
+    CHECK(parse_err("In file included from foo/bar.h:10:", "foo/bar.h", 10, 0));
+    CHECK(parse_err("/abs/path/f.py:99:", "/abs/path/f.py", 99, 0));
+    CHECK(parse_err("file.txt:5:some grep hit", "file.txt", 5, 0));
+    CHECK(parse_err("src/a.ts(14,3): error TS2304: x", "src/a.ts", 14, 3));
+    CHECK(parse_err("src/a.ts(14): error", "src/a.ts", 14, 0));
+    CHECK(parse_err("  File \"/tmp/t.py\", line 8, in <module>", "/tmp/t.py", 8, 0));
+    CHECK(parse_err("make: *** [all] Error 1 and then a.c:3:2: boom", "a.c", 3, 2));
+    /* not locations */
+    CHECK(!err_parse("at 12:30 we left", 16, &po, &pl, &l, &c));
+    CHECK(!err_parse("error:3", 7, &po, &pl, &l, &c));
+    CHECK(!err_parse("plain text", 10, &po, &pl, &l, &c));
+    CHECK(!err_parse("a.c:x:1: nope", 13, &po, &pl, &l, &c));
+    CHECK(!err_parse("", 0, &po, &pl, &l, &c));
+    CHECK(!err_parse("a.c:12abc", 9, &po, &pl, &l, &c));
+}
+
+static void wait_run(Editor *e)
+{
+    int i;
+
+    for (i = 0; i < 300 && e->run.on; i++) {
+        run_pump(e);
+        if (e->run.on)
+            msleep(10);
+    }
+}
+
+static void test_run(void)
+{
+    Editor e;
+    char dir[] = "/tmp/ked_run_XXXXXX";
+    char path[300];
+    FILE *f;
+    size_t i;
+
+    CHECK(mkdtemp(dir) != NULL);
+    snprintf(path, sizeof path, "%s/x.c", dir);
+    f = fopen(path, "w");
+    fputs("one\ntwo\nthree\nfour\nfive\n", f);
+    fclose(f);
+
+    ed_load(&e, "text");
+    e.root = xstrdup(dir);
+    run_command(&e, "printf 'x.c:4:2: error: y\\n\\033[31mred\\033[0m\\r\\nq.c:1: no file\\n'; exit 3");
+    CHECK(e.run.on && e.run.out && layout_count(&e.layout) == 2);
+    wait_run(&e);
+    CHECK(!e.run.on);
+    {
+        Buffer *b = &e.run.out->buf;
+
+        CHECK(b->nlines >= 5 && line_is(b, 1, "x.c:4:2: error: y") && line_is(b, 2, "red"));
+        CHECK(!b->modified);
+        CHECK(b->nlines > 5 && strstr(b->lines[b->nlines - 2].s, "uscito con 3") != NULL);
+        CHECK(line_is(b, 0, "$ printf 'x.c:4:2: error: y\\n\\033[31mred\\033[0m\\r\\nq.c:1: no file\\n'; exit 3"));
+    }
+    /* the focus stayed on the text pane and the output pane is a scratch buffer */
+    CHECK(e.doc != e.run.out && e.run.out->scratch && e.run.out->readonly);
+
+    /* F8 skips lines whose file does not exist and opens the next real one */
+    run_next_error(&e);
+    CHECK(e.doc->buf.path && strstr(e.doc->buf.path, "x.c") != NULL);
+    CHECK(e.cy == 3 && e.cx == 1);
+    run_next_error(&e);                                /* q.c does not exist: nothing more */
+    CHECK(e.cy == 3);
+    run_prev_error(&e);
+    CHECK(e.cy == 3);
+
+    /* appended text is cleaned: no escapes, no CR, controls shown as ? */
+    {
+        const char *junk = "\x1b[1mbold\x1b[0m\x01z\r\n";
+
+        run_append(&e, junk, strlen(junk));
+    }
+    {
+        Buffer *b = &e.run.out->buf;
+        size_t n = b->nlines;
+
+        CHECK(n >= 2 && line_is(b, n - 2, "bold?z"));
+    }
+    /* running again clears the output */
+    run_command(&e, "echo second");
+    wait_run(&e);
+    CHECK(line_is(&e.run.out->buf, 1, "second"));
+
+    /* running the same command again (F5) hands the stored text to itself */
+    run_again(&e);
+    wait_run(&e);
+    CHECK(line_is(&e.run.out->buf, 0, "$ echo second") && line_is(&e.run.out->buf, 1, "second"));
+    CHECK(strcmp(e.run.cmd, "echo second") == 0);
+
+    /* stopping */
+    run_command(&e, "sleep 30");
+    CHECK(e.run.on);
+    run_stop(&e);
+    wait_run(&e);
+    CHECK(!e.run.on);
+
+    /* closing the output buffer while a command runs kills it */
+    run_command(&e, "sleep 30");
+    for (i = 0; i < e.ndocs; i++)
+        if (e.docs[i] == e.run.out) {
+            Doc *d = e.run.out;
+
+            run_doc_removed(&e, d);
+            CHECK(!e.run.on && e.run.out == NULL);
+            e.docs[i] = doc_new();       /* keep the list valid; the test owns d now */
+            doc_free(d);
+            break;
+        }
+    editor_free(&e);
+    snprintf(path, sizeof path, "rm -rf %s", dir);
+    CHECK(system(path) == 0);
+}
+
+static void test_filter(void)
+{
+    Editor e;
+
+    /* the selection goes through the command and is replaced, in one undo step */
+    ed_load(&e, "pear\napple\nfig\nkiwi");
+    ed_sel(&e, 0, 0, 2, 3);
+    edit_filter_cmd(&e, "sort");
+    CHECK(buf_is(e.buf, "apple\nfig\npear\nkiwi") && e.sel_on);
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "pear\napple\nfig\nkiwi"));
+    editor_free(&e);
+
+    /* no selection: the whole text; a final newline added by the command is not kept */
+    ed_load(&e, "b\na\nc");
+    edit_filter_cmd(&e, "sort");
+    CHECK(buf_is(e.buf, "a\nb\nc") && !e.sel_on);
+    edit_filter_cmd(&e, "tr a-z A-Z");
+    CHECK(buf_is(e.buf, "A\nB\nC"));
+    editor_free(&e);
+
+    /* failure and timeout leave the text alone */
+    ed_load(&e, "keep");
+    edit_filter_cmd(&e, "exit 3");
+    CHECK(buf_is(e.buf, "keep") && strstr(e.msg, "errore") != NULL);
+    edit_filter_cmd(&e, "echo boom >&2; exit 1");
+    CHECK(buf_is(e.buf, "keep") && strstr(e.msg, "boom") != NULL);
+    CHECK(!e.buf->modified);
+    editor_free(&e);
+}
+
+static Key mk(uint32_t code, int mods)
+{
+    Key k;
+
+    k.code = code;
+    k.mods = mods;
+    return k;
+}
+
+static int parses(const char *spec, uint32_t code, int mods)
+{
+    Key k;
+    char err[96];
+
+    return key_parse(spec, &k, err, sizeof err) == 0 && k.code == code && k.mods == mods;
+}
+
+static void test_keymap(void)
+{
+    Keymap m;
+    Key k;
+    char err[96], out[48];
+    size_t i;
+
+    CHECK(parses("ctrl+s", CTRL('s'), 0));
+    CHECK(parses("Ctrl+S", CTRL('s'), 0));
+    CHECK(parses("alt+/", '/', MOD_ALT));
+    CHECK(parses("alt+shift+up", KEY_UP, MOD_ALT | MOD_SHIFT));
+    CHECK(parses("ctrl+tab", KEY_TAB, MOD_CTRL));
+    CHECK(parses("ctrl+shift+tab", KEY_TAB, MOD_CTRL | MOD_SHIFT));
+    CHECK(parses("shift+f3", KEY_F3, MOD_SHIFT));
+    CHECK(parses("f12", KEY_F12, 0));
+    CHECK(parses("alt+,", ',', MOD_ALT));
+    CHECK(parses("alt++", '+', MOD_ALT));
+    CHECK(parses("alt+D", 'd', MOD_ALT));
+    CHECK(parses("alt+shift+D", 'd', MOD_ALT | MOD_SHIFT));
+    CHECK(parses("ctrl+pgdn", KEY_PGDN, MOD_CTRL));
+    CHECK(parses("alt+\xC3\xA8", 0xE8, MOD_ALT));
+    CHECK(parses("f1", KEY_F1, 0));
+    /* errors: unknown key or modifier, empty, F13, keys the terminal cannot tell apart */
+    CHECK(key_parse("ctrl+", &k, err, sizeof err) < 0);
+    CHECK(key_parse("hyper+x", &k, err, sizeof err) < 0 && strstr(err, "hyper") != NULL);
+    CHECK(key_parse("alt+banana", &k, err, sizeof err) < 0);
+    CHECK(key_parse("f13", &k, err, sizeof err) < 0);
+    CHECK(key_parse("ctrl+i", &k, err, sizeof err) < 0);
+    CHECK(key_parse("ctrl+m", &k, err, sizeof err) < 0);
+    CHECK(key_parse("", &k, err, sizeof err) < 0);
+
+    /* formatting is the inverse */
+    key_format(mk(CTRL('s'), 0), 0, out, sizeof out);
+    CHECK(strcmp(out, "ctrl+s") == 0);
+    key_format(mk(KEY_UP, MOD_ALT | MOD_SHIFT), 1, out, sizeof out);
+    CHECK(strcmp(out, "Alt+Shift+Up") == 0);
+    key_format(mk(KEY_F5, MOD_SHIFT), 1, out, sizeof out);
+    CHECK(strcmp(out, "Shift+F5") == 0);
+    key_format(mk('/', MOD_ALT), 1, out, sizeof out);
+    CHECK(strcmp(out, "Alt+/") == 0);
+
+    /* normalisation: the Ctrl flag on a control code, Alt+capital */
+    CHECK(key_norm(mk(CTRL('s'), MOD_CTRL)).mods == 0);
+    CHECK(key_norm(mk('D', MOD_ALT)).code == 'd' && key_norm(mk('D', MOD_ALT)).mods == (MOD_ALT | MOD_SHIFT));
+    CHECK(key_norm(mk(KEY_TAB, MOD_CTRL)).mods == MOD_CTRL);
+
+    /* every default shortcut parses, and lands on its command */
+    keymap_init(&m);
+    for (i = 0; i < ncommands; i++) {
+        if (!commands[i].key[0])
+            continue;
+        CHECK(key_parse(commands[i].key, &k, err, sizeof err) == 0);
+        CHECK(keymap_find(&m, k) == (int)i);
+    }
+    CHECK(keymap_find(&m, mk(CTRL('s'), 0)) == command_by_id("save"));
+    CHECK(keymap_find(&m, mk(CTRL('s'), MOD_CTRL)) == command_by_id("save"));
+    CHECK(keymap_find(&m, mk(KEY_TAB, MOD_CTRL)) == command_by_id("next_win"));
+    CHECK(keymap_find(&m, mk(KEY_RIGHT, MOD_ALT)) == command_by_id("next_win"));
+    CHECK(keymap_find(&m, mk('n', MOD_ALT)) == command_by_id("find_next"));
+    CHECK(keymap_find(&m, mk(KEY_UP, MOD_ALT | MOD_SHIFT)) == command_by_id("cursor_above"));
+    CHECK(keymap_find(&m, mk('y', MOD_ALT)) == command_by_id("duplicate_down"));
+    CHECK(keymap_find(&m, mk('x', 0)) == -1 && keymap_find(&m, mk(KEY_UP, 0)) == -1);
+    CHECK(command_by_id("no_such") == -1);
+
+    /* rebinding and unbinding */
+    CHECK(key_parse("alt+j", &k, err, sizeof err) == 0);
+    keymap_bind(&m, k, command_by_id("duplicate_up"));
+    CHECK(keymap_find(&m, k) == command_by_id("duplicate_up"));
+    keymap_bind(&m, mk(CTRL('s'), 0), -1);
+    CHECK(keymap_find(&m, mk(CTRL('s'), 0)) == -1);
+    keymap_bind(&m, mk(CTRL('s'), 0), command_by_id("find"));
+    CHECK(keymap_find(&m, mk(CTRL('s'), 0)) == command_by_id("find"));
+    keymap_label(&m, command_by_id("duplicate_up"), out, sizeof out);
+    CHECK(strcmp(out, "Alt+J") == 0);
+    keymap_label(&m, command_by_id("fold_all"), out, sizeof out);
+    CHECK(out[0] == '\0');
+    keymap_free(&m);
+}
+
+static void test_config(void)
+{
+    Config c;
+    LangCfg l;
+    const char *text =
+        "# a comment\n"
+        "tab_width = 4        # trailing comment\n"
+        "expand_tab = ON\n"
+        "theme = chiaro\n"
+        "clipboard = off\n"
+        "git = yes\n"
+        "final_newline = always\n"
+        "\n"
+        "[Python]\n"
+        "tab_width=2\n"
+        "trim_trailing_space = true\n"
+        "\n"
+        "[ keys ]\n"
+        "ctrl+s = save\n"
+        "alt+y = duplicate_down\n"
+        "ctrl+shift+f = none\n";
+
+    config_init(&c);
+    CHECK(config_parse(&c, text, strlen(text)) == 0 && c.first_error[0] == '\0');
+    CHECK(strcmp(c.theme, "chiaro") == 0 && c.clipboard == 0 && c.git == 1);
+    CHECK(c.nkeys == 3 && strcmp(c.keys[0].key, "ctrl+s") == 0 && strcmp(c.keys[0].cmd, "save") == 0);
+    CHECK(strcmp(c.keys[2].cmd, "none") == 0 && c.keys[2].line == 16);
+    l = config_lang(&c, "C");
+    CHECK(l.tab_width == 4 && l.expand_tab == 1 && l.final_newline == 1 && l.trim_trailing_space == 0);
+    CHECK(l.autosuggest == 1 && l.suggest_min == 2);
+    l = config_lang(&c, "python");
+    CHECK(l.tab_width == 2 && l.expand_tab == 1 && l.trim_trailing_space == 1);
+    l = config_lang(&c, NULL);
+    CHECK(l.tab_width == 4);
+    config_free(&c);
+
+    /* defaults without a file */
+    config_init(&c);
+    l = config_lang(&c, "C");
+    CHECK(l.tab_width == 8 && l.expand_tab == 0 && l.final_newline == 0 && l.autosuggest == 1);
+    CHECK(c.clipboard == -1 && c.git == -1 && c.theme[0] == '\0');
+    config_free(&c);
+
+    /* mistakes are skipped, counted, and the first one is described with its line */
+    {
+        const char *bad =
+            "tab_width = 40\n"
+            "colour = red\n"
+            "expand_tab = maybe\n"
+            "no equals here\n"
+            "[python\n"
+            "tab_width = 3\n"
+            "[go]\n"
+            "theme = x\n"
+            "final_newline = sometimes\n";
+
+        config_init(&c);
+        CHECK(config_parse(&c, bad, strlen(bad)) == 7);
+        CHECK(strstr(c.first_error, "riga 1:") != NULL && strstr(c.first_error, "tab_width") != NULL);
+        l = config_lang(&c, "C");
+        CHECK(l.tab_width == 3 || l.tab_width == 8);        /* the bad value was not taken */
+        CHECK(l.tab_width != 40 && l.expand_tab == 0);
+        config_free(&c);
+    }
+
+    /* the directory comes from XDG_CONFIG_HOME, else HOME */
+    {
+        char *d;
+
+        setenv("XDG_CONFIG_HOME", "/tmp/xdgtest", 1);
+        d = config_dir();
+        CHECK(d && strcmp(d, "/tmp/xdgtest/ked") == 0);
+        free(d);
+        unsetenv("XDG_CONFIG_HOME");
+        setenv("HOME", "/tmp/hometest", 1);
+        d = config_dir();
+        CHECK(d && strcmp(d, "/tmp/hometest/.config/ked") == 0);
+        free(d);
+    }
+
+    /* loading from a folder; a missing file is not an error */
+    {
+        char dir[] = "/tmp/ked_cfg_XXXXXX";
+        char path[300];
+        FILE *f;
+
+        CHECK(mkdtemp(dir) != NULL);
+        config_init(&c);
+        CHECK(config_load(&c, dir) == 0 && c.nerrors == 0);
+        snprintf(path, sizeof path, "%s/config", dir);
+        f = fopen(path, "w");
+        fputs("tab_width = 6\n", f);
+        fclose(f);
+        CHECK(config_load(&c, dir) == 1 && config_lang(&c, "C").tab_width == 6);
+        config_free(&c);
+        remove(path);
+        rmdir(dir);
+    }
+}
+
+static void test_config_apply(void)
+{
+    Editor e;
+    char dir[] = "/tmp/ked_xdg_XXXXXX";
+    char path[300];
+    FILE *f;
+    Key k;
+    char err[64];
+
+    CHECK(mkdtemp(dir) != NULL);
+    snprintf(path, sizeof path, "%s/ked", dir);
+    CHECK(mkdir(path, 0700) == 0);
+    snprintf(path, sizeof path, "%s/ked/config", dir);
+    f = fopen(path, "w");
+    fputs("tab_width = 4\nexpand_tab = on\ntheme = chiaro\nclipboard = off\nautosuggest = off\n"
+          "trim_trailing_space = yes\nfinal_newline = always\n"
+          "[c]\ntab_width = 2\nexpand_tab = off\n"
+          "[keys]\nalt+j = duplicate_up\nctrl+s = none\nalt+q = save\n", f);
+    fclose(f);
+    setenv("XDG_CONFIG_HOME", dir, 1);
+
+    ed_load(&e, "a\n");
+    doc_set_syntax(e.doc, lang("c"));
+    editor_load_config(&e);
+    CHECK(e.cfg.nerrors == 0 && e.msg[0] == '\0');
+    CHECK(e.doc->tabw == 2 && e.tabw == 2 && !e.doc->expand_tab);
+    CHECK(strcmp(e.theme->name, "chiaro") == 0 && e.clipboard_osc52 == 0);
+    CHECK(!e.doc->autosuggest && e.doc->trim_space && e.doc->final_nl);
+    CHECK(key_parse("alt+j", &k, err, sizeof err) == 0 && keymap_find(&e.km, k) == command_by_id("duplicate_up"));
+    CHECK(keymap_find(&e.km, key_norm((Key){ CTRL('s'), 0 })) == -1);
+    CHECK(key_parse("alt+q", &k, err, sizeof err) == 0 && keymap_find(&e.km, k) == command_by_id("save"));
+    CHECK(keymap_find(&e.km, key_norm((Key){ CTRL('q'), 0 })) == command_by_id("quit"));
+    editor_free(&e);
+
+    /* plain text takes the top-level values: Tab inserts spaces to the next stop */
+    ed_load(&e, "ab");
+    editor_load_config(&e);
+    CHECK(e.doc->tabw == 4 && e.doc->expand_tab);
+    e.cx = 0;
+    edit_tab(&e);
+    CHECK(buf_is(e.buf, "    ab") && e.cx == 4);
+    e.cx = 5;
+    edit_tab(&e);
+    CHECK(buf_is(e.buf, "    a   b") && e.cx == 8);
+    ed_sel(&e, 0, 0, 0, 3);
+    edit_tab(&e);
+    CHECK(buf_is(e.buf, "        a   b"));
+    edit_dedent(&e);
+    CHECK(buf_is(e.buf, "    a   b"));
+    editor_free(&e);
+
+    /* trailing blanks go, as one undo step; the cursor stays inside the line */
+    ed_load(&e, "x  \n\ty \t\nz");
+    e.cx = 3;
+    edit_trim_trailing(&e, e.doc);
+    CHECK(buf_is(e.buf, "x\n\ty\nz") && e.cx == 1);
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "x  \n\ty \t\nz"));
+    editor_free(&e);
+
+    /* problems: unknown theme, key, command, bad key syntax */
+    snprintf(path, sizeof path, "%s/ked/config", dir);
+    f = fopen(path, "w");
+    fputs("theme = nonesiste\n[keys]\nalt+j = no_such_command\nhyper+x = save\nctrl+i = save\n", f);
+    fclose(f);
+    ed_load(&e, "x");
+    editor_load_config(&e);
+    CHECK(e.cfg.nerrors == 4 && strncmp(e.msg, "config:", 7) == 0);
+    CHECK(strstr(e.msg, "nonesiste") != NULL && strstr(e.msg, "altri") != NULL);
+    editor_free(&e);
+
+    unsetenv("XDG_CONFIG_HOME");
+    remove(path);
+    snprintf(path, sizeof path, "%s/ked", dir);
+    rmdir(path);
+    rmdir(dir);
+}
+
+static void collect_msg(const char *msg, void *ctx)
+{
+    SBuf *b = ctx;
+
+    sbuf_add(b, msg, strlen(msg));
+    sbuf_add(b, "\n", 1);
+}
+
+static void test_user_themes_syntax(void)
+{
+    char err[200];
+    const char *th = "name Notte\nbackground #101010\nforeground #eeeeee\ncomment #808080\n"
+                     "git_add #00ff00\n# comment\n";
+    size_t n0 = theme_count();
+    int i;
+    char dir[] = "/tmp/ked_user_XXXXXX";
+    char sub[300], cmd[400];
+    SBuf msgs = SBUF_INIT;
+    Buffer b;
+    Syntax *s;
+    uint16_t st = 0;
+
+    /* a theme: given values replace, the rest comes from the dark theme */
+    CHECK(theme_add_user(th, strlen(th), err, sizeof err) == 0);
+    CHECK(theme_count() == n0 + 1);
+    i = theme_by_name("notte");
+    CHECK(i == (int)n0 && strcmp(theme_get((size_t)i)->name, "Notte") == 0);
+    CHECK(theme_get((size_t)i)->has_bg && theme_get((size_t)i)->bg.r == 0x10);
+    CHECK(theme_get((size_t)i)->cls[SC_COMMENT].r == 0x80 && theme_get((size_t)i)->fg.g == 0xee);
+    CHECK(theme_get((size_t)i)->cls[SC_NORMAL].r == 0xee && theme_get((size_t)i)->git_add.g == 255);
+    CHECK(theme_get((size_t)i)->cls[SC_STRING].r == theme_get(0)->cls[SC_STRING].r);
+    CHECK(theme_by_name("scuro") == 0 && theme_by_name("chiaro") == 1 && theme_by_name("zzz") == -1);
+    CHECK(theme_get(n0)->has_bg && theme_get(n0 + 1) == theme_get(0));      /* wraps around */
+    CHECK(theme_add_user("name X\nbackground none\n", 24, err, sizeof err) == 0);
+    CHECK(!theme_get(n0 + 1)->has_bg);
+    /* errors */
+    CHECK(theme_add_user("name X\ncomment red\n", 20, err, sizeof err) < 0 && strstr(err, "riga 2") != NULL);
+    CHECK(theme_add_user("name X\nbanana #000000\n", 23, err, sizeof err) < 0 && strstr(err, "banana") != NULL);
+    CHECK(theme_add_user("comment #000000\n", 16, err, sizeof err) < 0 && strstr(err, "name") != NULL);
+    CHECK(theme_count() == n0 + 2);
+    theme_clear_user();
+    CHECK(theme_count() == n0);
+
+    /* a language: found by extension before the built-in ones, replaces one of the same name */
+    buf_init(&b);
+    b.path = xstrdup("x.foo");
+    CHECK(syn_detect(&b) == NULL);
+    {
+        const char *lang_foo = "name Foo\next foo\nwords keyword wibble wobble\nregion comment ;; $\n";
+
+        CHECK(syn_add_user(lang_foo, strlen(lang_foo), err, sizeof err) == 0);
+    }
+    s = syn_detect(&b);
+    CHECK(s && strcmp(syn_name(s), "Foo") == 0);
+    CHECK(strcmp(cls_str(s, &st, "wibble ;; c"), "kkkkkk.cccc") == 0);
+    syn_free(s);
+    free(b.path);
+    b.path = xstrdup("x.c");
+    {
+        const char *mine = "name C\next c\nwords keyword wibble\n";
+
+        CHECK(syn_add_user(mine, strlen(mine), err, sizeof err) == 0);
+    }
+    s = syn_detect(&b);
+    st = 0;
+    CHECK(s && strcmp(cls_str(s, &st, "if wibble"), "...kkkkkk") == 0);
+    syn_free(s);
+    syn_clear_user();
+    s = syn_detect(&b);
+    CHECK(s && strcmp(syn_name(s), "C") == 0);
+    st = 0;
+    CHECK(strncmp(cls_str(s, &st, "if wibble"), "kk.", 3) == 0);
+    syn_free(s);
+    buf_free(&b);
+    CHECK(syn_add_user("ext foo\n", 8, err, sizeof err) < 0);
+    CHECK(syn_add_user("name Bad\nfrobnicate\n", 20, err, sizeof err) < 0 && strstr(err, "riga 2") != NULL);
+
+    /* folders: alphabetical, bad files reported and skipped, hidden files ignored */
+    CHECK(mkdtemp(dir) != NULL);
+    put_file(dir, "b.theme", "name Beta\nforeground #112233\n");
+    put_file(dir, "a.theme", "name Alfa\n");
+    put_file(dir, "bad.theme", "name Bad\nmatch zzz\n");
+    put_file(dir, ".hidden", "name Hidden\n");
+    CHECK(theme_load_dir(dir, collect_msg, &msgs) == 2);
+    CHECK(theme_by_name("alfa") == (int)n0 && theme_by_name("beta") == (int)n0 + 1);
+    CHECK(theme_by_name("hidden") == -1 && strstr(msgs.p, "bad.theme") != NULL);
+    theme_clear_user();
+    sbuf_free(&msgs);
+    snprintf(cmd, sizeof cmd, "rm -rf %s", dir);
+    CHECK(system(cmd) == 0);
+
+    /* both folders through the editor's configuration */
+    {
+        Editor e;
+        char xdg[] = "/tmp/ked_xdg2_XXXXXX";
+        Buffer b2;
+        Syntax *s2;
+
+        CHECK(mkdtemp(xdg) != NULL);
+        snprintf(sub, sizeof sub, "%s/ked", xdg);
+        CHECK(mkdir(sub, 0700) == 0);
+        snprintf(sub, sizeof sub, "%s/ked/themes", xdg);
+        CHECK(mkdir(sub, 0700) == 0);
+        put_file(sub, "notte", "name Notte\nbackground #101010\n");
+        snprintf(sub, sizeof sub, "%s/ked/syntax", xdg);
+        CHECK(mkdir(sub, 0700) == 0);
+        put_file(sub, "foo", "name Foo\next foo\nwords keyword wibble\n");
+        snprintf(sub, sizeof sub, "%s/ked", xdg);
+        put_file(sub, "config", "theme = notte\n[foo]\ntab_width = 3\n");
+        setenv("XDG_CONFIG_HOME", xdg, 1);
+        ed_load(&e, "x");
+        editor_load_config(&e);
+        CHECK(e.cfg.nerrors == 0 && strcmp(e.theme->name, "Notte") == 0);
+        buf_init(&b2);
+        b2.path = xstrdup("t.foo");
+        s2 = syn_detect(&b2);
+        CHECK(s2 && strcmp(syn_name(s2), "Foo") == 0);
+        syn_free(s2);
+        buf_free(&b2);
+        editor_free(&e);
+        CHECK(theme_count() == 2);
+        unsetenv("XDG_CONFIG_HOME");
+        snprintf(cmd, sizeof cmd, "rm -rf %s", xdg);
+        CHECK(system(cmd) == 0);
+    }
+}
+
+static void test_git(void)
+{
+    uint8_t m[12];
+    const char *diff1 =
+        "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n"
+        "@@ -2,0 +3,2 @@ ctx\n+new1\n+new2\n"          /* two lines added after old line 2 */
+        "@@ -5 +7 @@\n-old\n+changed\n"                /* one line changed */
+        "@@ -9,2 +10,3 @@\n-a\n-b\n+x\n+y\n+z\n";      /* two become three */
+    const char *diff2 = "@@ -4,2 +3,0 @@\n-gone\n-gone2\n@@ -1,1 +0,0 @@\n-top\n";
+    char dir[] = "/tmp/ked_git_XXXXXX";
+    char path[300], cmd[600];
+    uint8_t *marks = NULL;
+    FILE *f;
+    int r;
+
+    memset(m, 0, sizeof m);
+    git_parse_diff(diff1, strlen(diff1), m, 12);
+    CHECK(m[0] == GIT_NONE && m[1] == GIT_NONE && m[2] == GIT_ADD && m[3] == GIT_ADD);
+    CHECK(m[4] == GIT_NONE && m[6] == GIT_MOD);
+    CHECK(m[9] == GIT_MOD && m[10] == GIT_MOD && m[11] == GIT_ADD);
+    /* a pure deletion marks the line above it (the first line for a deletion at the top) */
+    memset(m, 0, sizeof m);
+    git_parse_diff(diff2, strlen(diff2), m, 12);
+    CHECK(m[2] == GIT_DEL && m[0] == GIT_DEL);
+    /* junk and out-of-range hunks are harmless */
+    memset(m, 0, sizeof m);
+    git_parse_diff("@@ nonsense @@\n@@ -1 +100,5 @@\n+x\n@@ -1 +0 @@\n", 40, m, 12);
+    git_parse_diff("", 0, m, 12);
+
+    if (system("git --version >/dev/null 2>&1") != 0)
+        return;                                    /* no git here: nothing more to try */
+    CHECK(mkdtemp(dir) != NULL);
+    snprintf(path, sizeof path, "%s/a.txt", dir);
+    f = fopen(path, "w");
+    fputs("one\ntwo\nthree\nfour\nfive\n", f);
+    fclose(f);
+
+    /* outside a repository, or not tracked: no marks, not an error */
+    CHECK(git_file_marks(path, 5, &marks) == 0 && marks == NULL);
+    snprintf(cmd, sizeof cmd,
+             "cd %s && git init -q . && git -c user.name=t -c user.email=t@t add a.txt && "
+             "git -c user.name=t -c user.email=t@t commit -q -m first", dir);
+    CHECK(system(cmd) == 0);
+    r = git_file_marks(path, 5, &marks);
+    CHECK(r == 1 && marks && memcmp(marks, "\0\0\0\0\0", 5) == 0);
+    free(marks);
+
+    /* a change, an addition and a deletion against HEAD */
+    f = fopen(path, "w");
+    fputs("one\nTWO\nthree\nfive\nsix\n", f);
+    fclose(f);
+    r = git_file_marks(path, 5, &marks);
+    CHECK(r == 1 && marks[0] == GIT_NONE && marks[1] == GIT_MOD && marks[2] == GIT_DEL);
+    CHECK(marks[3] == GIT_NONE && marks[4] == GIT_ADD);
+    free(marks);
+    /* an untracked file next to it */
+    snprintf(path, sizeof path, "%s/b.txt", dir);
+    f = fopen(path, "w");
+    fputs("x\n", f);
+    fclose(f);
+    marks = NULL;
+    CHECK(git_file_marks(path, 1, &marks) == 0 && marks == NULL);
+    snprintf(cmd, sizeof cmd, "rm -rf %s", dir);
+    CHECK(system(cmd) == 0);
+}
+
+static void test_tags(void)
+{
+    char dir[] = "/tmp/ked_tags_XXXXXX";
+    char sub[300], path[300], cmd[400];
+    TagHits h;
+    char *found;
+    Buffer b;
+    const char *src = "#include <x.h>\nstatic int helper(int a)\n{\n    return a;\n}\n\nint main(void)\n{\n}\n";
+    const char *sorted =
+        "!_TAG_FILE_FORMAT\t2\t/extended format/\n"
+        "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n"
+        "helper\tsrc/a.c\t/^static int helper(int a)$/;\"\tf\n"
+        "main\tsrc/a.c\t/^int main(void)$/;\"\tf\tline:7\n"
+        "main\tsrc/b.c\t12;\"\tkind:function\n"
+        "mainloop\tsrc/c.c\t3;\"\tf\n"
+        "zeta\tsrc/a.c\t/^int \\/zeta$/;\"\tv\n";
+    const char *unsorted =
+        "zeta\tz.c\t9\n"
+        "alpha\ta.c\t/^alpha$/\n"
+        "alpha\tb.c\t4;\"\tf\n";
+
+    CHECK(mkdtemp(dir) != NULL);
+    snprintf(sub, sizeof sub, "%s/src", dir);
+    CHECK(mkdir(sub, 0700) == 0);
+    snprintf(path, sizeof path, "%s/tags", dir);
+    write_file(path, sorted, strlen(sorted));
+
+    /* the tags file is found from a folder below it */
+    found = tags_find_file(sub);
+    CHECK(found && strcmp(found, path) == 0);
+    free(found);
+
+    memset(&h, 0, sizeof h);
+    CHECK(tags_lookup(path, "main", &h) == 2);            /* "mainloop" is another name */
+    CHECK(strcmp(h.v[0].file, "src/a.c") == 0 && strcmp(h.v[0].kind, "f") == 0 && h.v[0].line == 7);
+    CHECK(strcmp(h.v[1].file, "src/b.c") == 0 && strcmp(h.v[1].addr, "12") == 0);
+    CHECK(strcmp(h.v[1].kind, "function") == 0);
+    taghits_free(&h);
+    CHECK(tags_lookup(path, "helper", &h) == 1 && strcmp(h.v[0].addr, "/^static int helper(int a)$/") == 0);
+    taghits_free(&h);
+    CHECK(tags_lookup(path, "mainloop", &h) == 1 && tags_lookup(path, "mai", &h) == 0);
+    taghits_free(&h);
+    CHECK(tags_lookup(path, "zeta", &h) == 1 && tags_lookup(path, "nothing", &h) == 0);
+    taghits_free(&h);
+    CHECK(tags_lookup(path, "aaa", &h) == 0 && tags_lookup("/nonexistent/tags", "x", &h) == -1);
+
+    /* resolving an address against the text of the file */
+    buf_init(&b);
+    {
+        size_t y = 0, x = 0;
+
+        buf_insert_text(&b, &y, &x, src, strlen(src));
+    }
+    memset(&h, 0, sizeof h);
+    tags_lookup(path, "helper", &h);
+    CHECK(tag_resolve(&h.v[0], "helper", &b) == 2);
+    taghits_free(&h);
+    tags_lookup(path, "main", &h);
+    CHECK(tag_resolve(&h.v[0], "main", &b) == 7);          /* from line:7 */
+    CHECK(tag_resolve(&h.v[1], "main", &b) == 12);         /* a plain number */
+    taghits_free(&h);
+    {
+        TagHit t;
+        memset(&t, 0, sizeof t);
+        t.addr = xstrdup("/^int main(void)$/");
+        CHECK(tag_resolve(&t, "main", &b) == 7);
+        free(t.addr);
+        t.addr = xstrdup("/^return/");
+        CHECK(tag_resolve(&t, "x", &b) == 0);               /* the line starts with spaces */
+        free(t.addr);
+        t.addr = xstrdup("/return a/");
+        CHECK(tag_resolve(&t, "x", &b) == 4);
+        free(t.addr);
+        t.addr = xstrdup("/^gone$/");
+        CHECK(tag_resolve(&t, "x", &b) == 0);
+        free(t.addr);
+    }
+    buf_free(&b);
+
+    /* an unsorted file is read line by line, CRLF and extended fields tolerated */
+    write_file(path, unsorted, strlen(unsorted));
+    memset(&h, 0, sizeof h);
+    CHECK(tags_lookup(path, "alpha", &h) == 2 && strcmp(h.v[0].file, "a.c") == 0);
+    CHECK(strcmp(h.v[1].file, "b.c") == 0 && strcmp(h.v[1].kind, "f") == 0);
+    taghits_free(&h);
+    CHECK(tags_lookup(path, "zeta", &h) == 1);
+    taghits_free(&h);
+
+    snprintf(cmd, sizeof cmd, "rm -rf %s", dir);
+    CHECK(system(cmd) == 0);
+}
+
 int main(void)
 {
     test_utf8();
@@ -1894,10 +2722,20 @@ int main(void)
     test_goto_parse();
     test_comments();
     test_commands();
+    test_keymap();
+    test_config();
+    test_config_apply();
+    test_user_themes_syntax();
+    test_git();
+    test_tags();
     test_complete();
     test_snippets();
     test_cursors();
     test_folding();
+    test_shell();
+    test_errors_parse();
+    test_run();
+    test_filter();
     if (failures) {
         fprintf(stderr, "%d test falliti\n", failures);
         return 1;

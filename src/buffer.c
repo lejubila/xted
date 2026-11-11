@@ -58,6 +58,7 @@ static void push_line(Buffer *b, const char *s, size_t n)
     l->len = l->cap = n;
     l->s = NULL;
     l->hl = 0;
+    l->git = 0;
     l->fold = 0;
     if (n > 0) {
         l->s = xmalloc(n);
@@ -369,6 +370,7 @@ static void raw_split(Buffer *b, size_t y, size_t x)
     tail = l->len - x;
     nl->s = NULL;
     nl->hl = 0;
+    nl->git = 0;
     nl->fold = 0;
     nl->len = nl->cap = tail;
     if (tail > 0) {

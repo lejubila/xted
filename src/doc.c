@@ -12,6 +12,9 @@ Doc *doc_new(void)
 
     memset(d, 0, sizeof *d);
     buf_init(&d->buf);
+    d->tabw = 8;
+    d->autosuggest = 1;
+    d->suggest_min = 2;
     return d;
 }
 
@@ -21,6 +24,7 @@ void doc_free(Doc *d)
         return;
     syn_free(d->syn);
     buf_free(&d->buf);
+    free(d->title);
     free(d);
 }
 
@@ -114,6 +118,8 @@ const char *doc_base_name(const Doc *d)
 {
     const char *p = d->buf.path, *s;
 
+    if (d->title)
+        return d->title;
     if (!p)
         return "[Senza nome]";
     s = strrchr(p, '/');

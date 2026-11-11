@@ -11,6 +11,7 @@ typedef struct {
     char *s;
     size_t len, cap;
     uint16_t hl;        /* opaque derived state (syntax), valid below Buffer.stable */
+    uint8_t git;        /* Git margin mark (GIT_ADD...), 0 for none; travels with the line */
     uint32_t fold;      /* lines hidden right after this one (0: not folded); see fold.c */
 } Line;
 

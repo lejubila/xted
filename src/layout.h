@@ -26,6 +26,19 @@ typedef struct {
     Win *active;
 } Layout;
 
+/* The text area of a pane is its width minus the Git margin, when the document has one. */
+static inline int win_gutter(const Win *w)
+{
+    return w->doc && w->doc->gutter ? 1 : 0;
+}
+
+static inline int win_text_w(const Win *w)
+{
+    int g = win_gutter(w);
+
+    return w->w > g ? w->w - g : 1;
+}
+
 enum { WIN_MIN_W = 12, WIN_MIN_H = 4 };
 
 void layout_init(Layout *l, Doc *d);

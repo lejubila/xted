@@ -22,6 +22,7 @@ typedef struct {
     Cand *v;
     size_t n, cap;
     size_t sel, top;        /* highlighted candidate, first visible one */
+    size_t min_prefix;      /* letters needed before candidates are looked up (0: the default) */
     int picked;             /* the user chose with the arrows: Enter then accepts */
     size_t y, x;            /* where the word being completed starts */
 } Complete;

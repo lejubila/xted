@@ -1,9 +1,12 @@
 #include "edit.h"
 #include "cursors.h"
+#include "shell.h"
 #include "utf8.h"
 #include "util.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <string.h>
 
 static Line *cur_line(Editor *e)
@@ -272,18 +275,36 @@ void edit_tab(Editor *e)
     size_t a, b, k;
 
     if (!edit_sel_active(e)) {
+        if (e->doc->expand_tab) {
+            /* spaces up to the next tab stop */
+            size_t col = editor_cursor_col(e), n = (size_t)e->tabw - col % (size_t)e->tabw;
+
+            begin(e);
+            e->sel_on = 0;
+            while (n-- > 0) {
+                buf_insert(e->buf, e->cy, e->cx, " ", 1);
+                e->cx++;
+            }
+            done(e);
+            return;
+        }
         edit_insert_cp(e, '\t');
         return;
     }
     sel_lines(e, &a, &b);
     begin(e);
-    for (k = a; k <= b; k++)
-        buf_insert(e->buf, k, 0, "\t", 1);
-    /* keep the selection on the same text; an end at column 0 stays there */
-    if (e->ay >= a && e->ay <= b && e->ax > 0)
-        e->ax++;
-    if (e->cy >= a && e->cy <= b && e->cx > 0)
-        e->cx++;
+    {
+        const char *unit = e->doc->expand_tab ? "                " : "\t";
+        size_t ulen = e->doc->expand_tab ? (size_t)e->tabw : 1;
+
+        for (k = a; k <= b; k++)
+            buf_insert(e->buf, k, 0, unit, ulen);
+        /* keep the selection on the same text; an end at column 0 stays there */
+        if (e->ay >= a && e->ay <= b && e->ax > 0)
+            e->ax += ulen;
+        if (e->cy >= a && e->cy <= b && e->cx > 0)
+            e->cx += ulen;
+    }
     finish(e);
 }
 
@@ -834,4 +855,109 @@ void edit_expand_snippet(Editor *e, size_t from_x, const SnipDef *d)
 void edit_store_clip(Editor *e, char *text, size_t n, const char *verb)
 {
     store_clip(e, text, n, 0, verb);
+}
+
+#define FILTER_TIMEOUT_MS 10000
+#define FILTER_MAX_OUTPUT (64u << 20)
+
+void edit_filter(Editor *e)
+{
+    char cmd[sizeof e->run.filter];
+
+    if (editor_prompt(e, "Filtra con: ", e->run.filter, cmd, sizeof cmd) == 0)
+        return;
+    snprintf(e->run.filter, sizeof e->run.filter, "%s", cmd);
+    edit_filter_cmd(e, cmd);
+}
+
+void edit_filter_cmd(Editor *e, const char *cmd)
+{
+    char *in;
+    const char *argv[4];
+    SBuf out = SBUF_INIT, err = SBUF_INIT;
+    size_t n, y0, x0, y1, x1;
+    int st = 0, r, sel = edit_sel_active(e);
+
+    if (sel) {
+        edit_sel_range(e, &y0, &x0, &y1, &x1);
+    } else {
+        y0 = x0 = 0;
+        y1 = e->buf->nlines - 1;
+        x1 = e->buf->lines[y1].len;
+    }
+    in = buf_get_range(e->buf, y0, x0, y1, x1, &n);
+    argv[0] = "/bin/sh";
+    argv[1] = "-c";
+    argv[2] = cmd;
+    argv[3] = NULL;
+    editor_set_msg(e, 0, "Filtro in corso…");
+    r = shell_capture(argv, e->root, in, n, &out, &err, FILTER_TIMEOUT_MS, FILTER_MAX_OUTPUT,
+                      &st);
+    if (r == -1) {
+        editor_set_msg(e, MSG_TTL_MS, "Impossibile avviare il comando");
+    } else if (r == -2) {
+        editor_set_msg(e, MSG_TTL_MS, "Il comando ha superato %d s: testo invariato",
+                       FILTER_TIMEOUT_MS / 1000);
+    } else if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) {
+        size_t k = 0;
+
+        while (k < err.len && err.p[k] != '\n')
+            k++;
+        if (k > 0)
+            editor_set_msg(e, MSG_TTL_MS, "Il comando è fallito: %.*s", (int)(k > 120 ? 120 : k),
+                           err.p);
+        else
+            editor_set_msg(e, MSG_TTL_MS, "Il comando è uscito con errore: testo invariato");
+    } else {
+        size_t ny = y0, nx = x0;
+
+        /* a filter that adds a final newline to text that had none must not add a line */
+        if (out.len > 0 && out.p[out.len - 1] == '\n' && (n == 0 || in[n - 1] != '\n'))
+            out.len--;
+        begin(e);
+        buf_delete_range(e->buf, y0, x0, y1, x1);
+        buf_insert_text(e->buf, &ny, &nx, out.p, out.len);
+        if (sel) {
+            e->sel_on = 1;
+            e->ay = y0;
+            e->ax = x0;
+            e->cy = ny;
+            e->cx = nx;
+        } else {
+            e->sel_on = 0;
+            e->cy = e->cy < e->buf->nlines ? e->cy : e->buf->nlines - 1;
+            e->cx = e->cx < cur_line(e)->len ? e->cx : cur_line(e)->len;
+        }
+        finish(e);
+        editor_set_msg(e, MSG_TTL_MS, "Filtrato con: %s", cmd);
+    }
+    free(in);
+    sbuf_free(&out);
+    sbuf_free(&err);
+}
+
+void edit_trim_trailing(Editor *e, Doc *d)
+{
+    Buffer *b = &d->buf;
+    size_t y;
+    int any = 0;
+
+    for (y = 0; y < b->nlines; y++) {
+        const Line *l = &b->lines[y];
+        size_t end = l->len;
+
+        while (end > 0 && is_blank(l->s[end - 1]))
+            end--;
+        if (end == l->len)
+            continue;
+        if (!any) {
+            buf_undo_begin(b, d == e->doc ? e->cy : 0, d == e->doc ? e->cx : 0);
+            any = 1;
+        }
+        buf_delete(b, y, end, l->len - end);
+        if (d == e->doc && e->cy == y && e->cx > end)
+            e->cx = end;
+    }
+    if (any)
+        buf_undo_close(b);
 }

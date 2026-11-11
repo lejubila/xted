@@ -30,7 +30,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/render.[ch]` | Rendering differenziale, un solo `write()` per frame |
 | `src/editor.[ch]` | Stato dell'editor, ciclo eventi, prompt, movimento, dispatch dei tasti |
 | `src/edit.[ch]` | Comandi di modifica: selezione, appunti, operazioni sulle righe, indentazione, autoindent |
-| `src/syntax.[ch]` | Motore di evidenziazione a regioni (parser delle definizioni, stato per riga, rilevamento del linguaggio, parentesi corrispondenti) |
+| `src/syntax.[ch]` | Motore di evidenziazione a regioni (parser delle definizioni, stato per riga, rilevamento del linguaggio, parentesi corrispondenti, linguaggi dell'utente da `syntax/`) |
 | `src/langs.[ch]` | Definizioni dei linguaggi incorporate, come dati testuali: un nuovo linguaggio è solo una voce qui |
 | `src/theme.[ch]` | Temi colore e codifica SGR con ripiego truecolor → 256 → 16 colori |
 | `src/doc.[ch]` | `Doc`: buffer + linguaggio + stato su disco (cambiamenti, sola lettura) di un file aperto; `View` (cursore/scorrimento/selezione) |
@@ -45,6 +45,13 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/snippet.[ch]` | Snippet incorporati per linguaggio, analisi del corpo (`$1`, `${2:x}`, `$0`) e sessione dei segnaposti |
 | `src/cursors.[ch]` | Multi-cursore: cursori extra dell'`Editor`, `cur_each` esegue un comando a cursore singolo su ciascuno (posizioni tenute come distanza dalla fine del testo), Ctrl+D / Alt+D |
 | `src/fold.[ch]` | Folding: `Line.fold` righe nascoste dopo la riga piegata, intervalli per parentesi o indentazione, passaggi sulle righe visibili |
+| `src/shell.[ch]` | Processi figli: `shell_start` (in background, stdout+stderr su un pipe), `shell_capture` (stdin da buffer, tempo massimo); niente `Editor` |
+| `src/run.[ch]` | Comandi di shell sull'`Editor`: pannello «[Output]» (documento `scratch`), Alt+R/F5, errori F8; il pipe è osservato da `term_watch` |
+| `src/errors.[ch]` | Riconoscimento di `file:riga:colonna` nell'output (gcc, tsc, Python); senza terminale |
+| `src/keymap.[ch]` | Nomi dei tasti (`ctrl+s`, `alt+shift+up`) e mappa tasto → comando, con i predefiniti presi da `commands[]` |
+| `src/config.[ch]` | File `~/.config/ked/config` (chiave = valore, `[linguaggio]`, `[keys]`); non conosce l'`Editor` |
+| `src/git.[ch]` | Indicatori Git: `git diff -U0` analizzato in `Line.git`; senza librerie |
+| `src/tags.[ch]` | File `tags` di ctags: ricerca (binaria se ordinato) e risoluzione dell'indirizzo; senza terminale |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 
@@ -52,6 +59,8 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 - Un modulo non deve dipendere da quelli di livello più alto: `buffer` e `utf8` non conoscono terminale né UI.
 - Ogni modifica al testo passa dalle primitive di `buffer.c` (`buf_insert/delete/split/join`) o dagli helper costruiti su di esse, così undo e rappresentazione interna restano isolati. Un comando che modifica il testo apre un gruppo undo (`buf_undo_begin`) e lo chiude a fine comando.
 - `Editor` espone i campi `cy, cx, rowoff, …` del **pannello attivo**; gli altri pannelli hanno la loro `View` in `Win`. Cambiare pannello o documento passa da `editor_store_view`/`load_win` (editor.c); `e->buf` e `e->doc` puntano sempre al documento attivo.
+- Un comando nuovo si aggiunge a `commands[]` (id inglese stabile, scorciatoia predefinita come testo di configurazione): palette, tasti e `[keys]` lo vedono da lì. In `editor.c` restano cablati solo digitazione, movimenti e selezione; non aggiungere `case` per tasti di comando.
+- `Doc.tabw`, `expand_tab`, … vengono da `config` per linguaggio (`apply_cfg`); `e->tabw` è lo specchio del documento attivo, per gli altri pannelli il renderer usa `d->tabw`. Con il margine Git (`Doc.gutter`) la larghezza del testo è `win_text_w(w)`, non `w->w`.
 - I campi extra del multi-cursore (`Editor.xc`) vengono svuotati cambiando pannello/documento e con undo/redo; i comandi di `edit.c` restano a cursore singolo e `cur_each` li ripete per ogni cursore. `Line.fold`/`Buffer.folded` sono lo stato del folding: dopo un'azione che sposta il cursore, `fold_reveal` riapre ciò che lo nasconde; le funzioni di movimento e rendering contano le righe *visibili* (`fold_next/prev/advance/back/nth/count`), mai `cy + 1`.
 - Lo stato derivato dal testo (evidenziazione) vive in `Line.hl` e vale per le righe `< Buffer.stable`: le `raw_*` di `buffer.c` lo invalidano, nessun altro codice deve farlo.
 

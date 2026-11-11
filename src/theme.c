@@ -1,5 +1,8 @@
 #include "theme.h"
 
+#include <ctype.h>
+#include <dirent.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,7 +26,8 @@ static const Theme themes[] = {
             /* code */     { 206, 145, 120 },
             /* link */     { 79, 193, 255 },
         },
-        { 90, 75, 10 }, { 45, 45, 48 }, { 4, 57, 94 }
+        { 90, 75, 10 }, { 45, 45, 48 }, { 4, 57, 94 },
+        { 60, 170, 60 }, { 200, 160, 40 }, { 210, 70, 70 }
     },
     {
         "chiaro", 1, { 56, 58, 66 }, { 250, 250, 250 },
@@ -44,18 +48,45 @@ static const Theme themes[] = {
             /* code */     { 163, 21, 21 },
             /* link */     { 4, 81, 165 },
         },
-        { 255, 236, 150 }, { 232, 232, 236 }, { 173, 214, 255 }
+        { 255, 236, 150 }, { 232, 232, 236 }, { 173, 214, 255 },
+        { 30, 130, 30 }, { 170, 120, 0 }, { 190, 40, 40 }
     },
 };
 
+/* Themes read from the user's folder come after the built-in ones. */
+static Theme *utheme;
+static size_t nutheme, ucap;
+
+#define NBUILTIN (sizeof themes / sizeof themes[0])
+
 size_t theme_count(void)
 {
-    return sizeof themes / sizeof themes[0];
+    return NBUILTIN + nutheme;
 }
 
 const Theme *theme_get(size_t i)
 {
-    return &themes[i % theme_count()];
+    i %= theme_count();
+    return i < NBUILTIN ? &themes[i] : &utheme[i - NBUILTIN];
+}
+
+static int same_name(const char *a, const char *b)
+{
+    while (*a && *b && tolower((unsigned char)*a) == tolower((unsigned char)*b)) {
+        a++;
+        b++;
+    }
+    return !*a && !*b;
+}
+
+int theme_by_name(const char *name)
+{
+    size_t i;
+
+    for (i = theme_count(); i-- > 0;)
+        if (same_name(theme_get(i)->name, name))
+            return (int)i;
+    return -1;
 }
 
 int theme_detect_depth(void)
@@ -157,4 +188,198 @@ void theme_fg(SBuf *o, int depth, Rgb c)
 void theme_bg(SBuf *o, int depth, Rgb c)
 {
     color(o, depth, c, 40);
+}
+
+/* ---- themes from files ------------------------------------------------------ */
+
+static int hex(int c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    c = tolower(c);
+    return c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+}
+
+static int parse_color(const char *s, Rgb *out)
+{
+    int i, v[6];
+
+    if (*s == '#')
+        s++;
+    if (strlen(s) != 6)
+        return -1;
+    for (i = 0; i < 6; i++) {
+        v[i] = hex((unsigned char)s[i]);
+        if (v[i] < 0)
+            return -1;
+    }
+    out->r = (unsigned char)(v[0] * 16 + v[1]);
+    out->g = (unsigned char)(v[2] * 16 + v[3]);
+    out->b = (unsigned char)(v[4] * 16 + v[5]);
+    return 0;
+}
+
+static const char *const class_keys[SC_COUNT] = {
+    "normal", "comment", "string", "keyword", "type", "constant", "number", "preproc",
+    "function", "operator", "variable", "heading", "emphasis", "code", "link"
+};
+
+int theme_add_user(const char *text, size_t n, char *err, size_t errlen)
+{
+    Theme t = themes[0];
+    char *name = NULL;
+    size_t pos = 0;
+    int lineno = 0;
+
+    while (pos < n) {
+        size_t len = 0, i;
+        char line[200], *key, *val, *sp;
+        Rgb c;
+
+        while (pos + len < n && text[pos + len] != '\n')
+            len++;
+        snprintf(line, sizeof line, "%.*s", (int)(len < sizeof line - 1 ? len : sizeof line - 1),
+                 text + pos);
+        pos += len + 1;
+        lineno++;
+        key = line;
+        while (*key == ' ' || *key == '\t')
+            key++;
+        if (!*key || *key == '#')
+            continue;
+        sp = key;
+        while (*sp && *sp != ' ' && *sp != '\t')
+            sp++;
+        if (*sp)
+            *sp++ = '\0';
+        val = sp;
+        while (*val == ' ' || *val == '\t')
+            val++;
+        for (i = strlen(val); i > 0 && (val[i - 1] == ' ' || val[i - 1] == '\t' || val[i - 1] == '\r'); i--)
+            val[i - 1] = '\0';
+        if (strcmp(key, "name") == 0) {
+            if (!*val) {
+                snprintf(err, errlen, "riga %d: manca il nome", lineno);
+                free(name);
+                return -1;
+            }
+            free(name);
+            name = xstrdup(val);
+            continue;
+        }
+        if (strcmp(key, "background") == 0 && strcmp(val, "none") == 0) {
+            t.has_bg = 0;
+            continue;
+        }
+        if (parse_color(val, &c) < 0) {
+            snprintf(err, errlen, "riga %d: colore non valido «%s» (serve #rrggbb)", lineno, val);
+            free(name);
+            return -1;
+        }
+        if (strcmp(key, "foreground") == 0) {
+            t.fg = c;
+            t.cls[SC_NORMAL] = c;
+        } else if (strcmp(key, "background") == 0) {
+            t.bg = c;
+            t.has_bg = 1;
+        } else if (strcmp(key, "match") == 0) {
+            t.match = c;
+        } else if (strcmp(key, "popup") == 0) {
+            t.popup = c;
+        } else if (strcmp(key, "popup_sel") == 0) {
+            t.popup_sel = c;
+        } else if (strcmp(key, "git_add") == 0) {
+            t.git_add = c;
+        } else if (strcmp(key, "git_mod") == 0) {
+            t.git_mod = c;
+        } else if (strcmp(key, "git_del") == 0) {
+            t.git_del = c;
+        } else {
+            for (i = 0; i < SC_COUNT; i++)
+                if (strcmp(key, class_keys[i]) == 0)
+                    break;
+            if (i == SC_COUNT) {
+                snprintf(err, errlen, "riga %d: chiave sconosciuta «%s»", lineno, key);
+                free(name);
+                return -1;
+            }
+            t.cls[i] = c;
+        }
+    }
+    if (!name) {
+        snprintf(err, errlen, "manca la riga «name»");
+        return -1;
+    }
+    t.name = name;
+    if (nutheme == ucap) {
+        ucap = ucap ? ucap * 2 : 4;
+        utheme = xrealloc(utheme, ucap * sizeof *utheme);
+    }
+    utheme[nutheme++] = t;
+    return 0;
+}
+
+void theme_clear_user(void)
+{
+    size_t i;
+
+    for (i = 0; i < nutheme; i++)
+        free((char *)utheme[i].name);
+    free(utheme);
+    utheme = NULL;
+    nutheme = ucap = 0;
+}
+
+static int str_cmp(const void *a, const void *b)
+{
+    return strcmp(*(char *const *)a, *(char *const *)b);
+}
+
+size_t theme_load_dir(const char *dir, void (*report)(const char *msg, void *ctx), void *ctx)
+{
+    DIR *d = opendir(dir);
+    struct dirent *de;
+    char **names = NULL;
+    size_t n = 0, cap = 0, i, added = 0;
+
+    if (!d)
+        return 0;
+    while ((de = readdir(d)) != NULL) {
+        if (de->d_name[0] == '.')
+            continue;
+        if (n == cap) {
+            cap = cap ? cap * 2 : 8;
+            names = xrealloc(names, cap * sizeof *names);
+        }
+        names[n++] = xstrdup(de->d_name);
+    }
+    closedir(d);
+    qsort(names, n, sizeof *names, str_cmp);
+    for (i = 0; i < n; i++) {
+        size_t pn = strlen(dir) + strlen(names[i]) + 2;
+        char *path = xmalloc(pn), err[160], msg[300];
+        FILE *f;
+        SBuf text = SBUF_INIT;
+        char buf[2048];
+        size_t got;
+
+        snprintf(path, pn, "%s/%s", dir, names[i]);
+        f = fopen(path, "r");
+        if (f) {
+            while ((got = fread(buf, 1, sizeof buf, f)) > 0 && text.len < (64u << 10))
+                sbuf_add(&text, buf, got);
+            fclose(f);
+            if (theme_add_user(text.p ? text.p : "", text.len, err, sizeof err) == 0) {
+                added++;
+            } else if (report) {
+                snprintf(msg, sizeof msg, "%s: %s", names[i], err);
+                report(msg, ctx);
+            }
+        }
+        sbuf_free(&text);
+        free(path);
+        free(names[i]);
+    }
+    free(names);
+    return added;
 }

@@ -32,7 +32,7 @@ typedef struct {
     int mods;
 } Key;
 
-enum { TERM_EV_KEY = 1, TERM_EV_RESIZE = 2 };
+enum { TERM_EV_KEY = 1, TERM_EV_RESIZE = 2, TERM_EV_FD = 4 };
 
 /* Raw mode + alternate screen; the terminal is restored on exit, on fatal
  * signals and on SIGTERM/SIGHUP. Returns -1 if stdin/stdout is not a tty. */
@@ -45,6 +45,8 @@ void term_size(int *rows, int *cols);
  * Returns a mask of TERM_EV_*, 0 on timeout. */
 int term_wait(int timeout_ms);
 int term_has_input(void);
+/* Also wakes term_wait when fd is readable (TERM_EV_FD); -1 stops watching. One at a time. */
+void term_watch(int fd);
 /* Reads one key from the buffered input; code is KEY_NONE for sequences
  * that are ignored, KEY_EOF when stdin is closed. */
 void term_read_key(Key *k);

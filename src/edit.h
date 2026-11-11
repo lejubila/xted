@@ -64,6 +64,15 @@ void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n);
 /* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */
 void edit_store_clip(Editor *e, char *text, size_t n, const char *verb);
 
+/* Alt+K: asks for a shell command, pipes the selection (or the whole text) through it and
+ * replaces it with the output. Nothing changes if the command fails. */
+void edit_filter(Editor *e);
+/* The same with the command given. */
+void edit_filter_cmd(Editor *e, const char *cmd);
+
+/* Strips trailing blanks from every line of d (one undo step; before saving). */
+void edit_trim_trailing(Editor *e, Doc *d);
+
 /* Replaces the word before the cursor (from byte from_x) with a snippet and
  * starts its session at the first stop. */
 void edit_expand_snippet(Editor *e, size_t from_x, const SnipDef *d);

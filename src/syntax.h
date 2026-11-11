@@ -28,6 +28,14 @@ int syn_comment(const Syntax *s, const char **open, const char **close);
 void syn_each_word(const Syntax *s, void (*fn)(const char *w, size_t n, int cls, void *ctx),
                    void *ctx);
 
+/* Adds a language written in the format of langs.c, searched before the built-in ones (the
+ * same name replaces one). Returns 0, or -1 with a message in err. */
+int syn_add_user(const char *text, size_t n, char *err, size_t errlen);
+/* Adds every file of dir (in alphabetical order); a bad file is skipped and reported through
+ * report(). Returns how many were added. */
+size_t syn_load_dir(const char *dir, void (*report)(const char *msg, void *ctx), void *ctx);
+void syn_clear_user(void);
+
 /* Picks the language for a file from its name, first line (shebang) and
  * modelines in the first/last 5 lines. NULL means plain text. */
 Syntax *syn_detect(const Buffer *b);
