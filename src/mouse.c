@@ -71,13 +71,27 @@ void mouse_locate(Editor *e, int x, int y, MouseHit *h)
         h->index = e->tree.top + (size_t)(y - e->text_y);
         return;
     }
-    w = layout_at(&e->layout, x, y);
-    if (!w)
+    if (e->sidebar_w > 0 && x == e->sidebar_w) {
+        h->kind = MH_EDGE;
         return;
+    }
+    w = layout_at(&e->layout, x, y);
+    if (!w) {
+        Node *n = layout_border_at(&e->layout, x, y);
+
+        if (n && n->vertical) {
+            h->kind = MH_BORDER;
+            h->node = n;
+        }
+        return;
+    }
     h->win = w;
     row = y - w->y;
     if (row >= w->h - 1) {
+        Node *n = layout_border_at(&e->layout, x, y);
+
         h->kind = MH_STATUS;
+        h->node = n && !n->vertical ? n : NULL;
         return;
     }
     h->kind = MH_TEXT;
@@ -119,6 +133,51 @@ static void wheel(Editor *e, Win *w, int n)
         editor_reload_view(e);
 }
 
+/* Counts presses on the same cell in a row (1..3). */
+static int count_press(Editor *e, const MouseEv *ev)
+{
+    MouseState *m = &e->mouse;
+    long now = clock_ms();
+    int same = now - m->t <= MULTI_CLICK_MS && ev->x == m->x && ev->y == m->y;
+
+    m->n = same ? m->n % 3 + 1 : 1;
+    m->t = now;
+    m->x = ev->x;
+    m->y = ev->y;
+    return m->n;
+}
+
+static void start_border(Editor *e, const MouseEv *ev, Node *n)
+{
+    e->mouse.drag = DRAG_NONE;
+    if (count_press(e, ev) == 2) {
+        n->frac = 500;
+        layout_refresh(&e->layout);
+        return;
+    }
+    e->mouse.drag = DRAG_BORDER;
+    e->mouse.node = n;
+}
+
+/* The pointer is where the border should go: the first half gets the cells before it. */
+static void drag_border(Editor *e, const MouseEv *ev)
+{
+    Node *n = e->mouse.node;
+
+    layout_set_size(n, n->vertical ? ev->x - n->x : ev->y - n->y + 1);
+    layout_refresh(&e->layout);
+}
+
+static void drag_sidebar(Editor *e, const MouseEv *ev)
+{
+    int w = ev->x < 10 ? 10 : ev->x > e->cols / 2 ? e->cols / 2 : ev->x;
+
+    if (w == e->sidebar_cols)
+        return;
+    e->sidebar_cols = w;
+    editor_relayout(e);
+}
+
 static void settle(Editor *e)
 {
     e->want_col = editor_cursor_col(e);
@@ -130,14 +189,9 @@ static void settle(Editor *e)
 static void press_text(Editor *e, const MouseEv *ev, const MouseHit *h)
 {
     MouseState *m = &e->mouse;
-    long now = clock_ms();
-    int same = now - m->t <= MULTI_CLICK_MS && ev->x == m->x && ev->y == m->y;
 
-    m->n = same ? m->n % 3 + 1 : 1;
-    m->t = now;
-    m->x = ev->x;
-    m->y = ev->y;
-    m->drag = 0;
+    count_press(e, ev);
+    m->drag = DRAG_NONE;
 
     if (h->win != e->layout.active)
         editor_focus(e, h->win);
@@ -174,7 +228,7 @@ static void press_text(Editor *e, const MouseEv *ev, const MouseHit *h)
     else if (m->n == 3)
         edit_select_line(e);
     else
-        m->drag = 1;
+        m->drag = DRAG_TEXT;
     settle(e);
 }
 
@@ -237,6 +291,14 @@ static void press_left(Editor *e, const MouseEv *ev, const MouseHit *h)
         if (h->win != e->layout.active)
             editor_focus(e, h->win);
         e->sidebar_focus = 0;
+        if (h->node)
+            start_border(e, ev, h->node);
+        break;
+    case MH_BORDER:
+        start_border(e, ev, h->node);
+        break;
+    case MH_EDGE:
+        e->mouse.drag = DRAG_SIDEBAR;
         break;
     case MH_TEXT:
         press_text(e, ev, h);
@@ -253,12 +315,18 @@ void mouse_event(Editor *e, const MouseEv *ev)
     if (!e->mouse_on || e->prompt_on || e->find.mode != FIND_OFF)
         return;
     if (ev->kind == MOUSE_RELEASE) {
-        e->mouse.drag = 0;
+        e->mouse.drag = DRAG_NONE;
         return;
     }
     if (ev->kind == MOUSE_DRAG) {
-        if (e->mouse.drag && !e->picker.on)
+        if (e->picker.on)
+            return;
+        if (e->mouse.drag == DRAG_TEXT)
             drag_to(e, ev);
+        else if (e->mouse.drag == DRAG_BORDER)
+            drag_border(e, ev);
+        else if (e->mouse.drag == DRAG_SIDEBAR)
+            drag_sidebar(e, ev);
         return;
     }
     mouse_locate(e, ev->x, ev->y, &h);

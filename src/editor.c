@@ -183,7 +183,7 @@ static int tabbar_visible(const Editor *e)
 static void relayout(Editor *e)
 {
     int y0 = tabbar_visible(e) ? 1 : 0, x0 = 0, h = e->rows - y0 - 1;
-    int sb = e->sidebar_on ? SIDEBAR_W : 0;
+    int sb = e->sidebar_on ? e->sidebar_cols : 0;
 
     if (sb > e->cols / 2)
         sb = e->cols / 2;
@@ -209,6 +209,7 @@ void editor_init(Editor *e)
     e->cols = 80;
     e->clipboard_osc52 = 1;
     e->mouse_on = 1;
+    e->sidebar_cols = SIDEBAR_W;
     e->theme = theme_get(0);
     e->color_depth = theme_detect_depth();
     e->render = render_create();
@@ -1287,7 +1288,7 @@ static void ser_layout(SBuf *b, const Node *n, const int *docmap, const Editor *
                   v->coloff);
         return;
     }
-    sbuf_addf(b, "%c%d ", n->vertical ? 'V' : 'H', n->pct);
+    sbuf_addf(b, "%c%d ", n->vertical ? 'V' : 'H', (n->frac + 5) / 10);
     ser_layout(b, n->a, docmap, e);
     ser_layout(b, n->b, docmap, e);
 }
@@ -1826,6 +1827,41 @@ static void update_complete(Editor *e, Key k)
         complete_close(&e->comp);
 }
 
+static void resize_mode_off(Editor *e)
+{
+    e->resize_mode = 0;
+    e->msg[0] = '\0';
+    e->msg_until = 0;
+}
+
+/* Arrow keys move the borders of the active pane while the mode lasts. Returns 0 for a key that
+ * ends the mode and must be handled as usual. */
+static int handle_resize_key(Editor *e, Key k)
+{
+    int dir = -1;
+
+    if (k.code == KEY_FOCUS_IN || k.code == KEY_FOCUS_OUT || k.code == KEY_MOUSE)
+        return 0;
+    switch (k.code) {
+    case KEY_LEFT: dir = LAYOUT_LEFT; break;
+    case KEY_RIGHT: dir = LAYOUT_RIGHT; break;
+    case KEY_UP: dir = LAYOUT_UP; break;
+    case KEY_DOWN: dir = LAYOUT_DOWN; break;
+    default: break;
+    }
+    if (dir >= 0 && !(k.mods & (MOD_ALT | MOD_CTRL))) {
+        if (layout_resize(&e->layout, e->layout.active, dir, (k.mods & MOD_SHIFT) ? 10 : 2) < 0)
+            editor_set_msg(e, MSG_TTL_MS, "Nessuno split in quella direzione");
+        return 1;
+    }
+    if (k.code == '=' && !k.mods) {
+        layout_equalize(&e->layout);
+        return 1;
+    }
+    resize_mode_off(e);
+    return k.code == KEY_ESC || k.code == KEY_ENTER;
+}
+
 static void handle_key(Editor *e, Key k)
 {
     int cmd, mod, vertical;
@@ -1836,6 +1872,8 @@ static void handle_key(Editor *e, Key k)
         mouse_event(e, &ev);
         return;
     }
+    if (e->resize_mode && handle_resize_key(e, k))
+        return;
     if (k.code == KEY_FOCUS_IN) {
         on_disk_change(e, e->doc);
         git_refresh_doc(e, e->doc);
@@ -1981,9 +2019,30 @@ void editor_cmd_palette(Editor *e)
     picker_filter(&e->picker);
 }
 
+void editor_relayout(Editor *e)
+{
+    relayout(e);
+}
+
 void editor_key(Editor *e, Key k)
 {
     handle_key(e, k);
+}
+
+void editor_cmd_resize_mode(Editor *e)
+{
+    if (layout_count(&e->layout) < 2) {
+        editor_set_msg(e, MSG_TTL_MS, "Nessun altro pannello da ridimensionare");
+        return;
+    }
+    e->resize_mode = 1;
+    editor_set_msg(e, 0,
+                   "Ridimensiona: frecce spostano il bordo (Maiusc x10)  = pareggia  Esc esci");
+}
+
+void editor_cmd_equalize(Editor *e)
+{
+    layout_equalize(&e->layout);
 }
 
 void editor_cmd_toggle_mouse(Editor *e)

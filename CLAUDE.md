@@ -31,10 +31,10 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/editor.[ch]` | Stato dell'editor, ciclo eventi, prompt, movimento, dispatch dei tasti |
 | `src/edit.[ch]` | Comandi di modifica: selezione, appunti, operazioni sulle righe, indentazione, autoindent |
 | `src/syntax.[ch]` | Motore di evidenziazione a regioni (parser delle definizioni, stato per riga, rilevamento del linguaggio, parentesi corrispondenti, linguaggi dell'utente da `syntax/`) |
-| `src/langs.[ch]` | Definizioni dei linguaggi incorporate, come dati testuali: un nuovo linguaggio è solo una voce qui (direttive in testa al file, anche `nocase` e le regioni a soli token `END = -`) |
+| `src/langs.[ch]` | Definizioni dei linguaggi incorporate, come dati testuali: un nuovo linguaggio è solo una voce qui (direttive in testa al file, anche `nocase`, le regioni a soli token `END = -` e `embed` per i linguaggi annidati, un livello) |
 | `src/theme.[ch]` | Temi colore e codifica SGR con ripiego truecolor → 256 → 16 colori |
 | `src/doc.[ch]` | `Doc`: buffer + linguaggio + stato su disco (cambiamenti, sola lettura) di un file aperto; `View` (cursore/scorrimento/selezione) |
-| `src/layout.[ch]` | Albero degli split e geometria dei pannelli; senza terminale |
+| `src/layout.[ch]` | Albero degli split e geometria dei pannelli (quote per mille `Node.frac`), bordi (`layout_border_at/set_size/resize/equalize`); senza terminale |
 | `src/fuzzy.[ch]`, `src/picker.[ch]` | Punteggio fuzzy e lista filtrabile (elenco buffer, apertura rapida) |
 | `src/files.[ch]` | Scansione dei file del progetto e modello ad albero del file browser |
 | `src/session.[ch]` | File di sessione per cartella (`$XDG_STATE_HOME/ked/sessions/`) |
@@ -64,6 +64,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 - `Doc.tabw`, `expand_tab`, … vengono da `config` per linguaggio (`apply_cfg`); `e->tabw` è lo specchio del documento attivo, per gli altri pannelli il renderer usa `d->tabw`. Con il margine Git (`Doc.gutter`) la larghezza del testo è `win_text_w(w)`, non `w->w`.
 - I campi extra del multi-cursore (`Editor.xc`) vengono svuotati cambiando pannello/documento e con undo/redo; i comandi di `edit.c` restano a cursore singolo e `cur_each` li ripete per ogni cursore. `Line.fold`/`Buffer.folded` sono lo stato del folding: dopo un'azione che sposta il cursore, `fold_reveal` riapre ciò che lo nasconde; le funzioni di movimento e rendering contano le righe *visibili* (`fold_next/prev/advance/back/nth/count`), mai `cy + 1`.
 - Il mouse passa da `KEY_MOUSE` (`term_mouse_event`) a `mouse_event`; la geometria dello schermo si ricava con `mouse_locate`/`render_tab_at`/`render_picker_height`, non si ricalcola altrove. Per far agire il mouse come un tasto in una lista si usa `editor_key`.
+- Il ridimensionamento degli split passa solo da `layout_set_size/layout_resize/layout_equalize` seguiti da `layout_refresh` (mouse: trascinamento di bordi e browser; tastiera: modalità Alt+E, `Editor.resize_mode`). Lo stato di sintassi di una riga può indicare un linguaggio incorporato (bit 15 di `Line.hl`): per i marcatori di commento di una riga usare `syn_comment_at`, non `syn_comment`.
 - Lo stato derivato dal testo (evidenziazione) vive in `Line.hl` e vale per le righe `< Buffer.stable`: le `raw_*` di `buffer.c` lo invalidano, nessun altro codice deve farlo.
 
 ## Stile del codice

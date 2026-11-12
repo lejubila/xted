@@ -78,7 +78,7 @@ const SnipDef *snip_lang(const char *lang, size_t *n)
         *n = N(snips_py);
         return snips_py;
     }
-    if (strcmp(lang, "PHP") == 0) {
+    if (strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0) {
         *n = N(snips_php);
         return snips_php;
     }

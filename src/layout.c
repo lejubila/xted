@@ -54,7 +54,7 @@ static void compute(Node *n, int x, int y, int w, int h)
         return;
     }
     if (n->vertical) {
-        int aw = (w - 1) * n->pct / 100;
+        int aw = (w - 1) * n->frac / 1000;
 
         if (aw < WIN_MIN_W)
             aw = WIN_MIN_W;
@@ -65,7 +65,7 @@ static void compute(Node *n, int x, int y, int w, int h)
         compute(n->a, x, y, aw, h);
         compute(n->b, x + aw + 1, y, w - aw - 1 > 0 ? w - aw - 1 : 1, h);
     } else {
-        int ah = h * n->pct / 100;
+        int ah = h * n->frac / 1000;
 
         if (ah < WIN_MIN_H)
             ah = WIN_MIN_H;
@@ -81,6 +81,57 @@ static void compute(Node *n, int x, int y, int w, int h)
 void layout_compute(Layout *l, int x, int y, int w, int h)
 {
     compute(l->root, x, y, w, h);
+}
+
+void layout_refresh(Layout *l)
+{
+    compute(l->root, l->root->x, l->root->y, l->root->w, l->root->h);
+}
+
+static Node *border_in(Node *n, int x, int y, int vertical)
+{
+    Node *r;
+
+    if (n->win || x < n->x || x >= n->x + n->w || y < n->y || y >= n->y + n->h)
+        return NULL;
+    if (n->vertical == vertical && (vertical ? x == n->a->x + n->a->w : y == n->a->y + n->a->h - 1))
+        return n;
+    r = border_in(n->a, x, y, vertical);
+    return r ? r : border_in(n->b, x, y, vertical);
+}
+
+/* A separator column is no pane's cell, a status line is: the two kinds never clash, and
+ * the separator wins where they meet. */
+Node *layout_border_at(const Layout *l, int x, int y)
+{
+    Node *n = border_in(l->root, x, y, 1);
+
+    return n ? n : border_in(l->root, x, y, 0);
+}
+
+void layout_set_size(Node *n, int cells)
+{
+    int dim = n->vertical ? n->w - 1 : n->h, f;
+
+    if (n->win || dim < 1)
+        return;
+    f = (cells * 1000 + dim - 1) / dim;
+    n->frac = f < 50 ? 50 : f > 950 ? 950 : f;
+}
+
+static void equalize(Node *n)
+{
+    if (n->win)
+        return;
+    n->frac = 500;
+    equalize(n->a);
+    equalize(n->b);
+}
+
+void layout_equalize(Layout *l)
+{
+    equalize(l->root);
+    layout_refresh(l);
 }
 
 static Node *find_leaf(Node *n, const Win *w)
@@ -115,7 +166,7 @@ Win *layout_split_at(Layout *l, int vertical, int pct)
     inner = xmalloc(sizeof *inner);
     memset(inner, 0, sizeof *inner);
     inner->vertical = vertical;
-    inner->pct = pct < 10 ? 10 : pct > 90 ? 90 : pct;
+    inner->frac = (pct < 10 ? 10 : pct > 90 ? 90 : pct) * 10;
     inner->parent = n->parent;
     inner->x = n->x;
     inner->y = n->y;
@@ -168,6 +219,37 @@ int layout_close(Layout *l, Win *w)
     free(n->win);
     free(n);
     free(p);
+    return 0;
+}
+
+/* The nearest ancestor of n that splits in the wanted direction with n on side `in_a`. */
+static Node *ancestor(const Node *n, int vertical, int in_a)
+{
+    const Node *c = n;
+    Node *p;
+
+    for (p = n->parent; p; c = p, p = p->parent)
+        if (p->vertical == vertical && (p->a == c) == in_a)
+            return p;
+    return NULL;
+}
+
+int layout_resize(Layout *l, Win *w, int dir, int cells)
+{
+    int vertical = dir == LAYOUT_LEFT || dir == LAYOUT_RIGHT;
+    int positive = dir == LAYOUT_RIGHT || dir == LAYOUT_DOWN;
+    Node *leaf_n = find_leaf(l->root, w), *p;
+
+    if (!leaf_n)
+        return -1;
+    /* the arrow pushes the border on its side: below/right of the pane when it points that way */
+    p = ancestor(leaf_n, vertical, positive);
+    if (!p)
+        p = ancestor(leaf_n, vertical, !positive);
+    if (!p)
+        return -1;
+    layout_set_size(p, (vertical ? p->a->w : p->a->h) + (positive ? cells : -cells));
+    layout_refresh(l);
     return 0;
 }
 

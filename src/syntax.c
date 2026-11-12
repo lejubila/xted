@@ -16,7 +16,21 @@ typedef struct {
     uint8_t cls;
     char esc;               /* escape character, 0 for none */
     int ml, bol, ns;        /* multi-line, only at line start, start not followed by a space */
+    /* "embed": the text up to `end` belongs to another language, resolved the first time it is needed */
+    int embed, peek;        /* peek: `end` is left for the outer language */
+    char *lang, *open;      /* language name; text that closes the opening tag, or NULL */
+    size_t ol;
+    struct Syntax *sub;
+    int tried;
 } Region;
+
+/* A state with this bit set means "inside an embedded language": bits 8..14 hold the index of
+ * the embed region, bits 0..7 the state of the inner language. Other states are 1 + a region. */
+#define EMBED_BIT 0x8000
+#define EMBED_MAX_REGION 128
+#define STATE_MAX_REGIONS 0x7FFF
+
+static struct Syntax *lang_by_name(const char *name);
 
 typedef struct {
     const char *w;
@@ -163,6 +177,9 @@ void syn_free(Syntax *s)
     for (i = 0; i < s->nreg; i++) {
         free(s->reg[i].start);
         free(s->reg[i].end);
+        free(s->reg[i].lang);
+        free(s->reg[i].open);
+        syn_free(s->reg[i].sub);
     }
     free(s->reg);
     free(s->tab);
@@ -326,6 +343,49 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                 PERR("riga %zu: idchars richiede dei caratteri", lineno);
             set_chars(s->idch, t[1].p, t[1].n);
             set_chars(s->idstart, t[1].p, t[1].n);
+        } else if (tok_is(t[0], "embed")) {
+            Region *r;
+            int cl;
+
+            if (nt < 5)
+                PERR("riga %zu: embed richiede linguaggio, classe, inizio e fine", lineno);
+            cl = class_by_name(t[2].p, t[2].n);
+            if (cl < 0)
+                PERR("riga %zu: classe sconosciuta", lineno);
+            if (s->nreg >= EMBED_MAX_REGION)
+                PERR("riga %zu: le embed vanno scritte prima delle altre regioni", lineno);
+            if (s->nreg == s->regcap) {
+                s->regcap = s->regcap ? s->regcap * 2 : 8;
+                s->reg = xrealloc(s->reg, s->regcap * sizeof *s->reg);
+            }
+            r = &s->reg[s->nreg];
+            memset(r, 0, sizeof *r);
+            r->embed = 1;
+            r->cls = (uint8_t)cl;
+            r->lang = xmalloc(t[1].n + 1);
+            memcpy(r->lang, t[1].p, t[1].n);
+            r->lang[t[1].n] = '\0';
+            r->sl = t[3].n;
+            r->start = xmalloc(r->sl + 1);
+            memcpy(r->start, t[3].p, r->sl);
+            r->start[r->sl] = '\0';
+            r->el = t[4].n;
+            r->end = xmalloc(r->el + 1);
+            memcpy(r->end, t[4].p, r->el);
+            r->end[r->el] = '\0';
+            s->nreg++;
+            for (i = 5; i < nt; i++) {
+                if (tok_is(t[i], "peek")) {
+                    r->peek = 1;
+                } else if (t[i].n > 5 && memcmp(t[i].p, "open=", 5) == 0) {
+                    r->ol = t[i].n - 5;
+                    r->open = xmalloc(r->ol + 1);
+                    memcpy(r->open, t[i].p + 5, r->ol);
+                    r->open[r->ol] = '\0';
+                } else {
+                    PERR("riga %zu: opzione sconosciuta", lineno);
+                }
+            }
         } else if (tok_is(t[0], "region")) {
             Region *r;
             int cl;
@@ -339,7 +399,7 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                 s->regcap = s->regcap ? s->regcap * 2 : 8;
                 s->reg = xrealloc(s->reg, s->regcap * sizeof *s->reg);
             }
-            if (s->nreg >= 0xFFFE)
+            if (s->nreg >= STATE_MAX_REGIONS)
                 PERR("riga %zu: troppe regioni", lineno);
             r = &s->reg[s->nreg];
             memset(r, 0, sizeof *r);
@@ -475,14 +535,103 @@ static size_t scan_number(const Syntax *s, const char *t, size_t len, size_t i)
     return j;
 }
 
-uint16_t syn_line(const Syntax *s, uint16_t state_in, const char *text, size_t len, uint8_t *cls)
+/* The language of an embed region, built the first time it is needed. */
+static Syntax *embed_sub(Region *r)
+{
+    if (!r->tried) {
+        r->tried = 1;
+        r->sub = lang_by_name(r->lang);
+    }
+    return r->sub;
+}
+
+static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t len,
+                          uint8_t *cls, int depth);
+
+/* Classifies text[*pi..] as the language embedded by region k, up to its end token (taken
+ * from the first occurrence in the line). Returns 0 when the end was found, else the state
+ * that carries on to the next line. */
+static uint16_t run_embedded(Syntax *s, size_t k, uint16_t inner, const char *text, size_t len,
+                             size_t *pi, uint8_t *cls)
+{
+    Region *r = &s->reg[k];
+    Syntax *sub = embed_sub(r);
+    size_t i = *pi, e;
+    int found = 0;
+
+    for (e = i; e + r->el <= len; e++)
+        if (text[e] == r->end[0] && memcmp(text + e, r->end, r->el) == 0) {
+            found = 1;
+            break;
+        }
+    if (!found)
+        e = len;
+    if (e > i)
+        inner = line_impl(sub, inner, text + i, e - i, cls ? cls + i : NULL, 1);
+    if (inner > 0xFF)
+        inner = 0;
+    if (!found) {
+        *pi = len;
+        return (uint16_t)(EMBED_BIT | (k << 8) | inner);
+    }
+    if (r->peek) {
+        *pi = e;
+    } else {
+        fill(cls, e, e + r->el, r->cls);
+        *pi = e + r->el;
+    }
+    return 0;
+}
+
+/* Starts an embedded language at text[i], where region k begins; false if it does not apply
+ * (no such language, tag not closed on this line, a longer word). Returns the new state. */
+static int embed_start(Syntax *s, size_t k, const char *text, size_t len, size_t *pi,
+                       uint8_t *cls, uint16_t *st)
+{
+    Region *r = &s->reg[k];
+    size_t i = *pi, j = i + r->sl;
+
+    if (!embed_sub(r))
+        return 0;
+    if (j < len && isalnum((uint8_t)r->start[r->sl - 1]) && isalnum((uint8_t)text[j]))
+        return 0;
+    if (r->open) {
+        size_t p;
+
+        for (p = j; p + r->ol <= len; p++)
+            if (text[p] == r->open[0] && memcmp(text + p, r->open, r->ol) == 0)
+                break;
+        if (p + r->ol > len)
+            return 0;
+        j = p + r->ol;
+    }
+    fill(cls, i, j, r->cls);
+    *pi = j;
+    *st = run_embedded(s, k, 0, text, len, pi, cls);
+    return 1;
+}
+
+uint16_t syn_line(Syntax *s, uint16_t state_in, const char *text, size_t len, uint8_t *cls)
+{
+    return line_impl(s, state_in, text, len, cls, 0);
+}
+
+static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t len,
+                          uint8_t *cls, int depth)
 {
     size_t i = 0;
     uint16_t st = state_in;
 
-    if (st && (size_t)st > s->nreg)
+    if (st & EMBED_BIT) {
+        size_t k = (size_t)((st >> 8) & 0x7F);
+
+        if (depth || k >= s->nreg || !s->reg[k].embed || !embed_sub(&s->reg[k]))
+            st = 0;
+        else
+            st = run_embedded(s, k, st & 0xFF, text, len, &i, cls);
+    } else if (st && (size_t)st > s->nreg) {
         st = 0;
-    if (st) {
+    } else if (st) {
         const Region *r = &s->reg[st - 1];
         int closed;
         size_t e = find_end(r, text, len, 0, &closed);
@@ -506,6 +655,13 @@ uint16_t syn_line(const Syntax *s, uint16_t state_in, const char *text, size_t l
             if (c != (uint8_t)r->start[0] || i + r->sl > len ||
                 memcmp(text + i, r->start, r->sl) != 0)
                 continue;
+            if (r->embed) {
+                if (!depth && embed_start(s, k, text, len, &i, cls, &st)) {
+                    matched = 1;
+                    break;
+                }
+                continue;
+            }
             if (r->bol && !only_blanks_before(text, i))
                 continue;
             if (r->ns && (i + r->sl >= len || text[i + r->sl] == ' ' || text[i + r->sl] == '\t'))
@@ -855,14 +1011,71 @@ static int by_shebang(const Buffer *b)
     return -1;
 }
 
-Syntax *syn_detect(const Buffer *b)
+static int same_name(const char *a, const char *b)
 {
-    int idx = by_modeline(b);
-    const char *base, *dot;
+    while (*a && *b && tolower((uint8_t)*a) == tolower((uint8_t)*b)) {
+        a++;
+        b++;
+    }
+    return !*a && !*b;
+}
+
+static Syntax *parse_lang(size_t idx)
+{
     SBuf text = SBUF_INIT;
     char err[128];
     Syntax *s;
     const char *const *d;
+
+    for (d = lang_at(idx)->def; *d; d++) {
+        sbuf_adds(&text, *d);
+        sbuf_add(&text, "\n", 1);
+    }
+    s = syn_parse(text.p ? text.p : "", text.len, err, sizeof err);
+    sbuf_free(&text);
+    return s;
+}
+
+/* By name or alias, any case. */
+static int lang_index(const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < lang_count(); i++)
+        if (same_name(lang_at(i)->name, name))
+            return (int)i;
+    return find_lang_word("alias", name, strlen(name), 1);
+}
+
+static Syntax *lang_by_name(const char *name)
+{
+    int i = lang_index(name);
+
+    return i < 0 ? NULL : parse_lang((size_t)i);
+}
+
+/* A .php file that does not start with "<?" is a template: HTML with PHP inside. */
+static int php_is_template(const Buffer *b)
+{
+    size_t y;
+
+    for (y = 0; y < b->nlines; y++) {
+        const Line *l = &b->lines[y];
+        size_t i = 0;
+
+        while (i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'))
+            i++;
+        if (i == l->len || (l->s[i] == '#' && i + 1 < l->len && l->s[i + 1] == '!'))
+            continue;
+        return !(i + 1 < l->len && l->s[i] == '<' && l->s[i + 1] == '?');
+    }
+    return 0;
+}
+
+Syntax *syn_detect(const Buffer *b)
+{
+    int idx = by_modeline(b);
+    const char *base, *dot;
 
     if (idx < 0)
         idx = by_shebang(b);
@@ -876,14 +1089,33 @@ Syntax *syn_detect(const Buffer *b)
     }
     if (idx < 0)
         return NULL;
+    if (same_name(lang_at((size_t)idx)->name, "PHP") && php_is_template(b)) {
+        int t = lang_index("PHP/HTML");
 
-    for (d = lang_at((size_t)idx)->def; *d; d++) {
-        sbuf_adds(&text, *d);
-        sbuf_add(&text, "\n", 1);
+        if (t >= 0)
+            idx = t;
     }
-    s = syn_parse(text.p ? text.p : "", text.len, err, sizeof err);
-    sbuf_free(&text);
-    return s;
+    return parse_lang((size_t)idx);
+}
+
+int syn_comment_at(Syntax *s, Buffer *b, size_t y, const char **open, const char **close)
+{
+    uint16_t st = 0;
+
+    if (!s)
+        return 0;
+    if (y > 0 && y <= b->nlines) {
+        syn_update(s, b, y - 1);
+        st = b->lines[y - 1].hl;
+    }
+    if (st & EMBED_BIT) {
+        size_t k = (size_t)((st >> 8) & 0x7F);
+
+        if (k < s->nreg && s->reg[k].embed && embed_sub(&s->reg[k]) &&
+            syn_comment(s->reg[k].sub, open, close))
+            return 1;
+    }
+    return syn_comment(s, open, close);
 }
 
 /* ---- user languages --------------------------------------------------------- */

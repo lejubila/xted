@@ -14,6 +14,11 @@
  *   sigil CLASS CHAR          CHAR followed by a name (shell $var, Python @decorator)
  *   operators CHARS           characters of class operator
  *   idchars CHARS             extra identifier characters
+ *   embed LANG CLASS START END [open=TEXT] [peek]
+ *                             the text between START and END is another language (name or
+ *                             alias), one level deep; START and END take CLASS. open= also
+ *                             colors the rest of the opening tag up to TEXT; peek leaves END
+ *                             to this language. Write embeds before the regions.
  *   region CLASS START END [ml] [bol] [ns] [esc=C]
  *                             END "$" = end of line, "-" = the START token alone; ml = continues
  *                             on the next lines; bol = only at line start; ns = START not
@@ -169,7 +174,7 @@ static const char *const lang_markdown[] = {
 static const char *const lang_php[] = {
     "name PHP",
     "comment //",
-    "ext php phtml php3 php4 php5 php7 php8 phps",
+    "ext php php3 php4 php5 php7 php8 phps",
     "shebang php",
     "alias php",
     "words keyword abstract and as break callable case catch class clone const continue "
@@ -183,9 +188,9 @@ static const char *const lang_php[] = {
     "words constant true false null TRUE FALSE NULL PHP_EOL PHP_INT_MAX PHP_INT_MIN "
         "PHP_VERSION __FILE__ __DIR__ __LINE__ __CLASS__ __FUNCTION__ __METHOD__ "
         "__NAMESPACE__ E_ALL E_ERROR E_WARNING E_NOTICE",
+    "embed HTML preproc ?> <? peek",
     "region preproc <?php -",
     "region preproc <?= -",
-    "region normal ?> <? ml",
     "region preproc #[ ] ml",
     "region comment /* */ ml",
     "region comment // $",
@@ -199,16 +204,32 @@ static const char *const lang_php[] = {
     NULL
 };
 
+/* Script and style bodies are colored as their own language, PHP tags switch to PHP. */
+#define HTML_RULES \
+    "embed JavaScript keyword <script </script> open=>", \
+    "embed CSS keyword <style </style> open=>", \
+    "embed PHP preproc <?php ?>", \
+    "embed PHP preproc <?= ?>", \
+    "region comment <!-- --> ml", \
+    "region preproc <! > ml", \
+    "region keyword < > ml ns"
+
 static const char *const lang_html[] = {
     "name HTML",
     "comment <!-- -->",
     "ext html htm xhtml vue svelte",
     "alias html htm xhtml vue svelte",
-    "region comment <!-- --> ml",
-    "region code <script </script> ml",
-    "region code <style </style> ml",
-    "region preproc <! > ml",
-    "region keyword < > ml ns",
+    HTML_RULES,
+    NULL
+};
+
+/* A .php file that starts with HTML (see syn_detect), and .phtml. */
+static const char *const lang_php_html[] = {
+    "name PHP/HTML",
+    "comment <!-- -->",
+    "ext phtml",
+    "alias php-html phtml",
+    HTML_RULES,
     NULL
 };
 
@@ -508,6 +529,7 @@ const LangDef lang_defs[] = {
     { "TypeScript", lang_ts },
     { "PHP", lang_php },
     { "HTML", lang_html },
+    { "PHP/HTML", lang_php_html },
     { "XML", lang_xml },
     { "CSS", lang_css },
     { "JSON", lang_json },

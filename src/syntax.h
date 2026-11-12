@@ -42,8 +42,14 @@ Syntax *syn_detect(const Buffer *b);
 
 /* Classifies one line: cls[i] receives the class of byte i (cls may be NULL
  * when only the state is wanted). Returns the state at the end of the line:
- * 0, or 1 + the index of the multi-line region left open. */
-uint16_t syn_line(const Syntax *s, uint16_t state_in, const char *text, size_t len, uint8_t *cls);
+ * 0, 1 + the index of the multi-line region left open, or (bit 15) a state inside an
+ * embedded language, see the "embed" directive in langs.c. */
+uint16_t syn_line(Syntax *s, uint16_t state_in, const char *text, size_t len, uint8_t *cls);
+
+/* Comment markers for line y: those of the embedded language when the line starts inside one
+ * (line comments inside <script>, block comments inside <style>), else the document's.
+ * Otherwise the same as syn_comment. */
+int syn_comment_at(Syntax *s, Buffer *b, size_t y, const char **open, const char **close);
 
 /* Makes the states of lines [0, last] valid (Buffer.stable > last). */
 void syn_update(Syntax *s, Buffer *b, size_t last);

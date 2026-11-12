@@ -678,14 +678,14 @@ void edit_toggle_comment(Editor *e)
     size_t a, b, k, indent = (size_t)-1, olen, clen = 0;
     int uncomment = 1, any = 0;
 
-    if (!syn_comment(e->doc->syn, &open, &close)) {
+    sel_lines(e, &a, &b);
+    if (!syn_comment_at(e->doc->syn, e->buf, a, &open, &close)) {
         editor_set_msg(e, MSG_TTL_MS, "Nessun commento definito per questo linguaggio");
         return;
     }
     olen = strlen(open);
     if (close)
         clen = strlen(close);
-    sel_lines(e, &a, &b);
     for (k = a; k <= b; k++) {
         const Line *l = &e->buf->lines[k];
         size_t lead = lead_blank(l);

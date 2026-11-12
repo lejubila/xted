@@ -17,7 +17,7 @@ typedef struct Node {
     struct Node *parent, *a, *b;
     Win *win;
     int vertical;       /* a is left of b (a separator column sits between them) */
-    int pct;            /* share of the space given to a, 10..90 */
+    int frac;           /* share of the space given to a, in thousandths (50..950) */
     int x, y, w, h;
 } Node;
 
@@ -55,6 +55,20 @@ int layout_close(Layout *l, Win *w);
 /* Panes in reading order. Returns the count; fills at most max entries. */
 size_t layout_wins(const Layout *l, Win **out, size_t max);
 size_t layout_count(const Layout *l);
+/* Recomputes every rectangle inside the root's current one (after a share changed). */
+void layout_refresh(Layout *l);
+/* The split whose border contains cell (x, y): the separator column of a side-by-side split,
+ * or the last row (the status line) of the upper half of a stacked one. NULL if none. */
+Node *layout_border_at(const Layout *l, int x, int y);
+/* Gives the first half of n exactly `cells` rows/columns (before the minimum sizes apply). */
+void layout_set_size(Node *n, int cells);
+/* Shares 50/50 in every split. */
+void layout_equalize(Layout *l);
+enum { LAYOUT_LEFT, LAYOUT_RIGHT, LAYOUT_UP, LAYOUT_DOWN };
+/* Moves a border of pane w by `cells` in the direction of the arrow: the pane's border on that
+ * side if it has one, otherwise the one on the opposite side. Returns -1 when no split runs
+ * that way. */
+int layout_resize(Layout *l, Win *w, int dir, int cells);
 /* Cycles the focus by delta (+1 / -1). */
 void layout_cycle(Layout *l, int delta);
 /* The pane showing cell (x, y), or NULL (separator or outside). */

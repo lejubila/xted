@@ -84,8 +84,11 @@ typedef struct {
 typedef struct {
     long t;                 /* monotonic ms of the last press */
     int x, y, n;            /* where it was, and how many presses in a row (1..3) */
-    int drag;               /* a drag that started in a text pane is running */
+    int drag;               /* DRAG_*: what the running drag moves */
+    struct Node *node;      /* the split whose border is dragged */
 } MouseState;
+
+enum { DRAG_NONE, DRAG_TEXT, DRAG_BORDER, DRAG_SIDEBAR };
 
 typedef struct Editor {
     Doc **docs;             /* open documents, in tab order */
@@ -106,6 +109,7 @@ typedef struct Editor {
     Config cfg;             /* the user's settings */
     int git_off;            /* git could not be run: the margin is off for this session */
     int mouse_on;           /* the terminal reports clicks and the wheel */
+    int resize_mode;        /* the arrow keys move split borders (Alt+E) */
     MouseState mouse;
     char *cfgdir;           /* where they were read from (NULL: unknown) */
     Complete comp;          /* suggestion popup */
@@ -121,7 +125,8 @@ typedef struct Editor {
     size_t rowoff, coloff;  /* first visible line / display column */
     int rows, cols;         /* terminal size */
     int text_x, text_y;     /* top-left of the pane area (right of the sidebar, below the tab bar) */
-    int sidebar_w;
+    int sidebar_w;          /* columns taken by the browser (0 when hidden) */
+    int sidebar_cols;       /* its width when shown */
     int tabw;
 
     int sel_on;             /* a selection runs from the anchor to the cursor */
@@ -183,6 +188,8 @@ void editor_goto(Editor *e, size_t line, size_t col);
 int editor_split_at(Editor *e, int vertical, int pct);
 /* Moves the keyboard focus to pane w. */
 void editor_focus(Editor *e, Win *w);
+/* Lays the panes out again (after the browser or a split border moved). */
+void editor_relayout(Editor *e);
 /* Re-reads the active pane's view into the live fields (after the run code edited it). */
 void editor_reload_view(Editor *e);
 /* One-key question on the message row: returns the lowercase key of keys, 0 on Esc. */
@@ -222,6 +229,8 @@ void editor_cmd_theme(Editor *e);
 void editor_cmd_redraw(Editor *e);
 void editor_cmd_git(Editor *e);
 void editor_cmd_toggle_mouse(Editor *e);
+void editor_cmd_resize_mode(Editor *e);
+void editor_cmd_equalize(Editor *e);
 /* Alt+X: the list of all commands. */
 void editor_cmd_palette(Editor *e);
 

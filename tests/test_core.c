@@ -622,7 +622,7 @@ static Syntax *lang(const char *name)
 }
 
 /* One letter per byte: the class of each byte of text. */
-static const char *cls_str(const Syntax *s, uint16_t *state, const char *text)
+static const char *cls_str(Syntax *s, uint16_t *state, const char *text)
 {
     static char out[256];
     uint8_t cls[256];
@@ -782,18 +782,18 @@ static void test_syntax_langs(void)
     CLS(php, st, "<?php echo $a->b(\"x\"); // c", "ppppp.kkkk.vvoof.sss...cccc");
     CHECK(st == 0);
     CLS(php, st, "$y = 1; #[Attr] // z", "vv.o.n..ppppppp.cccc");
-    CLS(php, st, "?> it's <b>", "...........");
+    CLS(php, st, "?> it's <b>", "pp......kkk");
     CHECK(st != 0);
-    CLS(php, st, "x <?= $x; ?>", "....o.vv....");     /* back in PHP at <?, in HTML again at ?> */
+    CLS(php, st, "x <?= $x; ?>", "..ppp.vv..pp");     /* back in PHP at <?, in HTML again at ?> */
     CHECK(st != 0);
 
     /* HTML: tags, comments, script bodies are left alone */
     st = 0;
     CLS(html, st, "<a href=\"x\">t < u</a>", "kkkkkkkkkkkk.....kkkk");
-    CLS(html, st, "<script>", "dddddddd");
+    CLS(html, st, "<script>", "kkkkkkkk");
     CHECK(st != 0);
-    CLS(html, st, "if (a<b) {", "dddddddddd");
-    CLS(html, st, "</script> <b>", "ddddddddd.kkk");
+    CLS(html, st, "if (a<b) {", "kk...o....");
+    CLS(html, st, "</script> <b>", "kkkkkkkkk.kkk");
     CHECK(st == 0);
 
     /* SQL ignores case */
@@ -821,10 +821,114 @@ static void test_syntax_langs(void)
     syn_free(diff); syn_free(yaml); syn_free(css); syn_free(rb);
 }
 
+static void test_syntax_embed(void)
+{
+    Syntax *html = lang("html"), *php = lang("php"), *tpl = lang("phtml");
+    uint16_t st = 0;
+    char err[128];
+    const char *open, *close;
+    Buffer b;
+    Syntax *s;
+
+    CHECK(html && php && tpl && strcmp(syn_name(tpl), "PHP/HTML") == 0);
+
+    /* JavaScript between the script tags, over several lines */
+    CLS(html, st, "<p>a</p>", "kkk.kkkk");
+    CHECK(st == 0);
+    CLS(html, st, "<script type=\"x\">var a = 1; /* c", "kkkkkkkkkkkkkkkkkkkk...o.n..cccc");
+    CHECK(st != 0);
+    CLS(html, st, "still */ return a</script>", "cccccccc.kkkkkk..kkkkkkkkk");
+    CHECK(st == 0);
+    CLS(html, st, "<script src=\"a.js\"></script> <b>", "kkkkkkkkkkkkkkkkkkkkkkkkkkkk.kkk");
+    CHECK(st == 0);
+    CLS(html, st, "<scripts>", "kkkkkkkkk");                  /* another tag: not a script */
+    CHECK(st == 0);
+    CLS(html, st, "<script", "kkkkkkk");                       /* tag not closed on the line */
+    CHECK(st != 0 && st < 0x8000);                             /* an ordinary multi-line tag */
+    CLS(html, st, "src=\"a.js\">", "kkkkkkkkkkk");
+    CHECK(st == 0);
+
+    /* CSS between style tags */
+    CLS(html, st, "<style>", "kkkkkkk");
+    CHECK(st != 0);
+    CLS(html, st, "a { color: red; }", "T...kkkkko.......");
+    CLS(html, st, "</style>", "kkkkkkkk");
+    CHECK(st == 0);
+
+    /* PHP tags inside HTML, on one line or across lines */
+    CLS(html, st, "<?php echo $x; ?> <i>", "ppppp.kkkk.vv..pp.kkk");
+    CHECK(st == 0);
+    CLS(html, st, "<b><?= $x", "kkkppp.vv");
+    CLS(html, st, "?></b>", "ppkkkk");
+    CHECK(st == 0);
+
+    /* PHP with HTML after ?>, and back at the next tag */
+    st = 0;
+    CLS(php, st, "$a = 1; ?>", "vv.o.n..pp");
+    CHECK(st != 0);
+    CLS(php, st, "<div><?php if ($a): ?>", "kkkkkppppp.kk..vv.o.pp");
+    CHECK(st != 0);
+    CLS(php, st, "<?php", "ppppp");
+    CHECK(st == 0);
+    CLS(php, st, "x", ".");
+
+    /* a template starts as HTML */
+    st = 0;
+    CLS(tpl, st, "<ul><?php foreach ($a as $b): ?>", "kkkkppppp.kkkkkkk..vv.kk.vv.o.pp");
+    CHECK(st == 0);
+
+    /* one level only: no script inside the HTML that follows ?>, no PHP inside a script body */
+    CLS(php, st, "?><script>", "ppkkkkkkkk");
+    CHECK(st != 0);
+    CLS(php, st, "var x = 1;", "..........");                  /* the HTML of the PHP file: no JS */
+    st = 0;
+    CLS(html, st, "<script>", "kkkkkkkk");
+    CLS(html, st, "a = \"<?php\"; </script>", "..o.sssssss..kkkkkkkkk");
+    CHECK(st == 0);
+
+    /* the comment markers follow the language the line starts in */
+    buf_init(&b);
+    {
+        size_t y = 0, x = 0;
+        static const char text[] = "<p>\n<script>\nvar a;\n</script>\n<style>\na {}\n</style>\n";
+
+        buf_insert_text(&b, &y, &x, text, sizeof text - 1);
+    }
+    s = html;
+    CHECK(syn_comment_at(s, &b, 0, &open, &close) && strcmp(open, "<!--") == 0);
+    CHECK(syn_comment_at(s, &b, 2, &open, &close) && strcmp(open, "//") == 0 && !close);
+    CHECK(syn_comment_at(s, &b, 3, &open, &close) && strcmp(open, "//") == 0);
+    CHECK(syn_comment_at(s, &b, 4, &open, &close) && strcmp(open, "<!--") == 0);
+    CHECK(syn_comment_at(s, &b, 5, &open, &close) && strcmp(open, "/*") == 0 && close);
+    CHECK(!syn_comment_at(NULL, &b, 0, &open, &close));
+    buf_free(&b);
+
+    /* the directive: errors and a language that does not exist */
+    CHECK(syn_parse("name X\nembed Y keyword <a\n", 28, err, sizeof err) == NULL &&
+          strstr(err, "riga 2") != NULL);
+    CHECK(syn_parse("name X\nembed Y nonsense <a </a>\n", 34, err, sizeof err) == NULL);
+    CHECK(syn_parse("name X\nembed Y keyword <a </a> what\n", 38, err, sizeof err) == NULL);
+    {
+        static const char def[] = "name X\nembed NoSuchLanguage keyword <a </a>\nregion string \" \"\n";
+        Syntax *x = syn_parse(def, sizeof def - 1, err, sizeof err);
+
+        CHECK(x != NULL);
+        st = 0;
+        CLS(x, st, "<a \"s\"", "...sss");                        /* ignored: the other rules apply */
+        CHECK(st == 0);
+        syn_free(x);
+    }
+    syn_free(html);
+    syn_free(php);
+    syn_free(tpl);
+}
+
 static void test_syntax_detect_langs(void)
 {
     static const struct { const char *path, *first, *want; } t[] = {
-        { "a.php", "", "PHP" }, { "a.phtml", "", "PHP" }, { "run", "#!/usr/bin/php\n", "PHP" },
+        { "a.php", "", "PHP" }, { "a.php", "<?php\n", "PHP" }, { "a.phtml", "", "PHP/HTML" },
+        { "a.php", "<html>\n", "PHP/HTML" }, { "a.php", "\n  <?php\n", "PHP" },
+        { "a.php", "#!/usr/bin/env php\n<?php\n", "PHP" }, { "run", "#!/usr/bin/php\n", "PHP" },
         { "a.ts", "", "TypeScript" }, { "a.js", "", "JavaScript" }, { "a.jsx", "", "JavaScript" },
         { "a.html", "", "HTML" }, { "a.svg", "", "XML" }, { "a.css", "", "CSS" },
         { "a.json", "", "JSON" }, { ".eslintrc", "", "JSON" }, { "a.yml", "", "YAML" },
@@ -990,6 +1094,130 @@ static void test_mouse(void)
     CHECK(e.doc == e.docs[0]);
     mclick(&e, MOUSE_PRESS, 7, 0, 0, 1);
     CHECK(e.ndocs == 1 && strstr(e.doc->buf.path, "a.c") != NULL);
+    editor_free(&e);
+}
+
+static void test_mouse_borders(void)
+{
+    Editor e;
+    MouseHit h;
+    Win *w[8], *a, *b, *c;
+
+    ed_load(&e, "one\ntwo\n");
+    mouse_screen(&e, 0);
+    CHECK(editor_split(&e, 1) == 0);                        /* a | b */
+    mouse_screen(&e, 0);
+    CHECK(layout_wins(&e.layout, w, 8) == 2);
+    a = w[0];
+    b = w[1];
+    CHECK(a->w == 39 && b->w == 40);
+    mouse_locate(&e, 39, 5, &h);
+    CHECK(h.kind == MH_BORDER && h.node && h.node->vertical);
+
+    mclick(&e, MOUSE_PRESS, 39, 5, 0, 0);
+    CHECK(e.mouse.drag == DRAG_BORDER && e.layout.active == b);     /* a separator does not focus */
+    mclick(&e, MOUSE_DRAG, 30, 6, 0, 0);
+    CHECK(a->w == 30 && a->w + 1 + b->w == 80);
+    mclick(&e, MOUSE_DRAG, 1, 6, 0, 0);
+    CHECK(a->w == WIN_MIN_W);
+    mclick(&e, MOUSE_DRAG, 70, 6, 0, 0);
+    CHECK(b->w == WIN_MIN_W);
+    mclick(&e, MOUSE_DRAG, 25, 6, 0, 0);
+    mclick(&e, MOUSE_RELEASE, 25, 6, 0, 0);
+    CHECK(e.mouse.drag == DRAG_NONE && a->w == 25);
+    mclick(&e, MOUSE_DRAG, 40, 6, 0, 0);                    /* no drag running: nothing moves */
+    CHECK(a->w == 25);
+
+    e.mouse.t = 0;
+    mclick(&e, MOUSE_PRESS, 25, 3, 0, 0);                   /* double click: equal shares */
+    mclick(&e, MOUSE_RELEASE, 25, 3, 0, 0);
+    mclick(&e, MOUSE_PRESS, 25, 3, 0, 0);
+    mclick(&e, MOUSE_RELEASE, 25, 3, 0, 0);
+    CHECK(a->w == 39 && b->w == 40);
+
+    /* stacked panes: the status line of the upper pane is the border */
+    CHECK(editor_split(&e, 0) == 0);                        /* a | (b over c) */
+    mouse_screen(&e, 0);
+    CHECK(layout_wins(&e.layout, w, 8) == 3);
+    b = w[1];
+    c = w[2];
+    mouse_locate(&e, b->x + 3, b->y + b->h - 1, &h);
+    CHECK(h.kind == MH_STATUS && h.node && !h.node->vertical && h.win == b);
+    mouse_locate(&e, b->x + 3, b->y + 2, &h);
+    CHECK(h.kind == MH_TEXT && h.node == NULL);
+    mclick(&e, MOUSE_PRESS, b->x + 3, b->y + b->h - 1, 0, 0);
+    CHECK(e.layout.active == b && e.mouse.drag == DRAG_BORDER);
+    mclick(&e, MOUSE_DRAG, b->x + 3, b->y + 5, 0, 0);       /* the status line goes to row y + 5 */
+    CHECK(b->h == 6 && b->h + c->h == 23);
+    mclick(&e, MOUSE_RELEASE, b->x + 3, b->y + 5, 0, 0);
+    mouse_locate(&e, a->w, 4, &h);
+    CHECK(h.kind == MH_BORDER && h.node->vertical);         /* the separator beats the status line */
+    mouse_locate(&e, a->w, a->h - 1, &h);
+    CHECK(h.kind == MH_BORDER);
+
+    /* the browser's width follows the pointer between 10 columns and half the screen */
+    e.sidebar_on = 1;
+    editor_relayout(&e);
+    CHECK(e.sidebar_w == 28);
+    mouse_locate(&e, 28, 5, &h);
+    CHECK(h.kind == MH_EDGE);
+    mclick(&e, MOUSE_PRESS, 28, 5, 0, 0);
+    mclick(&e, MOUSE_DRAG, 20, 5, 0, 0);
+    CHECK(e.sidebar_cols == 20 && e.sidebar_w == 20 && e.text_x == 21);
+    mclick(&e, MOUSE_DRAG, 2, 5, 0, 0);
+    CHECK(e.sidebar_cols == 10);
+    mclick(&e, MOUSE_DRAG, 75, 5, 0, 0);
+    CHECK(e.sidebar_cols == 40);
+    mclick(&e, MOUSE_RELEASE, 75, 5, 0, 0);
+    editor_free(&e);
+}
+
+static void kkey(Editor *e, uint32_t code, int mods)
+{
+    Key k;
+
+    k.code = code;
+    k.mods = mods;
+    editor_key(e, k);
+}
+
+static void test_resize_mode(void)
+{
+    Editor e;
+    Win *w[8], *a, *b;
+
+    ed_load(&e, "one\ntwo\n");
+    mouse_screen(&e, 0);
+    kkey(&e, 'e', MOD_ALT);                                 /* one pane: nothing to resize */
+    CHECK(!e.resize_mode);
+
+    CHECK(editor_split(&e, 1) == 0);
+    mouse_screen(&e, 0);
+    layout_wins(&e.layout, w, 8);
+    a = w[0];
+    b = w[1];
+    CHECK(e.layout.active == b && a->w == 39);
+    kkey(&e, 'e', MOD_ALT);
+    CHECK(e.resize_mode && strstr(e.msg, "Ridimensiona") != NULL);
+    kkey(&e, KEY_LEFT, 0);                                  /* b grows: its border moves left */
+    CHECK(a->w == 37 && b->w == 42);
+    kkey(&e, KEY_LEFT, MOD_SHIFT);
+    CHECK(a->w == 27);
+    kkey(&e, KEY_RIGHT, 0);
+    CHECK(a->w == 29);
+    kkey(&e, KEY_UP, 0);                                    /* no stacked split */
+    CHECK(a->w == 29 && e.resize_mode);
+    kkey(&e, '=', 0);
+    CHECK(a->w == 39 && e.resize_mode);
+    CHECK(e.cy == 0 && e.cx == 0);                          /* the arrows did not move the cursor */
+    kkey(&e, KEY_ESC, 0);
+    CHECK(!e.resize_mode && e.msg[0] == '\0');
+
+    kkey(&e, 'e', MOD_ALT);                                 /* another key ends it and is handled */
+    kkey(&e, KEY_DOWN, 0);
+    CHECK(e.resize_mode);
+    kkey(&e, 'x', 0);
+    CHECK(!e.resize_mode && e.buf->lines[0].len == 4);
     editor_free(&e);
 }
 
@@ -1209,6 +1437,77 @@ static void test_layout(void)
     /* too small to split */
     layout_compute(&l, 0, 1, 20, 5);
     CHECK(layout_split(&l, 1) == NULL && layout_split(&l, 0) == NULL);
+    layout_free(&l);
+    doc_free(d);
+}
+
+static void test_layout_resize(void)
+{
+    Doc *d = doc_new();
+    Layout l;
+    Win *a, *b, *c;
+    Node *n;
+    int w0;
+
+    layout_init(&l, d);
+    layout_compute(&l, 0, 1, 80, 22);
+    a = l.active;
+    CHECK(layout_border_at(&l, 5, 5) == NULL);
+    b = layout_split(&l, 1);                                   /* a | b */
+    layout_compute(&l, 0, 1, 80, 22);
+    CHECK(a->w == 39 && b->w == 40);
+    n = layout_border_at(&l, a->w, 7);
+    CHECK(n && n == l.root && n->vertical);
+    CHECK(layout_border_at(&l, a->w - 1, 7) == NULL && layout_border_at(&l, a->w, 0) == NULL);
+
+    /* the size of the first half is exact, wherever the pointer is */
+    for (w0 = 12; w0 <= 66; w0++) {
+        layout_set_size(n, w0);
+        layout_refresh(&l);
+        if (a->w != w0 || a->w + 1 + b->w != 80)
+            fprintf(stderr, "set_size %d: a=%d b=%d\n", w0, a->w, b->w);
+        CHECK(a->w == w0 && a->w + 1 + b->w == 80);
+    }
+    layout_set_size(n, 2);                                     /* the minimum width applies */
+    layout_refresh(&l);
+    CHECK(a->w == WIN_MIN_W);
+    layout_set_size(n, 79);
+    layout_refresh(&l);
+    CHECK(b->w == WIN_MIN_W);
+
+    /* the arrow pushes the border on its side; otherwise the other one */
+    layout_set_size(n, 40);
+    layout_refresh(&l);
+    l.active = a;
+    CHECK(layout_resize(&l, a, LAYOUT_RIGHT, 5) == 0 && a->w == 45);   /* a grows */
+    CHECK(layout_resize(&l, a, LAYOUT_LEFT, 7) == 0 && a->w == 38);    /* a has no left border */
+    CHECK(layout_resize(&l, b, LAYOUT_LEFT, 3) == 0 && a->w == 35);    /* b grows */
+    CHECK(layout_resize(&l, b, LAYOUT_RIGHT, 4) == 0 && a->w == 39);   /* b has no right border */
+    CHECK(layout_resize(&l, a, LAYOUT_UP, 1) == -1 && layout_resize(&l, a, LAYOUT_DOWN, 1) == -1);
+
+    /* stacked: the border is the status line of the upper pane */
+    c = layout_split(&l, 0);                                   /* (a over c) | b */
+    layout_compute(&l, 0, 1, 80, 22);
+    CHECK(c == l.active && a->h + c->h == 22);
+    n = layout_border_at(&l, 3, a->h);
+    CHECK(n == NULL || n->vertical == 0);
+    n = layout_border_at(&l, 3, a->y + a->h - 1);
+    CHECK(n && !n->vertical && n->a->h == a->h);
+    CHECK(layout_border_at(&l, 3, a->y + a->h - 2) == NULL);
+    layout_set_size(n, 6);
+    layout_refresh(&l);
+    CHECK(a->h == 6 && c->h == 16 && c->y == a->y + 6);
+    layout_set_size(n, 1);
+    layout_refresh(&l);
+    CHECK(a->h == WIN_MIN_H);
+    CHECK(layout_resize(&l, c, LAYOUT_UP, 3) == 0 && a->h == WIN_MIN_H);   /* already at the minimum */
+    layout_set_size(n, 11);
+    layout_refresh(&l);
+    CHECK(layout_resize(&l, c, LAYOUT_UP, 3) == 0 && a->h == 8);
+    CHECK(layout_resize(&l, a, LAYOUT_DOWN, 2) == 0 && a->h == 10);
+
+    layout_equalize(&l);
+    CHECK(a->h == 11 && layout_border_at(&l, 3, a->y + 10) != NULL);
     layout_free(&l);
     doc_free(d);
 }
@@ -2932,14 +3231,18 @@ int main(void)
     test_syntax_lines();
     test_syntax_parse();
     test_mouse();
+    test_mouse_borders();
+    test_resize_mode();
     test_syntax_detect();
     test_syntax_langs();
+    test_syntax_embed();
     test_syntax_detect_langs();
     test_syntax_incremental();
     test_syntax_brackets();
     test_theme();
     test_fuzzy_picker();
     test_layout();
+    test_layout_resize();
     test_docs();
     test_files_tree();
     test_session();

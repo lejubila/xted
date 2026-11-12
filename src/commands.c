@@ -32,6 +32,8 @@ const Command commands[] = {
     { "quit", "Esci", "ctrl+q", editor_cmd_quit, 0, 0 },
     { "split_v", "Dividi pannello in verticale", "alt+\\", editor_cmd_split_v, 0, 0 },
     { "split_h", "Dividi pannello in orizzontale", "alt+-", editor_cmd_split_h, 0, 0 },
+    { "resize_mode", "Ridimensiona i pannelli", "alt+e", editor_cmd_resize_mode, 0, 0 },
+    { "equalize_wins", "Pareggia i pannelli", "", editor_cmd_equalize, 0, 0 },
     { "close_win", "Chiudi pannello", "alt+q", editor_cmd_close_win, 0, 0 },
     { "next_win", "Pannello successivo", "alt+o", editor_cmd_next_win, 0, 0 },
     { "prev_win", "Pannello precedente", "alt+left", editor_cmd_prev_win, 0, 0 },
