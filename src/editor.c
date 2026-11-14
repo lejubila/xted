@@ -229,6 +229,7 @@ void editor_free(Editor *e)
         doc_free(e->docs[i]);
     free(e->docs);
     picker_free(&e->picker);
+    free(e->outline);
     find_free(e);
     complete_free(&e->comp);
     cur_clear(e);
@@ -1190,6 +1191,69 @@ static void cmd_buffers(Editor *e)
     picker_select_item(&e->picker, doc_index(e, e->doc));
 }
 
+typedef struct {
+    Editor *e;
+    size_t cap;
+} OutCtx;
+
+static void outline_cb(void *ctx, int kind, const char *name, const char *sig, size_t y, size_t x)
+{
+    OutCtx *o = ctx;
+    Editor *e = o->e;
+    SBuf b = SBUF_INIT;
+    static const char tag[] = { 'c', 'f', 'm', 'p', 'k' };
+
+    /* RULE_CLASS, RULE_FUNC, RULE_METHOD, RULE_PROP, RULE_CONST in this order */
+    sbuf_addf(&b, "%c  %s", kind >= RULE_CLASS && kind <= RULE_CONST ? tag[kind - RULE_CLASS] : '?',
+              name);
+    if ((kind == RULE_FUNC || kind == RULE_METHOD) && strlen(sig) < 48)
+        sbuf_addf(&b, "(%s)", sig);
+    else if (kind == RULE_FUNC || kind == RULE_METHOD)
+        sbuf_adds(&b, "(...)");
+    sbuf_addf(&b, "   :%zu", y + 1);
+    sbuf_add(&b, "", 1);
+    picker_add(&e->picker, b.p);
+    sbuf_free(&b);
+    if (e->noutline == o->cap) {
+        o->cap = o->cap ? o->cap * 2 : 64;
+        e->outline = xrealloc(e->outline, o->cap * 2 * sizeof *e->outline);
+    }
+    e->outline[2 * e->noutline] = y;
+    e->outline[2 * e->noutline + 1] = x;
+    e->noutline++;
+}
+
+static void cmd_symbols(Editor *e)
+{
+    OutCtx o;
+
+    o.e = e;
+    o.cap = e->noutline = 0;
+    free(e->outline);
+    e->outline = NULL;
+    picker_open(&e->picker, "Simboli");
+    e->picker_kind = PK_SYMBOLS;
+    if (!e->comp.sc)
+        e->comp.sc = sym_cache_new();
+    sym_budget(e->comp.sc, 0);
+    sym_outline(e->comp.sc, e->doc, outline_cb, &o);
+    if (e->picker.nitems == 0) {
+        picker_close(&e->picker);
+        editor_set_msg(e, MSG_TTL_MS, "Nessun simbolo in questo file");
+        return;
+    }
+    picker_filter(&e->picker);
+    /* start on the last definition at or above the cursor */
+    {
+        size_t k, best = 0;
+
+        for (k = 0; k < e->noutline; k++)
+            if (e->outline[2 * k] <= e->cy)
+                best = k;
+        picker_select_item(&e->picker, best);
+    }
+}
+
 static void cmd_quick_open(Editor *e)
 {
     picker_open(&e->picker, "File");
@@ -1213,6 +1277,16 @@ static void picker_accept(Editor *e)
             switch_doc(e, e->docs[idx]);
     } else if (kind == PK_RESULTS) {
         find_open_result(e, (size_t)idx);
+    } else if (kind == PK_SYMBOLS) {
+        if ((size_t)idx < e->noutline && e->outline[2 * idx] < e->buf->nlines) {
+            buf_undo_close(e->buf);
+            e->cy = e->outline[2 * idx];
+            e->cx = e->outline[2 * idx + 1];
+            if (e->cx > e->buf->lines[e->cy].len)
+                e->cx = e->buf->lines[e->cy].len;
+            e->want_col = editor_cursor_col(e);
+            e->sel_on = 0;
+        }
     } else if (kind == PK_TAGS) {
         find_open_tag(e, (size_t)idx);
     } else if (kind == PK_COMMANDS) {
@@ -2091,6 +2165,7 @@ void editor_cmd_save_all(Editor *e) { cmd_save_all(e); }
 void editor_cmd_open(Editor *e) { cmd_open(e); }
 void editor_cmd_quick_open(Editor *e) { cmd_quick_open(e); }
 void editor_cmd_buffers(Editor *e) { cmd_buffers(e); }
+void editor_cmd_symbols(Editor *e) { cmd_symbols(e); }
 void editor_cmd_close_buffer(Editor *e) { cmd_close_buffer(e); }
 void editor_cmd_quit(Editor *e) { cmd_quit(e); }
 void editor_cmd_next_buffer(Editor *e) { cycle_doc(e, 1); }

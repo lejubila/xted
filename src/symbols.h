@@ -129,4 +129,12 @@ int sym_call_hint(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
  * (only up to byte xlimit of line y), reported as RULE_VAR with no signature. */
 void sym_locals(SymCache *c, Doc *cur, size_t y, size_t xlimit, SymFn fn, void *ctx);
 
+/* The definitions of the document (classes, functions, methods, properties, constants) in file
+ * order, as kind (RULE_*), name (members qualified by their class), parameters, and where the
+ * name is (line, byte). Members that only a doc comment declares are left out. Returns how
+ * many. */
+typedef void (*OutlineFn)(void *ctx, int kind, const char *name, const char *sig, size_t y,
+                          size_t x);
+int sym_outline(SymCache *c, Doc *cur, OutlineFn fn, void *ctx);
+
 #endif

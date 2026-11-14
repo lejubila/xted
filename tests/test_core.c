@@ -3746,6 +3746,69 @@ static void test_params(void)
     sym_cache_free(c);
 }
 
+/* The outline of a file: definitions in file order, no doc-comment members or attributes. */
+static char out_text[1024];
+
+static void out_cb(void *ctx, int kind, const char *name, const char *sig, size_t y, size_t x)
+{
+    char one[160];
+
+    (void)ctx;
+    snprintf(one, sizeof one, "%d:%s(%s)@%zu,%zu ", kind, name, sig, y, x);
+    strcat(out_text, one);
+}
+
+static void test_outline(void)
+{
+    char dir[64], path[128], err[128];
+    Doc d;
+    SymCache *c = sym_cache_new();
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "o.php",
+             "<?php\n"
+             "/**\n"
+             " * @method static Foo make()\n"
+             " */\n"
+             "class Thing extends Base\n"
+             "{\n"
+             "    const MAX = 3;\n"
+             "    public $level = 1;\n"
+             "    public function run(int $n)\n"
+             "    {\n"
+             "        $this->extra = 1;\n"
+             "    }\n"
+             "}\n"
+             "function helper($a, $b) {}\n");
+    snprintf(path, sizeof path, "%s/o.php", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    out_text[0] = '\0';
+    CHECK(sym_outline(c, &d, out_cb, NULL) == 5);
+    CHECK(strstr(out_text, "0:Thing()@4,6") != NULL);                  /* the class, on its line */
+    CHECK(strstr(out_text, "2:Thing::run(int $n)@8,20") != NULL);
+    CHECK(strstr(out_text, "1:helper($a, $b)@13,9") != NULL);
+    CHECK(strstr(out_text, "make") == NULL && strstr(out_text, "extra") == NULL);
+    CHECK(strstr(out_text, "Thing::MAX") != NULL && strstr(out_text, "Thing::level") != NULL);
+    /* file order: the class before its members before the function */
+    CHECK(strstr(out_text, "0:Thing") < strstr(out_text, "Thing::run") &&
+          strstr(out_text, "Thing::run") < strstr(out_text, "1:helper"));
+    syn_free(d.syn);
+    buf_free(&d.buf);
+    sym_cache_free(c);
+    c = sym_cache_new();
+    put_file(dir, "o.py", "class K:\n    def go(self, a):\n        pass\n\ndef free():\n    x = 1\n");
+    snprintf(path, sizeof path, "%s/o.py", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    out_text[0] = '\0';
+    CHECK(sym_outline(c, &d, out_cb, NULL) == 3);
+    CHECK(strstr(out_text, "K.go(a)@1,8") != NULL && strstr(out_text, "free()@4,4") != NULL);
+    syn_free(d.syn);
+    buf_free(&d.buf);
+    sym_cache_free(c);
+}
+
 /* Names longer than any keyword (13+ letters) are still classes, methods and types. */
 static void test_long_names(void)
 {
@@ -4352,6 +4415,7 @@ int main(void)
     test_symbols();
     test_call_body();
     test_params();
+    test_outline();
     test_long_names();
     test_alias_static();
     test_laravel();

@@ -44,6 +44,7 @@ const Command commands[] = {
     { "find_next", "Occorrenza successiva", "f3", c_next, 0, 0 },
     { "find_prev", "Occorrenza precedente", "shift+f3", c_prev, 0, 0 },
     { "goto_line", "Vai alla riga", "ctrl+g", find_goto, 0, 0 },
+    { "symbols", "Vai al simbolo", "ctrl+t", editor_cmd_symbols, 0, 0 },
     { "undo", "Annulla", "ctrl+z", edit_undo, 1, 0 },
     { "redo", "Ripeti", "ctrl+y", edit_redo, 1, 0 },
     { "select_all", "Seleziona tutto", "ctrl+a", edit_select_all, 0, 0 },

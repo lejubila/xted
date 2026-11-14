@@ -4,7 +4,7 @@ Nov 7, 2026 · @David
 
 ## Obiettivi e vincoli
 
-Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 420 KB, avvio sotto 50 ms.
+Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 440 KB, avvio sotto 50 ms.
 
 - **Zero dipendenze**: niente ncurses, niente librerie esterne; controllo del terminale via termios e sequenze ANSI/VT100 scritte a mano.
 - **Linguaggio**: C99 (alternativa: Rust senza crate esterni, ma binario più grande).
@@ -80,6 +80,7 @@ Evidenziazione, indentazione e suggerimenti sono tutti interni: nessun language 
 ### Aiuti alla scrittura
 
 - **Parentesi**: evidenziazione della coppia corrispondente, salto alla parentesi corrispondente, chiusura automatica di parentesi e virgolette.
+- **Vai al simbolo** (Ctrl+T, comando `symbols`): elenco filtrabile (fuzzy) di classi, funzioni, metodi, proprietà e costanti del file, nell'ordine in cui compaiono, con i membri qualificati dalla classe e i parametri; Invio porta il cursore sul nome. Non elenca i membri dichiarati solo in un commento (`@method`) né gli attributi creati da assegnazioni (`$this->x = …`). Parte dalla definizione sopra il cursore.
 - **Autosuggest/autocompletamento**: popup con parole presenti in tutti i buffer aperti, parole chiave del linguaggio e snippet; filtro fuzzy, selezione con Tab/Invio (Invio sceglie la voce evidenziata, la prima se non ci si è mossi; dentro uno snippet Tab passa al segnaposto successivo e accetta solo dopo una scelta con le frecce). Dentro le parentesi di una chiamata e nel corpo di una funzione le variabili locali e i parametri della funzione (PHP, Python, JS/TS, C) hanno la precedenza (lettera `v`); nella dichiarazione dei parametri, dove va il tipo (`function f(Us|`, `int f(Poi|`, `def f(x: in|`), si propongono solo tipi e classi. Per una chiamata a una funzione o a un metodo noti la barra di stato mostra la firma con il parametro corrente tra parentesi quadre.
 - **Snippet** con segnaposti navigabili (es. `for` → ciclo completo).
 - **Code folding** basato su indentazione o parentesi.

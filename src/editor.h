@@ -25,7 +25,7 @@
 #define MSG_TTL_MS 5000
 #define SIDEBAR_W 28
 
-enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS, PK_COMMANDS, PK_TAGS };
+enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS, PK_COMMANDS, PK_TAGS, PK_SYMBOLS };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -118,6 +118,8 @@ typedef struct Editor {
     size_t nxc, xc_cap;
     int undo_hold;          /* inside cur_each: one undo group for all cursors */
     int picker_kind;        /* PK_* */
+    size_t *outline;        /* PK_SYMBOLS: line and byte of each item (pairs) */
+    size_t noutline;
 
     /* the active pane's view, live: it is copied into the pane when focus moves */
     size_t cy, cx;          /* cursor: line, byte offset in the line */
@@ -220,6 +222,7 @@ void editor_cmd_save_all(Editor *e);
 void editor_cmd_open(Editor *e);
 void editor_cmd_quick_open(Editor *e);
 void editor_cmd_buffers(Editor *e);
+void editor_cmd_symbols(Editor *e);
 void editor_cmd_close_buffer(Editor *e);
 void editor_cmd_quit(Editor *e);
 void editor_cmd_next_buffer(Editor *e);

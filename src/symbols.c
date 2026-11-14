@@ -3092,3 +3092,86 @@ void sym_locals(SymCache *c, Doc *cur, size_t y, size_t xlimit, SymFn fn, void *
         local_line(fam, l->s, k == y && xlimit < l->len ? xlimit : l->len, cl, fn, ctx);
     }
 }
+
+/* ---- outline of a file --------------------------------------------------- */
+
+typedef struct {
+    const Sym *s;
+    size_t y, x;
+} OutRow;
+
+static int out_cmp(const void *pa, const void *pb)
+{
+    const OutRow *a = pa, *b = pb;
+
+    if (a->y != b->y)
+        return a->y < b->y ? -1 : 1;
+    return a->x < b->x ? -1 : a->x > b->x;
+}
+
+/* Where the name of s starts on its line, as a whole word; (size_t)-1 if it is not there as
+ * code (a member made up by a doc comment, or reached through an object: "$this->x = "). */
+static size_t name_pos(Syntax *syn, const Buffer *b, const Sym *s)
+{
+    const Line *l;
+    const uint8_t *cl;
+    size_t n = strlen(s->name), i;
+
+    if (s->y0 >= b->nlines || n == 0)
+        return (size_t)-1;
+    l = &b->lines[s->y0];
+    syn_update(syn, (Buffer *)b, s->y0);
+    cl = syn_classes(syn, b, s->y0);
+    for (i = 0; i + n <= l->len; i++) {
+        if (memcmp(l->s + i, s->name, n) != 0 || (i > 0 && is_idc((unsigned char)l->s[i - 1])) ||
+            (i + n < l->len && is_idc((unsigned char)l->s[i + n])))
+            continue;
+        if (cl_skip(cl, i))
+            continue;
+        if (s->kind == RULE_PROP && i > 0 && (l->s[i - 1] == '>' || l->s[i - 1] == '.'))
+            return (size_t)-1;
+        return i;
+    }
+    return (size_t)-1;
+}
+
+int sym_outline(SymCache *c, Doc *cur, OutlineFn fn, void *ctx)
+{
+    const SymIndex *x;
+    OutRow *rows;
+    size_t i, n = 0;
+    const char *sep;
+
+    if (!cur->syn || syn_rule_count(cur->syn) == 0)
+        return 0;
+    x = index_of_doc(c, cur);
+    rows = xmalloc((x->n + 1) * sizeof *rows);
+    for (i = 0; i < x->n; i++) {
+        const Sym *s = &x->v[i];
+        size_t col;
+
+        if (!s->name[0] || s->kind == RULE_VAR)
+            continue;
+        col = name_pos(cur->syn, &cur->buf, s);
+        if (col == (size_t)-1)
+            continue;
+        rows[n].s = s;
+        rows[n].y = s->y0;
+        rows[n].x = col;
+        n++;
+    }
+    qsort(rows, n, sizeof *rows, out_cmp);
+    sep = strncmp(syn_name(cur->syn), "PHP", 3) == 0 ? "::" : ".";
+    for (i = 0; i < n; i++) {
+        const Sym *s = rows[i].s;
+        char q[2 * PM_NAME + 4];
+
+        if (s->owner >= 0 && (size_t)s->owner < x->n && x->v[s->owner].name[0])
+            snprintf(q, sizeof q, "%s%s%s", x->v[s->owner].name, sep, s->name);
+        else
+            snprintf(q, sizeof q, "%s", s->name);
+        fn(ctx, s->kind, q, s->sig, rows[i].y, rows[i].x);
+    }
+    free(rows);
+    return (int)n;
+}
