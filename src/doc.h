@@ -17,6 +17,14 @@ typedef struct {
     size_t ay, ax;
 } View;
 
+/* An indentation style found in the file or chosen with a command. */
+typedef struct {
+    int set;                /* the fields below mean something */
+    int expand;             /* spaces rather than tab characters */
+    int width;              /* spaces of a level (when expand) */
+    int tabw;               /* tab width to draw, 0: not decided */
+} IndentStyle;
+
 /* An open file: its text, language and what we know about it on disk. */
 typedef struct Doc {
     Buffer buf;
@@ -25,9 +33,13 @@ typedef struct Doc {
     int gutter;             /* a margin column shows the Git marks of Line.git */
     int tabw;               /* tab width, from the configuration for this language */
     int expand_tab;         /* Tab inserts spaces */
+    int indent_w;           /* spaces of one indentation level (with expand_tab, else tabw) */
+    IndentStyle det;        /* the style the text itself has (indent_detect) */
+    IndentStyle man;        /* chosen by the user with a command: wins over everything */
     int trim_space;         /* strip trailing blanks on save */
     int final_nl;           /* always end the file with a newline on save */
     int autosuggest;
+    int autopair;
     int suggest_min;
     char *title;            /* name shown instead of a file name (scratch documents) */
     int scratch;            /* not a file: never saved, kept out of sessions and exit checks */

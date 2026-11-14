@@ -13,7 +13,9 @@ Doc *doc_new(void)
     memset(d, 0, sizeof *d);
     buf_init(&d->buf);
     d->tabw = 8;
+    d->indent_w = 8;
     d->autosuggest = 1;
+    d->autopair = 1;
     d->suggest_min = 2;
     return d;
 }

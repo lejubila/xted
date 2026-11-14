@@ -27,12 +27,21 @@ void edit_select_word(Editor *e);
 /* ---- typing; a selection is replaced ---- */
 
 void edit_insert_cp(Editor *e, uint32_t cp);
+/* A typed character with the automatic pairs (see autopair): an opening bracket or quote adds
+ * the closing one, a closing one already there is stepped over, a selection is wrapped.
+ * Returns 1 if it handled the character; otherwise the caller inserts it. */
+int edit_type(Editor *e, uint32_t cp);
+/* Backspace inside an empty pair, "(|)", removes both characters. Returns 1 if it did. */
+int edit_backspace_pair(Editor *e);
 /* Keeps the indentation of the current line, up to the cursor. */
 void edit_newline(Editor *e);
 void edit_backspace(Editor *e);
 void edit_delete(Editor *e);
 /* Tab indents the selected lines, or inserts a tab without selection. */
 void edit_tab(Editor *e);
+/* Rewrites the indentation of all lines with tab characters (cols_per_tab columns each) or with
+ * spaces, keeping its width. Returns how many lines changed. One undo step. */
+size_t edit_convert_indent(Editor *e, int to_tabs, size_t cols_per_tab);
 /* Removes one tab (or up to tabw spaces) from the start of the selected lines. */
 void edit_dedent(Editor *e);
 

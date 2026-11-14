@@ -2,6 +2,8 @@
 #include "edit.h"
 #include "commands.h"
 #include "config.h"
+#include "editorconfig.h"
+#include "indent.h"
 #include "cursors.h"
 #include "find.h"
 #include "fold.h"
@@ -274,12 +276,45 @@ static int is_blank_doc(const Doc *d)
 static void apply_cfg(Editor *e, Doc *d)
 {
     LangCfg l = config_lang(&e->cfg, d->syn ? syn_name(d->syn) : NULL);
+    EcProps ec;
+    int tabw = l.tab_width, expand = l.expand_tab, iw = l.indent_width;
+    int trim = l.trim_trailing_space, final_nl = l.final_newline;
 
-    d->tabw = l.tab_width;
-    d->expand_tab = l.expand_tab;
-    d->trim_space = l.trim_trailing_space;
-    d->final_nl = l.final_newline;
+    /* what the user asked for in the configuration wins, then .editorconfig, then the style
+     * the file has, then the defaults; a command given in this session wins over all */
+    if (d->det.set && !(l.set & CFG_EXPAND_TAB)) {
+        expand = d->det.expand;
+        if (!(l.set & CFG_INDENT_WIDTH) && d->det.expand)
+            iw = d->det.width;
+    }
+    if (!d->scratch && editorconfig_lookup(d->buf.path, &ec) > 0) {
+        if (ec.expand >= 0 && !(l.set & CFG_EXPAND_TAB))
+            expand = ec.expand;
+        if (ec.size > 0 && !(l.set & CFG_INDENT_WIDTH))
+            iw = ec.size;
+        if (ec.tab_width > 0 && !(l.set & CFG_TAB_WIDTH))
+            tabw = ec.tab_width;
+        else if (ec.size > 0 && ec.expand == 1 && !(l.set & CFG_TAB_WIDTH))
+            tabw = ec.size;
+        if (ec.trim >= 0 && !(l.set & CFG_TRIM))
+            trim = ec.trim;
+        if (ec.final_nl >= 0 && !(l.set & CFG_FINAL_NL))
+            final_nl = ec.final_nl;
+    }
+    if (d->man.set) {
+        expand = d->man.expand;
+        if (d->man.width > 0)
+            iw = d->man.width;
+        if (d->man.tabw > 0)
+            tabw = d->man.tabw;
+    }
+    d->tabw = tabw;
+    d->expand_tab = expand;
+    d->indent_w = iw > 0 ? iw : tabw;
+    d->trim_space = trim;
+    d->final_nl = final_nl;
     d->autosuggest = l.autosuggest;
+    d->autopair = l.autopair;
     d->suggest_min = l.suggest_min;
     if (d == e->doc)
         e->tabw = d->tabw;
@@ -390,8 +425,21 @@ void editor_cmd_git(Editor *e)
     }
 }
 
+/* Looks at the text for its indentation style (Doc.det). Returns whether it found one. */
+static int detect_indent(Doc *d)
+{
+    int tabs = 0, width = 0;
+
+    d->det.set = indent_detect(&d->buf, &tabs, &width);
+    d->det.expand = !tabs;
+    d->det.width = width;
+    return d->det.set;
+}
+
 static Doc *install_doc(Editor *e, Doc *d)
 {
+    if (!d->scratch && d->buf.nlines > 1)
+        detect_indent(d);
     apply_cfg(e, d);
     git_refresh_doc(e, d);
     Doc *cur = e->doc;
@@ -1576,7 +1624,8 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         break;
     case KEY_BACKSPACE:
     case 8:
-        edit_backspace(e);
+        if (!edit_backspace_pair(e))
+            edit_backspace(e);
         break;
     case KEY_DEL:
         edit_delete(e);
@@ -1601,7 +1650,7 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         break;
     }
     default:
-        if (is_printable(k.code))
+        if (is_printable(k.code) && !edit_type(e, k.code))
             edit_insert_cp(e, k.code);
         break;
     }
@@ -2029,6 +2078,68 @@ void editor_cmd_match(Editor *e)
     } else {
         editor_set_msg(e, MSG_TTL_MS, "Nessuna parentesi corrispondente");
     }
+}
+
+/* ---- indentation commands ---------------------------------------------- */
+
+/* The user chose the style: it wins over the configuration, .editorconfig and the file. */
+static void set_indent(Editor *e, int expand, int width)
+{
+    Doc *d = e->doc;
+
+    d->man.set = 1;
+    d->man.expand = expand;
+    d->man.width = width;
+    d->man.tabw = 0;
+    apply_cfg(e, d);
+    render_invalidate(e->render);
+    if (expand)
+        editor_set_msg(e, MSG_TTL_MS, "Indentazione: %d spazi", d->indent_w);
+    else
+        editor_set_msg(e, MSG_TTL_MS, "Indentazione: tabulatore (larghezza %d)", d->tabw);
+}
+
+void editor_cmd_indent_tabs(Editor *e) { set_indent(e, 0, 0); }
+void editor_cmd_indent_spaces2(Editor *e) { set_indent(e, 1, 2); }
+void editor_cmd_indent_spaces4(Editor *e) { set_indent(e, 1, 4); }
+void editor_cmd_indent_spaces8(Editor *e) { set_indent(e, 1, 8); }
+
+/* Spaces to tab characters, or the opposite, keeping how the text looks: the tab is drawn as
+ * wide as one level of the old indentation. */
+static void convert_indent(Editor *e, int to_tabs)
+{
+    Doc *d = e->doc;
+    int level = d->expand_tab ? d->indent_w : d->tabw;
+    size_t n = edit_convert_indent(e, to_tabs, (size_t)level);
+
+    d->man.set = 1;
+    d->man.expand = !to_tabs;
+    d->man.width = to_tabs ? 0 : level;
+    d->man.tabw = to_tabs ? level : d->tabw;
+    apply_cfg(e, d);
+    render_invalidate(e->render);
+    editor_set_msg(e, MSG_TTL_MS, "%zu righe: indentazione con %s", n,
+                   to_tabs ? "tabulatori" : "spazi");
+}
+
+void editor_cmd_indent_to_tabs(Editor *e) { convert_indent(e, 1); }
+void editor_cmd_indent_to_spaces(Editor *e) { convert_indent(e, 0); }
+
+void editor_cmd_indent_detect(Editor *e)
+{
+    Doc *d = e->doc;
+
+    memset(&d->man, 0, sizeof d->man);
+    if (detect_indent(d)) {
+        apply_cfg(e, d);
+        editor_set_msg(e, MSG_TTL_MS, d->expand_tab ? "Indentazione rilevata: %d spazi"
+                                                    : "Indentazione rilevata: tabulatore (%d)",
+                       d->expand_tab ? d->indent_w : d->tabw);
+    } else {
+        apply_cfg(e, d);
+        editor_set_msg(e, MSG_TTL_MS, "Indentazione non riconoscibile: valgono le impostazioni");
+    }
+    render_invalidate(e->render);
 }
 
 void editor_cmd_theme(Editor *e)

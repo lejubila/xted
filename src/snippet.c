@@ -44,12 +44,12 @@ static const SnipDef snips_js[] = {
 
 static const SnipDef snips_php[] = {
     { "for", "for ($i = 0; $i < ${1:$n}; $i++) {\n\t$0\n}" },
-    { "foreach", "foreach ($${1:items} as $${2:item}) {\n\t$0\n}" },
+    { "foreach", "foreach ($$${1:items} as $$${2:item}) {\n\t$0\n}" },
     { "if", "if (${1:cond}) {\n\t$0\n}" },
     { "ife", "if (${1:cond}) {\n\t$2\n} else {\n\t$0\n}" },
     { "function", "function ${1:name}(${2:$args}) {\n\t$0\n}" },
     { "class", "class ${1:Name}\n{\n\tpublic function __construct(${2:})\n\t{\n\t\t$0\n\t}\n}" },
-    { "try", "try {\n\t$1\n} catch (${2:Exception} $${3:e}) {\n\t$0\n}" },
+    { "try", "try {\n\t$1\n} catch (${2:Exception} $$${3:e}) {\n\t$0\n}" },
     { "echo", "echo ${1:$value};$0" },
     { "php", "<?php\n\n$0" },
 };

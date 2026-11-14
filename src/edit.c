@@ -57,6 +57,20 @@ static void finish(Editor *e)
         buf_undo_close(e->buf);
 }
 
+/* One level of indentation of the document: a tab character, or indent_w spaces. */
+static size_t indent_unit(const Editor *e, char *unit)
+{
+    size_t n, w = e->doc->indent_w > 0 && e->doc->indent_w <= 16 ? (size_t)e->doc->indent_w : 8;
+
+    if (!e->doc->expand_tab) {
+        unit[0] = '\t';
+        return 1;
+    }
+    for (n = 0; n < w; n++)
+        unit[n] = ' ';
+    return n;
+}
+
 /* ---- selection --------------------------------------------------------- */
 
 int edit_sel_active(const Editor *e)
@@ -213,9 +227,157 @@ void edit_insert_cp(Editor *e, uint32_t cp)
     done(e);
 }
 
+/* ---- automatic pairs ---------------------------------------------------- */
+
+/* The closing character for an opening one that this document pairs, 0 if none. Quotes are for
+ * code, not prose; a Rust quote is also a lifetime; the backtick is a string or code marker
+ * only in some languages. */
+static char pair_closer(const Editor *e, uint32_t cp)
+{
+    const char *lang = e->doc->syn ? syn_name(e->doc->syn) : NULL;
+
+    if (!e->doc->autopair || cp > 126)
+        return 0;
+    switch (cp) {
+    case '(':
+        return ')';
+    case '[':
+        return ']';
+    case '{':
+        return '}';
+    case '"':
+        return lang && strcmp(lang, "Markdown") != 0 && strcmp(lang, "Diff") != 0 ? '"' : 0;
+    case '\'':
+        return lang && strcmp(lang, "Markdown") != 0 && strcmp(lang, "Diff") != 0 &&
+                       strcmp(lang, "Rust") != 0 ? '\'' : 0;
+    case '`':
+        return lang && (strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0 ||
+                        strcmp(lang, "Markdown") == 0 || strcmp(lang, "Shell") == 0) ? '`' : 0;
+    default:
+        return 0;
+    }
+}
+
+/* Pairs are not made with several cursors, in a snippet or in a read-only document. */
+static int pairing_allowed(const Editor *e)
+{
+    return !cur_multi(e) && !e->snip.on && !e->doc->readonly;
+}
+
+/* Is the cursor inside a string or a comment (a quote typed there is a character)? */
+static int in_string_or_comment(Editor *e)
+{
+    Syntax *s = e->doc->syn;
+    const uint8_t *cls;
+    const Line *l = cur_line(e);
+
+    if (!s || e->cx == 0 || l->len == 0)
+        return 0;
+    syn_update(s, e->buf, e->cy);
+    cls = syn_classes(s, e->buf, e->cy);
+    if (!cls)
+        return 0;
+    if (cls[e->cx - 1] == SC_COMMENT)
+        return 1;
+    if (cls[e->cx - 1] != SC_STRING)
+        return 0;
+    if (e->cx < l->len)
+        return cls[e->cx] == SC_STRING;
+    {
+        /* at the end of the line: after the closing quote of a string, or still in it */
+        size_t r = e->cx - 1;
+        char q = l->s[e->cx - 1];
+
+        while (r > 0 && cls[r - 1] == SC_STRING)
+            r--;
+        return !((q == '"' || q == '\'' || q == '`') && r < e->cx - 1 && l->s[r] == q);
+    }
+}
+
+static int word_byte(unsigned char c)
+{
+    return isalnum(c) || c == '_' || c >= 0x80;
+}
+
+int edit_type(Editor *e, uint32_t cp)
+{
+    const Line *l;
+    char close = pair_closer(e, cp), open = (char)cp;
+    unsigned char next, prev;
+    size_t y0, x0, y1, x1;
+
+    if (!pairing_allowed(e) || cp > 126)
+        return 0;
+    l = cur_line(e);
+    next = e->cx < l->len ? (unsigned char)l->s[e->cx] : 0;
+    prev = e->cx > 0 ? (unsigned char)l->s[e->cx - 1] : 0;
+
+    /* the closing character that is already there is stepped over */
+    if (!edit_sel_active(e) && next == cp && e->doc->autopair &&
+        (cp == ')' || cp == ']' || cp == '}' || (close && close == open))) {
+        e->cx++;
+        return 1;
+    }
+    if (!close)
+        return 0;
+    if (edit_sel_active(e)) {
+        /* the selection is wrapped and stays selected */
+        begin(e);
+        edit_sel_range(e, &y0, &x0, &y1, &x1);
+        buf_insert(e->buf, y1, x1, &close, 1);
+        buf_insert(e->buf, y0, x0, &open, 1);
+        e->ay = y0;
+        e->ax = x0 + 1;
+        e->cy = y1;
+        e->cx = y0 == y1 ? x1 + 1 : x1;
+        e->sel_on = 1;
+        done(e);
+        return 1;
+    }
+    if (next && !isspace(next) && next != ')' && next != ']' && next != '}')
+        return 0;
+    if (close == open && (prev == (unsigned char)open || (open == '\'' && word_byte(prev))))
+        return 0;
+    if (in_string_or_comment(e))
+        return 0;
+    begin(e);
+    {
+        char both[2];
+
+        both[0] = open;
+        both[1] = close;
+        buf_insert(e->buf, e->cy, e->cx, both, 2);
+    }
+    e->cx++;
+    done(e);
+    return 1;
+}
+
+/* Backspace between the two characters of an empty pair removes both. */
+int edit_backspace_pair(Editor *e)
+{
+    const Line *l;
+    char close;
+
+    if (!pairing_allowed(e) || edit_sel_active(e) || e->cx == 0)
+        return 0;
+    l = cur_line(e);
+    if (e->cx >= l->len)
+        return 0;
+    close = pair_closer(e, (unsigned char)l->s[e->cx - 1]);
+    if (!close || l->s[e->cx] != close)
+        return 0;
+    begin(e);
+    buf_delete(e->buf, e->cy, e->cx - 1, 2);
+    e->cx--;
+    done(e);
+    return 1;
+}
+
 void edit_newline(Editor *e)
 {
     size_t n = 0;
+    int between;
     const Line *l;
 
     begin(e);
@@ -223,6 +385,10 @@ void edit_newline(Editor *e)
     l = cur_line(e);
     while (n < l->len && n < e->cx && is_blank(l->s[n]))
         n++;
+    between = pairing_allowed(e) && e->cx > 0 && e->cx < l->len && e->doc->autopair &&
+              ((l->s[e->cx - 1] == '{' && l->s[e->cx] == '}') ||
+               (l->s[e->cx - 1] == '(' && l->s[e->cx] == ')') ||
+               (l->s[e->cx - 1] == '[' && l->s[e->cx] == ']'));
     buf_split(e->buf, e->cy, e->cx);
     e->cy++;
     e->cx = 0;
@@ -232,6 +398,17 @@ void edit_newline(Editor *e)
 
         buf_insert(e->buf, e->cy, 0, prev->s, n);
         e->cx = n;
+    }
+    if (between) {
+        /* {|} becomes the brace on a line of its own and the cursor on an indented one */
+        char unit[17];
+        size_t ul = indent_unit(e, unit);
+
+        buf_split(e->buf, e->cy, e->cx);
+        if (n > 0)
+            buf_insert(e->buf, e->cy + 1, 0, e->buf->lines[e->cy - 1].s, n);
+        buf_insert(e->buf, e->cy, e->cx, unit, ul);
+        e->cx += ul;
     }
     finish(e);
 }
@@ -278,8 +455,9 @@ void edit_tab(Editor *e)
 
     if (!edit_sel_active(e)) {
         if (e->doc->expand_tab) {
-            /* spaces up to the next tab stop */
-            size_t col = editor_cursor_col(e), n = (size_t)e->tabw - col % (size_t)e->tabw;
+            /* spaces up to the next indentation stop */
+            size_t iw = (size_t)(e->doc->indent_w > 0 ? e->doc->indent_w : 8);
+            size_t col = editor_cursor_col(e), n = iw - col % iw;
 
             begin(e);
             e->sel_on = 0;
@@ -296,8 +474,8 @@ void edit_tab(Editor *e)
     sel_lines(e, &a, &b);
     begin(e);
     {
-        const char *unit = e->doc->expand_tab ? "                " : "\t";
-        size_t ulen = e->doc->expand_tab ? (size_t)e->tabw : 1;
+        char unit[17];
+        size_t ulen = indent_unit(e, unit);
 
         for (k = a; k <= b; k++)
             buf_insert(e->buf, k, 0, unit, ulen);
@@ -323,7 +501,8 @@ void edit_dedent(Editor *e)
         if (l->len > 0 && l->s[0] == '\t')
             r = 1;
         else
-            while (r < l->len && r < (size_t)e->tabw && l->s[r] == ' ')
+            while (r < l->len && r < (size_t)(e->doc->indent_w > 0 ? e->doc->indent_w : 8) &&
+                   l->s[r] == ' ')
                 r++;
         if (r == 0)
             continue;
@@ -334,6 +513,54 @@ void edit_dedent(Editor *e)
             e->ax = e->ax > r ? e->ax - r : 0;
     }
     finish(e);
+}
+
+/* Rewrites the indentation of every line: tab characters (cols_per_tab columns each) or spaces,
+ * keeping its width in columns, measured with the document's tab width. Returns the number of
+ * lines changed. */
+size_t edit_convert_indent(Editor *e, int to_tabs, size_t cols_per_tab)
+{
+    size_t k, changed = 0, tabw = e->tabw > 0 ? (size_t)e->tabw : 8;
+
+    if (cols_per_tab == 0)
+        cols_per_tab = tabw;
+    begin(e);
+    for (k = 0; k < e->buf->nlines; k++) {
+        const Line *l = &e->buf->lines[k];
+        size_t lead = 0, width = 0, nl, tabs = 0, spaces;
+        char *repl;
+
+        while (lead < l->len && (l->s[lead] == ' ' || l->s[lead] == '\t')) {
+            width += l->s[lead] == '\t' ? tabw - width % tabw : 1;
+            lead++;
+        }
+        if (lead == 0 || lead == l->len)
+            continue;                       /* not indented, or only blanks */
+        if (to_tabs) {
+            tabs = width / cols_per_tab;
+            spaces = width % cols_per_tab;
+        } else {
+            spaces = width;
+        }
+        nl = tabs + spaces;
+        repl = xmalloc(nl + 1);
+        memset(repl, '\t', tabs);
+        memset(repl + tabs, ' ', spaces);
+        if (nl == lead && memcmp(repl, l->s, lead) == 0) {
+            free(repl);
+            continue;
+        }
+        buf_delete(e->buf, k, 0, lead);
+        buf_insert(e->buf, k, 0, repl, nl);
+        free(repl);
+        changed++;
+        if (e->cy == k)
+            e->cx = e->cx >= lead ? e->cx - lead + nl : (e->cx < nl ? e->cx : nl);
+        if (e->sel_on && e->ay == k)
+            e->ax = e->ax >= lead ? e->ax - lead + nl : (e->ax < nl ? e->ax : nl);
+    }
+    finish(e);
+    return changed;
 }
 
 /* ---- clipboard --------------------------------------------------------- */
@@ -967,7 +1194,23 @@ void edit_expand_snippet(Editor *e, size_t from_x, const SnipDef *d)
         char *ind = xmalloc(indent + 1);
 
         memcpy(ind, l->s, indent);
-        snip_parse(d->body, &raw, &st);
+        {
+            /* the tabs of the body are one level of the document's own indentation */
+            SBuf body = SBUF_INIT;
+            char unit[17];
+            size_t ul = indent_unit(e, unit);
+            const char *q;
+
+            for (q = d->body; *q; q++) {
+                if (*q == '\t')
+                    sbuf_add(&body, unit, ul);
+                else
+                    sbuf_add(&body, q, 1);
+            }
+            sbuf_add(&body, "", 1);
+            snip_parse(body.p, &raw, &st);
+            sbuf_free(&body);
+        }
         /* each line after the first starts with the indentation of the first */
         for (i = 0; i < raw.len; i++) {
             sbuf_add(&text, raw.p + i, 1);

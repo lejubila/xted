@@ -72,9 +72,10 @@ Evidenziazione, indentazione e suggerimenti sono tutti interni: nessun language 
 ### Indentazione
 
 - **Autoindent**: la nuova riga eredita l'indentazione della precedente.
+- **Coppie automatiche** (`autopair`, attivo di predefinito, per linguaggio): scrivendo `(` `[` `{` `"` `'` (e il backtick in JS/TS/Markdown/Shell) si inserisce anche il carattere di chiusura; la chiusura già presente si scavalca, Backspace in una coppia vuota le toglie entrambe, una selezione viene racchiusa, Invio tra `{}` mette la graffa su una riga propria. Non agisce in stringhe e commenti, davanti a una parola, con più cursori; le virgolette sono escluse in testo semplice, Markdown e Diff, l'apostrofo anche in Rust.
 - **Smart indent**: indentazione in più dopo `{`, `:` (Python), `(`, e deindentazione automatica alla chiusura `}`.
-- Tab o spazi configurabili per linguaggio, larghezza del tab; rilevamento automatico dello stile del file aperto.
-- Supporto a `.editorconfig` (indentazione, fine riga, charset).
+- Tab o spazi configurabili per linguaggio (`expand_tab`, `tab_width` = larghezza con cui si disegna un tabulatore, `indent_width` = spazi di un livello, se manca vale `tab_width`); rilevamento automatico dello stile del file aperto; comandi della palette «Indentazione: tabulatore / 2 / 4 / 8 spazi», «Converti l'indentazione in spazi / tabulatori», «Rileva lo stile di indentazione»; la barra di stato mostra `Spazi N` o `Tab N`. Precedenza: comando dell'utente, configurazione, `.editorconfig`, stile del file, predefiniti.
+- Supporto a `.editorconfig` (`indent_style`, `indent_size`, `tab_width`, `trim_trailing_whitespace`, `insert_final_newline`; non ancora `end_of_line` e `charset`).
 
 ### Aiuti alla scrittura
 

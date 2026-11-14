@@ -5,6 +5,8 @@
 #include "cursors.h"
 #include "complete.h"
 #include "doc.h"
+#include "editorconfig.h"
+#include "indent.h"
 #include "keymap.h"
 #include "errors.h"
 #include "edit.h"
@@ -338,7 +340,7 @@ static void test_ranges(void)
 
     buf_init(&b);
     y = x = 0;
-    buf_insert_text(&b, &y, &x, "hello\nworld\nagain", 17);
+    buf_insert_text(&b, &y, &x, "hello\nworld\nagain", strlen("hello\nworld\nagain"));
     CHECK(b.nlines == 3 && y == 2 && x == 5 && buf_is(&b, "hello\nworld\nagain"));
     buf_undo_close(&b);
 
@@ -443,6 +445,258 @@ static void ed_sel(Editor *e, size_t ay, size_t ax, size_t cy, size_t cx)
     e->ax = ax;
     e->cy = cy;
     e->cx = cx;
+}
+
+static Syntax *lang(const char *name);
+
+/* Types text as the keyboard does: with the automatic pairs. */
+static void type_text(Editor *e, const char *t)
+{
+    for (; *t; t++)
+        if (!edit_type(e, (unsigned char)*t))
+            edit_insert_cp(e, (unsigned char)*t);
+}
+
+static void put_file(const char *dir, const char *name, const char *text);
+static char *make_dir(char *buf, size_t n);
+
+static void test_indent(void)
+{
+    Editor e;
+    Buffer b;
+    int tabs = -1, width = -1;
+    char dir[64], path[160], err[128];
+    Doc *d;
+    size_t y = 0, x = 0;
+    EcProps ec;
+
+    /* detection */
+    buf_init(&b);
+    buf_insert_text(&b, &y, &x, "int f()\n{\n    if (a) {\n        b();\n    }\n}\n", strlen("int f()\n{\n    if (a) {\n        b();\n    }\n}\n"));
+    CHECK(indent_detect(&b, &tabs, &width) && tabs == 0 && width == 4);
+    buf_free(&b);
+    buf_init(&b);
+    y = x = 0;
+    buf_insert_text(&b, &y, &x, "a\n  b\n    c\n  d\n", strlen("a\n  b\n    c\n  d\n"));
+    CHECK(indent_detect(&b, &tabs, &width) && tabs == 0 && width == 2);
+    buf_free(&b);
+    buf_init(&b);
+    y = x = 0;
+    buf_insert_text(&b, &y, &x, "a\n\tb\n\t\tc\n\td\n", strlen("a\n\tb\n\t\tc\n\td\n"));
+    CHECK(indent_detect(&b, &tabs, &width) && tabs == 1);
+    buf_free(&b);
+    buf_init(&b);
+    y = x = 0;
+    buf_insert_text(&b, &y, &x, "a\nb\nc\n", strlen("a\nb\nc\n"));
+    CHECK(!indent_detect(&b, &tabs, &width));
+    buf_free(&b);
+
+    /* globs */
+    CHECK(editorconfig_match("*", "a/b.c") && editorconfig_match("*.py", "x/y/z.py"));
+    CHECK(!editorconfig_match("*.py", "z.pyc") && editorconfig_match("*.{js,ts}", "a.ts"));
+    CHECK(editorconfig_match("Makefile", "sub/Makefile") && !editorconfig_match("/Makefile", "sub/Makefile"));
+    CHECK(editorconfig_match("src/**.c", "src/a/b.c") && !editorconfig_match("src/*.c", "src/a/b.c"));
+    CHECK(editorconfig_match("[ab].txt", "a.txt") && !editorconfig_match("[!a].txt", "a.txt"));
+    CHECK(editorconfig_match("f{1..3}.x", "f2.x") && !editorconfig_match("f{1..3}.x", "f4.x"));
+
+    /* .editorconfig files: the nearest wins, root = true stops the climb */
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(path, sizeof path, "%s/sub", dir);
+    CHECK(mkdir(path, 0700) == 0);
+    put_file(dir, ".editorconfig",
+             "root = true\n[*]\nindent_style = space\nindent_size = 4\n[*.mk]\nindent_style = tab\n"
+             "trim_trailing_whitespace = true\n");
+    put_file(dir, "sub/.editorconfig", "[*.py]\nindent_size = 2\n");
+    snprintf(path, sizeof path, "%s/sub/a.py", dir);
+    CHECK(editorconfig_lookup(path, &ec) == 2);
+    CHECK(ec.expand == 1 && ec.size == 2 && ec.trim == -1);
+    snprintf(path, sizeof path, "%s/sub/b.mk", dir);
+    CHECK(editorconfig_lookup(path, &ec) == 2 && ec.expand == 0 && ec.size == 4 && ec.trim == 1);
+
+    /* the whole chain: configuration > .editorconfig > the file's own style > defaults */
+    put_file(dir, "sub/a.py", "x = 1\nif x:\n\ty = 2\n\tz = 3\n");
+    editor_init(&e);
+    snprintf(path, sizeof path, "%s/sub/a.py", dir);
+    d = editor_open_doc(&e, path, err, sizeof err);
+    CHECK(d && d->expand_tab == 1 && d->indent_w == 2);     /* .editorconfig over the tabs of the text */
+    editor_free(&e);
+    put_file(dir, "n.txt", "a\n\tb\n\tc\n");
+    snprintf(path, sizeof path, "%s/n.txt", dir);
+    editor_init(&e);
+    config_parse(&e.cfg, "indent_width = 3\n", strlen("indent_width = 3\n"));
+    d = editor_open_doc(&e, path, err, sizeof err);
+    CHECK(d && d->expand_tab == 1 && d->indent_w == 3);     /* .editorconfig (space, 4) vs the config's 3 */
+    editor_free(&e);
+    {
+        char dir2[64];
+
+        CHECK(make_dir(dir2, sizeof dir2) != NULL);
+        put_file(dir2, "t.txt", "a\n\tb\n\tc\n");
+        snprintf(path, sizeof path, "%s/t.txt", dir2);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d && d->expand_tab == 0);                    /* the text uses tabs */
+        editor_free(&e);
+        put_file(dir2, "s.txt", "a\n  b\n    c\n  d\n");
+        snprintf(path, sizeof path, "%s/s.txt", dir2);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d && d->expand_tab == 1 && d->indent_w == 2);
+        editor_free(&e);
+        editor_init(&e);
+        config_parse(&e.cfg, "expand_tab = false\n", strlen("expand_tab = false\n"));
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d && d->expand_tab == 0);                    /* the user's setting wins */
+        editor_free(&e);
+    }
+
+    /* Tab, Shift+Tab and Enter between braces follow the indentation width */
+    ed_load(&e, "x");
+    e.doc->expand_tab = 1;
+    e.doc->indent_w = 3;
+    e.tabw = e.doc->tabw = 8;
+    edit_tab(&e);
+    CHECK(buf_is(e.buf, "   x") && e.cx == 3);
+    e.cx = 4;
+    edit_tab(&e);                                           /* up to the next stop: 6 */
+    CHECK(buf_is(e.buf, "   x  ") && e.cx == 6);
+    edit_select_all(&e);
+    edit_tab(&e);
+    CHECK(buf_is(e.buf, "      x  "));
+    edit_dedent(&e);
+    CHECK(buf_is(e.buf, "   x  "));
+    editor_free(&e);
+
+    /* conversion keeps the width in columns */
+    ed_load(&e, "a\n    b\n        c\n\t\td\n  \n");
+    e.tabw = e.doc->tabw = 4;
+    CHECK(edit_convert_indent(&e, 1, 4) == 2);
+    CHECK(buf_is(e.buf, "a\n\tb\n\t\tc\n\t\td\n  \n"));
+    CHECK(edit_convert_indent(&e, 0, 0) == 3);
+    CHECK(buf_is(e.buf, "a\n    b\n        c\n        d\n  \n"));
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "a\n\tb\n\t\tc\n\t\td\n  \n"));
+    editor_free(&e);
+
+    /* a snippet's tabs become the document's indentation */
+    ed_load(&e, "if");
+    e.doc->expand_tab = 1;
+    e.doc->indent_w = 2;
+    e.cx = 2;
+    {
+        static const SnipDef sd = { "t", "a {\n\t$0\n}" };
+
+        edit_expand_snippet(&e, 0, &sd);
+    }
+    CHECK(buf_is(e.buf, "a {\n  \n}") && e.cy == 1 && e.cx == 2);
+    editor_free(&e);
+}
+
+/* Every built-in snippet expands to plain text with no marker left over and has a stop for
+ * each of its placeholders (a "$" before a placeholder is written "$$"). */
+static void test_snippet_defs(void)
+{
+    static const char *const langs[] = { "C", "Python", "PHP", "JavaScript", "Shell" };
+    size_t li, i, n;
+
+    for (li = 0; li < sizeof langs / sizeof langs[0]; li++) {
+        const SnipDef *sd = snip_lang(langs[li], &n);
+
+        CHECK(sd != NULL && n > 0);
+        for (i = 0; i < n; i++) {
+            SBuf text = SBUF_INIT;
+            SnipStops st;
+            const char *p;
+            size_t want = 0;
+            int ok;
+
+            snip_parse(sd[i].body, &text, &st);
+            sbuf_add(&text, "", 1);
+            for (p = sd[i].body; *p; p++) {
+                if (p[0] == '$' && p[1] == '$')
+                    p++;
+                else if (p[0] == '$' && p[1] == '{')
+                    want++;
+            }
+            ok = strstr(text.p, "${") == NULL && st.n >= want;
+            CHECK(ok);
+            if (!ok)
+                printf("snippet %s/%s\n", langs[li], sd[i].name);
+            sbuf_free(&text);
+        }
+    }
+}
+
+static void test_autopair(void)
+{
+    Editor e;
+
+    ed_load(&e, "");
+    doc_set_syntax(e.doc, lang("c"));
+    type_text(&e, "f(");
+    CHECK(buf_is(e.buf, "f()") && e.cx == 2);
+    type_text(&e, "a)");                        /* the closing one is stepped over */
+    CHECK(buf_is(e.buf, "f(a)") && e.cx == 4);
+    type_text(&e, " {");
+    CHECK(buf_is(e.buf, "f(a) {}") && e.cx == 6);
+    edit_newline(&e);                           /* {|} opens an indented block */
+    CHECK(buf_is(e.buf, "f(a) {\n\t\n}") && e.cy == 1 && e.cx == 1);
+    editor_free(&e);
+
+    ed_load(&e, "");
+    doc_set_syntax(e.doc, lang("c"));
+    type_text(&e, "s = \"ab");
+    CHECK(buf_is(e.buf, "s = \"ab\"") && e.cx == 7);
+    type_text(&e, "(");                         /* inside a string: a character */
+    CHECK(buf_is(e.buf, "s = \"ab(\""));
+    type_text(&e, "\"");                        /* the closing quote is stepped over */
+    CHECK(buf_is(e.buf, "s = \"ab(\"") && e.cx == 9);
+    type_text(&e, ";");
+    CHECK(buf_is(e.buf, "s = \"ab(\";"));
+    editor_free(&e);
+
+    /* an apostrophe after a letter is not a quote; nothing is paired before a word */
+    ed_load(&e, "");
+    doc_set_syntax(e.doc, lang("c"));
+    type_text(&e, "don'");
+    CHECK(buf_is(e.buf, "don'"));
+    editor_free(&e);
+    ed_load(&e, "foo");
+    doc_set_syntax(e.doc, lang("c"));
+    type_text(&e, "(");
+    CHECK(buf_is(e.buf, "(foo"));
+    editor_free(&e);
+
+    /* Backspace inside an empty pair removes both, and it is one undo step */
+    ed_load(&e, "");
+    doc_set_syntax(e.doc, lang("c"));
+    type_text(&e, "[");
+    CHECK(buf_is(e.buf, "[]"));
+    CHECK(edit_backspace_pair(&e) && buf_is(e.buf, "") && e.cx == 0);
+    type_text(&e, "(");
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, ""));
+    editor_free(&e);
+
+    /* a selection is wrapped and stays selected */
+    ed_load(&e, "abc");
+    doc_set_syntax(e.doc, lang("c"));
+    ed_sel(&e, 0, 1, 0, 2);
+    CHECK(edit_type(&e, '('));
+    CHECK(buf_is(e.buf, "a(b)c") && e.sel_on && e.ax == 2 && e.cx == 3);
+    editor_free(&e);
+
+    /* off by setting; no quotes in text without a language */
+    ed_load(&e, "");
+    doc_set_syntax(e.doc, lang("c"));
+    e.doc->autopair = 0;
+    type_text(&e, "(");
+    CHECK(buf_is(e.buf, "("));
+    editor_free(&e);
+    ed_load(&e, "");
+    type_text(&e, "\"");
+    CHECK(buf_is(e.buf, "\""));
+    editor_free(&e);
 }
 
 static void test_edit_cmds(void)
@@ -2773,6 +3027,7 @@ static void test_config(void)
         "[Python]\n"
         "tab_width=2\n"
         "trim_trailing_space = true\n"
+        "autopair = off\n"
         "\n"
         "[ keys ]\n"
         "ctrl+s = save\n"
@@ -2783,12 +3038,12 @@ static void test_config(void)
     CHECK(config_parse(&c, text, strlen(text)) == 0 && c.first_error[0] == '\0');
     CHECK(strcmp(c.theme, "chiaro") == 0 && c.clipboard == 0 && c.git == 1);
     CHECK(c.nkeys == 3 && strcmp(c.keys[0].key, "ctrl+s") == 0 && strcmp(c.keys[0].cmd, "save") == 0);
-    CHECK(strcmp(c.keys[2].cmd, "none") == 0 && c.keys[2].line == 16);
+    CHECK(strcmp(c.keys[2].cmd, "none") == 0 && c.keys[2].line == 17);
     l = config_lang(&c, "C");
     CHECK(l.tab_width == 4 && l.expand_tab == 1 && l.final_newline == 1 && l.trim_trailing_space == 0);
-    CHECK(l.autosuggest == 1 && l.suggest_min == 2);
+    CHECK(l.autosuggest == 1 && l.suggest_min == 2 && l.autopair == 1);
     l = config_lang(&c, "python");
-    CHECK(l.tab_width == 2 && l.expand_tab == 1 && l.trim_trailing_space == 1);
+    CHECK(l.tab_width == 2 && l.expand_tab == 1 && l.trim_trailing_space == 1 && l.autopair == 0);
     l = config_lang(&c, NULL);
     CHECK(l.tab_width == 4);
     config_free(&c);
@@ -3899,6 +4154,9 @@ int main(void)
     test_ranges();
     test_clip();
     test_edit_cmds();
+    test_autopair();
+    test_indent();
+    test_snippet_defs();
     test_syntax_lines();
     test_syntax_parse();
     test_mouse();

@@ -12,7 +12,9 @@ static LangCfg unset(void)
     LangCfg l;
 
     l.tab_width = l.expand_tab = l.trim_trailing_space = l.final_newline = -1;
-    l.autosuggest = l.suggest_min = -1;
+    l.indent_width = -1;
+    l.set = 0;
+    l.autosuggest = l.suggest_min = l.autopair = -1;
     return l;
 }
 
@@ -97,6 +99,11 @@ static int set_lang_value(LangCfg *l, const char *key, const char *val)
         if (v < 0)
             return -2;
         l->tab_width = v;
+    } else if (!strcmp(key, "indent_width")) {
+        v = parse_int(val, 1, 16);
+        if (v < 0)
+            return -2;
+        l->indent_width = v;
     } else if (!strcmp(key, "expand_tab")) {
         v = parse_bool(val);
         if (v < 0)
@@ -119,6 +126,11 @@ static int set_lang_value(LangCfg *l, const char *key, const char *val)
         if (v < 0)
             return -2;
         l->autosuggest = v;
+    } else if (!strcmp(key, "autopair")) {
+        v = parse_bool(val);
+        if (v < 0)
+            return -2;
+        l->autopair = v;
     } else if (!strcmp(key, "suggest_min")) {
         v = parse_int(val, 1, 10);
         if (v < 0)
@@ -330,16 +342,30 @@ int config_load(Config *c, const char *dir)
 
 static void overlay(LangCfg *dst, const LangCfg *src)
 {
-    if (src->tab_width >= 0)
+    if (src->tab_width >= 0) {
         dst->tab_width = src->tab_width;
-    if (src->expand_tab >= 0)
+        dst->set |= CFG_TAB_WIDTH;
+    }
+    if (src->expand_tab >= 0) {
         dst->expand_tab = src->expand_tab;
-    if (src->trim_trailing_space >= 0)
+        dst->set |= CFG_EXPAND_TAB;
+    }
+    if (src->indent_width >= 0) {
+        dst->indent_width = src->indent_width;
+        dst->set |= CFG_INDENT_WIDTH;
+    }
+    if (src->trim_trailing_space >= 0) {
         dst->trim_trailing_space = src->trim_trailing_space;
-    if (src->final_newline >= 0)
+        dst->set |= CFG_TRIM;
+    }
+    if (src->final_newline >= 0) {
         dst->final_newline = src->final_newline;
+        dst->set |= CFG_FINAL_NL;
+    }
     if (src->autosuggest >= 0)
         dst->autosuggest = src->autosuggest;
+    if (src->autopair >= 0)
+        dst->autopair = src->autopair;
     if (src->suggest_min >= 0)
         dst->suggest_min = src->suggest_min;
 }
@@ -355,6 +381,9 @@ LangCfg config_lang(const Config *c, const char *lang)
     out.trim_trailing_space = 0;
     out.final_newline = 0;
     out.autosuggest = 1;
+    out.autopair = 1;
+    out.indent_width = 0;
+    out.set = 0;
     out.suggest_min = 2;
     overlay(&out, &c->base);
     if (lang) {

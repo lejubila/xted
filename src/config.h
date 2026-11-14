@@ -10,13 +10,18 @@
  * "not set" in every field below. */
 
 typedef struct {
-    int tab_width;              /* 1..16 */
+    int tab_width;              /* 1..16: how wide a tab character is drawn */
     int expand_tab;             /* Tab inserts spaces */
+    int indent_width;           /* 1..16: spaces of one indentation level (0: tab_width) */
     int trim_trailing_space;    /* on save */
     int final_newline;          /* on save: 0 keep as it was, 1 always end with a newline */
     int autosuggest;
+    int autopair;               /* typing an opening bracket or quote adds the closing one */
     int suggest_min;            /* letters typed before the popup shows, 1..10 */
+    unsigned set;               /* CFG_*: given by the user, not a default (config_lang) */
 } LangCfg;
+
+enum { CFG_TAB_WIDTH = 1, CFG_EXPAND_TAB = 2, CFG_INDENT_WIDTH = 4, CFG_TRIM = 8, CFG_FINAL_NL = 16 };
 
 typedef struct {
     char *name;                 /* language name, lower case */

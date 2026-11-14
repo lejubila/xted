@@ -78,6 +78,13 @@ const Command commands[] = {
     { "goto_tag", "Vai alla definizione", "f12", c_tag, 0, 0 },
     { "match", "Parentesi corrispondente", "alt+m", editor_cmd_match, 0, 0 },
     { "theme", "Cambia tema", "alt+t", editor_cmd_theme, 0, 0 },
+    { "indent_tabs", "Indentazione: tabulatore", "", editor_cmd_indent_tabs, 0, 0 },
+    { "indent_spaces_2", "Indentazione: 2 spazi", "", editor_cmd_indent_spaces2, 0, 0 },
+    { "indent_spaces_4", "Indentazione: 4 spazi", "", editor_cmd_indent_spaces4, 0, 0 },
+    { "indent_spaces_8", "Indentazione: 8 spazi", "", editor_cmd_indent_spaces8, 0, 0 },
+    { "indent_to_spaces", "Converti l'indentazione in spazi", "", editor_cmd_indent_to_spaces, 1, 0 },
+    { "indent_to_tabs", "Converti l'indentazione in tabulatori", "", editor_cmd_indent_to_tabs, 1, 0 },
+    { "indent_detect", "Rileva lo stile di indentazione", "", editor_cmd_indent_detect, 0, 0 },
     { "palette", "Command palette", "alt+x", editor_cmd_palette, 0, 0 },
     { "redraw", "Ridisegna lo schermo", "ctrl+l", editor_cmd_redraw, 0, 0 },
 };
