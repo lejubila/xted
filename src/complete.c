@@ -183,6 +183,18 @@ static void class_cb(void *ctx, const char *fq, int rank)
         const char *last = strrchr(fq, '\\');
 
         last = last ? last + 1 : fq;
+        /* the same class already found in a file the document includes (`new Foo` without its
+         * use) carries no qualified name: give it this one, so that accepting it adds the use */
+        {
+            size_t i, ll = strlen(last);
+
+            for (i = 0; i < g->n; i++)
+                if (g->v[i].kind == CAND_CLASS && !g->v[i].sig && g->v[i].dist >= 1 &&
+                    strlen(g->v[i].w) == ll && memcmp(g->v[i].w, last, ll) == 0) {
+                    g->v[i].sig = xstrdup(fq);
+                    return;
+                }
+        }
         consider_sig(g, last, strlen(last), CAND_CLASS, 2, fq);
     }
 }
@@ -263,6 +275,7 @@ void complete_close(Complete *c)
     c->picked = 0;
     c->sel = c->top = 0;
     c->rows = 0;
+    c->scanning = 0;
 }
 
 void complete_free(Complete *c)
@@ -306,11 +319,13 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
     if (use_ctx) {
         if (!c->sc)
             c->sc = sym_cache_new();
+        sym_budget(c->sc, COMPLETE_SCAN_MS);
         sym_classes(c->sc, cur, g.prefix, plen, 1, class_cb, &g);
         budget = 0;
     } else if (sep != (size_t)-1) {
         if (!c->sc)
             c->sc = sym_cache_new();
+        sym_budget(c->sc, COMPLETE_SCAN_MS);
         sym_members(c->sc, docs, ndocs, cur, y, sep, sym_cb, &g);
         budget = 0;                 /* after an operator only members make sense */
     } else {
@@ -323,6 +338,7 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
         if (syn_rule_count(cur->syn) > 0) {
             if (!c->sc)
                 c->sc = sym_cache_new();
+            sym_budget(c->sc, COMPLETE_SCAN_MS);
             sym_globals(c->sc, docs, ndocs, cur, sym_cb, &g);
             if (php && plen >= 3 && (start == 0 || b->lines[y].s[start - 1] != '$'))
                 sym_classes(c->sc, cur, g.prefix, plen, 0, class_cb, &g);
@@ -381,7 +397,40 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
     c->y = y;
     c->x = start;
     c->on = c->n > 0;
+    c->scanning = c->sc && sym_busy(c->sc);
+    c->scan_doc = cur;
+    c->scan_y = y;
+    c->scan_x = x;
+    c->scan_gen = cur->buf.gen;
     return c->on;
+}
+
+int complete_resume(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t x)
+{
+    char *keep = NULL;
+    size_t top = c->top, picked = c->picked, i;
+    unsigned spin = c->spin + 1;
+
+    if (!c->scanning || c->scan_doc != cur || c->scan_y != y || c->scan_x != x ||
+        c->scan_gen != cur->buf.gen) {
+        c->scanning = 0;
+        return 0;
+    }
+    if (c->on && c->sel < c->n)
+        keep = xstrdup(c->v[c->sel].text);
+    complete_open(c, docs, ndocs, cur, y, x);
+    c->spin = spin;
+    if (keep) {
+        for (i = 0; i < c->n; i++)
+            if (strcmp(c->v[i].text, keep) == 0) {
+                c->sel = i;
+                c->top = top <= i ? top : i;
+                c->picked = (int)picked;
+                break;
+            }
+        free(keep);
+    }
+    return 1;
 }
 
 static int param_optional(const char *p, size_t n)

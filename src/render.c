@@ -611,7 +611,7 @@ static void tab_row(SBuf *o, const Editor *e)
     free(wd);
 }
 
-static void status_row(SBuf *o, const Win *w, int active)
+static void status_row(SBuf *o, const Win *w, int active, int scan)
 {
     const Doc *d = w->doc;
     SBuf right = SBUF_INIT;
@@ -621,6 +621,10 @@ static void status_row(SBuf *o, const Win *w, int active)
 
     snprintf(mark, sizeof mark, "%s%s", d->buf.modified ? " [+]" : "", d->readonly && !d->scratch ? " [RO]" : "");
     marklen = strlen(mark);
+    if (scan >= 0 && cols >= 48)
+        sbuf_addf(&right, " Scansione %c ", "|/-\\"[scan & 3]);
+    else if (scan >= 0)
+        sbuf_addf(&right, " %c ", "|/-\\"[scan & 3]);
     if (cols >= 48)
         sbuf_addf(&right, " %s  %s  UTF-8  Ln %zu, Col %zu ", syn_name(d->syn),
                   d->buf.crlf ? "CRLF" : "LF", w->view.cy + 1,
@@ -807,7 +811,8 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
                      use ? &ov : NULL);
         }
         else
-            status_row(o, w, w == e->layout.active);
+            status_row(o, w, w == e->layout.active,
+                       w == e->layout.active && e->comp.scanning ? (int)(e->comp.spin & 3) : -1);
         x += w->w;
     }
 }

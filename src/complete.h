@@ -10,6 +10,8 @@
 #define COMPLETE_ROWS 8
 #define COMPLETE_MIN_PREFIX 2
 #define COMPLETE_SCAN_LINES 100000
+#define COMPLETE_SCAN_MS 25     /* longest a keystroke waits for a scan of the project */
+#define COMPLETE_IDLE_MS 5      /* pause between the steps of a scan that goes on while idle */
 
 enum { CAND_WORD = 0, CAND_KEYWORD, CAND_SNIPPET, CAND_FUNC, CAND_CLASS, CAND_METHOD, CAND_PROP,
        CAND_CONST };
@@ -31,6 +33,11 @@ typedef struct {
     size_t y, x;            /* where the word being completed starts */
     size_t rows;            /* rows the renderer could show last time (0: COMPLETE_ROWS) */
     SymCache *sc;           /* indexes of the symbols of files and of the standard library */
+    int scanning;           /* a scan of the project was cut short: the list may be incomplete */
+    unsigned spin;          /* steps of that scan so far (for the indicator) */
+    const void *scan_doc;   /* where the query was made, to go on only if nothing changed */
+    size_t scan_y, scan_x;
+    unsigned long scan_gen;
 } Complete;
 
 /* Length in bytes of the word that ends at (y,x); *start is where it begins. */
@@ -42,6 +49,9 @@ size_t complete_prefix(const Buffer *b, size_t y, size_t x, size_t *start);
  * language's keywords and its snippets. Leaves the popup open (on) if there is at least one.
  * Returns that. */
 int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t x);
+/* Goes on with the scan that cut the last complete_open short, if the cursor and the text are
+ * where they were; the list is rebuilt keeping the highlighted candidate. Returns 1 if it ran. */
+int complete_resume(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t x);
 /* For a function or method candidate with parameters: the snippet body "name(${1:a}, ${2:b})$0"
  * that inserts a call with its mandatory arguments as placeholders (optional ones, with a
  * default or "...", are left out). Returns 1 for that, 2 for a function without parameters

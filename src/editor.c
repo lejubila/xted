@@ -567,6 +567,9 @@ static int next_key(Editor *e, Key *k)
             prepare_frame(e);
             render_frame(e->render, e);
             term_watch(run_fd(e));
+            /* a scan of the project cut short by the time limit goes on while the user waits */
+            if (e->comp.scanning && (timeout < 0 || timeout > COMPLETE_IDLE_MS))
+                timeout = COMPLETE_IDLE_MS;
             if (run_timeout(e) >= 0 && (timeout < 0 || run_timeout(e) < timeout))
                 timeout = run_timeout(e);
             ev = term_wait(timeout);
@@ -574,6 +577,8 @@ static int next_key(Editor *e, Key *k)
                 resize(e);
             if ((ev & TERM_EV_FD) || (!ev && run_timeout(e) >= 0))
                 run_pump(e);
+            if (!ev && e->comp.scanning)
+                complete_resume(&e->comp, e->docs, e->ndocs, e->doc, e->cy, e->cx);
             if (!(ev & TERM_EV_KEY))
                 continue;
         }

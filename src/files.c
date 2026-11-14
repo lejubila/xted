@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 static int skipped(const char *name)
@@ -64,60 +65,134 @@ char *files_join(const char *dir, const char *name)
     return p;
 }
 
+/* A walk that can stop and go on later: one frame per directory being read (its entries and
+ * the next one to visit), the innermost last, as the recursion would hold them. */
 typedef struct {
-    void (*add)(const char *, void *);
-    void *ctx;
-    size_t count;
-    const char *const *prune;
-} Scan;
-
-static void scan_dir(Scan *s, const char *root, const char *rel, int depth)
-{
-    char *dir = rel[0] ? files_join(root, rel) : xstrdup(root);
+    char *rel;
+    int depth;
     char **names;
-    size_t n = list_dir(dir, &names, 0), i;
+    size_t nn, ni;
+} Dirf;
 
-    for (i = 0; i < n && s->count < SCAN_MAX_FILES; i++) {
-        char *r = rel[0] ? files_join(rel, names[i]) : xstrdup(names[i]);
-        char *full = files_join(root, r);
+struct FScan {
+    char *root;
+    const char *const *prune;
+    Dirf *st;
+    size_t ns, cap;
+    size_t count;
+};
+
+static void push_dir(FScan *s, char *rel, int depth)
+{
+    char *dir = rel[0] ? files_join(s->root, rel) : xstrdup(s->root);
+    Dirf *f;
+
+    if (s->ns == s->cap) {
+        s->cap = s->cap ? s->cap * 2 : 16;
+        s->st = xrealloc(s->st, s->cap * sizeof *s->st);
+    }
+    f = &s->st[s->ns++];
+    f->rel = rel;
+    f->depth = depth;
+    f->nn = list_dir(dir, &f->names, 0);
+    f->ni = 0;
+    free(dir);
+}
+
+static void pop_dir(FScan *s)
+{
+    Dirf *f = &s->st[--s->ns];
+    size_t i;
+
+    for (i = 0; i < f->nn; i++)
+        free(f->names[i]);
+    free(f->names);
+    free(f->rel);
+}
+
+FScan *files_scan_begin(const char *root, const char *const *prune)
+{
+    FScan *s = xmalloc(sizeof *s);
+
+    memset(s, 0, sizeof *s);
+    s->root = xstrdup(root);
+    s->prune = prune;
+    push_dir(s, xstrdup(""), 0);
+    return s;
+}
+
+void files_scan_free(FScan *s)
+{
+    if (!s)
+        return;
+    while (s->ns > 0)
+        pop_dir(s);
+    free(s->st);
+    free(s->root);
+    free(s);
+}
+
+static long mono_us(void)
+{
+    struct timespec t;
+
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (long)t.tv_sec * 1000000L + t.tv_nsec / 1000;
+}
+
+int files_scan_step(FScan *s, void (*add)(const char *rel, void *ctx), void *ctx, long budget_us)
+{
+    long end = budget_us > 0 ? mono_us() + budget_us : 0;
+
+    while (s->ns > 0) {
+        Dirf *f = &s->st[s->ns - 1];
+        const char *name;
+        char *r, *full;
         struct stat st;
 
+        if (f->ni >= f->nn || s->count >= SCAN_MAX_FILES) {
+            pop_dir(s);
+            continue;
+        }
+        name = f->names[f->ni++];
+        r = f->rel[0] ? files_join(f->rel, name) : xstrdup(name);
+        full = files_join(s->root, r);
         if (lstat(full, &st) == 0) {
             if (S_ISDIR(st.st_mode)) {
                 size_t pi;
                 int skip = 0;
 
                 for (pi = 0; s->prune && s->prune[pi]; pi++)
-                    if (strcmp(s->prune[pi], names[i]) == 0)
+                    if (strcmp(s->prune[pi], name) == 0)
                         skip = 1;
-                if (!skip && depth < SCAN_MAX_DEPTH)
-                    scan_dir(s, root, r, depth + 1);
+                if (!skip && f->depth < SCAN_MAX_DEPTH) {
+                    push_dir(s, r, f->depth + 1);       /* takes r; f may move */
+                    r = NULL;
+                }
             } else if (S_ISREG(st.st_mode) ||
                        (S_ISLNK(st.st_mode) && stat(full, &st) == 0 && S_ISREG(st.st_mode))) {
-                s->add(r, s->ctx);
+                add(r, ctx);
                 s->count++;
             }
         }
         free(full);
         free(r);
+        if (end && mono_us() >= end)
+            return s->ns == 0;
     }
-    for (i = 0; i < n; i++)
-        free(names[i]);
-    free(names);
-    free(dir);
+    return 1;
 }
 
 size_t files_scan_prune(const char *root, void (*add)(const char *rel, void *ctx), void *ctx,
                         const char *const *prune)
 {
-    Scan s;
+    FScan *s = files_scan_begin(root, prune);
+    size_t n;
 
-    s.add = add;
-    s.ctx = ctx;
-    s.count = 0;
-    s.prune = prune;
-    scan_dir(&s, root, "", 0);
-    return s.count;
+    files_scan_step(s, add, ctx, 0);
+    n = s->count;
+    files_scan_free(s);
+    return n;
 }
 
 size_t files_scan(const char *root, void (*add)(const char *rel, void *ctx), void *ctx)

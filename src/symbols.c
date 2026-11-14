@@ -878,6 +878,13 @@ struct SymCache {
     char **cls;                     /* qualified names of the project's classes */
     size_t ncls, clscap;
     int cls_done;
+    int cl_phase;                   /* load_classes: 0 start, 1 classmap, 2 PSR-4 directories */
+    FILE *cl_file;                  /* the classmap being read */
+    size_t cl_opt, cl_i;            /* its entries; the PSR-4 directory being walked */
+    FScan *cl_fs;
+    FScan *files_fs;                /* the walk that fills files */
+    long deadline_us;               /* scans stop here (0: no limit) */
+    int busy;                       /* a scan was cut short since sym_budget */
     char root[PATH_MAX];            /* the project (where vendor/ or composer.json is); "" = cwd */
     StdLib *lib[LIB_N];
     int lib_tried[LIB_N];
@@ -908,6 +915,14 @@ static void free_project(SymCache *c)
     }
     for (i = 0; i < c->ncls; i++)
         free(c->cls[i]);
+    files_scan_free(c->files_fs);
+    files_scan_free(c->cl_fs);
+    if (c->cl_file)
+        fclose(c->cl_file);
+    c->files_fs = c->cl_fs = NULL;
+    c->cl_file = NULL;
+    c->cl_phase = 0;
+    c->cl_opt = c->cl_i = 0;
     free(c->files);
     free(c->al_name);
     free(c->al_qual);
@@ -991,6 +1006,28 @@ static long now_us(void)
 
     clock_gettime(CLOCK_MONOTONIC, &t);
     return (long)t.tv_sec * 1000000L + t.tv_nsec / 1000;
+}
+
+void sym_budget(SymCache *c, long ms)
+{
+    c->busy = 0;
+    c->deadline_us = ms > 0 ? now_us() + ms * 1000L : 0;
+}
+
+int sym_busy(const SymCache *c)
+{
+    return c->busy;
+}
+
+/* Microseconds a scan may still run: 0 for no limit, -1 when the time is up. */
+static long scan_left(const SymCache *c)
+{
+    long l;
+
+    if (!c->deadline_us)
+        return 0;
+    l = c->deadline_us - now_us();
+    return l > 0 ? l : -1;
 }
 
 static void cache_put(SymCache *c, SymIndex *x)
@@ -1307,13 +1344,27 @@ static char *find_class_file(SymCache *c, const char *qual, const char *ext)
             return f;
     }
     if (!c->files_done) {
-        /* vendor is Composer's business (the map above); walking it can take seconds */
+        /* vendor is Composer's business (the map above); walking it can take seconds, so the
+         * walk goes on a little at each call and the class is not found until it ends */
         static const char *const prune[] = { "vendor", NULL };
+        long left = scan_left(c);
 
-        char top[PATH_MAX];
+        if (left < 0) {
+            c->busy = 1;
+            return NULL;
+        }
+        if (!c->files_fs) {
+            char top[PATH_MAX];
 
-        rooted(c, top, sizeof top, ".");
-        files_scan_prune(top, collect_file, c, prune);
+            rooted(c, top, sizeof top, ".");
+            c->files_fs = files_scan_begin(top, prune);
+        }
+        if (!files_scan_step(c->files_fs, collect_file, c, left)) {
+            c->busy = 1;
+            return NULL;
+        }
+        files_scan_free(c->files_fs);
+        c->files_fs = NULL;
         c->files_done = 1;
     }
     for (i = 0; i < c->nfiles; i++) {
@@ -1485,6 +1536,8 @@ static void env_includes(SymCache *c, Env *e, size_t k)
             !env_has_class(e, last_segment(x->inc[j] + 1))) {
             char *f = find_class_file(c, x->inc[j] + 1, ext_of(x->key));
 
+            if (!f && !c->files_done)
+                continue;               /* the walk is not over: ask again next time */
             x->incp[j] = f ? f : xstrdup("");
         }
         if (x->incp[j] && x->incp[j][0])
@@ -2227,56 +2280,90 @@ static void walk_add(const char *rel, void *ctx)
 }
 
 /* config/app.php aliases, then vendor/composer/autoload_classmap.php (every class when Composer
- * was run with -o), else the project's own PSR-4 directories. */
+ * was run with -o), else the project's own PSR-4 directories. It may take long on a big project
+ * or a network disk: each call works until the deadline and goes on at the next; the classes
+ * found so far are already usable. */
 static void load_classes(SymCache *c)
 {
-    FILE *f;
     char line[1024];
-    size_t i, optimized = 0;
+    size_t i;
 
     if (c->cls_done)
         return;
-    c->cls_done = 1;
-    load_aliases(c);
-    for (i = 0; i < c->nal; i++)
-        add_class(c, c->al_qual[i], strlen(c->al_qual[i]));
-    rooted(c, line, sizeof line, "vendor/composer/autoload_classmap.php");
-    f = fopen(line, "r");
-    while (f && fgets(line, sizeof line, f)) {
-        char fq[PM_PATH], *p = line;
+    if (c->cl_phase == 0) {
+        load_aliases(c);
+        for (i = 0; i < c->nal; i++)
+            add_class(c, c->al_qual[i], strlen(c->al_qual[i]));
+        rooted(c, line, sizeof line, "vendor/composer/autoload_classmap.php");
+        c->cl_file = fopen(line, "r");
+        c->cl_phase = 1;
+    }
+    if (c->cl_phase == 1) {
         size_t n = 0;
 
-        while (*p == ' ')
-            p++;
-        if (*p != '\'')
-            continue;
-        for (p++; *p && *p != '\'' && n + 1 < sizeof fq; p++) {
-            if (*p == '\\' && p[1] == '\\')
-                p++;
-            fq[n++] = *p;
-        }
-        if (*p != '\'' || strstr(fq, "Composer\\") == fq)
-            continue;
-        add_class(c, fq, n);
-        optimized++;
-    }
-    if (f)
-        fclose(f);
-    if (optimized < 200) {
-        load_psr4(c);
-        for (i = 0; i < c->nps; i++) {
-            WalkCtx w;
-            char top[PATH_MAX];
-            static const char *const prune[] = { "vendor", NULL };
+        while (c->cl_file && fgets(line, sizeof line, c->cl_file)) {
+            char fq[PM_PATH], *p = line;
+            size_t k = 0;
 
-            if (c->ps_dir[i][0] != '.')
-                continue;               /* the project's own directories, not vendor */
-            w.c = c;
-            w.prefix = c->ps_prefix[i];
-            rooted(c, top, sizeof top, c->ps_dir[i]);
-            files_scan_prune(top, walk_add, &w, prune);
+            if ((++n & 255) == 0 && scan_left(c) < 0) {
+                c->busy = 1;
+                return;
+            }
+            while (*p == ' ')
+                p++;
+            if (*p != '\'')
+                continue;
+            for (p++; *p && *p != '\'' && k + 1 < sizeof fq; p++) {
+                if (*p == '\\' && p[1] == '\\')
+                    p++;
+                fq[k++] = *p;
+            }
+            if (*p != '\'' || strstr(fq, "Composer\\") == fq)
+                continue;
+            add_class(c, fq, k);
+            c->cl_opt++;
+        }
+        if (c->cl_file)
+            fclose(c->cl_file);
+        c->cl_file = NULL;
+        c->cl_phase = 2;
+        if (c->cl_opt < 200) {
+            load_psr4(c);
+            c->cl_i = 0;
+        } else {
+            c->cl_i = (size_t)-1;       /* an optimized map lists everything */
         }
     }
+    while (c->cl_i != (size_t)-1 && c->cl_i < c->nps) {
+        static const char *const prune[] = { "vendor", NULL };
+        long left = scan_left(c);
+        WalkCtx w;
+
+        if (c->ps_dir[c->cl_i][0] != '.') {
+            c->cl_i++;                  /* the project's own directories, not vendor */
+            continue;
+        }
+        if (left < 0) {
+            c->busy = 1;
+            return;
+        }
+        if (!c->cl_fs) {
+            char top[PATH_MAX];
+
+            rooted(c, top, sizeof top, c->ps_dir[c->cl_i]);
+            c->cl_fs = files_scan_begin(top, prune);
+        }
+        w.c = c;
+        w.prefix = c->ps_prefix[c->cl_i];
+        if (!files_scan_step(c->cl_fs, walk_add, &w, left)) {
+            c->busy = 1;
+            return;
+        }
+        files_scan_free(c->cl_fs);
+        c->cl_fs = NULL;
+        c->cl_i++;
+    }
+    c->cls_done = 1;
 }
 
 static int prefix_ci(const char *s, const char *p, size_t pl)

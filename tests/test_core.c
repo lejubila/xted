@@ -3425,6 +3425,70 @@ static void test_alias_static(void)
 }
 
 /* Laravel: facades documented with @method, global aliases, Composer's PSR-4 map. */
+static void count_file(const char *rel, void *ctx)
+{
+    (void)rel;
+    (*(size_t *)ctx)++;
+}
+
+/* The scans of the project stop at a time limit and go on at the next call. */
+static void test_scan_steps(void)
+{
+    char dir[64], path[256], err[128];
+    size_t i, j, all = 0, got = 0, steps = 0;
+    FScan *fs;
+    Doc d;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    static Got g;
+    size_t sep;
+    int found = 0, busy_seen = 0;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < 30; i++) {
+        snprintf(path, sizeof path, "%s/d%02zu", dir, i);
+        CHECK(mkdir(path, 0700) == 0);
+        for (j = 0; j < 40; j++) {
+            char name[64];
+
+            snprintf(name, sizeof name, "d%02zu/f%zu.txt", i, j);
+            put_file(dir, name, "x\n");
+        }
+    }
+    put_file(dir, "d29/Target.php",
+             "<?php\nclass Target {\n    public function hello() {}\n}\n");
+    put_file(dir, "composer.json", "{}\n");
+    put_file(dir, "main.php", "<?php\nuse Target;\nTarget::\n");
+
+    CHECK(files_scan(dir, count_file, &all) == all && all == 1203);
+    fs = files_scan_begin(dir, NULL);
+    while (!files_scan_step(fs, count_file, &got, 1))
+        steps++;
+    files_scan_free(fs);
+    CHECK(got == all && steps > 10);
+
+    memset(&d, 0, sizeof d);
+    snprintf(path, sizeof path, "%s/main.php", dir);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    docs[0] = &d;
+    sep = sym_member_at(d.syn, &d.buf, 2, d.buf.lines[2].len);
+    /* Target.php is only found by walking the project (no Composer here) */
+    for (i = 0; i < 2000 && !found; i++) {
+        sym_budget(c, 1);
+        memset(&g, 0, sizeof g);
+        sym_members(c, docs, 1, &d, 2, sep, got_cb, &g);
+        if (sym_busy(c))
+            busy_seen = 1;
+        found = has_sym(&g, "hello");
+    }
+    CHECK(found && i < 2000);
+    (void)busy_seen;
+    sym_budget(c, 0);
+    CHECK(!sym_busy(c));
+    sym_cache_free(c);
+    doc_release(&d);
+}
+
 static void test_laravel(void)
 {
     char dir[64], path[256], err[128], t[64], cwd[512];
@@ -3874,6 +3938,7 @@ int main(void)
     test_long_names();
     test_alias_static();
     test_laravel();
+    test_scan_steps();
     test_snippets();
     test_cursors();
     test_folding();

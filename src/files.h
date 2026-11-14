@@ -13,6 +13,13 @@
 size_t files_scan(const char *root, void (*add)(const char *rel, void *ctx), void *ctx);
 
 /* Like files_scan, also skipping the folders called prune (a NULL-terminated list). */
+/* The same walk in steps: each files_scan_step visits files for about budget_us microseconds
+ * (0: to the end) and returns 1 when the walk is complete. */
+typedef struct FScan FScan;
+FScan *files_scan_begin(const char *root, const char *const *prune);
+int files_scan_step(FScan *s, void (*add)(const char *rel, void *ctx), void *ctx, long budget_us);
+void files_scan_free(FScan *s);
+
 size_t files_scan_prune(const char *root, void (*add)(const char *rel, void *ctx), void *ctx,
                         const char *const *prune);
 

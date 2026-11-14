@@ -62,6 +62,13 @@ typedef struct SymCache SymCache;
 SymCache *sym_cache_new(void);
 void sym_cache_free(SymCache *c);
 
+/* The scans that read the project (its files, its classes) are cut after ms milliseconds and go
+ * on at the next call, so that typing never waits for a big tree: call before a group of
+ * queries (0: no limit, the default). sym_busy tells whether, since then, one was cut short: the
+ * results may be incomplete and the same query should be repeated. */
+void sym_budget(SymCache *c, long ms);
+int sym_busy(const SymCache *c);
+
 /* kind: RULE_* (the standard library reports its own kinds mapped to these). rank: 0 current
  * file, 1 included or open file, 2 standard library. */
 typedef void (*SymFn)(void *ctx, const char *name, int kind, const char *sig, const char *ret,
