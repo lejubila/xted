@@ -10,9 +10,9 @@
 
 static void usage(FILE *f)
 {
-    fputs("uso: ked [file[:riga[:colonna]] ...]\n"
-          "     ked -        legge il testo da stdin\n"
-          "configurazione: $XDG_CONFIG_HOME/ked (o ~/.config/ked): config, syntax/, themes/\n", f);
+    fputs("uso: xted [file[:riga[:colonna]] ...]\n"
+          "     xted -       legge il testo da stdin\n"
+          "configurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/\n", f);
 }
 
 /* Splits "name:12:3" into the name and a line/column, but only when the
@@ -72,7 +72,7 @@ int main(int argc, char **argv)
             return 0;
         }
         if (argv[i][0] == '-' && argv[i][1] != '\0') {
-            fprintf(stderr, "ked: opzione sconosciuta: %s\n", argv[i]);
+            fprintf(stderr, "xted: opzione sconosciuta: %s\n", argv[i]);
             usage(stderr);
             return 2;
         }
@@ -86,13 +86,13 @@ int main(int argc, char **argv)
 
         if (strcmp(argv[i], "-") == 0) {
             if (stdin_used || isatty(STDIN_FILENO)) {
-                fputs("ked: '-' richiede il testo su stdin (una volta sola)\n", stderr);
+                fputs("xted: '-' richiede il testo su stdin (una volta sola)\n", stderr);
                 return 2;
             }
             stdin_used = 1;
             d = editor_open_fd(&e, STDIN_FILENO, err, sizeof err);
             if (!d) {
-                fprintf(stderr, "ked: stdin: %s\n", err);
+                fprintf(stderr, "xted: stdin: %s\n", err);
                 return 1;
             }
         } else if (is_dir(argv[i])) {
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 
             d = editor_open_doc(&e, name, err, sizeof err);
             if (!d) {
-                fprintf(stderr, "ked: %s: %s\n", name, err);
+                fprintf(stderr, "xted: %s: %s\n", name, err);
                 free(name);
                 return 1;
             }
@@ -122,7 +122,7 @@ int main(int argc, char **argv)
         editor_restore_session(&e);
 
     if (term_init() < 0) {
-        fputs("ked: serve un terminale interattivo\n", stderr);
+        fputs("xted: serve un terminale interattivo\n", stderr);
         return 1;
     }
     editor_run(&e);

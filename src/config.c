@@ -302,17 +302,18 @@ char *config_dir(void)
     size_t n;
     char *d;
 
-    if (x && x[0] == '/') {
-        n = strlen(x) + 5;
-        d = xmalloc(n);
-        snprintf(d, n, "%s/ked", x);
-        return d;
-    }
+    if (x && x[0] == '/')
+        return app_dir(x);
     if (h && h[0]) {
         n = strlen(h) + 16;
         d = xmalloc(n);
-        snprintf(d, n, "%s/.config/ked", h);
-        return d;
+        snprintf(d, n, "%s/.config", h);
+        {
+            char *r = app_dir(d);
+
+            free(d);
+            return r;
+        }
     }
     return NULL;
 }

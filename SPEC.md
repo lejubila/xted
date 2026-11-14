@@ -9,7 +9,7 @@ Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico b
 - **Zero dipendenze**: niente ncurses, niente librerie esterne; controllo del terminale via termios e sequenze ANSI/VT100 scritte a mano.
 - **Linguaggio**: C99 (alternativa: Rust senza crate esterni, ma binario più grande).
 - **Build**: un solo `Makefile`, compilabile con `gcc` o `clang`, opzione di link statico (`-static`, es. con musl).
-- **Licenza e nome**: da decidere (es. nome provvisorio `ked`).
+- **Nome**: `xted` (X = Unix/Linux, T = text/terminal, ED = editor), con `xt` come comando breve (collegamento creato da `make install`). **Licenza**: da decidere.
 - **Ispirazione**: kilo/antirez per la base, nano per la semplicità, micro per i comandi familiari (Ctrl+C/Ctrl+V).
 
 ## Architettura e terminale
@@ -31,7 +31,7 @@ Il nucleo è un buffer di testo indipendente dalla UI, con rendering differenzia
 
 Più file aperti contemporaneamente come buffer, mostrati in tab e affiancabili in split.
 
-- **Apertura da riga di comando**: `ked file1 file2 ...`, anche `ked file.c:120` per saltare alla riga 120; `ked -` legge da stdin.
+- **Apertura da riga di comando**: `xted file1 file2 ...`, anche `xted file.c:120` per saltare alla riga 120; `xted -` legge da stdin.
 - **Buffer multipli**: apri, chiudi, passa al successivo/precedente, lista dei buffer aperti con selezione rapida.
 - **Tab bar** in alto con nome file e indicatore di modifica (`*`).
 - **Split** orizzontale e verticale, anche dello stesso file; spostamento del focus tra i pannelli.
@@ -124,10 +124,10 @@ L'interfaccia è minimale ma informativa; tutto è configurabile da un file di t
 
 ### Configurazione
 
-- File `~/.config/ked/config` in formato chiave = valore, con override per linguaggio.
+- File `~/.config/xted/config` in formato chiave = valore, con override per linguaggio.
 - Scorciatoie da tastiera rimappabili.
-- Cartella `~/.config/ked/syntax/` per aggiungere linguaggi senza ricompilare.
-- Temi in `~/.config/ked/themes/`.
+- Cartella `~/.config/xted/syntax/` per aggiungere linguaggi senza ricompilare.
+- Temi in `~/.config/xted/themes/`.
 - Valori predefiniti sensati: l'editor funziona senza alcun file di configurazione.
 
 ### Prestazioni e qualità

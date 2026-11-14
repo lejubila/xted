@@ -5,13 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 void die(const char *fmt, ...)
 {
     va_list ap;
 
     term_restore();
-    fputs("ked: ", stderr);
+    fputs("xted: ", stderr);
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
@@ -117,4 +118,20 @@ void sbuf_addf(SBuf *b, const char *fmt, ...)
     va_end(ap2);
     if (n > 0)
         b->len += (size_t)n;
+}
+
+char *app_dir(const char *base)
+{
+    size_t n = strlen(base) + 8;
+    char *d = xmalloc(n), *old = xmalloc(n);
+    struct stat st;
+
+    snprintf(d, n, "%s/xted", base);
+    snprintf(old, n, "%s/ked", base);
+    if (stat(d, &st) != 0 && stat(old, &st) == 0 && S_ISDIR(st.st_mode)) {
+        free(d);
+        return old;
+    }
+    free(old);
+    return d;
 }

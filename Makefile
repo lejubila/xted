@@ -26,9 +26,12 @@ LIBSRC   = src/util.c src/utf8.c src/term.c src/undo.c src/clip.c src/buffer.c \
            src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=build/%.o) build/main.o
 
-all: ked
+PROG     = xted
+PREFIX  ?= /usr/local
 
-ked: $(OBJ)
+all: $(PROG)
+
+$(PROG): $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LINK)
 ifndef SAN
 	strip -s $@
@@ -46,7 +49,22 @@ test: build/test_core
 	./build/test_core
 
 clean:
-	rm -rf build ked
+	rm -rf build $(PROG)
 
-.PHONY: all test clean
+# xt is a short name for the same program: a link, never a second binary. An xt that is not
+# ours (another program with that name) is left alone.
+install: $(PROG)
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(PROG) $(DESTDIR)$(PREFIX)/bin/$(PROG)
+	@if [ -e $(DESTDIR)$(PREFIX)/bin/xt ] && [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" != "$(PROG)" ]; then \
+	    echo "xt esiste già in $(DESTDIR)$(PREFIX)/bin e non è un collegamento a $(PROG): non lo tocco"; \
+	else \
+	    ln -sf $(PROG) $(DESTDIR)$(PREFIX)/bin/xt; \
+	fi
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(PROG)
+	@if [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" = "$(PROG)" ]; then rm -f $(DESTDIR)$(PREFIX)/bin/xt; fi
+
+.PHONY: all test clean install uninstall
 -include $(OBJ:.o=.d)

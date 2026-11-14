@@ -155,7 +155,7 @@ static void roundtrip(const char *path, const char *data, size_t n, int crlf, in
 
 static void test_files(void)
 {
-    char dir[] = "/tmp/ked_test_XXXXXX";
+    char dir[] = "/tmp/xted_test_XXXXXX";
     char path[64], err[128];
     Buffer b;
     struct stat st;
@@ -291,7 +291,7 @@ static void test_undo(void)
 
 static void test_undo_saved(void)
 {
-    char dir[] = "/tmp/ked_test_XXXXXX";
+    char dir[] = "/tmp/xted_test_XXXXXX";
     char path[64], err[128];
     Buffer b;
     size_t y, x;
@@ -1017,8 +1017,8 @@ static void test_syntax_detect(void)
     CHECK(strcmp(detect_name("run", "#!/usr/bin/python3.11\n"), "Python") == 0);
     CHECK(strcmp(detect_name(NULL, "#!/bin/sh\n"), "Shell") == 0);
     CHECK(strcmp(detect_name("a.txt", "x\n# vim: set ft=markdown :\n"), "Markdown") == 0);
-    CHECK(strcmp(detect_name("a.txt", "// ked: ft=c++\n"), "C") == 0);
-    CHECK(strcmp(detect_name("a.c", "# ked: filetype=python\n"), "Python") == 0);
+    CHECK(strcmp(detect_name("a.txt", "// xted: ft=c++\n"), "C") == 0);
+    CHECK(strcmp(detect_name("a.c", "# xted: filetype=python\n"), "Python") == 0);
     CHECK(strcmp(detect_name("a.txt", "plain\n"), "-") == 0);
     CHECK(strcmp(detect_name(NULL, ""), "-") == 0);
     CHECK(strcmp(detect_name("Makefile", ""), "Makefile") == 0);
@@ -1192,7 +1192,7 @@ static void test_syntax_detect_langs(void)
         { "a.rb", "", "Ruby" }, { "Rakefile", "", "Ruby" }, { "run", "#!/usr/bin/env ruby\n", "Ruby" },
         { "Makefile", "", "Makefile" }, { "rules.mk", "", "Makefile" },
         { "Dockerfile", "", "Dockerfile" }, { "a.patch", "", "Diff" },
-        { "a.txt", "// ked: ft=typescript\n", "TypeScript" },
+        { "a.txt", "// xted: ft=typescript\n", "TypeScript" },
     };
     size_t i;
 
@@ -1234,7 +1234,7 @@ static void test_mouse(void)
 {
     Editor e;
     MouseHit h;
-    char dir[] = "/tmp/ked_mouse_XXXXXX";
+    char dir[] = "/tmp/xted_mouse_XXXXXX";
     char p1[300], p2[300], err[128];
     SBuf text = SBUF_INIT;
     size_t i;
@@ -1603,7 +1603,7 @@ static void put_file(const char *dir, const char *name, const char *text)
 
 static char *make_dir(char *buf, size_t n)
 {
-    snprintf(buf, n, "/tmp/ked-test-XXXXXX");
+    snprintf(buf, n, "/tmp/xted-test-XXXXXX");
     return mkdtemp(buf);
 }
 
@@ -1917,7 +1917,7 @@ static void test_session(void)
     {
         char *f = session_file();
 
-        CHECK(f && strstr(f, "/ked/sessions/%") != NULL && strncmp(f, dir, strlen(dir)) == 0);
+        CHECK(f && strstr(f, "/xted/sessions/%") != NULL && strncmp(f, dir, strlen(dir)) == 0);
         free(f);
     }
     unsetenv("XDG_STATE_HOME");
@@ -2800,7 +2800,7 @@ static void wait_run(Editor *e)
 static void test_run(void)
 {
     Editor e;
-    char dir[] = "/tmp/ked_run_XXXXXX";
+    char dir[] = "/tmp/xted_run_XXXXXX";
     char path[300];
     FILE *f;
     size_t i;
@@ -3083,18 +3083,18 @@ static void test_config(void)
 
         setenv("XDG_CONFIG_HOME", "/tmp/xdgtest", 1);
         d = config_dir();
-        CHECK(d && strcmp(d, "/tmp/xdgtest/ked") == 0);
+        CHECK(d && strcmp(d, "/tmp/xdgtest/xted") == 0);
         free(d);
         unsetenv("XDG_CONFIG_HOME");
         setenv("HOME", "/tmp/hometest", 1);
         d = config_dir();
-        CHECK(d && strcmp(d, "/tmp/hometest/.config/ked") == 0);
+        CHECK(d && strcmp(d, "/tmp/hometest/.config/xted") == 0);
         free(d);
     }
 
     /* loading from a folder; a missing file is not an error */
     {
-        char dir[] = "/tmp/ked_cfg_XXXXXX";
+        char dir[] = "/tmp/xted_cfg_XXXXXX";
         char path[300];
         FILE *f;
 
@@ -3115,16 +3115,16 @@ static void test_config(void)
 static void test_config_apply(void)
 {
     Editor e;
-    char dir[] = "/tmp/ked_xdg_XXXXXX";
+    char dir[] = "/tmp/xted_xdg_XXXXXX";
     char path[300];
     FILE *f;
     Key k;
     char err[64];
 
     CHECK(mkdtemp(dir) != NULL);
-    snprintf(path, sizeof path, "%s/ked", dir);
+    snprintf(path, sizeof path, "%s/xted", dir);
     CHECK(mkdir(path, 0700) == 0);
-    snprintf(path, sizeof path, "%s/ked/config", dir);
+    snprintf(path, sizeof path, "%s/xted/config", dir);
     f = fopen(path, "w");
     fputs("tab_width = 4\nexpand_tab = on\ntheme = chiaro\nclipboard = off\nautosuggest = off\n"
           "trim_trailing_space = yes\nfinal_newline = always\n"
@@ -3173,7 +3173,7 @@ static void test_config_apply(void)
     editor_free(&e);
 
     /* problems: unknown theme, key, command, bad key syntax */
-    snprintf(path, sizeof path, "%s/ked/config", dir);
+    snprintf(path, sizeof path, "%s/xted/config", dir);
     f = fopen(path, "w");
     fputs("theme = nonesiste\n[keys]\nalt+j = no_such_command\nhyper+x = save\nctrl+i = save\n", f);
     fclose(f);
@@ -3185,7 +3185,7 @@ static void test_config_apply(void)
 
     unsetenv("XDG_CONFIG_HOME");
     remove(path);
-    snprintf(path, sizeof path, "%s/ked", dir);
+    snprintf(path, sizeof path, "%s/xted", dir);
     rmdir(path);
     rmdir(dir);
 }
@@ -3205,7 +3205,7 @@ static void test_user_themes_syntax(void)
                      "git_add #00ff00\n# comment\n";
     size_t n0 = theme_count();
     int i;
-    char dir[] = "/tmp/ked_user_XXXXXX";
+    char dir[] = "/tmp/xted_user_XXXXXX";
     char sub[300], cmd[400];
     SBuf msgs = SBUF_INIT;
     Buffer b;
@@ -3284,20 +3284,20 @@ static void test_user_themes_syntax(void)
     /* both folders through the editor's configuration */
     {
         Editor e;
-        char xdg[] = "/tmp/ked_xdg2_XXXXXX";
+        char xdg[] = "/tmp/xted_xdg2_XXXXXX";
         Buffer b2;
         Syntax *s2;
 
         CHECK(mkdtemp(xdg) != NULL);
-        snprintf(sub, sizeof sub, "%s/ked", xdg);
+        snprintf(sub, sizeof sub, "%s/xted", xdg);
         CHECK(mkdir(sub, 0700) == 0);
-        snprintf(sub, sizeof sub, "%s/ked/themes", xdg);
+        snprintf(sub, sizeof sub, "%s/xted/themes", xdg);
         CHECK(mkdir(sub, 0700) == 0);
         put_file(sub, "notte", "name Notte\nbackground #101010\n");
-        snprintf(sub, sizeof sub, "%s/ked/syntax", xdg);
+        snprintf(sub, sizeof sub, "%s/xted/syntax", xdg);
         CHECK(mkdir(sub, 0700) == 0);
         put_file(sub, "foo", "name Foo\next foo\nwords keyword wibble\n");
-        snprintf(sub, sizeof sub, "%s/ked", xdg);
+        snprintf(sub, sizeof sub, "%s/xted", xdg);
         put_file(sub, "config", "theme = notte\n[foo]\ntab_width = 3\n");
         setenv("XDG_CONFIG_HOME", xdg, 1);
         ed_load(&e, "x");
@@ -3326,7 +3326,7 @@ static void test_git(void)
         "@@ -5 +7 @@\n-old\n+changed\n"                /* one line changed */
         "@@ -9,2 +10,3 @@\n-a\n-b\n+x\n+y\n+z\n";      /* two become three */
     const char *diff2 = "@@ -4,2 +3,0 @@\n-gone\n-gone2\n@@ -1,1 +0,0 @@\n-top\n";
-    char dir[] = "/tmp/ked_git_XXXXXX";
+    char dir[] = "/tmp/xted_git_XXXXXX";
     char path[300], cmd[600];
     uint8_t *marks = NULL;
     FILE *f;
@@ -3385,7 +3385,7 @@ static void test_git(void)
 
 static void test_tags(void)
 {
-    char dir[] = "/tmp/ked_tags_XXXXXX";
+    char dir[] = "/tmp/xted_tags_XXXXXX";
     char sub[300], path[300], cmd[400];
     TagHits h;
     char *found;
@@ -3908,6 +3908,50 @@ static void count_file(const char *rel, void *ctx)
 }
 
 /* The scans of the project stop at a time limit and go on at the next call. */
+/* The folders were called "ked" before the rename: they stay in use if they are the only ones. */
+static void test_app_dir(void)
+{
+    char dir[64], path[160], *d, *f;
+    Session r;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    d = app_dir(dir);
+    snprintf(path, sizeof path, "%s/xted", dir);
+    CHECK(d && strcmp(d, path) == 0);                           /* neither exists: the new name */
+    free(d);
+    snprintf(path, sizeof path, "%s/ked", dir);
+    CHECK(mkdir(path, 0700) == 0);
+    d = app_dir(dir);
+    CHECK(d && strcmp(d, path) == 0);                           /* only the old one: it is used */
+    free(d);
+    snprintf(path, sizeof path, "%s/xted", dir);
+    CHECK(mkdir(path, 0700) == 0);
+    d = app_dir(dir);
+    CHECK(d && strcmp(d, path) == 0);                           /* both: the new one wins */
+    free(d);
+
+    /* a session saved by the old name still loads */
+    put_file(dir, "old-session", "ked-session 1\nactive 0\nsidebar 0\nbuf\t3\t1\t0\t/tmp/a.txt\n");
+    snprintf(path, sizeof path, "%s/old-session", dir);
+    CHECK(session_load(path, &r) == 0 && r.n == 1 && r.e[0].y == 3);
+    session_free(&r);
+
+    /* the session and config folders follow the same rule */
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(path, sizeof path, "%s/ked", dir);
+    CHECK(mkdir(path, 0700) == 0);
+    setenv("XDG_STATE_HOME", dir, 1);
+    f = session_file();
+    CHECK(f && strstr(f, "/ked/sessions/%") != NULL && strstr(f, "/xted/") == NULL);
+    free(f);
+    unsetenv("XDG_STATE_HOME");
+    setenv("XDG_CONFIG_HOME", dir, 1);
+    d = config_dir();
+    CHECK(d && strcmp(d, path) == 0);
+    free(d);
+    unsetenv("XDG_CONFIG_HOME");
+}
+
 static void test_scan_steps(void)
 {
     char dir[64], path[256], err[128];
@@ -4420,6 +4464,7 @@ int main(void)
     test_alias_static();
     test_laravel();
     test_scan_steps();
+    test_app_dir();
     test_snippets();
     test_cursors();
     test_folding();

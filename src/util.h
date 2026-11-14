@@ -15,6 +15,9 @@ void *xrealloc(void *p, size_t n);
 char *xstrdup(const char *s);
 /* NUL-terminated copy of the first n bytes, trailing blanks dropped. */
 char *xstrndup(const char *s, size_t n);
+/* base + "/xted" (malloc'ed). The folder used to be called "ked": if only that one exists, it
+ * is the one returned, so that configuration and sessions made before the rename stay in use. */
+char *app_dir(const char *base);
 
 /* Growable byte string. Not NUL-terminated. */
 typedef struct {

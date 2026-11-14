@@ -19,7 +19,7 @@ typedef struct {
 } Session;
 
 /* File that holds the session of the current folder, under $XDG_STATE_HOME
- * (or ~/.local/state)/ked/sessions/. malloc'ed; NULL if there is no home. */
+ * (or ~/.local/state)/xted/sessions/. malloc'ed; NULL if there is no home. */
 char *session_file(void);
 void session_add(Session *s, const char *path, size_t y, size_t x, size_t rowoff);
 /* Writes (creating folders) or, with no entries, removes the file. 0 on success. */

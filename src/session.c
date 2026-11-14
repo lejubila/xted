@@ -8,12 +8,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define MAGIC "ked-session 1"
+#define MAGIC "xted-session 1"
+#define MAGIC_OLD "ked-session 1"     /* written before the editor was renamed */
 
 char *session_file(void)
 {
     const char *state = getenv("XDG_STATE_HOME"), *home = getenv("HOME");
-    char cwd[4096], *key, *out;
+    char cwd[4096], *key, *out, *base, *dir;
     SBuf b = SBUF_INIT;
     size_t i;
 
@@ -27,15 +28,21 @@ char *session_file(void)
     } else {
         return NULL;
     }
+    sbuf_add(&b, "", 1);
+    base = sbuf_steal(&b);
+    dir = app_dir(base);
+    free(base);
     key = xstrdup(cwd);
     for (i = 0; key[i]; i++)
         if (key[i] == '/')
             key[i] = '%';
-    sbuf_adds(&b, "/ked/sessions/");
+    sbuf_adds(&b, dir);
+    sbuf_adds(&b, "/sessions/");
     sbuf_adds(&b, key);
     sbuf_add(&b, "", 1);
     out = sbuf_steal(&b);
     free(key);
+    free(dir);
     return out;
 }
 
@@ -102,7 +109,8 @@ int session_load(const char *file, Session *s)
     memset(s, 0, sizeof *s);
     if (!f)
         return -1;
-    if (!fgets(line, sizeof line, f) || strncmp(line, MAGIC, strlen(MAGIC)) != 0) {
+    if (!fgets(line, sizeof line, f) || (strncmp(line, MAGIC, strlen(MAGIC)) != 0 &&
+                                         strncmp(line, MAGIC_OLD, strlen(MAGIC_OLD)) != 0)) {
         fclose(f);
         return -1;
     }

@@ -1,7 +1,7 @@
-# ked
+# xted
 
 Editor di testo da terminale per Linux, scritto in C99 con sola libc POSIX.
-Binario unico, avvio sotto 50 ms. `ked` è il nome provvisorio.
+Binario unico, avvio sotto 50 ms. Il nome è `xted` (scelto al posto del provvisorio `ked`, già usato da altri editor); `xt` è il collegamento breve che crea `make install`.
 Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verità: non duplicarle qui.
 
 ## Vincoli non negoziabili
@@ -37,7 +37,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/layout.[ch]` | Albero degli split e geometria dei pannelli (quote per mille `Node.frac`), bordi (`layout_border_at/set_size/resize/equalize`); senza terminale |
 | `src/fuzzy.[ch]`, `src/picker.[ch]` | Punteggio fuzzy e lista filtrabile (elenco buffer, apertura rapida) |
 | `src/files.[ch]` | Scansione dei file del progetto e modello ad albero del file browser |
-| `src/session.[ch]` | File di sessione per cartella (`$XDG_STATE_HOME/ked/sessions/`) |
+| `src/session.[ch]` | File di sessione per cartella (`$XDG_STATE_HOME/xted/sessions/`) |
 | `src/search.[ch]` | Nucleo della ricerca: `Matcher` (testo o regex POSIX ERE, per riga), ricerca nel buffer, sostituzione, ricerca nei file; senza terminale |
 | `src/find.[ch]` | Comandi di ricerca/sostituzione/vai alla riga sull'`Editor`: barra di ricerca come macchina a stati |
 | `src/commands.[ch]` | Tabella dei comandi (nome, scorciatoia come testo, funzione): alimenta la command palette (Alt+X) |
@@ -51,7 +51,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/run.[ch]` | Comandi di shell sull'`Editor`: pannello «[Output]» (documento `scratch`), Alt+R/F5, errori F8; il pipe è osservato da `term_watch` |
 | `src/errors.[ch]` | Riconoscimento di `file:riga:colonna` nell'output (gcc, tsc, Python); senza terminale |
 | `src/keymap.[ch]` | Nomi dei tasti (`ctrl+s`, `alt+shift+up`) e mappa tasto → comando, con i predefiniti presi da `commands[]` |
-| `src/config.[ch]` | File `~/.config/ked/config` (chiave = valore, `[linguaggio]`, `[keys]`); non conosce l'`Editor` |
+| `src/config.[ch]` | File `~/.config/xted/config` (chiave = valore, `[linguaggio]`, `[keys]`); non conosce l'`Editor` |
 | `src/git.[ch]` | Indicatori Git: `git diff -U0` analizzato in `Line.git`; senza librerie |
 | `src/tags.[ch]` | File `tags` di ctags: ricerca (binaria se ordinato) e risoluzione dell'indirizzo; senza terminale |
 | `src/mouse.[ch]` | Mouse: `mouse_locate` (cella → tab, browser, picker, riga/byte di un pannello) e `mouse_event` (clic, doppio/triplo clic, trascinamento, rotella, Alt+clic); gli eventi SGR vengono decodificati da `term.c` (`KEY_MOUSE`) |
@@ -60,12 +60,13 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `tests/` | Test automatici |
 
+- Le cartelle di configurazione e di stato si chiamavano `ked`: `app_dir` (util.c) usa ancora quella vecchia se è l'unica che esiste, e le sessioni con intestazione `ked-session` si leggono ancora.
 - Ogni fase aggiunge i moduli previsti da `SPEC.md` (sintassi, comandi, configurazione, …).
 - Un modulo non deve dipendere da quelli di livello più alto: `buffer` e `utf8` non conoscono terminale né UI.
 - Ogni modifica al testo passa dalle primitive di `buffer.c` (`buf_insert/delete/split/join`) o dagli helper costruiti su di esse, così undo e rappresentazione interna restano isolati. Un comando che modifica il testo apre un gruppo undo (`buf_undo_begin`) e lo chiude a fine comando.
 - `Editor` espone i campi `cy, cx, rowoff, …` del **pannello attivo**; gli altri pannelli hanno la loro `View` in `Win`. Cambiare pannello o documento passa da `editor_store_view`/`load_win` (editor.c); `e->buf` e `e->doc` puntano sempre al documento attivo.
 - Un comando nuovo si aggiunge a `commands[]` (id inglese stabile, scorciatoia predefinita come testo di configurazione): palette, tasti e `[keys]` lo vedono da lì. In `editor.c` restano cablati solo digitazione, movimenti e selezione; non aggiungere `case` per tasti di comando.
-- L'indentazione di un documento (`Doc.tabw` larghezza di un tab disegnato, `expand_tab`, `indent_w` spazi di un livello) si risolve in `apply_cfg` con questa precedenza: comando dell'utente (`Doc.man`, palette «Indentazione: …») > `~/.config/ked/config` (solo i valori scritti: `LangCfg.set`) > `.editorconfig` > stile rilevato nel testo (`Doc.det`, calcolato in `install_doc`) > predefiniti. `edit.c` usa sempre `indent_unit` (un livello) e `indent_w`, mai `tabw`, per inserire o togliere indentazione. - `Doc.tabw`, `expand_tab`, … vengono da `config` per linguaggio (`apply_cfg`); `e->tabw` è lo specchio del documento attivo, per gli altri pannelli il renderer usa `d->tabw`. Con il margine Git (`Doc.gutter`) la larghezza del testo è `win_text_w(w)`, non `w->w`.
+- L'indentazione di un documento (`Doc.tabw` larghezza di un tab disegnato, `expand_tab`, `indent_w` spazi di un livello) si risolve in `apply_cfg` con questa precedenza: comando dell'utente (`Doc.man`, palette «Indentazione: …») > `~/.config/xted/config` (solo i valori scritti: `LangCfg.set`) > `.editorconfig` > stile rilevato nel testo (`Doc.det`, calcolato in `install_doc`) > predefiniti. `edit.c` usa sempre `indent_unit` (un livello) e `indent_w`, mai `tabw`, per inserire o togliere indentazione. - `Doc.tabw`, `expand_tab`, … vengono da `config` per linguaggio (`apply_cfg`); `e->tabw` è lo specchio del documento attivo, per gli altri pannelli il renderer usa `d->tabw`. Con il margine Git (`Doc.gutter`) la larghezza del testo è `win_text_w(w)`, non `w->w`.
 - I campi extra del multi-cursore (`Editor.xc`) vengono svuotati cambiando pannello/documento e con undo/redo; i comandi di `edit.c` restano a cursore singolo e `cur_each` li ripete per ogni cursore. `Line.fold`/`Buffer.folded` sono lo stato del folding: dopo un'azione che sposta il cursore, `fold_reveal` riapre ciò che lo nasconde; le funzioni di movimento e rendering contano le righe *visibili* (`fold_next/prev/advance/back/nth/count`), mai `cy + 1`.
 - Il mouse passa da `KEY_MOUSE` (`term_mouse_event`) a `mouse_event`; la geometria dello schermo si ricava con `mouse_locate`/`render_tab_at`/`render_picker_height`, non si ricalcola altrove. Per far agire il mouse come un tasto in una lista si usa `editor_key`.
 - Il ridimensionamento degli split passa solo da `layout_set_size/layout_resize/layout_equalize` seguiti da `layout_refresh` (mouse: trascinamento di bordi e browser; tastiera: modalità Alt+E, `Editor.resize_mode`). Lo stato di sintassi di una riga può indicare un linguaggio incorporato (bit 15 di `Line.hl`): per i marcatori di commento di una riga usare `syn_comment_at`, non `syn_comment`.
@@ -85,12 +86,13 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 ## Comandi
 
 ```
-make                 # build ottimizzata (./ked)
+make                 # build ottimizzata (./xted)
 make STATIC=1        # link statico
 make SAN=1           # build con AddressSanitizer e UBSan
 make test            # test automatici
 make clean
-./ked [file]         # esecuzione
+./xted [file]        # esecuzione
+make install         # in $(PREFIX)/bin (predefinito /usr/local): xted e il collegamento xt
 ```
 
 ## Metodo di lavoro

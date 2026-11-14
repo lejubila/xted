@@ -1,5 +1,5 @@
 /* Built-in language definitions, in the same text format that will be read
- * from ~/.config/ked/syntax/ (Phase 7). One definition per language; adding
+ * from ~/.config/xted/syntax/ (Phase 7). One definition per language; adding
  * a language means adding data here, not code.
  *
  * Format: one directive per line, blank-separated; lines starting with '#'

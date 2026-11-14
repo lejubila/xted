@@ -258,7 +258,7 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
     dlen = slash ? (size_t)(slash - target) + 1 : 0;
     tmp = xmalloc(dlen + 16);
     memcpy(tmp, target, dlen);
-    strcpy(tmp + dlen, ".ked.XXXXXX");
+    strcpy(tmp + dlen, ".xted.XXXXXX");
     fd = mkstemp(tmp);
     if (fd < 0) {
         snprintf(err, errlen, "%s", strerror(errno));

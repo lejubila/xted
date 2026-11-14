@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-/* The user's settings file (~/.config/ked/config): "key = value" lines, "#" comments,
+/* The user's settings file (~/.config/xted/config): "key = value" lines, "#" comments,
  * "[language]" sections that override the language-dependent settings, and a "[keys]"
  * section of "key = command" lines. Parsing never fails: a bad line is skipped and
  * counted, and the first problem is kept as a message with its line number. -1 means
@@ -53,7 +53,8 @@ void config_free(Config *c);
 int config_parse(Config *c, const char *text, size_t n);
 /* Records a problem found while applying the settings (counted like a bad line). */
 void config_error(Config *c, int line, const char *msg);
-/* $XDG_CONFIG_HOME/ked or ~/.config/ked (malloc'ed), NULL if neither is known. */
+/* $XDG_CONFIG_HOME/xted or ~/.config/xted (malloc'ed), NULL if neither is known. An older
+ * folder called "ked" is used when it is the only one that exists. */
 char *config_dir(void);
 /* Reads dir/config if it exists. Returns 1 if a file was read. */
 int config_load(Config *c, const char *dir);
