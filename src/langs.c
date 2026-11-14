@@ -23,6 +23,20 @@
  *                             END "$" = end of line, "-" = the START token alone; ml = continues
  *                             on the next lines; bol = only at line start; ns = START not
  *                             followed by a blank. The first region that matches wins.
+ *   decl KIND PATTERN         a definition for the autosuggest index. KIND: class func method
+ *                             prop const var ns (ns: a block that is only a scope). A func inside a
+ *                             class is a method. First matching decl at a statement start wins.
+ *   include PATTERN           names a file (~ a quoted string, & a dotted module path, % a class)
+ *   bind PATTERN              ties a variable (@) to a type (%), searched upwards from the cursor
+ *   attr PATTERN              a member created by assignment inside a method (this.x = ...)
+ *   member OPS                operators that open the member list: member -> ::
+ *   scope indent              blocks are marked by indentation (default: braces)
+ *   Patterns are items separated by blanks, matched after skipping blanks: a|b alternatives,
+ *   NAME* repeated, NAME? optional (a modifier word counts only when a name follows it),
+ *   @ identifier, % type (the last segment of a qualified one; generics and * & are skipped),
+ *   ^ parameters up to the matching ")" (the "(" is written before it), ~ quoted string,
+ *   & dotted path, <> optional <...>, $$ end of line, =X lookahead (not consumed),
+ *   anything else literal. A pattern may stop early: the rest of the line is not checked.
  * Classes: normal comment string keyword type constant number preproc function
  *          operator variable heading emphasis code link
  */
@@ -49,6 +63,31 @@ static const char *const lang_c[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^~?:",
+    "member . -> ::",
+    "decl ns extern ~ ={",
+    "decl ns namespace @ ={",
+    "decl ns namespace ={",
+    "decl ns namespace @ $$",
+    "decl class template? <> class|struct @ final? : public|protected|private|virtual* % ={",
+    "decl class template? <> class|struct @ final? ={|:",
+    "decl class template? <> class|struct @ final? $$",
+    "decl class typedef? struct|union|enum @ ={",
+    "decl class typedef? struct|union|enum @ $$",
+    "decl class typedef struct|union|enum ={",
+    "decl class typedef struct|union|enum $$",
+    "decl class typedef unsigned|signed|const|struct|enum|union* % @ =;",
+    "decl func # define @ ( ^",
+    "decl const # define @",
+    "decl func static|inline|extern|const|unsigned|signed|struct|union|enum|volatile|virtual|explicit|constexpr|typename|friend* % @ ( ^",
+    "decl method @ ( ^",
+    "decl prop static|const|unsigned|signed|struct|union|enum|volatile|mutable* % @ =;|,|[|:|=",
+    "decl var static|extern|const|unsigned|signed|struct|union|enum|volatile* % @ =;|=|[",
+    "include # include ~",
+    "attr this -> @ =",
+    "bind auto @ = new %",
+    "bind auto @ = % (",
+    "bind @ = new %",
+    "bind const|struct|enum|union|volatile|static|unsigned|constexpr* % @ =;|=|(|[|,|)|{|:",
     NULL
 };
 
@@ -74,6 +113,29 @@ static const char *const lang_python[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^~:",
+    "scope indent",
+    "member .",
+    "decl class class @ ( %",
+    "decl class class @",
+    "decl func async? def @ ( ^ -> %",
+    "decl func async? def @ ( ^",
+    "decl prop @ = % (",
+    "decl prop @ : %",
+    "decl prop @ =",
+    "decl var @ = % (",
+    "decl var @ : %",
+    "decl var @ =",
+    "include from & import",
+    "include import &",
+    "attr self . @ = % (",
+    "attr self . @ : %",
+    "attr self . @ =",
+    "bind @ = % (",
+    "bind @ : %",
+    "bind @ = ' !str",
+    "bind @ = \" !str",
+    "bind @ = [ !list",
+    "bind @ = { !dict",
     NULL
 };
 
@@ -100,6 +162,33 @@ static const char *const lang_js[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^~?:",
+    "member .",
+    "decl class export? default? abstract? class @ extends %",
+    "decl class export? default? abstract? class @",
+    "decl func export? default? async? function @ ( ^ : %",
+    "decl func export? default? async? function @ ( ^",
+    "decl func export? const|let|var @ = ( ^",
+    "decl func export? const|let|var @ = async (",
+    "decl func export? const|let|var @ = async function",
+    "decl func export? const|let|var @ = function",
+    "decl method static|async|get|set|public|private|protected|readonly|override|abstract* @ ( ^ : %",
+    "decl method static|async|get|set|public|private|protected|readonly|override|abstract* @ ( ^",
+    "decl prop static|public|private|protected|readonly|declare|override* @ : %",
+    "decl prop static|public|private|protected|readonly|declare|override* @ =;|=",
+    "decl var export? const|let|var @ = new %",
+    "decl var export? const|let|var @ =",
+    "include from ~",
+    "include import ~",
+    "include require ~",
+    "attr this . @ = new %",
+    "attr this . @ =",
+    "bind @ = new %",
+    "bind @ : %",
+    "bind @ = % (",
+    "bind @ = ' !String",
+    "bind @ = \" !String",
+    "bind @ = ` !String",
+    "bind @ = [ !Array",
     NULL
 };
 
@@ -129,6 +218,36 @@ static const char *const lang_ts[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^~?:",
+    "member .",
+    "decl class export? default? declare? interface @ extends %",
+    "decl class export? default? declare? interface @",
+    "decl class export? default? declare? enum @",
+    "decl class export? default? abstract? class @ extends %",
+    "decl class export? default? abstract? class @",
+    "decl func export? default? async? function @ ( ^ : %",
+    "decl func export? default? async? function @ ( ^",
+    "decl func export? const|let|var @ = ( ^",
+    "decl func export? const|let|var @ = async (",
+    "decl func export? const|let|var @ = async function",
+    "decl func export? const|let|var @ = function",
+    "decl method static|async|get|set|public|private|protected|readonly|override|abstract* @ ( ^ : %",
+    "decl method static|async|get|set|public|private|protected|readonly|override|abstract* @ ( ^",
+    "decl prop static|public|private|protected|readonly|declare|override* @ : %",
+    "decl prop static|public|private|protected|readonly|declare|override* @ =;|=",
+    "decl var export? const|let|var @ = new %",
+    "decl var export? const|let|var @ =",
+    "include from ~",
+    "include import ~",
+    "include require ~",
+    "attr this . @ = new %",
+    "attr this . @ =",
+    "bind @ = new %",
+    "bind @ : %",
+    "bind @ = % (",
+    "bind @ = ' !String",
+    "bind @ = \" !String",
+    "bind @ = ` !String",
+    "bind @ = [ !Array",
     NULL
 };
 
@@ -171,6 +290,24 @@ static const char *const lang_markdown[] = {
     NULL
 };
 
+#define PHP_SYM_RULES \
+    "member -> ::", \
+    "decl class abstract|final|readonly* class|interface|trait|enum @ extends %", \
+    "decl class abstract|final|readonly* class|interface|trait|enum @", \
+    "decl func public|protected|private|static|abstract|final* function @ ( ^ : %", \
+    "decl func public|protected|private|static|abstract|final* function @ ( ^", \
+    "decl prop public|protected|private|static|readonly|var public|protected|private|static|readonly* % $ @", \
+    "decl prop public|protected|private|static|readonly|var public|protected|private|static|readonly* $ @", \
+    "decl const public|protected|private|final* const @ =", \
+    "include require|require_once|include|include_once ~", \
+    "include use % =;|as", \
+    "include new %", \
+    "attr $ this -> @ = new %", \
+    "attr $ this -> @ =", \
+    "bind $ @ = new %", \
+    "bind var % $ @", \
+    "bind % $ @"
+
 static const char *const lang_php[] = {
     "name PHP",
     "comment //",
@@ -201,6 +338,7 @@ static const char *const lang_php[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^~?:.@",
+    PHP_SYM_RULES,
     NULL
 };
 
@@ -230,6 +368,7 @@ static const char *const lang_php_html[] = {
     "ext phtml",
     "alias php-html phtml",
     HTML_RULES,
+    PHP_SYM_RULES,
     NULL
 };
 

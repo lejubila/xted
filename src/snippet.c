@@ -126,6 +126,8 @@ void snip_parse(const char *body, SBuf *text, SnipStops *out)
             size_t j = i + 4, start = text->len;
 
             while (body[j] && body[j] != '}') {
+                if (body[j] == '$' && body[j + 1] == '$')
+                    j++;                /* "$$" is a literal dollar here too */
                 sbuf_add(text, body + j, 1);
                 j++;
             }

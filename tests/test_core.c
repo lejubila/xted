@@ -20,6 +20,7 @@
 #include "session.h"
 #include "shell.h"
 #include "snippet.h"
+#include "symbols.h"
 #include "editor.h"
 #include "mouse.h"
 #include "syntax.h"
@@ -2108,7 +2109,8 @@ static void test_complete(void)
         doc_set_syntax(k.doc, lang("c"));
         buf_insert_text(&k.doc->buf, &y, &x, "retu", 4);
         CHECK(complete_open(&c, k.docs, k.ndocs, k.doc, 0, 4));
-        CHECK(c.n == 1 && strcmp(c.v[0].text, "return") == 0 && c.v[0].kind == CAND_KEYWORD);
+        /* the C library adds fuzzy matches (rename_t_u...), the keyword still comes first */
+        CHECK(c.n >= 1 && strcmp(c.v[0].text, "return") == 0 && c.v[0].kind == CAND_KEYWORD);
         complete_close(&c);
         editor_free(&k);
     }
@@ -3218,6 +3220,498 @@ static void test_tags(void)
     CHECK(system(cmd) == 0);
 }
 
+
+/* ---- symbols and member completion -------------------------------------- */
+
+typedef struct {
+    char got[1 << 19];          /* the whole standard library is reported by sym_globals */
+    int n;
+} Got;
+
+static void got_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret,
+                   int rank)
+{
+    Got *g = ctx;
+    size_t len = strlen(g->got);
+
+    (void)rank;
+    snprintf(g->got + len, sizeof g->got - len, "[%s %d (%s) %s]", name, kind, sig, ret);
+    g->n++;
+}
+
+static int has_sym(const Got *g, const char *name)
+{
+    char key[128];
+
+    snprintf(key, sizeof key, "[%s ", name);
+    return strstr(g->got, key) != NULL;
+}
+
+static const Sym *find_sym(const SymIndex *x, const char *name, int kind)
+{
+    size_t i;
+
+    for (i = 0; i < x->n; i++)
+        if (strcmp(x->v[i].name, name) == 0 && x->v[i].kind == kind)
+            return &x->v[i];
+    return NULL;
+}
+
+/* A Doc on the stack (doc_free frees the Doc itself). */
+static void doc_release(Doc *d)
+{
+    syn_free(d->syn);
+    buf_free(&d->buf);
+    free(d->title);
+}
+
+static void test_symbol_patterns(void)
+{
+    PatMatch m;
+    const char *t;
+
+    t = "public static function foo(int $a, $b = (1)): ?\\App\\Bar {";
+    CHECK(pat_match("public|static* function @ ( ^ : %", t, strlen(t), 0, &m));
+    CHECK(strcmp(m.name, "foo") == 0 && strcmp(m.params, "int $a, $b = (1)") == 0 &&
+          strcmp(m.type, "Bar") == 0);
+    /* a keyword is never a name */
+    t = "if (x) {";
+    CHECK(!pat_match("@ ( ^", t, strlen(t), 0, &m));
+    /* a modifier counts only when a name follows */
+    t = "get(key) {";
+    CHECK(pat_match("static|get* @ ( ^", t, strlen(t), 0, &m) && strcmp(m.name, "get") == 0);
+    t = "static get size() {";
+    CHECK(pat_match("static|get* @ ( ^", t, strlen(t), 0, &m) && strcmp(m.name, "size") == 0);
+    /* look-ahead and end of line */
+    t = "struct node";
+    CHECK(pat_match("struct @ $$", t, strlen(t), 0, &m) && strcmp(m.name, "node") == 0);
+    t = "struct node *make(void)";
+    CHECK(!pat_match("struct @ ={|:", t, strlen(t), 0, &m));
+    t = "struct node {";
+    CHECK(pat_match("struct @ ={", t, strlen(t), 0, &m) && m.end == 12);
+    /* types: qualified, generic, pointer */
+    t = "std::vector<std::string> *items;";
+    CHECK(pat_match("% @ =;", t, strlen(t), 0, &m) && strcmp(m.type, "vector") == 0 &&
+          strcmp(m.name, "items") == 0);
+    t = "template <typename T> class Box : public Base {";
+    CHECK(pat_match("template? <> class|struct @ : public|protected|private|virtual* % ={", t,
+                    strlen(t), 0, &m) &&
+          strcmp(m.name, "Box") == 0 && strcmp(m.type, "Base") == 0);
+    /* paths */
+    t = "from ..pkg.mod import x";
+    CHECK(pat_match("from & import", t, strlen(t), 0, &m) && strcmp(m.path, "./../pkg/mod") == 0);
+    t = "const a = require('./lib/a');";
+    CHECK(pat_match("require ~", t, strlen(t), 10, &m) && strcmp(m.path, "./lib/a") == 0);
+}
+
+static void call_body_is(const char *name, int kind, const char *sig, int want, const char *body)
+{
+    Cand c;
+    SBuf b = SBUF_INIT;
+    int r;
+
+    c.text = (char *)name;
+    c.sig = (char *)sig;
+    c.kind = kind;
+    r = complete_call_body(&c, &b);
+    sbuf_add(&b, "", 1);
+    CHECK(r == want);
+    if (want)
+        CHECK(strcmp(b.p, body) == 0);
+    sbuf_free(&b);
+}
+
+static void test_call_body(void)
+{
+    call_body_is("strlen", CAND_FUNC, "strlen(const char *s): size_t", 1,
+                 "strlen(${1:const char *s})$0");
+    call_body_is("put", CAND_METHOD, "put(map<a,b> m, int n)", 1, "put(${1:map<a,b> m}, ${2:int n})$0");
+    call_body_is("f", CAND_FUNC, "f($x, $y = 1)", 1, "f(${1:$$x})$0");
+    call_body_is("g", CAND_FUNC, "g(a=1, *args)", 1, "g($1)$0");
+    call_body_is("h", CAND_FUNC, "h(): int", 2, "h()");
+    call_body_is("k", CAND_PROP, "k: int", 0, "");
+    call_body_is("m", CAND_FUNC, "m(a, ...)", 1, "m(${1:a})$0");
+}
+
+/* Names longer than any keyword (13+ letters) are still classes, methods and types. */
+static void test_long_names(void)
+{
+    char dir[64], path[128], err[128];
+    Doc d;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    static Got g;
+    size_t y, sep;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "long.php",
+             "<?php\n"
+             "class PiGardenSocketClient\n"
+             "{\n"
+             "    protected $socketResource;\n"
+             "    public function openConnection() {}\n"
+             "    public function run()\n"
+             "    {\n"
+             "        $this->\n"
+             "        $probe = new PiGardenAdminController();\n"
+             "        $probe->\n"
+             "    }\n"
+             "}\n"
+             "class PiGardenAdminController { public function resetEverything() {} }\n");
+    snprintf(path, sizeof path, "%s/long.php", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    docs[0] = &d;
+    y = 7;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "socketResource") && has_sym(&g, "openConnection") &&
+          !has_sym(&g, "resetEverything"));
+    y = 9;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "resetEverything") && !has_sym(&g, "openConnection") &&
+          !has_sym(&g, "run"));
+    sym_cache_free(c);
+    doc_release(&d);
+}
+
+static void test_symbols(void)
+{
+    char dir[64], path[128], err[128];
+    Doc d, dp;
+    SymIndex *x;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    static Got g;
+    char t[64];
+    size_t y, sep;
+    const Sym *s;
+
+    test_symbol_patterns();
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(path, sizeof path, "%s/lib", dir);
+    CHECK(mkdir(path, 0700) == 0);
+    put_file(dir, "lib/helper.php",
+             "<?php\n"
+             "class Helper {\n"
+             "    public $level = 1;\n"
+             "    public function assist(string $what, int $n = 0): string { return $what; }\n"
+             "    public function chain(): Helper { return $this; }\n"
+             "    public function self(): static { return $this; }\n"
+             "}\n"
+             "function helper_fn(int $a): Helper { return new Helper(); }\n");
+    put_file(dir, "main.php",
+             "<?php\n"
+             "require_once __DIR__ . '/lib/helper.php';\n"
+             "\n"
+             "abstract class Base\n"
+             "{\n"
+             "    protected int $id;\n"
+             "    public function getId(): int { return $this->id; }\n"
+             "}\n"
+             "\n"
+             "final class Thing extends Base\n"
+             "{\n"
+             "    const MAX = 3;\n"
+             "    private Helper $helper;\n"
+             "    public function __construct(Helper $h)\n"
+             "    {\n"
+             "        $this->helper = $h;\n"
+             "        $this->extra = new Helper();\n"
+             "    }\n"
+             "\n"
+             "    public function run(): self\n"
+             "    {\n"
+             "        $x = new Helper();\n"
+             "        $this->\n"
+             "        $x->\n"
+             "        $x->chain()->self()->\n"
+             "        $this->helper->\n"
+             "        helper_fn(1)->\n"
+             "        $x->assist('a')->\n"
+             "        return $this;\n"
+             "    }\n"
+             "}\n"
+             "class Other { public function only() {} }\n"
+             "$this->\n");
+    snprintf(path, sizeof path, "%s/main.php", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    docs[0] = &d;
+    CHECK(strcmp(syn_name(d.syn), "PHP") == 0);
+
+    /* the index: classes, members, bases, types, includes */
+    x = sym_build(&d.buf, d.syn);
+    s = find_sym(x, "Thing", RULE_CLASS);
+    CHECK(s && strcmp(s->ret, "Base") == 0 && s->y0 == 9 && s->y1 == 30);
+    s = find_sym(x, "getId", RULE_METHOD);
+    CHECK(s && s->owner >= 0 && strcmp(x->v[s->owner].name, "Base") == 0 && strcmp(s->ret, "int") == 0);
+    s = find_sym(x, "helper", RULE_PROP);
+    CHECK(s && strcmp(s->ret, "Helper") == 0);
+    s = find_sym(x, "extra", RULE_PROP);                    /* made by an assignment in a method */
+    CHECK(s && strcmp(s->ret, "Helper") == 0 && strcmp(x->v[s->owner].name, "Thing") == 0);
+    s = find_sym(x, "__construct", RULE_METHOD);
+    CHECK(s && strcmp(s->sig, "Helper $h") == 0);
+    CHECK(find_sym(x, "MAX", RULE_CONST) != NULL);
+    CHECK(x->ninc >= 1 && strcmp(x->inc[0], "/lib/helper.php") == 0);
+    sym_index_free(x);
+
+    /* $this-> : the members of the class around the cursor, with the inherited ones */
+    y = 22;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    CHECK(sep == 13);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "helper") && has_sym(&g, "run") && has_sym(&g, "getId") &&
+          has_sym(&g, "MAX") && has_sym(&g, "extra") && !has_sym(&g, "only"));
+    /* an object created above, from a file that is included, not open */
+    y = 23;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "assist") && has_sym(&g, "level") && !has_sym(&g, "run"));
+    CHECK(strstr(g.got, "[assist 2 (string $what, int $n = 0) string]") != NULL);
+    /* chains: methods returning their class, "static", a typed property, a function result */
+    y = 24;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    CHECK(sym_type_before(c, docs, 1, &d, y, sep, t, sizeof t) && strcmp(t, "Helper") == 0);
+    y = 25;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    CHECK(sym_type_before(c, docs, 1, &d, y, sep, t, sizeof t) && strcmp(t, "Helper") == 0);
+    y = 26;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    CHECK(sym_type_before(c, docs, 1, &d, y, sep, t, sizeof t) && strcmp(t, "Helper") == 0);
+    /* a chain that ends in a scalar: no members, and the type is not a class we know */
+    y = 27;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    CHECK(!sym_type_before(c, docs, 1, &d, y, sep, t, sizeof t) || strcmp(t, "string") == 0);
+    /* outside any class: unknown, so every member of every class is offered */
+    y = 32;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 0);
+    CHECK(has_sym(&g, "only") && has_sym(&g, "run"));
+    /* not an operator: a number, a comment */
+    CHECK(sym_member_at(d.syn, &d.buf, 0, 5) == (size_t)-1);
+
+    /* globals: this file, the included one, the standard library */
+    memset(&g, 0, sizeof g);
+    sym_globals(c, docs, 1, &d, got_cb, &g);
+    CHECK(has_sym(&g, "Thing") && has_sym(&g, "helper_fn") && has_sym(&g, "Helper") &&
+          has_sym(&g, "strlen") && has_sym(&g, "DateTime") && has_sym(&g, "array_map"));
+
+    /* the popup after "$this->": members only, with their signature; a new method is seen */
+    {
+        Complete cp;
+        size_t i;
+        int found = 0;
+
+        memset(&cp, 0, sizeof cp);
+        y = 22;
+        CHECK(complete_open(&cp, docs, 1, &d, y, d.buf.lines[y].len));
+        for (i = 0; i < cp.n; i++)
+            if (strcmp(cp.v[i].text, "getId") == 0 && cp.v[i].kind == CAND_METHOD &&
+                cp.v[i].sig && strcmp(cp.v[i].sig, "getId(): int") == 0)
+                found = 1;
+        CHECK(found);
+        complete_close(&cp);
+        buf_insert(&d.buf, 22, d.buf.lines[22].len, "ge", 2);
+        CHECK(complete_open(&cp, docs, 1, &d, 22, d.buf.lines[22].len));
+        CHECK(cp.n >= 1 && strcmp(cp.v[0].text, "getId") == 0);
+        complete_free(&cp);
+    }
+    sym_cache_free(c);
+    doc_release(&d);
+
+    /* Python: indentation scopes, self, inheritance, a function that returns an instance */
+    c = sym_cache_new();
+    put_file(dir, "a.py",
+             "class Base:\n"
+             "    def ping(self, n: int) -> int:\n"
+             "        return n\n"
+             "\n"
+             "class Dog(Base):\n"
+             "    legs: int = 4\n"
+             "    def __init__(self, name):\n"
+             "        self.name = name\n"
+             "        self.owner = Person()\n"
+             "    def bark(self, times=1) -> 'Dog':\n"
+             "        self.\n"
+             "\n"
+             "class Person:\n"
+             "    def pet(self) -> Dog: pass\n"
+             "\n"
+             "def make() -> Dog:\n"
+             "    d = make()\n"
+             "    d.\n"
+             "    d.owner.pet().\n"
+             "    s = 'abc'\n"
+             "    s.\n");
+    snprintf(path, sizeof path, "%s/a.py", dir);
+    memset(&dp, 0, sizeof dp);
+    CHECK(doc_load(&dp, path, err, sizeof err) == 0);
+    docs[0] = &dp;
+    x = sym_build(&dp.buf, dp.syn);
+    s = find_sym(x, "Dog", RULE_CLASS);
+    CHECK(s && strcmp(s->ret, "Base") == 0 && s->y1 == 10);
+    CHECK(find_sym(x, "name", RULE_PROP) && find_sym(x, "owner", RULE_PROP));
+    s = find_sym(x, "ping", RULE_METHOD);
+    CHECK(s && strcmp(s->sig, "n: int") == 0 && strcmp(s->ret, "int") == 0);
+    CHECK(find_sym(x, "make", RULE_FUNC) != NULL && find_sym(x, "pet", RULE_METHOD) != NULL);
+    sym_index_free(x);
+    y = 10;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &dp, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "bark") && has_sym(&g, "ping") && has_sym(&g, "legs") && has_sym(&g, "name"));
+    y = 17;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    CHECK(sym_type_before(c, docs, 1, &dp, y, sep, t, sizeof t) && strcmp(t, "Dog") == 0);
+    y = 18;                                     /* d.owner.pet(). */
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    CHECK(sym_type_before(c, docs, 1, &dp, y, sep, t, sizeof t) && strcmp(t, "Dog") == 0);
+    y = 20;                                     /* a str: the standard library */
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &dp, y, sep, got_cb, &g) == 0 || has_sym(&g, "upper"));
+    memset(&g, 0, sizeof g);
+    sym_globals(c, docs, 1, &dp, got_cb, &g);
+    CHECK(has_sym(&g, "len") && has_sym(&g, "Dog") && has_sym(&g, "os") && has_sym(&g, "make"));
+    sym_cache_free(c);
+    doc_release(&dp);
+
+    /* C and JavaScript: braces, a typedef of an anonymous struct, a class with this.x */
+    c = sym_cache_new();
+    put_file(dir, "a.c",
+             "#include \"b.h\"\n"
+             "typedef struct {\n"
+             "    int w;\n"
+             "    char *label;\n"
+             "} Box;\n"
+             "struct node { struct node *next; };\n"
+             "static int area(const Box *b)\n"
+             "{\n"
+             "    int local = 1;\n"
+             "    return b->w * local;\n"
+             "}\n"
+             "Box *make_box(int w, int h);\n"
+             "#define BOX_MAX 10\n"
+             "void f(void)\n"
+             "{\n"
+             "    Box *p = make_box(1, 2);\n"
+             "    p->\n"
+             "    struct tm t;\n"
+             "    t.\n"
+             "}\n");
+    put_file(dir, "b.h", "int from_header(int x);\n");
+    snprintf(path, sizeof path, "%s/a.c", dir);
+    memset(&dp, 0, sizeof dp);
+    CHECK(doc_load(&dp, path, err, sizeof err) == 0);
+    docs[0] = &dp;
+    x = sym_build(&dp.buf, dp.syn);
+    s = find_sym(x, "Box", RULE_CLASS);
+    CHECK(s != NULL);
+    CHECK(find_sym(x, "w", RULE_PROP) && find_sym(x, "label", RULE_PROP));
+    s = find_sym(x, "area", RULE_FUNC);
+    CHECK(s && strcmp(s->sig, "const Box *b") == 0);
+    CHECK(find_sym(x, "local", RULE_VAR) == NULL && find_sym(x, "make_box", RULE_FUNC) &&
+          find_sym(x, "BOX_MAX", RULE_CONST) && find_sym(x, "next", RULE_PROP));
+    CHECK(x->ninc == 1 && strcmp(x->inc[0], "b.h") == 0);
+    sym_index_free(x);
+    y = 16;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &dp, y, sep, got_cb, &g) == 1 && has_sym(&g, "w") &&
+          has_sym(&g, "label"));
+    y = 18;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &dp, y, sep, got_cb, &g) == 1 && has_sym(&g, "tm_year"));
+    memset(&g, 0, sizeof g);
+    sym_globals(c, docs, 1, &dp, got_cb, &g);
+    CHECK(has_sym(&g, "printf") && has_sym(&g, "from_header") && has_sym(&g, "area"));
+    sym_cache_free(c);
+    doc_release(&dp);
+
+    c = sym_cache_new();
+    put_file(dir, "a.js",
+             "import { util } from './u.js';\n"
+             "class Animal {\n"
+             "  static count = 0;\n"
+             "  constructor(name) {\n"
+             "    this.name = name;\n"
+             "    this.tags = new Set();\n"
+             "  }\n"
+             "  speak(times) { return this.name; }\n"
+             "}\n"
+             "class Cat extends Animal {\n"
+             "  purr() {\n"
+             "    this.\n"
+             "    this.tags.\n"
+             "  }\n"
+             "}\n"
+             "const c = new Cat('x');\n"
+             "c.\n"
+             "[1, 2].map(x => x).\n"
+             "document.getElementById('a').\n");
+    put_file(dir, "u.js", "export function util(a) { return a; }\n");
+    snprintf(path, sizeof path, "%s/a.js", dir);
+    memset(&dp, 0, sizeof dp);
+    CHECK(doc_load(&dp, path, err, sizeof err) == 0);
+    docs[0] = &dp;
+    y = 11;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &dp, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "purr") && has_sym(&g, "speak") && has_sym(&g, "name") && has_sym(&g, "tags"));
+    y = 12;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &dp, y, sep, got_cb, &g) == 1 && has_sym(&g, "add") &&
+          has_sym(&g, "size"));
+    y = 16;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    CHECK(sym_type_before(c, docs, 1, &dp, y, sep, t, sizeof t) && strcmp(t, "Cat") == 0);
+    y = 18;
+    sep = sym_member_at(dp.syn, &dp.buf, y, dp.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &dp, y, sep, got_cb, &g) == 1 && has_sym(&g, "querySelector"));
+    memset(&g, 0, sizeof g);
+    sym_globals(c, docs, 1, &dp, got_cb, &g);
+    CHECK(has_sym(&g, "util") && has_sym(&g, "Animal") && has_sym(&g, "Math") &&
+          has_sym(&g, "setTimeout"));
+    sym_cache_free(c);
+    doc_release(&dp);
+
+    /* the standard library itself: every list unpacks, classes, members, bases */
+    {
+        const char *ids[] = { "php", "c", "cpp", "py", "js" };
+        size_t i;
+
+        for (i = 0; i < 5; i++) {
+            StdLib *l = std_open(ids[i]);
+
+            CHECK(l != NULL);
+            std_close(l);
+        }
+        CHECK(std_open("nope") == NULL);
+        {
+            StdLib *l = std_open("php");
+            size_t bl;
+            const char *b;
+
+            CHECK(std_class(l, "DateTime", 8) && !std_class(l, "NoSuchClass", 11));
+            b = std_base(l, "InvalidArgumentException", 24, &bl);
+            CHECK(b && bl == 14 && memcmp(b, "LogicException", 14) == 0);
+            std_close(l);
+        }
+    }
+    rm_rf(dir);
+}
+
 int main(void)
 {
     test_utf8();
@@ -3262,6 +3756,9 @@ int main(void)
     test_git();
     test_tags();
     test_complete();
+    test_symbols();
+    test_call_body();
+    test_long_names();
     test_snippets();
     test_cursors();
     test_folding();

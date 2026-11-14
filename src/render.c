@@ -186,7 +186,7 @@ typedef struct {
 static void emit_popup(SBuf *o, const Editor *e, const Ovl *ov)
 {
     size_t w = ov->c1 - ov->c0, used = 0;
-    const char *name = ov->cand->text;
+    const char *name = ov->cand->sig ? ov->cand->sig : ov->cand->text;
 
     if (e->color_depth != COLOR_NONE) {
         sbuf_adds(o, "\x1b[0m");
@@ -201,6 +201,14 @@ static void emit_popup(SBuf *o, const Editor *e, const Ovl *ov)
     if (ov->cand->kind == CAND_SNIPPET && w > used + 9) {
         spaces(o, w - used - 7 - 1);
         sbuf_adds(o, "snippet");
+        used = w - 1;
+    } else if (ov->cand->kind >= CAND_FUNC && w > used + 3) {
+        static const char tag[] = { 'f', 'c', 'm', 'p', 'k' };
+
+        spaces(o, w - used - 2);
+        sbuf_adds(o, "\x1b[2m");
+        sbuf_add(o, &tag[ov->cand->kind - CAND_FUNC], 1);
+        sbuf_adds(o, "\x1b[22m");
         used = w - 1;
     }
     spaces(o, w > used ? w - used : 0);
@@ -220,28 +228,46 @@ static void popup_geom(const Editor *e, PopupGeom *g)
         return;
     l = &e->buf->lines[c->y];
     h = c->n - c->top < COMPLETE_ROWS ? c->n - c->top : COMPLETE_ROWS;
-    for (i = c->top; i < c->top + h; i++) {
-        size_t n = utf8_cols(c->v[i].text, strlen(c->v[i].text), strlen(c->v[i].text), 8);
+    /* the width of the whole list, so that the popup does not jump while scrolling */
+    for (i = 0; i < c->n; i++) {
+        const char *t = c->v[i].sig ? c->v[i].sig : c->v[i].text;
+        size_t n = utf8_cols(t, strlen(t), strlen(t), 8);
 
         if (c->v[i].kind == CAND_SNIPPET)
             n += 9;
+        else if (c->v[i].kind >= CAND_FUNC)
+            n += 3;
         if (n > wmax)
             wmax = n;
     }
     w = (int)wmax + 2;
-    if (w > 32)
-        w = 32;
+    if (w > 100)
+        w = 100;
     if (w < 8)
         w = 8;
     if (w > win_text_w(aw))
         w = win_text_w(aw);
     r = aw->y + (int)fold_count(e->buf, e->rowoff, e->cy);
-    if (r + (int)h <= aw->y + aw->h - 2)
-        g->row0 = r + 1;
-    else if (r - (int)h >= aw->y)
-        g->row0 = r - (int)h;
-    else
-        return;
+    {
+        /* as many rows as fit under the cursor line, or above it; at least one */
+        int below = aw->y + aw->h - 2 - r, above = r - aw->y, room = below >= above ? below : above;
+        size_t take = h;
+
+        if (room < 1)
+            return;
+        if (take > (size_t)room) {
+            h = (size_t)room;
+            take = h;
+            ((Complete *)c)->rows = h;  /* so the selection scrolls within what is shown */
+        } else {
+            ((Complete *)c)->rows = 0;
+        }
+        if ((int)take <= below)
+            g->row0 = r + 1;
+        else
+            g->row0 = r - (int)take;
+        h = take;
+    }
     cx = (int)utf8_cols(l->s, l->len, c->x < l->len ? c->x : l->len, e->tabw) - (int)e->coloff;
     if (cx < 0)
         cx = 0;
@@ -407,9 +433,9 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
                 ov_done = 1;
             }
             if (start < ov->c1) {
-                col = stop;
-                if (stop > ov->c1)
-                    spaces(o, stop - ov->c1);
+                col = stop > ov->c1 ? stop : ov->c1;    /* the popup fills up to c1 */
+                if (stop > ov->c1)      /* a tab or wide character cut by the popup's edge */
+                    spaces(o, (stop < right ? stop : right) - ov->c1);
                 continue;
             }
         }
@@ -769,10 +795,12 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
             int use = pg->on && w == e->layout.active && y >= pg->row0 && y < pg->row0 + pg->h;
 
             if (use) {
+                size_t k = (size_t)(y - pg->row0);
+
                 ov.c0 = w->view.coloff + (size_t)pg->cx;
                 ov.c1 = ov.c0 + (size_t)pg->w;
-                ov.cand = &e->comp.v[e->comp.top + (size_t)(y - pg->row0)];
-                ov.sel = e->comp.top + (size_t)(y - pg->row0) == e->comp.sel;
+                ov.cand = &e->comp.v[e->comp.top + k];
+                ov.sel = e->comp.top + k == e->comp.sel;
             }
             text_row(o, e, w, fold_nth(&w->doc->buf, w->view.rowoff, (size_t)(y - w->y)),
                      w == e->layout.active,

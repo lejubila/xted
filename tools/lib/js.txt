@@ -1,0 +1,871 @@
+// JavaScript / TypeScript standard library, DOM essentials and Node globals. Curated.
+#
+parseInt(string, radix)>number
+parseFloat(string)>number
+isNaN(value)>boolean
+isFinite(value)>boolean
+encodeURIComponent(uriComponent)>string
+decodeURIComponent(encodedURIComponent)>string
+encodeURI(uri)>string
+decodeURI(encodedURI)>string
+escape(string)>string
+unescape(string)>string
+eval(x)>any
+setTimeout(handler, timeout, ...args)>number
+clearTimeout(id)>void
+setInterval(handler, timeout, ...args)>number
+clearInterval(id)>void
+setImmediate(callback, ...args)>Immediate
+queueMicrotask(callback)>void
+requestAnimationFrame(callback)>number
+cancelAnimationFrame(handle)>void
+structuredClone(value, options)>any
+fetch(input, init)>Promise
+atob(data)>string
+btoa(data)>string
+alert(message)>void
+confirm(message)>boolean
+prompt(message, default)>string
+require(id)>any
+Infinity:number
+NaN:number
+undefined:undefined
+globalThis:object
+console:Console
+document:Document
+window:Window
+navigator:Navigator
+location:Location
+history:History
+localStorage:Storage
+sessionStorage:Storage
+process:Process
+module:Module
+exports:object
+__dirname:string
+__filename:string
+Buffer:Buffer
+#Object
+keys(obj)>Array
+values(obj)>Array
+entries(obj)>Array
+assign(target, ...sources)>Object
+create(proto, propertiesObject)>Object
+freeze(obj)>Object
+isFrozen(obj)>boolean
+seal(obj)>Object
+fromEntries(iterable)>Object
+getPrototypeOf(obj)>Object
+setPrototypeOf(obj, proto)>Object
+defineProperty(obj, prop, descriptor)>Object
+defineProperties(obj, props)>Object
+getOwnPropertyNames(obj)>Array
+getOwnPropertyDescriptor(obj, prop)>Object
+is(value1, value2)>boolean
+hasOwn(obj, prop)>boolean
+hasOwnProperty(prop)>boolean
+isPrototypeOf(obj)>boolean
+propertyIsEnumerable(prop)>boolean
+toString()>string
+toLocaleString()>string
+valueOf()>Object
+constructor:Function
+#Function
+apply(thisArg, argsArray)>any
+bind(thisArg, ...args)>Function
+call(thisArg, ...args)>any
+toString()>string
+name:string
+length:number
+#Array
+isArray(value)>boolean
+from(arrayLike, mapFn, thisArg)>Array
+of(...items)>Array
+length:number
+push(...items)>number
+pop()>any
+shift()>any
+unshift(...items)>number
+slice(start, end)>Array
+splice(start, deleteCount, ...items)>Array
+concat(...items)>Array
+join(separator)>string
+reverse()>Array
+sort(compareFn)>Array
+toSorted(compareFn)>Array
+toReversed()>Array
+toSpliced(start, deleteCount, ...items)>Array
+with(index, value)>Array
+indexOf(searchElement, fromIndex)>number
+lastIndexOf(searchElement, fromIndex)>number
+includes(searchElement, fromIndex)>boolean
+find(predicate, thisArg)>any
+findIndex(predicate, thisArg)>number
+findLast(predicate, thisArg)>any
+findLastIndex(predicate, thisArg)>number
+filter(predicate, thisArg)>Array
+map(callbackfn, thisArg)>Array
+flatMap(callback, thisArg)>Array
+flat(depth)>Array
+forEach(callbackfn, thisArg)>void
+reduce(callbackfn, initialValue)>any
+reduceRight(callbackfn, initialValue)>any
+some(predicate, thisArg)>boolean
+every(predicate, thisArg)>boolean
+fill(value, start, end)>Array
+copyWithin(target, start, end)>Array
+at(index)>any
+keys()>Iterator
+values()>Iterator
+entries()>Iterator
+#String
+fromCharCode(...codes)>string
+fromCodePoint(...codePoints)>string
+raw(template, ...substitutions)>string
+length:number
+charAt(pos)>string
+charCodeAt(index)>number
+codePointAt(pos)>number
+at(index)>string
+concat(...strings)>string
+includes(searchString, position)>boolean
+startsWith(searchString, position)>boolean
+endsWith(searchString, endPosition)>boolean
+indexOf(searchString, position)>number
+lastIndexOf(searchString, position)>number
+match(regexp)>Array
+matchAll(regexp)>Iterator
+replace(searchValue, replaceValue)>string
+replaceAll(searchValue, replaceValue)>string
+search(regexp)>number
+slice(start, end)>string
+substring(start, end)>string
+substr(from, length)>string
+split(separator, limit)>Array
+toLowerCase()>string
+toUpperCase()>string
+toLocaleLowerCase()>string
+toLocaleUpperCase()>string
+trim()>string
+trimStart()>string
+trimEnd()>string
+padStart(maxLength, fillString)>string
+padEnd(maxLength, fillString)>string
+repeat(count)>string
+normalize(form)>string
+localeCompare(that)>number
+isWellFormed()>boolean
+#Number
+isInteger(number)>boolean
+isFinite(number)>boolean
+isNaN(number)>boolean
+isSafeInteger(number)>boolean
+parseFloat(string)>number
+parseInt(string, radix)>number
+MAX_SAFE_INTEGER:number
+MIN_SAFE_INTEGER:number
+MAX_VALUE:number
+MIN_VALUE:number
+EPSILON:number
+POSITIVE_INFINITY:number
+NEGATIVE_INFINITY:number
+toFixed(fractionDigits)>string
+toPrecision(precision)>string
+toExponential(fractionDigits)>string
+toString(radix)>string
+toLocaleString(locales, options)>string
+valueOf()>number
+#Boolean
+valueOf()>boolean
+#BigInt
+asIntN(bits, bigint)>BigInt
+asUintN(bits, bigint)>BigInt
+toString(radix)>string
+#Symbol
+for(key)>Symbol
+keyFor(sym)>string
+iterator:Symbol
+asyncIterator:Symbol
+description:string
+#Math
+abs(x)>number
+ceil(x)>number
+floor(x)>number
+round(x)>number
+trunc(x)>number
+sign(x)>number
+sqrt(x)>number
+cbrt(x)>number
+pow(x, y)>number
+exp(x)>number
+expm1(x)>number
+log(x)>number
+log2(x)>number
+log10(x)>number
+log1p(x)>number
+min(...values)>number
+max(...values)>number
+random()>number
+sin(x)>number
+cos(x)>number
+tan(x)>number
+asin(x)>number
+acos(x)>number
+atan(x)>number
+atan2(y, x)>number
+sinh(x)>number
+cosh(x)>number
+tanh(x)>number
+hypot(...values)>number
+clz32(x)>number
+fround(x)>number
+imul(x, y)>number
+PI:number
+E:number
+LN2:number
+LN10:number
+LOG2E:number
+LOG10E:number
+SQRT2:number
+SQRT1_2:number
+#JSON
+parse(text, reviver)>any
+stringify(value, replacer, space)>string
+#Promise
+all(values)>Promise
+allSettled(values)>Promise
+any(values)>Promise
+race(values)>Promise
+resolve(value)>Promise
+reject(reason)>Promise
+withResolvers()>Object
+then(onfulfilled, onrejected)>Promise
+catch(onrejected)>Promise
+finally(onfinally)>Promise
+#Map
+size:number
+get(key)>any
+set(key, value)>Map
+has(key)>boolean
+delete(key)>boolean
+clear()>void
+forEach(callbackfn, thisArg)>void
+keys()>Iterator
+values()>Iterator
+entries()>Iterator
+#Set
+size:number
+add(value)>Set
+has(value)>boolean
+delete(value)>boolean
+clear()>void
+forEach(callbackfn, thisArg)>void
+keys()>Iterator
+values()>Iterator
+entries()>Iterator
+union(other)>Set
+intersection(other)>Set
+difference(other)>Set
+#WeakMap
+get(key)>any
+set(key, value)>WeakMap
+has(key)>boolean
+delete(key)>boolean
+#WeakSet
+add(value)>WeakSet
+has(value)>boolean
+delete(value)>boolean
+#WeakRef
+deref()>any
+#Date
+now()>number
+parse(s)>number
+UTC(year, month, ...rest)>number
+getTime()>number
+getFullYear()>number
+getMonth()>number
+getDate()>number
+getDay()>number
+getHours()>number
+getMinutes()>number
+getSeconds()>number
+getMilliseconds()>number
+getTimezoneOffset()>number
+getUTCFullYear()>number
+getUTCMonth()>number
+getUTCDate()>number
+getUTCHours()>number
+setFullYear(year, month, date)>number
+setMonth(month, date)>number
+setDate(date)>number
+setHours(hours, min, sec, ms)>number
+setMinutes(min, sec, ms)>number
+setSeconds(sec, ms)>number
+setTime(time)>number
+toISOString()>string
+toJSON()>string
+toString()>string
+toDateString()>string
+toTimeString()>string
+toLocaleDateString(locales, options)>string
+toLocaleTimeString(locales, options)>string
+toLocaleString(locales, options)>string
+valueOf()>number
+#RegExp
+test(string)>boolean
+exec(string)>Array
+lastIndex:number
+source:string
+flags:string
+global:boolean
+#Error
+message:string
+name:string
+stack:string
+cause:any
+#TypeError:Error
+#RangeError:Error
+#SyntaxError:Error
+#ReferenceError:Error
+#EvalError:Error
+#URIError:Error
+#AggregateError:Error
+errors:Array
+#Iterator
+next()>Object
+return(value)>Object
+toArray()>Array
+map(mapper)>Iterator
+filter(predicate)>Iterator
+take(limit)>Iterator
+drop(limit)>Iterator
+#ArrayBuffer
+byteLength:number
+slice(begin, end)>ArrayBuffer
+#Uint8Array:Array
+#Int32Array:Array
+#Float64Array:Array
+#Uint8ClampedArray:Array
+#DataView
+getInt8(byteOffset)>number
+getUint8(byteOffset)>number
+getInt32(byteOffset, littleEndian)>number
+getFloat64(byteOffset, littleEndian)>number
+setInt32(byteOffset, value, littleEndian)>void
+#Reflect
+get(target, propertyKey, receiver)>any
+set(target, propertyKey, value, receiver)>boolean
+has(target, propertyKey)>boolean
+ownKeys(target)>Array
+apply(target, thisArgument, argumentsList)>any
+construct(target, argumentsList)>Object
+defineProperty(target, propertyKey, attributes)>boolean
+deleteProperty(target, propertyKey)>boolean
+getPrototypeOf(target)>Object
+#Proxy
+revocable(target, handler)>Object
+#Intl
+DateTimeFormat(locales, options)>Object
+NumberFormat(locales, options)>Object
+#Console
+log(...data)>void
+info(...data)>void
+warn(...data)>void
+error(...data)>void
+debug(...data)>void
+trace(...data)>void
+table(tabularData, properties)>void
+dir(item, options)>void
+group(...label)>void
+groupEnd()>void
+time(label)>void
+timeEnd(label)>void
+count(label)>void
+assert(condition, ...data)>void
+clear()>void
+#Window:EventTarget
+document:Document
+location:Location
+history:History
+navigator:Navigator
+localStorage:Storage
+sessionStorage:Storage
+innerWidth:number
+innerHeight:number
+scrollX:number
+scrollY:number
+open(url, target, features)>Window
+close()>void
+alert(message)>void
+confirm(message)>boolean
+prompt(message, default)>string
+getComputedStyle(elt, pseudoElt)>CSSStyleDeclaration
+matchMedia(query)>MediaQueryList
+scrollTo(x, y)>void
+setTimeout(handler, timeout, ...args)>number
+setInterval(handler, timeout, ...args)>number
+requestAnimationFrame(callback)>number
+postMessage(message, targetOrigin)>void
+#EventTarget
+addEventListener(type, listener, options)>void
+removeEventListener(type, listener, options)>void
+dispatchEvent(event)>boolean
+#Node:EventTarget
+appendChild(node)>Node
+removeChild(child)>Node
+replaceChild(node, child)>Node
+insertBefore(node, child)>Node
+cloneNode(deep)>Node
+contains(other)>boolean
+hasChildNodes()>boolean
+parentNode:Node
+parentElement:Element
+childNodes:NodeList
+firstChild:Node
+lastChild:Node
+nextSibling:Node
+previousSibling:Node
+nodeName:string
+nodeType:number
+nodeValue:string
+textContent:string
+isConnected:boolean
+#Document:Node
+getElementById(elementId)>HTMLElement
+getElementsByClassName(classNames)>HTMLCollection
+getElementsByTagName(qualifiedName)>HTMLCollection
+getElementsByName(elementName)>NodeList
+querySelector(selectors)>Element
+querySelectorAll(selectors)>NodeList
+createElement(tagName, options)>HTMLElement
+createTextNode(data)>Text
+createDocumentFragment()>DocumentFragment
+createEvent(eventInterface)>Event
+write(...text)>void
+body:HTMLElement
+head:HTMLElement
+title:string
+cookie:string
+documentElement:HTMLElement
+readyState:string
+referrer:string
+URL:string
+forms:HTMLCollection
+images:HTMLCollection
+activeElement:Element
+hidden:boolean
+#Element:Node
+querySelector(selectors)>Element
+querySelectorAll(selectors)>NodeList
+getAttribute(qualifiedName)>string
+setAttribute(qualifiedName, value)>void
+removeAttribute(qualifiedName)>void
+hasAttribute(qualifiedName)>boolean
+toggleAttribute(qualifiedName, force)>boolean
+getBoundingClientRect()>DOMRect
+closest(selectors)>Element
+matches(selectors)>boolean
+append(...nodes)>void
+prepend(...nodes)>void
+remove()>void
+before(...nodes)>void
+after(...nodes)>void
+replaceWith(...nodes)>void
+insertAdjacentHTML(position, text)>void
+insertAdjacentElement(where, element)>Element
+scrollIntoView(arg)>void
+focus(options)>void
+blur()>void
+click()>void
+classList:DOMTokenList
+className:string
+id:string
+innerHTML:string
+outerHTML:string
+tagName:string
+children:HTMLCollection
+firstElementChild:Element
+lastElementChild:Element
+nextElementSibling:Element
+previousElementSibling:Element
+scrollTop:number
+scrollLeft:number
+clientWidth:number
+clientHeight:number
+attributes:NamedNodeMap
+#HTMLElement:Element
+style:CSSStyleDeclaration
+dataset:DOMStringMap
+hidden:boolean
+title:string
+innerText:string
+offsetWidth:number
+offsetHeight:number
+offsetTop:number
+offsetLeft:number
+offsetParent:Element
+tabIndex:number
+contentEditable:string
+draggable:boolean
+#HTMLInputElement:HTMLElement
+value:string
+checked:boolean
+disabled:boolean
+type:string
+name:string
+placeholder:string
+files:FileList
+select()>void
+setCustomValidity(error)>void
+checkValidity()>boolean
+#HTMLFormElement:HTMLElement
+submit()>void
+reset()>void
+elements:HTMLFormControlsCollection
+action:string
+method:string
+#HTMLCanvasElement:HTMLElement
+getContext(contextId, options)>CanvasRenderingContext2D
+toDataURL(type, quality)>string
+width:number
+height:number
+#CanvasRenderingContext2D
+fillRect(x, y, w, h)>void
+strokeRect(x, y, w, h)>void
+clearRect(x, y, w, h)>void
+beginPath()>void
+moveTo(x, y)>void
+lineTo(x, y)>void
+arc(x, y, radius, startAngle, endAngle, counterclockwise)>void
+fill()>void
+stroke()>void
+fillText(text, x, y, maxWidth)>void
+drawImage(image, dx, dy)>void
+save()>void
+restore()>void
+translate(x, y)>void
+rotate(angle)>void
+scale(x, y)>void
+fillStyle:string
+strokeStyle:string
+lineWidth:number
+font:string
+#DOMTokenList
+add(...tokens)>void
+remove(...tokens)>void
+toggle(token, force)>boolean
+contains(token)>boolean
+replace(token, newToken)>boolean
+length:number
+#NodeList
+forEach(callbackfn, thisArg)>void
+item(index)>Node
+length:number
+entries()>Iterator
+#HTMLCollection
+item(index)>Element
+namedItem(name)>Element
+length:number
+#CSSStyleDeclaration
+getPropertyValue(property)>string
+setProperty(property, value, priority)>void
+removeProperty(property)>string
+cssText:string
+#Event
+preventDefault()>void
+stopPropagation()>void
+stopImmediatePropagation()>void
+target:EventTarget
+currentTarget:EventTarget
+type:string
+bubbles:boolean
+cancelable:boolean
+defaultPrevented:boolean
+#MouseEvent:Event
+clientX:number
+clientY:number
+pageX:number
+pageY:number
+button:number
+ctrlKey:boolean
+shiftKey:boolean
+altKey:boolean
+#KeyboardEvent:Event
+key:string
+code:string
+ctrlKey:boolean
+shiftKey:boolean
+altKey:boolean
+metaKey:boolean
+repeat:boolean
+#CustomEvent:Event
+detail:any
+#Location
+href:string
+origin:string
+protocol:string
+host:string
+hostname:string
+port:string
+pathname:string
+search:string
+hash:string
+assign(url)>void
+replace(url)>void
+reload()>void
+#History
+back()>void
+forward()>void
+go(delta)>void
+pushState(data, unused, url)>void
+replaceState(data, unused, url)>void
+length:number
+state:any
+#Navigator
+userAgent:string
+language:string
+languages:Array
+onLine:boolean
+clipboard:Clipboard
+geolocation:Geolocation
+platform:string
+#Clipboard
+writeText(data)>Promise
+readText()>Promise
+#Storage
+getItem(key)>string
+setItem(key, value)>void
+removeItem(key)>void
+clear()>void
+key(index)>string
+length:number
+#Response
+json()>Promise
+text()>Promise
+blob()>Promise
+arrayBuffer()>Promise
+formData()>Promise
+clone()>Response
+ok:boolean
+status:number
+statusText:string
+headers:Headers
+url:string
+body:ReadableStream
+#Request
+method:string
+url:string
+headers:Headers
+json()>Promise
+text()>Promise
+#Headers
+get(name)>string
+set(name, value)>void
+has(name)>boolean
+append(name, value)>void
+delete(name)>void
+forEach(callbackfn, thisArg)>void
+#URL
+searchParams:URLSearchParams
+href:string
+origin:string
+pathname:string
+search:string
+hash:string
+host:string
+hostname:string
+port:string
+protocol:string
+toString()>string
+#URLSearchParams
+get(name)>string
+getAll(name)>Array
+set(name, value)>void
+append(name, value)>void
+has(name)>boolean
+delete(name)>void
+toString()>string
+forEach(callbackfn, thisArg)>void
+#FormData
+append(name, value)>void
+get(name)>any
+getAll(name)>Array
+set(name, value)>void
+has(name)>boolean
+delete(name)>void
+#FileReader:EventTarget
+readAsText(blob, encoding)>void
+readAsDataURL(blob)>void
+readAsArrayBuffer(blob)>void
+result:any
+#Blob
+size:number
+type:string
+text()>Promise
+arrayBuffer()>Promise
+slice(start, end, contentType)>Blob
+#AbortController
+abort(reason)>void
+signal:AbortSignal
+#XMLHttpRequest:EventTarget
+open(method, url, async)>void
+send(body)>void
+setRequestHeader(name, value)>void
+abort()>void
+status:number
+responseText:string
+response:any
+readyState:number
+#WebSocket:EventTarget
+send(data)>void
+close(code, reason)>void
+readyState:number
+url:string
+#Worker:EventTarget
+postMessage(message, transfer)>void
+terminate()>void
+#MutationObserver
+observe(target, options)>void
+disconnect()>void
+#IntersectionObserver
+observe(target)>void
+unobserve(target)>void
+disconnect()>void
+#ResizeObserver
+observe(target, options)>void
+unobserve(target)>void
+disconnect()>void
+#Process
+argv:Array
+env:Object
+pid:number
+platform:string
+version:string
+versions:Object
+cwd()>string
+exit(code)>void
+nextTick(callback, ...args)>void
+hrtime(time)>Array
+memoryUsage()>Object
+uptime()>number
+on(event, listener)>Process
+stdout:Writable
+stderr:Writable
+stdin:Readable
+exitCode:number
+#Buffer
+from(value, encodingOrOffset, length)>Buffer
+alloc(size, fill, encoding)>Buffer
+concat(list, totalLength)>Buffer
+isBuffer(obj)>boolean
+byteLength(string, encoding)>number
+toString(encoding, start, end)>string
+slice(start, end)>Buffer
+equals(otherBuffer)>boolean
+write(string, offset, length, encoding)>number
+readUInt8(offset)>number
+length:number
+#Writable
+write(chunk, encoding, callback)>boolean
+end(chunk, encoding, callback)>void
+on(event, listener)>Writable
+isTTY:boolean
+columns:number
+#Readable
+on(event, listener)>Readable
+pipe(destination, options)>Writable
+read(size)>any
+setEncoding(encoding)>Readable
+#fs
+readFileSync(path, options)>string
+writeFileSync(file, data, options)>void
+appendFileSync(path, data, options)>void
+existsSync(path)>boolean
+mkdirSync(path, options)>string
+readdirSync(path, options)>Array
+statSync(path, options)>Stats
+unlinkSync(path)>void
+rmSync(path, options)>void
+renameSync(oldPath, newPath)>void
+copyFileSync(src, dest, mode)>void
+readFile(path, options, callback)>void
+writeFile(file, data, options, callback)>void
+readdir(path, options, callback)>void
+stat(path, options, callback)>void
+createReadStream(path, options)>Readable
+createWriteStream(path, options)>Writable
+promises:fsPromises
+watch(filename, options, listener)>FSWatcher
+#fsPromises
+readFile(path, options)>Promise
+writeFile(file, data, options)>Promise
+readdir(path, options)>Promise
+mkdir(path, options)>Promise
+stat(path, options)>Promise
+unlink(path)>Promise
+rm(path, options)>Promise
+access(path, mode)>Promise
+#Stats
+isFile()>boolean
+isDirectory()>boolean
+isSymbolicLink()>boolean
+size:number
+mtime:Date
+mtimeMs:number
+mode:number
+#path
+join(...paths)>string
+resolve(...paths)>string
+dirname(path)>string
+basename(path, suffix)>string
+extname(path)>string
+normalize(path)>string
+relative(from, to)>string
+isAbsolute(path)>boolean
+parse(path)>Object
+format(pathObject)>string
+sep:string
+delimiter:string
+#os
+platform()>string
+arch()>string
+cpus()>Array
+homedir()>string
+tmpdir()>string
+hostname()>string
+totalmem()>number
+freemem()>number
+EOL:string
+#child_process
+exec(command, options, callback)>ChildProcess
+execSync(command, options)>Buffer
+spawn(command, args, options)>ChildProcess
+spawnSync(command, args, options)>Object
+fork(modulePath, args, options)>ChildProcess
+#http
+createServer(options, requestListener)>Server
+request(options, callback)>Object
+get(url, options, callback)>Object
+#EventEmitter
+on(eventName, listener)>EventEmitter
+once(eventName, listener)>EventEmitter
+off(eventName, listener)>EventEmitter
+emit(eventName, ...args)>boolean
+addListener(eventName, listener)>EventEmitter
+removeListener(eventName, listener)>EventEmitter
+removeAllListeners(eventName)>EventEmitter
+listenerCount(eventName)>number
+#util
+promisify(original)>Function
+inspect(object, options)>string
+format(format, ...args)>string
+isDeepStrictEqual(val1, val2)>boolean
+#Module
+exports:Object
+id:string
+filename:string
+children:Array
+require(id)>any
+#ReadableStream
+getReader(options)>ReadableStreamDefaultReader
+pipeTo(destination, options)>Promise

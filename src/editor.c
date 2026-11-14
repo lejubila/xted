@@ -1766,7 +1766,32 @@ static void complete_accept(Editor *e)
     int snippet = c->kind == CAND_SNIPPET;
     const SnipDef *sd = snip_lang(e->doc->syn ? syn_name(e->doc->syn) : NULL, &ns);
 
+    SBuf body = SBUF_INIT;
+    const Line *ln = &e->buf->lines[e->cy];
+    int call = 0;
+
+    /* a call already there ("foo|(") only gets the name */
+    if (!snippet && !(e->cx < ln->len && ln->s[e->cx] == '('))
+        call = complete_call_body(c, &body);
     complete_close(&e->comp);
+    if (call == 1) {
+        SnipDef d = { text, body.p ? body.p : "" };
+
+        sbuf_add(&body, "", 1);
+        d.body = body.p;
+        edit_expand_snippet(e, from, &d);
+        sbuf_free(&body);
+        free(text);
+        return;
+    }
+    if (call == 2) {
+        edit_replace_word(e, from, body.p, body.len);
+        if (e->cx > 0)
+            e->cx--;                    /* between the parentheses */
+        sbuf_free(&body);
+        free(text);
+        return;
+    }
     if (snippet)
         for (i = 0; i < ns; i++)
             if (strcmp(sd[i].name, text) == 0) {
@@ -1816,9 +1841,11 @@ static void update_complete(Editor *e, Key k)
 {
     int word = !(k.mods & (MOD_ALT | MOD_CTRL)) && is_printable(k.code) && cp_is_word(k.code);
     int bs = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == KEY_BACKSPACE || k.code == 8);
+    /* the end of a member operator (-> :: .) opens the list of members: complete_open decides */
+    int op = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == '>' || k.code == ':' || k.code == '.');
 
     /* keys already waiting (fast typing, a paste without bracketing) are not worth a scan each */
-    if ((word || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&
+    if ((word || op || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&
         !e->snip.on && !cur_multi(e) && e->doc->autosuggest && !term_has_input()) {
         e->comp.min_prefix = (size_t)e->doc->suggest_min;
         complete_open(&e->comp, e->docs, e->ndocs, e->doc, e->cy, e->cx);

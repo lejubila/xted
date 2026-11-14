@@ -4,13 +4,14 @@
 #include "utf8.h"
 #include "util.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define MAX_RAW 2048
 
 typedef struct {
-    char *w;
+    char *w, *sig;
     int kind, score;
     size_t dist;            /* lines from the cursor; documents other than the current one: far */
 } Raw;
@@ -83,7 +84,8 @@ static int first_char_ok(const Gather *g, const char *w)
     return a == b;
 }
 
-static void consider(Gather *g, const char *w, size_t n, int kind, size_t dist)
+static void consider_sig(Gather *g, const char *w, size_t n, int kind, size_t dist,
+                         const char *sig)
 {
     char tmp[256];
     int score;
@@ -93,16 +95,63 @@ static void consider(Gather *g, const char *w, size_t n, int kind, size_t dist)
         return;
     memcpy(tmp, w, n);
     tmp[n] = '\0';
-    if (!first_char_ok(g, tmp))
+    if (g->plen > 0 && !first_char_ok(g, tmp))
         return;
     score = fuzzy_score(g->prefix, tmp);
     if (score < 0 || !set_add(g, w, n))
         return;
+    /* the standard library is big: it must not bury the file's own names and the keywords */
+    if (kind >= CAND_FUNC && dist >= 2)
+        score -= 8;
     g->v[g->n].w = xstrdup(tmp);
+    g->v[g->n].sig = sig && sig[0] ? xstrdup(sig) : NULL;
     g->v[g->n].kind = kind;
     g->v[g->n].score = score;
     g->v[g->n].dist = dist;
     g->n++;
+}
+
+static void consider(Gather *g, const char *w, size_t n, int kind, size_t dist)
+{
+    consider_sig(g, w, n, kind, dist, NULL);
+}
+
+/* A symbol from the index or the library: "name(params): type", the kind decides the letter. */
+static void sym_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret,
+                   int rank)
+{
+    char buf[PM_PARAMS + PM_NAME + 96];
+    int ck;
+    size_t n;
+    const Gather *g = ctx;
+
+    /* most of the library is rejected by the first letter: do not format it */
+    if (g->plen > 0 && (strlen(name) < g->plen || !first_char_ok(g, name)))
+        return;
+    switch (kind) {
+    case RULE_CLASS:
+        ck = CAND_CLASS;
+        break;
+    case RULE_METHOD:
+        ck = CAND_METHOD;
+        break;
+    case RULE_PROP:
+    case RULE_VAR:
+        ck = CAND_PROP;
+        break;
+    case RULE_CONST:
+        ck = CAND_CONST;
+        break;
+    default:
+        ck = CAND_FUNC;
+        break;
+    }
+    n = (size_t)snprintf(buf, sizeof buf, "%s", name);
+    if (ck == CAND_FUNC || ck == CAND_METHOD)
+        n += (size_t)snprintf(buf + n, sizeof buf - n, "(%s)", sig);
+    if (ck != CAND_CLASS && ret[0] && n < sizeof buf)
+        snprintf(buf + n, sizeof buf - n, ": %s", ret);
+    consider_sig(ctx, name, strlen(name), ck, (size_t)rank, buf);
 }
 
 static void scan_line(Gather *g, const Line *l, size_t dist, int is_cursor_line, size_t skip_x)
@@ -147,31 +196,37 @@ void complete_close(Complete *c)
 {
     size_t i;
 
-    for (i = 0; i < c->n; i++)
+    for (i = 0; i < c->n; i++) {
         free(c->v[i].text);
+        free(c->v[i].sig);
+    }
     c->n = 0;
     c->on = 0;
     c->picked = 0;
     c->sel = c->top = 0;
+    c->rows = 0;
 }
 
 void complete_free(Complete *c)
 {
     complete_close(c);
     free(c->v);
+    sym_cache_free(c->sc);
     memset(c, 0, sizeof *c);
 }
 
-int complete_open(Complete *c, Doc *const *docs, size_t ndocs, const Doc *cur, size_t y,
-                  size_t x)
+int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t x)
 {
     Gather g;
     const Buffer *b = &cur->buf;
-    size_t start, plen, i, budget = COMPLETE_SCAN_LINES, d, take;
+    size_t start, plen, i, budget = COMPLETE_SCAN_LINES, d, take, sep = (size_t)-1;
 
     complete_close(c);
     plen = complete_prefix(b, y, x, &start);
-    if (plen < (c->min_prefix ? c->min_prefix : COMPLETE_MIN_PREFIX) || plen >= sizeof g.prefix)
+    if (syn_rule_count(cur->syn) > 0)
+        sep = sym_member_at(cur->syn, b, y, start);
+    if (plen >= sizeof g.prefix ||
+        (sep == (size_t)-1 && plen < (c->min_prefix ? c->min_prefix : COMPLETE_MIN_PREFIX)))
         return 0;
     memset(&g, 0, sizeof g);
     memcpy(g.prefix, b->lines[y].s + start, plen);
@@ -182,15 +237,25 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, const Doc *cur, s
     g.set = xmalloc(g.setsize * sizeof *g.set);
     memset(g.set, 0, g.setsize * sizeof *g.set);
 
-    {
+    if (sep != (size_t)-1) {
+        if (!c->sc)
+            c->sc = sym_cache_new();
+        sym_members(c->sc, docs, ndocs, cur, y, sep, sym_cb, &g);
+        budget = 0;                 /* after an operator only members make sense */
+    } else {
         size_t ns, k;
         const SnipDef *sd = snip_lang(cur->syn ? syn_name(cur->syn) : NULL, &ns);
 
         /* snippets first: a snippet named like a keyword wins */
         for (k = 0; k < ns; k++)
             consider(&g, sd[k].name, strlen(sd[k].name), CAND_SNIPPET, 0);
+        syn_each_word(cur->syn, kw_cb, &g);
+        if (syn_rule_count(cur->syn) > 0) {
+            if (!c->sc)
+                c->sc = sym_cache_new();
+            sym_globals(c->sc, docs, ndocs, cur, sym_cb, &g);
+        }
     }
-    syn_each_word(cur->syn, kw_cb, &g);
     /* the current document outward from the cursor line */
     for (d = 0; budget > 0; d++) {
         int more = 0;
@@ -227,11 +292,14 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, const Doc *cur, s
             c->v = xrealloc(c->v, c->cap * sizeof *c->v);
         }
         c->v[c->n].text = g.v[i].w;
+        c->v[c->n].sig = g.v[i].sig;
         c->v[c->n].kind = g.v[i].kind;
         c->n++;
     }
-    for (i = take; i < g.n; i++)
+    for (i = take; i < g.n; i++) {
         free(g.v[i].w);
+        free(g.v[i].sig);
+    }
     for (i = 0; i < g.setsize; i++)
         free(g.set[i]);
     free(g.set);
@@ -240,6 +308,114 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, const Doc *cur, s
     c->x = start;
     c->on = c->n > 0;
     return c->on;
+}
+
+static int param_optional(const char *p, size_t n)
+{
+    size_t i;
+    int d = 0;
+
+    if (n > 0 && p[0] == '[')
+        return 1;
+    if (n > 0 && p[0] == '*')
+        return 1;
+    for (i = 0; i < n; i++) {
+        if (p[i] == '(' || p[i] == '[' || p[i] == '{' || p[i] == '<')
+            d++;
+        else if ((p[i] == ')' || p[i] == ']' || p[i] == '}' || p[i] == '>') && d > 0)
+            d--;
+        else if (d == 0 && p[i] == '=')
+            return 1;
+        else if (d == 0 && p[i] == '?' && i + 1 < n && p[i + 1] == ':')
+            return 1;
+        else if (p[i] == '.' && i + 2 < n && p[i + 1] == '.' && p[i + 2] == '.')
+            return 1;
+    }
+    return 0;
+}
+
+static void body_add(SBuf *b, const char *s, size_t n)
+{
+    size_t i;
+
+    for (i = 0; i < n; i++) {
+        if (s[i] == '$')
+            sbuf_adds(b, "$$");
+        else if (s[i] != '}')
+            sbuf_add(b, s + i, 1);
+    }
+}
+
+int complete_call_body(const Cand *c, SBuf *body)
+{
+    const char *sg = c->sig, *p, *q, *start;
+    size_t nparams = 0, nstops = 0, name_len;
+    int depth = 0, any = 0;
+    SBuf out = SBUF_INIT;
+
+    if ((c->kind != CAND_FUNC && c->kind != CAND_METHOD) || !sg)
+        return 0;
+    name_len = strlen(c->text);
+    if (strncmp(sg, c->text, name_len) != 0 || sg[name_len] != '(')
+        return 0;
+    start = sg + name_len + 1;
+    for (q = start; *q; q++) {
+        if (*q == '(' || *q == '[' || *q == '{')
+            depth++;
+        else if ((*q == ')' || *q == ']' || *q == '}') && depth-- == 0)
+            break;
+    }
+    if (*q != ')')
+        return 0;
+    /* [start, q) are the parameters */
+    for (p = start; p < q && (*p == ' ' || *p == '\t'); p++)
+        ;
+    if (p == q) {
+        /* no parameters: a plain call, no placeholders */
+        body_add(body, c->text, name_len);
+        sbuf_adds(body, "()");
+        return 2;
+    }
+    body_add(&out, c->text, name_len);
+    sbuf_adds(&out, "(");
+    depth = 0;
+    for (p = start; p <= q; p++) {
+        if (p < q && (*p == '(' || *p == '[' || *p == '{' || *p == '<'))
+            depth++;
+        else if (p < q && (*p == ')' || *p == ']' || *p == '}' || (*p == '>' && p[-1] != '-')) &&
+                 depth > 0)
+            depth--;
+        if (p == q || (*p == ',' && depth == 0)) {
+            const char *a = start, *z = p;
+
+            while (a < z && (*a == ' ' || *a == '\t'))
+                a++;
+            while (z > a && (z[-1] == ' ' || z[-1] == '\t'))
+                z--;
+            if (z > a) {
+                nparams++;
+                if (!param_optional(a, (size_t)(z - a))) {
+                    if (any)
+                        sbuf_adds(&out, ", ");
+                    if (nstops < 8) {
+                        sbuf_addf(&out, "${%zu:", ++nstops);
+                        body_add(&out, a, (size_t)(z - a));
+                        sbuf_adds(&out, "}");
+                    } else {
+                        body_add(&out, a, (size_t)(z - a));
+                    }
+                    any = 1;
+                }
+            }
+            start = p + 1;
+        }
+    }
+    if (!any)
+        sbuf_adds(&out, nparams ? "$1" : "");
+    sbuf_adds(&out, ")$0");
+    sbuf_add(body, out.p, out.len);
+    sbuf_free(&out);
+    return 1;
 }
 
 void complete_move(Complete *c, long delta)
@@ -255,8 +431,12 @@ void complete_move(Complete *c, long delta)
         s = 0;
     c->sel = (size_t)s;
     c->picked = 1;
-    if (c->sel < c->top)
-        c->top = c->sel;
-    if (c->sel >= c->top + COMPLETE_ROWS)
-        c->top = c->sel - COMPLETE_ROWS + 1;
+    {
+        size_t rows = c->rows ? c->rows : COMPLETE_ROWS;
+
+        if (c->sel < c->top)
+            c->top = c->sel;
+        if (c->sel >= c->top + rows)
+            c->top = c->sel - rows + 1;
+    }
 }

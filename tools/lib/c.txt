@@ -1,0 +1,2537 @@
+#
+a64l(const char *s)>long int
+abort()>void
+abs(int x)>int
+accept(int fd, SOCKADDR_ARG addr, socklen_t *addr_len)>int
+accept4(int fd, SOCKADDR_ARG addr, socklen_t *addr_len, int flags)>int
+access(const char *name, int type)>int
+acct(const char *name)>int
+adjtime(const struct timeval *delta, struct timeval *olddelta)>int
+alarm(unsigned int seconds)>unsigned int
+aligned_alloc(size_t alignment, size_t size)>void *
+alphasort(const struct dirent **e1, const struct dirent **e2)>int
+arc4random()>__uint32_t
+arc4random_buf(void *buf, size_t size)>void
+arc4random_uniform(uint32_t upper_bound)>__uint32_t
+asctime(const struct tm *tp)>char *
+asctime_r(const struct tm *tp, char *buf)>char *
+asprintf(char **ptr, const char *fmt, ...)>int
+assert(expr)>
+assert_perror(errnum)>
+at_quick_exit(void (*func)(void))>int
+atexit(void (*func)(void))>int
+atof(const char *nptr)>double
+atoi(const char *nptr)>int
+atol(const char *nptr)>long int
+atoll(const char *nptr)>long long int
+basename(char *filename)>char *
+bcmp(const void *s1, const void *s2, size_t n)>int
+bcopy(const void *src, void *dest, size_t n)>void
+bind(int fd, CONST_SOCKADDR_ARG addr, socklen_t len)>int
+bindresvport(int sockfd, struct sockaddr_in *sock_in)>int
+bindresvport6(int sockfd, struct sockaddr_in6 *sock_in)>int
+brk(void *addr)>int
+bsd_signal(int sig, sighandler_t handler)>__sighandler_t
+bsearch(KEY, BASE, NMEMB, SIZE, COMPAR)>
+btowc(int c)>wint_t
+bzero(void *s, size_t n)>void
+call_once(once_flag *flag, void (*func)(void))>void
+calloc(size_t nmemb, size_t size)>void *
+canonicalize_file_name(const char *name)>char *
+cfgetibaud(const struct termios *termios_p)>baud_t
+cfgetispeed(const struct termios *termios_p)>speed_t
+cfgetobaud(const struct termios *termios_p)>baud_t
+cfgetospeed(const struct termios *termios_p)>speed_t
+cfmakeraw(struct termios *termios_p)>void
+cfsetbaud(struct termios *termios_p, baud_t baud)>int
+cfsetibaud(struct termios *termios_p, baud_t baud)>int
+cfsetispeed(struct termios *termios_p, speed_t speed)>int
+cfsetobaud(struct termios *termios_p, baud_t baud)>int
+cfsetospeed(struct termios *termios_p, speed_t speed)>int
+cfsetspeed(struct termios *termios_p, speed_t speed)>int
+chdir(const char *path)>int
+chmod(const char *file, mode_t mode)>int
+chown(const char *file, uid_t owner, gid_t group)>int
+chroot(const char *path)>int
+clearenv()>int
+clearerr(FILE *stream)>void
+clearerr_unlocked(FILE *stream)>void
+clock()>clock_t
+clock_getcpuclockid(pid_t pid, clockid_t *clock_id)>int
+clock_getres(clockid_t clock_id, struct timespec *res)>int
+clock_gettime(clockid_t clock_id, struct timespec *tp)>int
+clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *req, struct timespec *rem)>int
+clock_settime(clockid_t clock_id, const struct timespec *tp)>int
+close(int fd)>int
+close_range(unsigned int fd, unsigned int max_fd, int flags)>int
+closedir(DIR *dirp)>int
+closefrom(int lowfd)>void
+confstr(int name, char *buf, size_t len)>size_t
+connect(int fd, CONST_SOCKADDR_ARG addr, socklen_t len)>int
+copy_file_range(int infd, off64_t *pinoff, int outfd, off64_t *poutoff, size_t length, unsigned int flags)>ssize_t
+creat(const char *file, mode_t mode)>int
+crypt(const char *key, const char *salt)>char *
+ctermid(char *s)>char *
+ctime(const time_t *timer)>char *
+ctime_r(const time_t *timer, char *buf)>char *
+cuserid(char *s)>char *
+daemon(int nochdir, int noclose)>int
+difftime(time_t time1, time_t time0)>double
+dirfd(dirp)>
+dirname(char *path)>char *
+div(int numer, int denom)>div_t
+dladdr(const void *address, Dl_info *info)>int
+dladdr1(const void *address, Dl_info *info, void **extra_info, int flags)>int
+dlclose(void *handle)>int
+dlerror()>char *
+dlinfo(void *handle, int request, void *arg)>int
+dlmopen(Lmid_t nsid, const char *file, int mode)>void *
+dlopen(const char *file, int mode)>void *
+dlsym(void *handle, const char *name)>void *
+dlvsym(void *handle, const char *name, const char *version)>void *
+dprintf(int fd, const char *fmt, ...)>int
+drand48()>double
+drand48_r(struct drand48_data *buffer, double *result)>int
+dup(int fd)>int
+dup2(int fd, int fd2)>int
+dup3(int fd, int fd2, int flags)>int
+duplocale(locale_t dataset)>locale_t
+dysize(int year)>int
+eaccess(const char *name, int type)>int
+ecvt(double value, int ndigit, int *decpt, int *sign)>char *
+ecvt_r(double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+endgrent()>void
+endhostent()>void
+endnetent()>void
+endnetgrent()>void
+endprotoent()>void
+endpwent()>void
+endservent()>void
+endusershell()>void
+epoll_create(int size)>int
+epoll_create1(int flags)>int
+epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)>int
+epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *ss)>int
+epoll_pwait2(int epfd, struct epoll_event *events, int maxevents, const struct timespec *timeout, const)>int
+epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)>int
+erand48(unsigned short int xsubi[3])>double
+erand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, double *result)>int
+euidaccess(const char *name, int type)>int
+execl(const char *path, const char *arg, ...)>int
+execle(const char *path, const char *arg, ...)>int
+execlp(const char *file, const char *arg, ...)>int
+execv(const char *path, char *const argv[])>int
+execve(const char *path, char *const argv[], char *const envp[])>int
+execveat(int fd, const char *path, char *const argv[], char *const envp[], int flags)>int
+execvp(const char *file, char *const argv[])>int
+execvpe(const char *file, char *const argv[], char *const envp[])>int
+exit(int status)>void
+explicit_bzero(void *s, size_t n)>void
+faccessat(int fd, const char *file, int type, int flag)>int
+fchdir(int fd)>int
+fchmod(int fd, mode_t mode)>int
+fchmodat(int fd, const char *file, mode_t mode, int flag)>int
+fchown(int fd, uid_t owner, gid_t group)>int
+fchownat(int fd, const char *file, uid_t owner, gid_t group, int flag)>int
+fclose(FILE *stream)>int
+fcloseall()>int
+fcntl(int fd, int cmd, ...)>int
+fcvt(double value, int ndigit, int *decpt, int *sign)>char *
+fcvt_r(double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+fdatasync(int fildes)>int
+fdopen(int fd, const char *modes)>FILE *
+fdopendir(int fd)>DIR *
+feclearexcept(int excepts)>int
+fedisableexcept(int excepts)>int
+feenableexcept(int excepts)>int
+fegetenv(fenv_t *envp)>int
+fegetexcept()>int
+fegetexceptflag(fexcept_t *flagp, int excepts)>int
+fegetmode(femode_t *modep)>int
+fegetround()>int
+feholdexcept(fenv_t *envp)>int
+feof(FILE *stream)>int
+feof_unlocked(FILE *stream)>int
+feraiseexcept(int excepts)>int
+ferror(FILE *stream)>int
+ferror_unlocked(FILE *stream)>int
+fesetenv(const fenv_t *envp)>int
+fesetexcept(int excepts)>int
+fesetexceptflag(const fexcept_t *flagp, int excepts)>int
+fesetmode(const femode_t *modep)>int
+fesetround(int rounding_direction)>int
+fetestexcept(int excepts)>int
+fetestexceptflag(const fexcept_t *flagp, int excepts)>int
+feupdateenv(const fenv_t *envp)>int
+fexecve(int fd, char *const argv[], char *const envp[])>int
+fflush(FILE *stream)>int
+fflush_unlocked(FILE *stream)>int
+ffs(int i)>int
+ffsl(long int l)>int
+ffsll(long long int ll)>int
+fgetc(FILE *stream)>int
+fgetc_unlocked(FILE *stream)>int
+fgetgrent(FILE *stream)>:group *
+fgetgrent_r(FILE *stream, struct group *resultbuf, char *buffer, size_t buflen, struct group **result)>int
+fgetpos(FILE *stream, fpos_t *pos)>int
+fgetpwent(FILE *stream)>:passwd *
+fgetpwent_r(FILE *stream, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **resul)>int
+fgets(char *s, int n, FILE *stream)>char *
+fgets_unlocked(char *s, int n, FILE *stream)>char *
+fgetwc(FILE *stream)>wint_t
+fgetwc_unlocked(FILE *stream)>wint_t
+fgetws(wchar_t *ws, int n, FILE *stream)>wchar_t *
+fgetws_unlocked(wchar_t *ws, int n, FILE *stream)>wchar_t *
+fileno(FILE *stream)>int
+fileno_unlocked(FILE *stream)>int
+flockfile(FILE *stream)>void
+fmemopen(void *s, size_t len, const char *modes)>FILE *
+fnmatch(const char *pattern, const char *name, int flags)>int
+fopen(const char *filename, const char *modes)>FILE *
+fopencookie(void *magic_cookie, const char *modes, cookie_io_functions_t io_funcs)>FILE *
+fork()>__pid_t
+fpathconf(int fd, int name)>long int
+fpclassify(x)>
+fprintf(FILE *stream, const char *format, ...)>int
+fputc(int c, FILE *stream)>int
+fputc_unlocked(int c, FILE *stream)>int
+fputs(const char *s, FILE *stream)>int
+fputs_unlocked(const char *s, FILE *stream)>int
+fputwc(wchar_t wc, FILE *stream)>wint_t
+fputwc_unlocked(wchar_t wc, FILE *stream)>wint_t
+fputws(const wchar_t *ws, FILE *stream)>int
+fputws_unlocked(const wchar_t *ws, FILE *stream)>int
+fread(void *ptr, size_t size, size_t n, FILE *stream)>size_t
+fread_unlocked(void *ptr, size_t size, size_t n, FILE *stream)>size_t
+free(void *ptr)>void
+free_aligned_sized(void *ptr, size_t alignment, size_t size)>void
+free_sized(void *ptr, size_t size)>void
+freeaddrinfo(struct addrinfo *ai)>void
+freeifaddrs(struct ifaddrs *ifa)>void
+freelocale(locale_t dataset)>void
+freopen(const char *filename, const char *modes, FILE *stream)>FILE *
+fscanf(FILE *stream, const char *format, ...)>int
+fseek(FILE *stream, long int off, int whence)>int
+fseeko(FILE *stream, off_t off, int whence)>int
+fsetpos(FILE *stream, const fpos_t *pos)>int
+fstat(int fd, struct stat *buf)>int
+fstatat(int fd, const char *file, struct stat *buf, int flag)>int
+fsync(int fd)>int
+ftell(FILE *stream)>long int
+ftello(FILE *stream)>__off_t
+ftruncate(int fd, off_t length)>int
+ftrylockfile(FILE *stream)>int
+funlockfile(FILE *stream)>void
+futimens(int fd, const struct timespec times[2])>int
+futimes(int fd, const struct timeval tvp[2])>int
+futimesat(int fd, const char *file, const struct timeval tvp[2])>int
+fwide(FILE *fp, int mode)>int
+fwprintf(FILE *stream, const wchar_t *format, ...)>int
+fwrite(const void *ptr, size_t size, size_t n, FILE *s)>size_t
+fwrite_unlocked(const void *ptr, size_t size, size_t n, FILE *stream)>size_t
+fwscanf(FILE *stream, const wchar_t *format, ...)>int
+gai_cancel(struct gaicb *gaicbp)>int
+gai_error(struct gaicb *req)>int
+gai_strerror(int ecode)>char *
+gai_suspend(const struct gaicb *const list[], int ent, const struct timespec *timeout)>int
+gcvt(double value, int ndigit, char *buf)>char *
+get_current_dir_name()>char *
+getaddrinfo(const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai)>int
+getaddrinfo_a(int mode, struct gaicb *list[], int ent, struct sigevent *sig)>int
+getc(FILE *stream)>int
+getc_unlocked(FILE *stream)>int
+getchar()>int
+getchar_unlocked()>int
+getcwd(char *buf, size_t size)>char *
+getdate(const char *string)>:tm *
+getdate_r(const char *string, struct tm *resbufp)>int
+getdelim(char **lineptr, size_t *n, int delimiter, FILE *stream)>__ssize_t
+getdirentries(int fd, char *buf, size_t nbytes, off_t *basep)>__ssize_t
+getdomainname(char *name, size_t len)>int
+getdtablesize()>int
+getegid()>__gid_t
+getentropy(void *buffer, size_t length)>int
+getenv(const char *name)>char *
+geteuid()>__uid_t
+getgid()>__gid_t
+getgrent()>:group *
+getgrent_r(struct group *resultbuf, char *buffer, size_t buflen, struct group **result)>int
+getgrgid(gid_t gid)>:group *
+getgrgid_r(gid_t gid, struct group *resultbuf, char *buffer, size_t buflen, struct group **result)>int
+getgrnam(const char *name)>:group *
+getgrnam_r(const char *name, struct group *resultbuf, char *buffer, size_t buflen, struct group **res)>int
+getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups)>int
+getgroups(int size, gid_t list[])>int
+gethostbyaddr(const void *addr, socklen_t len, int type)>:hostent *
+gethostbyaddr_r(const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t b)>int
+gethostbyname(const char *name)>:hostent *
+gethostbyname2(const char *name, int af)>:hostent *
+gethostbyname2_r(const char *name, int af, struct hostent *result_buf, char *buf, size_t buflen, struct hos)>int
+gethostbyname_r(const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **r)>int
+gethostent()>:hostent *
+gethostent_r(struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errn)>int
+gethostid()>long int
+gethostname(char *name, size_t len)>int
+getifaddrs(struct ifaddrs **ifap)>int
+getipv4sourcefilter(int s, struct in_addr interface_addr, struct in_addr group, uint32_t *fmode, uint32_t *num)>int
+getitimer(itimer_which_t which, struct itimerval *value)>int
+getline(char **lineptr, size_t *n, FILE *stream)>__ssize_t
+getloadavg(double loadavg[], int nelem)>int
+getlogin()>char *
+getlogin_r(char *name, size_t name_len)>int
+getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, soc)>int
+getnetbyaddr(uint32_t net, int type)>:netent *
+getnetbyaddr_r(uint32_t net, int type, struct netent *result_buf, char *buf, size_t buflen, struct netent)>int
+getnetbyname(const char *name)>:netent *
+getnetbyname_r(const char *name, struct netent *result_buf, char *buf, size_t buflen, struct netent **res)>int
+getnetent()>:netent *
+getnetent_r(struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop)>int
+getnetgrent(char **hostp, char **userp, char **domainp)>int
+getnetgrent_r(char **hostp, char **userp, char **domainp, char *buffer, size_t buflen)>int
+getpagesize()>int
+getpass(const char *prompt)>char *
+getpeername(int fd, SOCKADDR_ARG addr, socklen_t *len)>int
+getpgid(pid_t pid)>__pid_t
+getpgrp()>__pid_t
+getpid()>__pid_t
+getppid()>__pid_t
+getpriority(priority_which_t which, id_t who)>int
+getprotobyname(const char *name)>:protoent *
+getprotobyname_r(const char *name, struct protoent *result_buf, char *buf, size_t buflen, struct protoent *)>int
+getprotobynumber(int proto)>:protoent *
+getprotobynumber_r(int proto, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result)>int
+getprotoent()>:protoent *
+getprotoent_r(struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result)>int
+getpt()>int
+getpw(uid_t uid, char *buffer)>int
+getpwent()>:passwd *
+getpwent_r(struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **result)>int
+getpwnam(const char *name)>:passwd *
+getpwnam_r(const char *name, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **r)>int
+getpwuid(uid_t uid)>:passwd *
+getpwuid_r(uid_t uid, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **result)>int
+getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)>int
+getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)>int
+getrlimit(rlimit_resource_t resource, struct rlimit *rlimits)>int
+getrusage(rusage_who_t who, struct rusage *usage)>int
+gets(char *s)>char *
+getservbyname(const char *name, const char *proto)>:servent *
+getservbyname_r(const char *name, const char *proto, struct servent *result_buf, char *buf, size_t buflen,)>int
+getservbyport(int port, const char *proto)>:servent *
+getservbyport_r(int port, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct )>int
+getservent()>:servent *
+getservent_r(struct servent *result_buf, char *buf, size_t buflen, struct servent **result)>int
+getsid(pid_t pid)>__pid_t
+getsockname(int fd, SOCKADDR_ARG addr, socklen_t *len)>int
+getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)>int
+getsourcefilter(int s, uint32_t interface_addr, const struct sockaddr *group, socklen_t grouplen, uint32_t)>int
+getsubopt(char **optionp, char *const *tokens, char **valuep)>int
+gettimeofday(struct timeval *tv, void *tz)>int
+getuid()>__uid_t
+getumask()>__mode_t
+getusershell()>char *
+getw(FILE *stream)>int
+getwc(FILE *stream)>wint_t
+getwc_unlocked(FILE *stream)>wint_t
+getwchar()>wint_t
+getwchar_unlocked()>wint_t
+getwd(char *buf)>char *
+glob(const char *pattern, int flags, int (*errfunc)(const char *, int), glob_t *pglob)>int
+glob_pattern_p(const char *pattern, int quote)>int
+globfree(glob_t *pglob)>void
+gmtime(const time_t *timer)>:tm *
+gmtime_r(const time_t *timer, struct tm *tp)>:tm *
+grantpt(int fd)>int
+group_member(gid_t gid)>int
+gsignal(int sig)>int
+herror(const char *str)>void
+hstrerror(int err_num)>char *
+htonl(x)>
+htons(x)>
+if_freenameindex(struct if_nameindex *ptr)>void
+if_indextoname(unsigned int ifindex, char ifname[IF_NAMESIZE])>char *
+if_nameindex()>:if_nameindex *
+if_nametoindex(const char *ifname)>unsigned int
+imaxabs(intmax_t n)>intmax_t
+imaxdiv(intmax_t numer, intmax_t denom)>imaxdiv_t
+index(char *s, int c)>char *
+inet6_opt_append(void *extbuf, socklen_t extlen, int offset, uint8_t type, socklen_t len, uint8_t align, vo)>int
+inet6_opt_find(void *extbuf, socklen_t extlen, int offset, uint8_t type, socklen_t *lenp, void **databufp)>int
+inet6_opt_finish(void *extbuf, socklen_t extlen, int offset)>int
+inet6_opt_get_val(void *databuf, int offset, void *val, socklen_t vallen)>int
+inet6_opt_init(void *extbuf, socklen_t extlen)>int
+inet6_opt_next(void *extbuf, socklen_t extlen, int offset, uint8_t *typep, socklen_t *lenp, void **databu)>int
+inet6_opt_set_val(void *databuf, int offset, void *val, socklen_t vallen)>int
+inet6_option_alloc(struct cmsghdr *cmsg, int datalen, int multx, int plusy)>uint8_t *
+inet6_option_append(struct cmsghdr *cmsg, const uint8_t *typep, int multx, int plusy)>int
+inet6_option_find(const struct cmsghdr *cmsg, uint8_t **tptrp, int type)>int
+inet6_option_init(void *bp, struct cmsghdr **cmsgp, int type)>int
+inet6_option_next(const struct cmsghdr *cmsg, uint8_t **tptrp)>int
+inet6_option_space(int nbytes)>int
+inet6_rth_add(void *bp, const struct in6_addr *addr)>int
+inet6_rth_getaddr(const void *bp, int index)>:in6_addr *
+inet6_rth_init(void *bp, socklen_t bp_len, int type, int segments)>void *
+inet6_rth_reverse(const void *in, void *out)>int
+inet6_rth_segments(const void *bp)>int
+inet6_rth_space(int type, int segments)>socklen_t
+inet_addr(const char *cp)>in_addr_t
+inet_aton(const char *cp, struct in_addr *inp)>int
+inet_lnaof(struct in_addr in)>in_addr_t
+inet_makeaddr(in_addr_t net, in_addr_t host)>:in_addr
+inet_net_ntop(int af, const void *cp, int bits, char *buf, size_t len)>char *
+inet_net_pton(int af, const char *cp, void *buf, size_t len)>int
+inet_neta(in_addr_t net, char *buf, size_t len)>char *
+inet_netof(struct in_addr in)>in_addr_t
+inet_network(const char *cp)>in_addr_t
+inet_nsap_addr(const char *cp, unsigned char *buf, int len)>unsigned int
+inet_nsap_ntoa(int len, const unsigned char *cp, char *buf)>char *
+inet_ntoa(struct in_addr in)>char *
+inet_ntop(int af, const void *cp, char *buf, socklen_t len)>char *
+inet_pton(int af, const char *cp, void *buf)>int
+initgroups(const char *user, gid_t group)>int
+initstate(unsigned int seed, char *statebuf, size_t statelen)>char *
+initstate_r(unsigned int seed, char *statebuf, size_t statelen, struct random_data *buf)>int
+innetgr(const char *netgroup, const char *host, const char *user, const char *domain)>int
+ioctl(int fd, unsigned long int request, ...)>int
+iruserok(uint32_t raddr, int suser, const char *remuser, const char *locuser)>int
+iruserok_af(const void *raddr, int suser, const char *remuser, const char *locuser, sa_family_t af)>int
+isalnum_l(c, l)>
+isalpha_l(c, l)>
+isascii(c)>
+isascii_l(c, l)>
+isatty(int fd)>int
+isblank_l(c, l)>
+iscntrl_l(c, l)>
+isctype(int c, int mask)>int
+isdigit_l(c, l)>
+iseqsig(x, y)>
+isfdtype(int fd, int fdtype)>int
+isfinite(x)>
+isgraph_l(c, l)>
+isgreater(x, y)>
+isgreaterequal(x, y)>
+isinf(x)>
+isless(x, y)>
+islessequal(x, y)>
+islessgreater(x, y)>
+islower_l(c, l)>
+isnan(x)>
+isnormal(x)>
+isprint_l(c, l)>
+ispunct_l(c, l)>
+issignaling(x)>
+isspace_l(c, l)>
+issubnormal(x)>
+isunordered(x, y)>
+isupper_l(c, l)>
+iswalnum_l(wint_t wc, locale_t locale)>int
+iswalpha_l(wint_t wc, locale_t locale)>int
+iswblank_l(wint_t wc, locale_t locale)>int
+iswcntrl_l(wint_t wc, locale_t locale)>int
+iswctype_l(wint_t wc, wctype_t desc, locale_t locale)>int
+iswdigit_l(wint_t wc, locale_t locale)>int
+iswgraph_l(wint_t wc, locale_t locale)>int
+iswlower_l(wint_t wc, locale_t locale)>int
+iswprint_l(wint_t wc, locale_t locale)>int
+iswpunct_l(wint_t wc, locale_t locale)>int
+iswspace_l(wint_t wc, locale_t locale)>int
+iswupper_l(wint_t wc, locale_t locale)>int
+iswxdigit_l(wint_t wc, locale_t locale)>int
+isxdigit_l(c, l)>
+iszero(x)>
+jrand48(unsigned short int xsubi[3])>long int
+jrand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, long int *result)>int
+kill(pid_t pid, int sig)>int
+killpg(pid_t pgrp, int sig)>int
+l64a(long int n)>char *
+labs(long int x)>long int
+lchmod(const char *file, mode_t mode)>int
+lchown(const char *file, uid_t owner, gid_t group)>int
+lcong48(unsigned short int param[7])>void
+lcong48_r(unsigned short int param[7], struct drand48_data *buffer)>int
+ldiv(long int numer, long int denom)>ldiv_t
+link(const char *from, const char *to)>int
+linkat(int fromfd, const char *from, int tofd, const char *to, int flags)>int
+listen(int fd, int n)>int
+llabs(long long int x)>long long int
+lldiv(long long int numer, long long int denom)>lldiv_t
+localeconv()>:lconv *
+localtime(const time_t *timer)>:tm *
+localtime_r(const time_t *timer, struct tm *tp)>:tm *
+lockf(int fd, int cmd, off_t len)>int
+longjmp(struct jmp_buf_tag env[1], int val)>void
+lrand48()>long int
+lrand48_r(struct drand48_data *buffer, long int *result)>int
+lseek(int fd, off_t offset, int whence)>__off_t
+lstat(const char *file, struct stat *buf)>int
+lutimes(const char *file, const struct timeval tvp[2])>int
+madvise(void *addr, size_t len, int advice)>int
+malloc(size_t size)>void *
+mblen(const char *s, size_t n)>int
+mbrlen(const char *s, size_t n, mbstate_t *ps)>size_t
+mbrtowc(wchar_t *pwc, const char *s, size_t n, mbstate_t *p)>size_t
+mbsinit(const mbstate_t *ps)>int
+mbsnrtowcs(wchar_t *dst, const char **src, size_t nmc, size_t len, mbstate_t *ps)>size_t
+mbsrtowcs(wchar_t *dst, const char **src, size_t len, mbstate_t *ps)>size_t
+mbstowcs(wchar_t *pwcs, const char *s, size_t n)>size_t
+mbtowc(wchar_t *pwc, const char *s, size_t n)>int
+memalignment(const void *p)>size_t
+memccpy(void *dest, const void *src, int c, size_t n)>void *
+memchr(S, C, N)>
+memcmp(const void *s1, const void *s2, size_t n)>int
+memcpy(void *dest, const void *src, size_t n)>void *
+memfrob(void *s, size_t n)>void *
+memmem(const void *haystack, size_t haystacklen, const void *needle, size_t needlelen)>void *
+memmove(void *dest, const void *src, size_t n)>void *
+mempcpy(void *dest, const void *src, size_t n)>void *
+memrchr(const void *s, int c, size_t n)>void *
+memset(void *s, int c, size_t n)>void *
+memset_explicit(void *s, int c, size_t n)>void *
+mincore(void *start, size_t len, unsigned char *vec)>int
+mkdir(const char *path, mode_t mode)>int
+mkdirat(int fd, const char *path, mode_t mode)>int
+mkdtemp(char *template)>char *
+mkfifo(const char *path, mode_t mode)>int
+mkfifoat(int fd, const char *path, mode_t mode)>int
+mknod(const char *path, mode_t mode, dev_t dev)>int
+mknodat(int fd, const char *path, mode_t mode, dev_t dev)>int
+mkostemp(char *template, int flags)>int
+mkostemps(char *template, int suffixlen, int flags)>int
+mkstemp(char *template)>int
+mkstemps(char *template, int suffixlen)>int
+mktemp(char *template)>char *
+mktime(struct tm *tp)>time_t
+mlock(const void *addr, size_t len)>int
+mlockall(int flags)>int
+mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)>void *
+mprotect(void *addr, size_t len, int prot)>int
+mrand48()>long int
+mrand48_r(struct drand48_data *buffer, long int *result)>int
+mremap(void *addr, size_t old_len, size_t new_len, int flags, ...)>void *
+msync(void *addr, size_t len, int flags)>int
+munlock(const void *addr, size_t len)>int
+munlockall()>int
+munmap(void *addr, size_t len)>int
+nanosleep(const struct timespec *requested_time, struct timespec *remaining)>int
+newlocale(int category_mask, const char *locale, locale_t base)>locale_t
+nice(int inc)>int
+nrand48(unsigned short int xsubi[3])>long int
+nrand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, long int *result)>int
+ntohl(x)>
+ntohs(x)>
+obstack_printf(struct obstack *obstack, const char *format, ...)>int
+obstack_vprintf(struct obstack *obstack, const char *format, gnuc_va_list args)>int
+on_exit(void (*func)(int status, void *arg), void *arg)>int
+open(const char *file, int oflag, ...)>int
+open_memstream(char **bufloc, size_t *sizeloc)>FILE *
+open_wmemstream(wchar_t **bufloc, size_t *sizeloc)>__FILE *
+openat(int fd, const char *file, int oflag, ...)>int
+opendir(const char *name)>DIR *
+pathconf(const char *path, int name)>long int
+pause()>int
+pclose(FILE *stream)>int
+perror(const char *s)>void
+pipe(int pipedes[2])>int
+pipe2(int pipedes[2], int flags)>int
+popen(const char *command, const char *modes)>FILE *
+posix_fadvise(int fd, off_t offset, off_t len, int advise)>int
+posix_fallocate(int fd, off_t offset, off_t len)>int
+posix_madvise(void *addr, size_t len, int advice)>int
+posix_memalign(void **memptr, size_t alignment, size_t size)>int
+posix_openpt(int oflag)>int
+pread(int fd, void *buf, size_t nbytes, off_t offset)>ssize_t
+preadv(int fd, const struct iovec *iovec, int count, off_t offset)>ssize_t
+preadv2(int fp, const struct iovec *iovec, int count, off_t offset, int _flags)>ssize_t
+preadv64v2(int fp, const struct iovec *iovec, int count, off64_t offset, int _flags)>ssize_t
+printf(const char *format, ...)>int
+profil(unsigned short int *sample_buffer, size_t size, size_t offset, unsigned int scale)>int
+pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *tim)>int
+psiginfo(const siginfo_t *pinfo, const char *s)>void
+psignal(int sig, const char *s)>void
+pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void))>int
+pthread_attr_destroy(pthread_attr_t *attr)>int
+pthread_attr_getaffinity_np(const pthread_attr_t *attr, size_t cpusetsize, cpu_set_t *cpuset)>int
+pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)>int
+pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)>int
+pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inherit)>int
+pthread_attr_getschedparam(const pthread_attr_t *attr, struct sched_param *param)>int
+pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy)>int
+pthread_attr_getscope(const pthread_attr_t *attr, int *scope)>int
+pthread_attr_getsigmask_np(const pthread_attr_t *attr, sigset_t *sigmask)>int
+pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stacksize)>int
+pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)>int
+pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)>int
+pthread_attr_init(pthread_attr_t *attr)>int
+pthread_attr_setaffinity_np(pthread_attr_t *attr, size_t cpusetsize, const cpu_set_t *cpuset)>int
+pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)>int
+pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)>int
+pthread_attr_setinheritsched(pthread_attr_t *attr, int inherit)>int
+pthread_attr_setschedparam(pthread_attr_t *attr, const struct sched_param *param)>int
+pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)>int
+pthread_attr_setscope(pthread_attr_t *attr, int scope)>int
+pthread_attr_setsigmask_np(pthread_attr_t *attr, const sigset_t *sigmask)>int
+pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize)>int
+pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)>int
+pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)>int
+pthread_barrier_destroy(pthread_barrier_t *barrier)>int
+pthread_barrier_init(pthread_barrier_t *barrier, const pthread_barrierattr_t *attr, unsigned int count)>int
+pthread_barrier_wait(pthread_barrier_t *barrier)>int
+pthread_barrierattr_destroy(pthread_barrierattr_t *attr)>int
+pthread_barrierattr_getpshared(const pthread_barrierattr_t *attr, int *pshared)>int
+pthread_barrierattr_init(pthread_barrierattr_t *attr)>int
+pthread_barrierattr_setpshared(pthread_barrierattr_t *attr, int pshared)>int
+pthread_cancel(pthread_t th)>int
+pthread_cleanup_pop(execute)>
+pthread_cleanup_pop_restore_np(execute)>
+pthread_cleanup_push(routine, arg)>
+pthread_cleanup_push_defer_np(routine, arg)>
+pthread_clockjoin_np(pthread_t th, void **thread_return, clockid_t clockid, const struct timespec *abstime)>int
+pthread_cond_broadcast(pthread_cond_t *cond)>int
+pthread_cond_clockwait(pthread_cond_t *cond, pthread_mutex_t *mutex, clockid_t clock_id, const struct timespec *a)>int
+pthread_cond_destroy(pthread_cond_t *cond)>int
+pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *cond_attr)>int
+pthread_cond_signal(pthread_cond_t *cond)>int
+pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime)>int
+pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex)>int
+pthread_condattr_destroy(pthread_condattr_t *attr)>int
+pthread_condattr_getclock(const pthread_condattr_t *attr, clockid_t *clock_id)>int
+pthread_condattr_getpshared(const pthread_condattr_t *attr, int *pshared)>int
+pthread_condattr_init(pthread_condattr_t *attr)>int
+pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)>int
+pthread_condattr_setpshared(pthread_condattr_t *attr, int pshared)>int
+pthread_create(pthread_t *newthread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *ar)>int
+pthread_detach(pthread_t th)>int
+pthread_equal(pthread_t thread1, pthread_t thread2)>int
+pthread_exit(void *retval)>void
+pthread_getaffinity_np(pthread_t th, size_t cpusetsize, cpu_set_t *cpuset)>int
+pthread_getattr_default_np(pthread_attr_t *attr)>int
+pthread_getattr_np(pthread_t th, pthread_attr_t *attr)>int
+pthread_getconcurrency()>int
+pthread_getcpuclockid(pthread_t thread_id, clockid_t *clock_id)>int
+pthread_getname_np(pthread_t target_thread, char *buf, size_t buflen)>int
+pthread_getschedparam(pthread_t target_thread, int *policy, struct sched_param *param)>int
+pthread_getspecific(pthread_key_t key)>void *
+pthread_gettid_np(pthread_t thread_id)>pid_t
+pthread_join(pthread_t th, void **thread_return)>int
+pthread_key_create(pthread_key_t *key, void (*destr_function)(void *))>int
+pthread_key_delete(pthread_key_t key)>int
+pthread_mutex_clocklock(pthread_mutex_t *mutex, clockid_t clockid, const struct timespec *abstime)>int
+pthread_mutex_consistent(pthread_mutex_t *mutex)>int
+pthread_mutex_destroy(pthread_mutex_t *mutex)>int
+pthread_mutex_getprioceiling(const pthread_mutex_t *mutex, int *prioceiling)>int
+pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr)>int
+pthread_mutex_lock(pthread_mutex_t *mutex)>int
+pthread_mutex_setprioceiling(pthread_mutex_t *mutex, int prioceiling, int *old_ceiling)>int
+pthread_mutex_timedlock(pthread_mutex_t *mutex, const struct timespec *abstime)>int
+pthread_mutex_trylock(pthread_mutex_t *mutex)>int
+pthread_mutex_unlock(pthread_mutex_t *mutex)>int
+pthread_mutexattr_destroy(pthread_mutexattr_t *attr)>int
+pthread_mutexattr_getprioceiling(const pthread_mutexattr_t *attr, int *prioceiling)>int
+pthread_mutexattr_getprotocol(const pthread_mutexattr_t *attr, int *protocol)>int
+pthread_mutexattr_getpshared(const pthread_mutexattr_t *attr, int *pshared)>int
+pthread_mutexattr_getrobust(const pthread_mutexattr_t *attr, int *robustness)>int
+pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *kind)>int
+pthread_mutexattr_init(pthread_mutexattr_t *attr)>int
+pthread_mutexattr_setprioceiling(pthread_mutexattr_t *attr, int prioceiling)>int
+pthread_mutexattr_setprotocol(pthread_mutexattr_t *attr, int protocol)>int
+pthread_mutexattr_setpshared(pthread_mutexattr_t *attr, int pshared)>int
+pthread_mutexattr_setrobust(pthread_mutexattr_t *attr, int robustness)>int
+pthread_mutexattr_settype(pthread_mutexattr_t *attr, int kind)>int
+pthread_once(pthread_once_t *once_control, void (*init_routine)(void))>int
+pthread_rwlock_clockrdlock(pthread_rwlock_t *rwlock, clockid_t clockid, const struct timespec *abstime)>int
+pthread_rwlock_clockwrlock(pthread_rwlock_t *rwlock, clockid_t clockid, const struct timespec *abstime)>int
+pthread_rwlock_destroy(pthread_rwlock_t *rwlock)>int
+pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *attr)>int
+pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)>int
+pthread_rwlock_timedrdlock(pthread_rwlock_t *rwlock, const struct timespec *abstime)>int
+pthread_rwlock_timedwrlock(pthread_rwlock_t *rwlock, const struct timespec *abstime)>int
+pthread_rwlock_tryrdlock(pthread_rwlock_t *rwlock)>int
+pthread_rwlock_trywrlock(pthread_rwlock_t *rwlock)>int
+pthread_rwlock_unlock(pthread_rwlock_t *rwlock)>int
+pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)>int
+pthread_rwlockattr_destroy(pthread_rwlockattr_t *attr)>int
+pthread_rwlockattr_getkind_np(const pthread_rwlockattr_t *attr, int *pref)>int
+pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *attr, int *pshared)>int
+pthread_rwlockattr_init(pthread_rwlockattr_t *attr)>int
+pthread_rwlockattr_setkind_np(pthread_rwlockattr_t *attr, int pref)>int
+pthread_rwlockattr_setpshared(pthread_rwlockattr_t *attr, int pshared)>int
+pthread_self()>pthread_t
+pthread_setaffinity_np(pthread_t th, size_t cpusetsize, const cpu_set_t *cpuset)>int
+pthread_setattr_default_np(const pthread_attr_t *attr)>int
+pthread_setcancelstate(int state, int *oldstate)>int
+pthread_setcanceltype(int type, int *oldtype)>int
+pthread_setconcurrency(int level)>int
+pthread_setname_np(pthread_t target_thread, const char *name)>int
+pthread_setschedparam(pthread_t target_thread, int policy, const struct sched_param *param)>int
+pthread_setschedprio(pthread_t target_thread, int prio)>int
+pthread_setspecific(pthread_key_t key, const void *pointer)>int
+pthread_spin_destroy(pthread_spinlock_t *lock)>int
+pthread_spin_init(pthread_spinlock_t *lock, int pshared)>int
+pthread_spin_lock(pthread_spinlock_t *lock)>int
+pthread_spin_trylock(pthread_spinlock_t *lock)>int
+pthread_spin_unlock(pthread_spinlock_t *lock)>int
+pthread_testcancel()>void
+pthread_timedjoin_np(pthread_t th, void **thread_return, const struct timespec *abstime)>int
+pthread_tryjoin_np(pthread_t th, void **thread_return)>int
+pthread_yield()>int
+ptsname(int fd)>char *
+ptsname_r(int fd, char *buf, size_t buflen)>int
+putc(int c, FILE *stream)>int
+putc_unlocked(int c, FILE *stream)>int
+putchar(int c)>int
+putchar_unlocked(int c)>int
+putenv(char *string)>int
+putgrent(const struct group *p, FILE *f)>int
+putpwent(const struct passwd *p, FILE *f)>int
+puts(const char *s)>int
+putw(int w, FILE *stream)>int
+putwc(wchar_t wc, FILE *stream)>wint_t
+putwc_unlocked(wchar_t wc, FILE *stream)>wint_t
+putwchar(wchar_t wc)>wint_t
+putwchar_unlocked(wchar_t wc)>wint_t
+pwrite(int fd, const void *buf, size_t n, off_t offset)>ssize_t
+pwritev(int fd, const struct iovec *iovec, int count, off_t offset)>ssize_t
+pwritev2(int fd, const struct iovec *iodev, int count, off_t offset, int flags)>ssize_t
+pwritev64v2(int fd, const struct iovec *iodev, int count, off64_t offset, int flags)>ssize_t
+qecvt(long double value, int ndigit, int *decpt, int *sign)>char *
+qecvt_r(long double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+qfcvt(long double value, int ndigit, int *decpt, int *sign)>char *
+qfcvt_r(long double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+qgcvt(long double value, int ndigit, char *buf)>char *
+qsort(void *base, size_t nmemb, size_t size, compar_fn_t compar)>void
+qsort_r(void *base, size_t nmemb, size_t size, compar_d_fn_t compar, void *arg)>void
+quick_exit(int status)>void
+raise(int sig)>int
+rand()>int
+rand_r(unsigned int *seed)>int
+random()>long int
+random_r(struct random_data *buf, int32_t *result)>int
+rawmemchr(const void *s, int c)>void *
+rcmd(char **ahost, unsigned short int rport, const char *locuser, const char *remuser, const ch)>int
+rcmd_af(char **ahost, unsigned short int rport, const char *locuser, const char *remuser, const ch)>int
+re_comp(const char *)>char *
+re_compile_fastmap(struct re_pattern_buffer *buffer)>int
+re_compile_pattern(const char *pattern, size_t length, struct re_pattern_buffer *buffer)>char *
+re_exec(const char *)>int
+re_match(struct re_pattern_buffer *buffer, const char *String, regoff_t length, regoff_t start, str)>regoff_t
+re_match_2(struct re_pattern_buffer *buffer, const char *string1, regoff_t length1, const char *strin)>regoff_t
+re_search(struct re_pattern_buffer *buffer, const char *String, regoff_t length, regoff_t start, reg)>regoff_t
+re_search_2(struct re_pattern_buffer *buffer, const char *string1, regoff_t length1, const char *strin)>regoff_t
+re_set_registers(struct re_pattern_buffer *buffer, struct re_registers *regs, re_size_t num_regs, regoff_t )>void
+re_set_syntax(reg_syntax_t syntax)>reg_syntax_t
+read(int fd, void *buf, size_t nbytes)>ssize_t
+readdir(DIR *dirp)>:dirent *
+readdir64_r(DIR *dirp, struct dirent64 *entry, struct dirent64 **result)>int
+readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result)>int
+readlink(const char *path, char *buf, size_t len)>ssize_t
+readlinkat(int fd, const char *path, char *buf, size_t len)>ssize_t
+readv(int fd, const struct iovec *iovec, int count)>ssize_t
+realloc(void *ptr, size_t size)>void *
+reallocarray(void *ptr, size_t nmemb, size_t size)>void *
+realpath(const char *name, char *resolved)>char *
+recv(int fd, void *buf, size_t n, int flags)>ssize_t
+recvfrom(int fd, void *buf, size_t n, int flags, SOCKADDR_ARG addr, socklen_t *addr_len)>ssize_t
+recvmmsg(int fd, struct mmsghdr *vmessages, unsigned int vlen, int flags, struct timespec *tmo)>int
+recvmsg(int fd, struct msghdr *message, int flags)>ssize_t
+regcomp(regex_t *_Restrict_ preg, const char *_Restrict_ pattern, int cflags)>int
+regerror(int errcode, const regex_t *_Restrict_ preg, char *_Restrict_ errbuf, size_t errbuf_size)>size_t
+regexec(const regex_t *_Restrict_ preg, const char *_Restrict_ String, size_t nmatch, regmatch_t p)>int
+regfree(regex_t *preg)>void
+remap_file_pages(void *start, size_t size, int prot, size_t pgoff, int flags)>int
+remove(const char *filename)>int
+rename(const char *old, const char *new)>int
+renameat(int oldfd, const char *old, int newfd, const char *new)>int
+renameat2(int oldfd, const char *old, int newfd, const char *new, unsigned int flags)>int
+revoke(const char *file)>int
+rewind(FILE *stream)>void
+rewinddir(DIR *dirp)>void
+rexec(char **ahost, int rport, const char *name, const char *pass, const char *cmd, int *fd2p)>int
+rexec_af(char **ahost, int rport, const char *name, const char *pass, const char *cmd, int *fd2p, s)>int
+rindex(char *s, int c)>char *
+rmdir(const char *path)>int
+rpmatch(const char *response)>int
+rresvport(int *alport)>int
+rresvport_af(int *alport, sa_family_t af)>int
+ruserok(const char *rhost, int suser, const char *remuser, const char *locuser)>int
+ruserok_af(const char *rhost, int suser, const char *remuser, const char *locuser, sa_family_t af)>int
+sbrk(intptr_t delta)>void *
+scandir(const char *dir, struct dirent ***namelist, int (*selector)(const struct dirent *), int (*)>int
+scandirat(int dfd, const char *dir, struct dirent ***namelist, int (*selector)(const struct dirent *)>int
+scanf(const char *format, ...)>int
+sched_get_priority_max(int algorithm)>int
+sched_get_priority_min(int algorithm)>int
+sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset)>int
+sched_getparam(pid_t pid, struct sched_param *param)>int
+sched_getscheduler(pid_t pid)>int
+sched_rr_get_interval(pid_t pid, struct timespec *t)>int
+sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset)>int
+sched_setparam(pid_t pid, const struct sched_param *param)>int
+sched_setscheduler(pid_t pid, int policy, const struct sched_param *param)>int
+sched_yield()>int
+secure_getenv(const char *name)>char *
+seed48(unsigned short int seed16v[3])>unsigned short int *
+seed48_r(unsigned short int seed16v[3], struct drand48_data *buffer)>int
+seekdir(DIR *dirp, long int pos)>void
+select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)>int
+sem_clockwait(sem_t *sem, clockid_t clock, const struct timespec *abstime)>int
+sem_close(sem_t *sem)>int
+sem_destroy(sem_t *sem)>int
+sem_getvalue(sem_t *sem, int *sval)>int
+sem_init(sem_t *sem, int pshared, unsigned int value)>int
+sem_open(const char *name, int oflag, ...)>sem_t *
+sem_post(sem_t *sem)>int
+sem_timedwait(sem_t *sem, const struct timespec *abstime)>int
+sem_trywait(sem_t *sem)>int
+sem_unlink(const char *name)>int
+sem_wait(sem_t *sem)>int
+send(int fd, const void *buf, size_t n, int flags)>ssize_t
+sendmmsg(int fd, struct mmsghdr *vmessages, unsigned int vlen, int flags)>int
+sendmsg(int fd, const struct msghdr *message, int flags)>ssize_t
+sendto(int fd, const void *buf, size_t n, int flags, CONST_SOCKADDR_ARG addr, socklen_t addr_len)>ssize_t
+setbuf(FILE *stream, char *buf)>void
+setbuffer(FILE *stream, char *buf, size_t size)>void
+setdomainname(const char *name, size_t len)>int
+setegid(gid_t gid)>int
+setenv(const char *name, const char *value, int replace)>int
+seteuid(uid_t uid)>int
+setgid(gid_t gid)>int
+setgrent()>void
+setgroups(size_t n, const gid_t *groups)>int
+sethostent(int stay_open)>void
+sethostid(long int id)>int
+sethostname(const char *name, size_t len)>int
+setipv4sourcefilter(int s, struct in_addr interface_addr, struct in_addr group, uint32_t fmode, uint32_t numsr)>int
+setitimer(itimer_which_t which, const struct itimerval *new, struct itimerval *old)>int
+setjmp(env)>
+setlinebuf(FILE *stream)>void
+setlocale(int category, const char *locale)>char *
+setlogin(const char *name)>int
+setnetent(int stay_open)>void
+setnetgrent(const char *netgroup)>int
+setpgid(pid_t pid, pid_t pgid)>int
+setpgrp()>int
+setpriority(priority_which_t which, id_t who, int prio)>int
+setprotoent(int stay_open)>void
+setpwent()>void
+setregid(gid_t rgid, gid_t egid)>int
+setresgid(gid_t rgid, gid_t egid, gid_t sgid)>int
+setresuid(uid_t ruid, uid_t euid, uid_t suid)>int
+setreuid(uid_t ruid, uid_t euid)>int
+setrlimit(rlimit_resource_t resource, const struct rlimit *rlimits)>int
+setservent(int stay_open)>void
+setsid()>__pid_t
+setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen)>int
+setsourcefilter(int s, uint32_t interface_addr, const struct sockaddr *group, socklen_t grouplen, uint32_t)>int
+setstate(char *statebuf)>char *
+setstate_r(char *statebuf, struct random_data *buf)>int
+settimeofday(const struct timeval *tv, const struct timezone *tz)>int
+setuid(uid_t uid)>int
+setusershell()>void
+setvbuf(FILE *stream, char *buf, int modes, size_t n)>int
+shm_open(const char *name, int oflag, mode_t mode)>int
+shm_unlink(const char *name)>int
+shutdown(int fd, int how)>int
+sigabbrev_np(int sig)>char *
+sigaction(int sig, const struct sigaction *act, struct sigaction *oact)>int
+sigaddset(sigset_t *set, int signo)>int
+sigaltstack(const stack_t *ss, stack_t *oss)>int
+sigandset(sigset_t *set, const sigset_t *left, const sigset_t *right)>int
+sigblock(int mask)>int
+sigdelset(sigset_t *set, int signo)>int
+sigdescr_np(int sig)>char *
+sigemptyset(sigset_t *set)>int
+sigfillset(sigset_t *set)>int
+siggetmask()>int
+sighold(int sig)>int
+sigignore(int sig)>int
+siginterrupt(int sig, int interrupt)>int
+sigisemptyset(const sigset_t *set)>int
+sigismember(const sigset_t *set, int signo)>int
+siglongjmp(sigjmp_buf env, int val)>void
+sigmask(sig)>
+signal(int sig, sighandler_t handler)>__sighandler_t
+signbit(x)>
+sigorset(sigset_t *set, const sigset_t *left, const sigset_t *right)>int
+sigpause(sig)>
+sigpending(sigset_t *set)>int
+sigprocmask(int how, const sigset_t *set, sigset_t *oset)>int
+sigqueue(pid_t pid, int sig, const union sigval val)>int
+sigrelse(int sig)>int
+sigreturn(struct sigcontext *scp)>int
+sigset(int sig, sighandler_t disp)>__sighandler_t
+sigsetjmp(env, savemask)>
+sigsetmask(int mask)>int
+sigstack(struct sigstack *ss, struct sigstack *oss)>int
+sigsuspend(const sigset_t *set)>int
+sigtimedwait(const sigset_t *set, siginfo_t *info, const struct timespec *timeout)>int
+sigwait(const sigset_t *set, int *sig)>int
+sigwaitinfo(const sigset_t *set, siginfo_t *info)>int
+sleep(unsigned int seconds)>unsigned int
+snprintf(char *s, size_t maxlen, const char *format, ...)>int
+sockatmark(int fd)>int
+socket(int domain, int type, int protocol)>int
+socketpair(int domain, int type, int protocol, int fds[2])>int
+sprintf(char *s, const char *format, ...)>int
+srand(unsigned int seed)>void
+srand48(long int seedval)>void
+srand48_r(long int seedval, struct drand48_data *buffer)>int
+srandom(unsigned int seed)>void
+srandom_r(unsigned int seed, struct random_data *buf)>int
+sscanf(const char *s, const char *format, ...)>int
+ssignal(int sig, sighandler_t handler)>__sighandler_t
+stat(const char *file, struct stat *buf)>int
+stpcpy(char *dest, const char *src)>char *
+stpncpy(char *dest, const char *src, size_t n)>char *
+strcasecmp(const char *s1, const char *s2)>int
+strcasecmp_l(const char *s1, const char *s2, locale_t loc)>int
+strcasestr(char *haystack, const char *needle)>char *
+strcat(char *dest, const char *src)>char *
+strchr(S, C)>
+strchrnul(char *s, int c)>char *
+strcmp(const char *s1, const char *s2)>int
+strcoll(const char *s1, const char *s2)>int
+strcoll_l(const char *s1, const char *s2, locale_t l)>int
+strcpy(char *dest, const char *src)>char *
+strcspn(const char *s, const char *reject)>size_t
+strdup(const char *s)>char *
+strdupa(s)>
+strerror(int errnum)>char *
+strerror_l(int errnum, locale_t l)>char *
+strerror_r(int errnum, char *buf, size_t buflen)>char *
+strerrordesc_np(int err)>char *
+strerrorname_np(int err)>char *
+strfromd(char *dest, size_t size, const char *format, double f)>int
+strfromf(char *dest, size_t size, const char *format, float f)>int
+strfromf128(char *dest, size_t size, const char *format, _Float128 f)>int
+strfromf128x(char *dest, size_t size, const char *format, _Float128x f)>int
+strfromf16(char *dest, size_t size, const char *format, _Float16 f)>int
+strfromf32(char *dest, size_t size, const char *format, _Float32 f)>int
+strfromf32x(char *dest, size_t size, const char *format, _Float32x f)>int
+strfromf64x(char *dest, size_t size, const char *format, _Float64x f)>int
+strfroml(char *dest, size_t size, const char *format, long double f)>int
+strfry(char *string)>char *
+strftime(char *s, size_t maxsize, const char *format, const struct tm *tp)>size_t
+strftime_l(char *s, size_t maxsize, const char *format, const struct tm *tp, locale_t loc)>size_t
+strlcat(char *dest, const char *src, size_t n)>size_t
+strlcpy(char *dest, const char *src, size_t n)>size_t
+strlen(const char *s)>size_t
+strncasecmp(const char *s1, const char *s2, size_t n)>int
+strncasecmp_l(const char *s1, const char *s2, size_t n, locale_t loc)>int
+strncat(char *dest, const char *src, size_t n)>char *
+strncmp(const char *s1, const char *s2, size_t n)>int
+strncpy(char *dest, const char *src, size_t n)>char *
+strndup(const char *string, size_t n)>char *
+strndupa(s, n)>
+strnlen(const char *string, size_t maxlen)>size_t
+strpbrk(S, ACCEPT)>
+strptime(const char *s, const char *fmt, struct tm *tp)>char *
+strptime_l(const char *s, const char *fmt, struct tm *tp, locale_t loc)>char *
+strrchr(S, C)>
+strsep(char **stringp, const char *delim)>char *
+strsignal(int sig)>char *
+strspn(const char *s, const char *accept)>size_t
+strstr(HAYSTACK, NEEDLE)>
+strtod(const char *nptr, char **endptr)>double
+strtod_l(const char *nptr, char **endptr, locale_t loc)>double
+strtof(const char *nptr, char **endptr)>float
+strtof128(const char *nptr, char **endptr)>_Float128
+strtof128_l(const char *nptr, char **endptr, locale_t loc)>_Float128
+strtof128x(const char *nptr, char **endptr)>_Float128x
+strtof128x_l(const char *nptr, char **endptr, locale_t loc)>_Float128x
+strtof16(const char *nptr, char **endptr)>_Float16
+strtof16_l(const char *nptr, char **endptr, locale_t loc)>_Float16
+strtof32(const char *nptr, char **endptr)>_Float32
+strtof32_l(const char *nptr, char **endptr, locale_t loc)>_Float32
+strtof32x(const char *nptr, char **endptr)>_Float32x
+strtof32x_l(const char *nptr, char **endptr, locale_t loc)>_Float32x
+strtof64_l(const char *nptr, char **endptr, locale_t loc)>_Float64
+strtof64x(const char *nptr, char **endptr)>_Float64x
+strtof64x_l(const char *nptr, char **endptr, locale_t loc)>_Float64x
+strtof_l(const char *nptr, char **endptr, locale_t loc)>float
+strtoimax(const char *nptr, char **endptr, int base)>intmax_t
+strtok(char *s, const char *delim)>char *
+strtok_r(char *s, const char *delim, char **save_ptr)>char *
+strtol(const char *nptr, char **endptr, int base)>long int
+strtol_l(const char *nptr, char **endptr, int base, locale_t loc)>long int
+strtold(const char *nptr, char **endptr)>long double
+strtold_l(const char *nptr, char **endptr, locale_t loc)>long double
+strtoll(const char *nptr, char **endptr, int base)>long long int
+strtoll_l(const char *nptr, char **endptr, int base, locale_t loc)>long long int
+strtoq(const char *nptr, char **endptr, int base)>long long int
+strtoul(const char *nptr, char **endptr, int base)>unsigned long int
+strtoul_l(const char *nptr, char **endptr, int base, locale_t loc)>unsigned long int
+strtoull(const char *nptr, char **endptr, int base)>unsigned long long int
+strtoull_l(const char *nptr, char **endptr, int base, locale_t loc)>unsigned long long int
+strtoumax(const char *nptr, char **endptr, int base)>uintmax_t
+strtouq(const char *nptr, char **endptr, int base)>unsigned long long int
+strverscmp(const char *s1, const char *s2)>int
+strxfrm(char *dest, const char *src, size_t n)>size_t
+strxfrm_l(char *dest, const char *src, size_t n, locale_t l)>size_t
+swab(const void *from, void *to, ssize_t n)>void
+swprintf(wchar_t *s, size_t n, const wchar_t *format, ...)>int
+swscanf(const wchar_t *s, const wchar_t *format, ...)>int
+symlink(const char *from, const char *to)>int
+symlinkat(const char *from, int tofd, const char *to)>int
+sync()>void
+syncfs(int fd)>int
+syscall(long int sysno, ...)>long int
+sysconf(int name)>long int
+system(const char *command)>int
+sysv_signal(int sig, sighandler_t handler)>__sighandler_t
+tcdrain(int fd)>int
+tcflow(int fd, int action)>int
+tcflush(int fd, int queue_selector)>int
+tcgetattr(int fd, struct termios *termios_p)>int
+tcgetpgrp(int fd)>__pid_t
+tcgetsid(int fd)>__pid_t
+tcsendbreak(int fd, int duration)>int
+tcsetattr(int fd, int optional_actions, const struct termios *termios_p)>int
+tcsetpgrp(int fd, pid_t pgrp_id)>int
+telldir(DIR *dirp)>long int
+tempnam(const char *dir, const char *pfx)>char *
+time(time_t *timer)>time_t
+timegm(struct tm *tp)>time_t
+timelocal(struct tm *tp)>time_t
+timer_create(clockid_t clock_id, struct sigevent *evp, timer_t *timerid)>int
+timer_delete(timer_t timerid)>int
+timer_getoverrun(timer_t timerid)>int
+timer_gettime(timer_t timerid, struct itimerspec *value)>int
+timer_settime(timer_t timerid, int flags, const struct itimerspec *value, struct itimerspec *ovalue)>int
+timeradd(a, b, result)>
+timerclear(tvp)>
+timercmp(a, b, CMP)>
+timerisset(tvp)>
+timersub(a, b, result)>
+timespec_get(struct timespec *ts, int base)>int
+timespec_getres(struct timespec *ts, int base)>int
+tmpfile()>FILE *
+tmpnam(char[L_tmpnam])>char *
+tmpnam_r(char s[L_tmpnam])>char *
+toascii(c)>
+toascii_l(c, l)>
+tolower(c)>
+tolower_l(c, locale)>
+toupper(c)>
+toupper_l(c, locale)>
+towctrans(wint_t wc, wctrans_t desc)>wint_t
+towctrans_l(wint_t wc, wctrans_t desc, locale_t locale)>wint_t
+towlower_l(wint_t wc, locale_t locale)>wint_t
+towupper_l(wint_t wc, locale_t locale)>wint_t
+truncate(const char *file, off_t length)>int
+ttyname(int fd)>char *
+ttyname_r(int fd, char *buf, size_t buflen)>int
+ttyslot()>int
+tzset()>void
+uabs(int x)>unsigned int
+ualarm(useconds_t value, useconds_t interval)>__useconds_t
+ulabs(long int x)>unsigned long int
+ullabs(long long int x)>unsigned long long int
+umask(mode_t mask)>__mode_t
+umaxabs(intmax_t n)>uintmax_t
+uname(struct utsname *name)>int
+ungetc(int c, FILE *stream)>int
+ungetwc(wint_t wc, FILE *stream)>wint_t
+unlink(const char *name)>int
+unlinkat(int fd, const char *name, int flag)>int
+unlockpt(int fd)>int
+unsetenv(const char *name)>int
+uselocale(locale_t dataset)>locale_t
+usleep(useconds_t useconds)>int
+utime(const char *file, const struct utimbuf *file_times)>int
+utimensat(int fd, const char *path, const struct timespec times[2], int flags)>int
+utimes(const char *file, const struct timeval tvp[2])>int
+valloc(size_t size)>void *
+vasprintf(char **ptr, const char *f, gnuc_va_list arg)>int
+vdprintf(int fd, const char *fmt, gnuc_va_list arg)>int
+versionsort(const struct dirent **e1, const struct dirent **e2)>int
+vfork()>__pid_t
+vfprintf(FILE *s, const char *format, gnuc_va_list arg)>int
+vfscanf(FILE *s, const char *format, gnuc_va_list arg)>int
+vfwprintf(FILE *s, const wchar_t *format, gnuc_va_list arg)>int
+vfwscanf(FILE *s, const wchar_t *format, gnuc_va_list arg)>int
+vhangup()>int
+vprintf(const char *format, gnuc_va_list arg)>int
+vscanf(const char *format, gnuc_va_list arg)>int
+vsnprintf(char *s, size_t maxlen, const char *format, gnuc_va_list arg)>int
+vsprintf(char *s, const char *format, gnuc_va_list arg)>int
+vsscanf(const char *s, const char *format, gnuc_va_list arg)>int
+vswprintf(wchar_t *s, size_t n, const wchar_t *format, gnuc_va_list arg)>int
+vswscanf(const wchar_t *s, const wchar_t *format, gnuc_va_list arg)>int
+vwprintf(const wchar_t *format, gnuc_va_list arg)>int
+vwscanf(const wchar_t *format, gnuc_va_list arg)>int
+wait(int *stat_loc)>__pid_t
+wait3(int *stat_loc, int options, struct rusage *usage)>__pid_t
+wait4(pid_t pid, int *stat_loc, int options, struct rusage *usage)>__pid_t
+waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)>int
+waitpid(pid_t pid, int *stat_loc, int options)>__pid_t
+wcpcpy(wchar_t *dest, const wchar_t *src)>wchar_t *
+wcpncpy(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
+wcrtomb(char *s, wchar_t wc, mbstate_t *ps)>size_t
+wcscasecmp(const wchar_t *s1, const wchar_t *s2)>int
+wcscasecmp_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)>int
+wcscat(wchar_t *dest, const wchar_t *src)>wchar_t *
+wcschr(WCS, WC)>
+wcschrnul(const wchar_t *s, wchar_t wc)>wchar_t *
+wcscmp(const wchar_t *s1, const wchar_t *s2)>int
+wcscoll(const wchar_t *s1, const wchar_t *s2)>int
+wcscoll_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)>int
+wcscpy(wchar_t *dest, const wchar_t *src)>wchar_t *
+wcscspn(const wchar_t *wcs, const wchar_t *reject)>size_t
+wcsdup(const wchar_t *s)>wchar_t *
+wcsftime(wchar_t *s, size_t maxsize, const wchar_t *format, const struct tm *tp)>size_t
+wcsftime_l(wchar_t *s, size_t maxsize, const wchar_t *format, const struct tm *tp, locale_t loc)>size_t
+wcslcat(wchar_t *dest, const wchar_t *src, size_t n)>size_t
+wcslcpy(wchar_t *dest, const wchar_t *src, size_t n)>size_t
+wcslen(const wchar_t *s)>size_t
+wcsncasecmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
+wcsncasecmp_l(const wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)>int
+wcsncat(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
+wcsncmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
+wcsncpy(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
+wcsnlen(const wchar_t *s, size_t maxlen)>size_t
+wcsnrtombs(char *dst, const wchar_t **src, size_t nwc, size_t len, mbstate_t *ps)>size_t
+wcspbrk(WCS, ACCEPT)>
+wcsrchr(WCS, WC)>
+wcsrtombs(char *dst, const wchar_t **src, size_t len, mbstate_t *ps)>size_t
+wcsspn(const wchar_t *wcs, const wchar_t *accept)>size_t
+wcsstr(HAYSTACK, NEEDLE)>
+wcstod(const wchar_t *nptr, wchar_t **endptr)>double
+wcstod_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>double
+wcstof(const wchar_t *nptr, wchar_t **endptr)>float
+wcstof128(const wchar_t *nptr, wchar_t **endptr)>_Float128
+wcstof128_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float128
+wcstof128x(const wchar_t *nptr, wchar_t **endptr)>_Float128x
+wcstof128x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float128x
+wcstof16(const wchar_t *nptr, wchar_t **endptr)>_Float16
+wcstof16_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float16
+wcstof32(const wchar_t *nptr, wchar_t **endptr)>_Float32
+wcstof32_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float32
+wcstof32x(const wchar_t *nptr, wchar_t **endptr)>_Float32x
+wcstof32x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float32x
+wcstof64_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float64
+wcstof64x(const wchar_t *nptr, wchar_t **endptr)>_Float64x
+wcstof64x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float64x
+wcstof_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>float
+wcstoimax(const gwchar_t *nptr, gwchar_t **endptr, int base)>intmax_t
+wcstok(wchar_t *s, const wchar_t *delim, wchar_t **ptr)>wchar_t *
+wcstol(const wchar_t *nptr, wchar_t **endptr, int base)>long int
+wcstol_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>long int
+wcstold(const wchar_t *nptr, wchar_t **endptr)>long double
+wcstold_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>long double
+wcstoll(const wchar_t *nptr, wchar_t **endptr, int base)>long long int
+wcstoll_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>long long int
+wcstombs(char *s, const wchar_t *pwcs, size_t n)>size_t
+wcstoq(const wchar_t *nptr, wchar_t **endptr, int base)>long long int
+wcstoul(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long int
+wcstoul_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>unsigned long int
+wcstoull(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long long int
+wcstoull_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>unsigned long long int
+wcstoumax(const gwchar_t *nptr, gwchar_t **endptr, int base)>uintmax_t
+wcstouq(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long long int
+wcswcs(const wchar_t *haystack, const wchar_t *needle)>wchar_t *
+wcswidth(const wchar_t *s, size_t n)>int
+wcsxfrm(wchar_t *s1, const wchar_t *s2, size_t n)>size_t
+wcsxfrm_l(wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)>size_t
+wctob(wint_t c)>int
+wctomb(char *s, wchar_t wchar)>int
+wctrans(const char *property)>wctrans_t
+wctrans_l(const char *property, locale_t locale)>wctrans_t
+wctype_l(const char *property, locale_t locale)>wctype_t
+wcwidth(wchar_t c)>int
+wmemchr(S, C, N)>
+wmemcmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
+wmemcpy(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
+wmemmove(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
+wmempcpy(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
+wmemset(wchar_t *s, wchar_t c, size_t n)>wchar_t *
+wprintf(const wchar_t *format, ...)>int
+write(int fd, const void *buf, size_t n)>ssize_t
+writev(int fd, const struct iovec *iovec, int count)>ssize_t
+wscanf(const wchar_t *format, ...)>int
+~__pthread_cleanup_class()>
+ACCESSPERMS:
+AF_ALG:
+AF_APPLETALK:
+AF_ASH:
+AF_ATMPVC:
+AF_ATMSVC:
+AF_AX25:
+AF_BLUETOOTH:
+AF_BRIDGE:
+AF_CAIF:
+AF_CAN:
+AF_ECONET:
+AF_FILE:
+AF_IB:
+AF_IEEE802154:
+AF_INET:
+AF_INET6:
+AF_IPX:
+AF_IRDA:
+AF_ISDN:
+AF_IUCV:
+AF_KCM:
+AF_KEY:
+AF_LLC:
+AF_LOCAL:
+AF_MAX:
+AF_MCTP:
+AF_MPLS:
+AF_NETBEUI:
+AF_NETLINK:
+AF_NETROM:
+AF_NFC:
+AF_PACKET:
+AF_PHONET:
+AF_PPPOX:
+AF_QIPCRTR:
+AF_RDS:
+AF_ROSE:
+AF_ROUTE:
+AF_RXRPC:
+AF_SECURITY:
+AF_SMC:
+AF_SNA:
+AF_TIPC:
+AF_UNIX:
+AF_UNSPEC:
+AF_VSOCK:
+AF_WANPIPE:
+AF_X25:
+AF_XDP:
+AI_ADDRCONFIG:
+AI_ALL:
+AI_CANONIDN:
+AI_CANONNAME:
+AI_IDN:
+AI_IDN_ALLOW_UNASSIGNED:
+AI_IDN_USE_STD3_ASCII_RULES:
+AI_NUMERICHOST:
+AI_NUMERICSERV:
+AI_PASSIVE:
+AI_V4MAPPED:
+ALLPERMS:
+AT_EACCESS:
+AT_EMPTY_PATH:
+AT_FDCWD:
+AT_NO_AUTOMOUNT:
+AT_RECURSIVE:
+AT_REMOVEDIR:
+AT_RENAME_EXCHANGE:
+AT_RENAME_NOREPLACE:
+AT_RENAME_WHITEOUT:
+AT_STATX_DONT_SYNC:
+AT_STATX_FORCE_SYNC:
+AT_STATX_SYNC_AS_STAT:
+AT_STATX_SYNC_TYPE:
+AT_SYMLINK_FOLLOW:
+AT_SYMLINK_NOFOLLOW:
+BAUD_MAX:
+BOOL_MAX:
+BOOL_WIDTH:
+BUFSIZ:
+CCEQ:
+CHAR_BIT:
+CHAR_MAX:
+CHAR_MIN:
+CHAR_WIDTH:
+CMPLX:
+CMPLXF:
+CMPLXF128:
+CMPLXF128X:
+CMPLXF16:
+CMPLXF32:
+CMPLXF32X:
+CMPLXF64X:
+CMPLXL:
+CMSG_ALIGN:
+CMSG_DATA:
+CMSG_FIRSTHDR:
+CMSG_LEN:
+CMSG_NXTHDR:
+CMSG_SPACE:
+CPU_ALLOC:
+CPU_ALLOC_SIZE:
+CPU_AND:
+CPU_AND_S:
+CPU_CLR:
+CPU_CLR_S:
+CPU_COUNT:
+CPU_COUNT_S:
+CPU_EQUAL:
+CPU_EQUAL_S:
+CPU_FREE:
+CPU_ISSET:
+CPU_ISSET_S:
+CPU_OR:
+CPU_OR_S:
+CPU_SET:
+CPU_SETSIZE:
+CPU_SET_S:
+CPU_XOR:
+CPU_XOR_S:
+CPU_ZERO:
+CPU_ZERO_S:
+DEFFILEMODE:
+DLFO_FLAG_SFRAME:
+DTTOIF:
+DT_BLK:
+DT_CHR:
+DT_DIR:
+DT_FIFO:
+DT_LNK:
+DT_REG:
+DT_SOCK:
+DT_UNKNOWN:
+DT_WHT:
+EAI_ADDRFAMILY:
+EAI_AGAIN:
+EAI_ALLDONE:
+EAI_BADFLAGS:
+EAI_CANCELED:
+EAI_FAIL:
+EAI_FAMILY:
+EAI_IDN_ENCODE:
+EAI_INPROGRESS:
+EAI_INTR:
+EAI_MEMORY:
+EAI_NODATA:
+EAI_NONAME:
+EAI_NOTCANCELED:
+EAI_OVERFLOW:
+EAI_SERVICE:
+EAI_SOCKTYPE:
+EAI_SYSTEM:
+EOF:
+EPIOCGPARAMS:
+EPIOCSPARAMS:
+EPOLLERR:
+EPOLLET:
+EPOLLEXCLUSIVE:
+EPOLLHUP:
+EPOLLIN:
+EPOLLMSG:
+EPOLLONESHOT:
+EPOLLOUT:
+EPOLLPRI:
+EPOLLRDBAND:
+EPOLLRDHUP:
+EPOLLRDNORM:
+EPOLLWAKEUP:
+EPOLLWRBAND:
+EPOLLWRNORM:
+EPOLL_CTL_ADD:
+EPOLL_CTL_DEL:
+EPOLL_CTL_MOD:
+EPOLL_IOC_TYPE:
+EXIT_FAILURE:
+EXIT_SUCCESS:
+FD_CLR:
+FD_ISSET:
+FD_SET:
+FD_SETSIZE:
+FD_ZERO:
+FE_SNANS_ALWAYS_SIGNAL:
+FNM_CASEFOLD:
+FNM_EXTMATCH:
+FNM_FILE_NAME:
+FNM_LEADING_DIR:
+FNM_NOESCAPE:
+FNM_NOMATCH:
+FNM_NOSYS:
+FNM_PATHNAME:
+FNM_PERIOD:
+FOPEN_MAX:
+FP_ILOGB0:
+FP_ILOGBNAN:
+FP_INFINITE:
+FP_INT_DOWNWARD:
+FP_INT_TONEAREST:
+FP_INT_TONEARESTFROMZERO:
+FP_INT_TOWARDZERO:
+FP_INT_UPWARD:
+FP_LLOGB0:
+FP_LLOGBNAN:
+FP_NAN:
+FP_NORMAL:
+FP_SUBNORMAL:
+FP_ZERO:
+F_LOCK:
+F_OK:
+F_TEST:
+F_TLOCK:
+F_ULOCK:
+GAI_NOWAIT:
+GAI_WAIT:
+GLOB_ABEND:
+GLOB_ABORTED:
+GLOB_ALTDIRFUNC:
+GLOB_APPEND:
+GLOB_BRACE:
+GLOB_DOOFFS:
+GLOB_ERR:
+GLOB_MAGCHAR:
+GLOB_MARK:
+GLOB_NOCHECK:
+GLOB_NOESCAPE:
+GLOB_NOMAGIC:
+GLOB_NOMATCH:
+GLOB_NOSORT:
+GLOB_NOSPACE:
+GLOB_NOSYS:
+GLOB_ONLYDIR:
+GLOB_PERIOD:
+GLOB_TILDE:
+GLOB_TILDE_CHECK:
+GROUP_FILTER_SIZE:
+HOST_NOT_FOUND:
+HUGE_VAL:
+HUGE_VALF:
+HUGE_VALL:
+HUGE_VAL_F128:
+HUGE_VAL_F128X:
+HUGE_VAL_F16:
+HUGE_VAL_F32:
+HUGE_VAL_F32X:
+HUGE_VAL_F64X:
+IFF_ALLMULTI:
+IFF_AUTOMEDIA:
+IFF_BROADCAST:
+IFF_DEBUG:
+IFF_DYNAMIC:
+IFF_LOOPBACK:
+IFF_MASTER:
+IFF_MULTICAST:
+IFF_NOARP:
+IFF_NOTRAILERS:
+IFF_POINTOPOINT:
+IFF_PORTSEL:
+IFF_PROMISC:
+IFF_RUNNING:
+IFF_SLAVE:
+IFF_UP:
+IFHWADDRLEN:
+IFNAMSIZ:
+IFTODT:
+IF_NAMESIZE:
+IN6ADDR_ANY_INIT:
+IN6ADDR_LOOPBACK_INIT:
+IN6_ARE_ADDR_EQUAL:
+IN6_IS_ADDR_LINKLOCAL:
+IN6_IS_ADDR_LOOPBACK:
+IN6_IS_ADDR_MC_GLOBAL:
+IN6_IS_ADDR_MC_LINKLOCAL:
+IN6_IS_ADDR_MC_NODELOCAL:
+IN6_IS_ADDR_MC_ORGLOCAL:
+IN6_IS_ADDR_MC_SITELOCAL:
+IN6_IS_ADDR_MULTICAST:
+IN6_IS_ADDR_SITELOCAL:
+IN6_IS_ADDR_UNSPECIFIED:
+IN6_IS_ADDR_V4COMPAT:
+IN6_IS_ADDR_V4MAPPED:
+INADDR_ALLHOSTS_GROUP:
+INADDR_ALLRTRS_GROUP:
+INADDR_ALLSNOOPERS_GROUP:
+INADDR_ANY:
+INADDR_BROADCAST:
+INADDR_DUMMY:
+INADDR_LOOPBACK:
+INADDR_MAX_LOCAL_GROUP:
+INADDR_NONE:
+INADDR_UNSPEC_GROUP:
+INET6_ADDRSTRLEN:
+INET_ADDRSTRLEN:
+INFINITY:
+INT16_C:
+INT16_MAX:
+INT16_MIN:
+INT16_WIDTH:
+INT32_C:
+INT32_MAX:
+INT32_MIN:
+INT32_WIDTH:
+INT64_C:
+INT64_MAX:
+INT64_MIN:
+INT64_WIDTH:
+INT8_C:
+INT8_MAX:
+INT8_MIN:
+INT8_WIDTH:
+INTMAX_C:
+INTMAX_MAX:
+INTMAX_MIN:
+INTMAX_WIDTH:
+INTPTR_MAX:
+INTPTR_MIN:
+INTPTR_WIDTH:
+INT_FAST16_MAX:
+INT_FAST16_MIN:
+INT_FAST16_WIDTH:
+INT_FAST32_MAX:
+INT_FAST32_MIN:
+INT_FAST32_WIDTH:
+INT_FAST64_MAX:
+INT_FAST64_MIN:
+INT_FAST64_WIDTH:
+INT_FAST8_MAX:
+INT_FAST8_MIN:
+INT_FAST8_WIDTH:
+INT_LEAST16_MAX:
+INT_LEAST16_MIN:
+INT_LEAST16_WIDTH:
+INT_LEAST32_MAX:
+INT_LEAST32_MIN:
+INT_LEAST32_WIDTH:
+INT_LEAST64_MAX:
+INT_LEAST64_MIN:
+INT_LEAST64_WIDTH:
+INT_LEAST8_MAX:
+INT_LEAST8_MIN:
+INT_LEAST8_WIDTH:
+INT_MAX:
+INT_MIN:
+INT_WIDTH:
+IN_BADCLASS:
+IN_CLASSA:
+IN_CLASSA_HOST:
+IN_CLASSA_MAX:
+IN_CLASSA_NET:
+IN_CLASSA_NSHIFT:
+IN_CLASSB:
+IN_CLASSB_HOST:
+IN_CLASSB_MAX:
+IN_CLASSB_NET:
+IN_CLASSB_NSHIFT:
+IN_CLASSC:
+IN_CLASSC_HOST:
+IN_CLASSC_NET:
+IN_CLASSC_NSHIFT:
+IN_CLASSD:
+IN_EXPERIMENTAL:
+IN_LOOPBACKNET:
+IN_MULTICAST:
+IPPORT_BIFFUDP:
+IPPORT_CMDSERVER:
+IPPORT_DAYTIME:
+IPPORT_DISCARD:
+IPPORT_ECHO:
+IPPORT_EFSSERVER:
+IPPORT_EXECSERVER:
+IPPORT_FINGER:
+IPPORT_FTP:
+IPPORT_LOGINSERVER:
+IPPORT_MTP:
+IPPORT_NAMESERVER:
+IPPORT_NETSTAT:
+IPPORT_RESERVED:
+IPPORT_RJE:
+IPPORT_ROUTESERVER:
+IPPORT_SMTP:
+IPPORT_SUPDUP:
+IPPORT_SYSTAT:
+IPPORT_TELNET:
+IPPORT_TFTP:
+IPPORT_TIMESERVER:
+IPPORT_TTYLINK:
+IPPORT_USERRESERVED:
+IPPORT_WHOIS:
+IPPORT_WHOSERVER:
+IPPROTO_AH:
+IPPROTO_BEETPH:
+IPPROTO_COMP:
+IPPROTO_DCCP:
+IPPROTO_DSTOPTS:
+IPPROTO_EGP:
+IPPROTO_ENCAP:
+IPPROTO_ESP:
+IPPROTO_ETHERNET:
+IPPROTO_FRAGMENT:
+IPPROTO_GRE:
+IPPROTO_HOPOPTS:
+IPPROTO_ICMP:
+IPPROTO_ICMPV6:
+IPPROTO_IDP:
+IPPROTO_IGMP:
+IPPROTO_IP:
+IPPROTO_IPIP:
+IPPROTO_IPV6:
+IPPROTO_L2TP:
+IPPROTO_MAX:
+IPPROTO_MH:
+IPPROTO_MPLS:
+IPPROTO_MPTCP:
+IPPROTO_MTP:
+IPPROTO_NONE:
+IPPROTO_PIM:
+IPPROTO_PUP:
+IPPROTO_RAW:
+IPPROTO_ROUTING:
+IPPROTO_RSVP:
+IPPROTO_SCTP:
+IPPROTO_SMC:
+IPPROTO_TCP:
+IPPROTO_TP:
+IPPROTO_UDP:
+IPPROTO_UDPLITE:
+IP_MSFILTER_SIZE:
+ITIMER_PROF:
+ITIMER_REAL:
+ITIMER_VIRTUAL:
+LC_ADDRESS:
+LC_ADDRESS_MASK:
+LC_ALL:
+LC_ALL_MASK:
+LC_COLLATE:
+LC_COLLATE_MASK:
+LC_CTYPE:
+LC_CTYPE_MASK:
+LC_GLOBAL_LOCALE:
+LC_IDENTIFICATION:
+LC_IDENTIFICATION_MASK:
+LC_MEASUREMENT:
+LC_MEASUREMENT_MASK:
+LC_MESSAGES:
+LC_MESSAGES_MASK:
+LC_MONETARY:
+LC_MONETARY_MASK:
+LC_NAME:
+LC_NAME_MASK:
+LC_NUMERIC:
+LC_NUMERIC_MASK:
+LC_PAPER:
+LC_PAPER_MASK:
+LC_TELEPHONE:
+LC_TELEPHONE_MASK:
+LC_TIME:
+LC_TIME_MASK:
+LLONG_MAX:
+LLONG_MIN:
+LLONG_WIDTH:
+LM_ID_BASE:
+LM_ID_NEWLM:
+LONG_MAX:
+LONG_MIN:
+LONG_WIDTH:
+L_INCR:
+L_SET:
+L_XTND:
+MAP_FAILED:
+MATH_ERREXCEPT:
+MATH_ERRNO:
+MAXFLOAT:
+MAXNAMLEN:
+MB_CUR_MAX:
+MB_LEN_MAX:
+MSG_BATCH:
+MSG_CMSG_CLOEXEC:
+MSG_CONFIRM:
+MSG_CTRUNC:
+MSG_DONTROUTE:
+MSG_DONTWAIT:
+MSG_EOR:
+MSG_ERRQUEUE:
+MSG_FASTOPEN:
+MSG_FIN:
+MSG_MORE:
+MSG_NOSIGNAL:
+MSG_OOB:
+MSG_PEEK:
+MSG_PROXY:
+MSG_RST:
+MSG_SOCK_DEVMEM:
+MSG_SYN:
+MSG_TRUNC:
+MSG_TRYHARD:
+MSG_WAITALL:
+MSG_WAITFORONE:
+MSG_ZEROCOPY:
+M_1_PI:
+M_2_PI:
+M_2_SQRTPI:
+M_E:
+M_LN10:
+M_LN2:
+M_LOG10E:
+M_LOG2E:
+M_PI:
+M_PI_2:
+M_PI_4:
+M_SQRT1_2:
+M_SQRT2:
+NAN:
+NCCS:
+NETDB_INTERNAL:
+NETDB_SUCCESS:
+NFDBITS:
+NI_DGRAM:
+NI_IDN:
+NI_IDN_ALLOW_UNASSIGNED:
+NI_IDN_USE_STD3_ASCII_RULES:
+NI_MAXHOST:
+NI_MAXSERV:
+NI_NAMEREQD:
+NI_NOFQDN:
+NI_NUMERICHOST:
+NI_NUMERICSERV:
+NO_ADDRESS:
+NO_DATA:
+NO_RECOVERY:
+NSIG:
+NSS_BUFLEN_GROUP:
+NSS_BUFLEN_PASSWD:
+PF_ALG:
+PF_APPLETALK:
+PF_ASH:
+PF_ATMPVC:
+PF_ATMSVC:
+PF_AX25:
+PF_BLUETOOTH:
+PF_BRIDGE:
+PF_CAIF:
+PF_CAN:
+PF_ECONET:
+PF_FILE:
+PF_IB:
+PF_IEEE802154:
+PF_INET:
+PF_INET6:
+PF_IPX:
+PF_IRDA:
+PF_ISDN:
+PF_IUCV:
+PF_KCM:
+PF_KEY:
+PF_LLC:
+PF_LOCAL:
+PF_MAX:
+PF_MCTP:
+PF_MPLS:
+PF_NETBEUI:
+PF_NETLINK:
+PF_NETROM:
+PF_NFC:
+PF_PACKET:
+PF_PHONET:
+PF_PPPOX:
+PF_QIPCRTR:
+PF_RDS:
+PF_ROSE:
+PF_ROUTE:
+PF_RXRPC:
+PF_SECURITY:
+PF_SMC:
+PF_SNA:
+PF_TIPC:
+PF_UNIX:
+PF_UNSPEC:
+PF_VSOCK:
+PF_WANPIPE:
+PF_X25:
+PF_XDP:
+PRIB16:
+PRIB32:
+PRIB8:
+PRIBFAST16:
+PRIBFAST32:
+PRIBFAST8:
+PRIBLEAST16:
+PRIBLEAST32:
+PRIBLEAST8:
+PRIBMAX:
+PRIBPTR:
+PRIX16:
+PRIX32:
+PRIX8:
+PRIXFAST16:
+PRIXFAST32:
+PRIXFAST8:
+PRIXLEAST16:
+PRIXLEAST32:
+PRIXLEAST8:
+PRIXMAX:
+PRIXPTR:
+PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP:
+PTHREAD_ATTR_NO_SIGMASK_NP:
+PTHREAD_BARRIER_SERIAL_THREAD:
+PTHREAD_CANCELED:
+PTHREAD_CANCEL_ASYNCHRONOUS:
+PTHREAD_CANCEL_DEFERRED:
+PTHREAD_CANCEL_DISABLE:
+PTHREAD_CANCEL_ENABLE:
+PTHREAD_COND_INITIALIZER:
+PTHREAD_CREATE_DETACHED:
+PTHREAD_CREATE_JOINABLE:
+PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP:
+PTHREAD_EXPLICIT_SCHED:
+PTHREAD_INHERIT_SCHED:
+PTHREAD_MUTEX_ADAPTIVE_NP:
+PTHREAD_MUTEX_DEFAULT:
+PTHREAD_MUTEX_ERRORCHECK:
+PTHREAD_MUTEX_ERRORCHECK_NP:
+PTHREAD_MUTEX_FAST_NP:
+PTHREAD_MUTEX_INITIALIZER:
+PTHREAD_MUTEX_NORMAL:
+PTHREAD_MUTEX_RECURSIVE:
+PTHREAD_MUTEX_RECURSIVE_NP:
+PTHREAD_MUTEX_ROBUST:
+PTHREAD_MUTEX_ROBUST_NP:
+PTHREAD_MUTEX_STALLED:
+PTHREAD_MUTEX_STALLED_NP:
+PTHREAD_MUTEX_TIMED_NP:
+PTHREAD_ONCE_INIT:
+PTHREAD_PRIO_INHERIT:
+PTHREAD_PRIO_NONE:
+PTHREAD_PRIO_PROTECT:
+PTHREAD_PROCESS_PRIVATE:
+PTHREAD_PROCESS_SHARED:
+PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP:
+PTHREAD_RWLOCK_DEFAULT_NP:
+PTHREAD_RWLOCK_INITIALIZER:
+PTHREAD_RWLOCK_PREFER_READER_NP:
+PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP:
+PTHREAD_RWLOCK_PREFER_WRITER_NP:
+PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP:
+PTHREAD_SCOPE_PROCESS:
+PTHREAD_SCOPE_SYSTEM:
+PTRDIFF_MAX:
+PTRDIFF_MIN:
+PTRDIFF_WIDTH:
+RAND_MAX:
+REGS_FIXED:
+REGS_REALLOCATE:
+REGS_UNALLOCATED:
+REG_BADBR:
+REG_BADPAT:
+REG_BADRPT:
+REG_EBRACE:
+REG_EBRACK:
+REG_ECOLLATE:
+REG_ECTYPE:
+REG_EEND:
+REG_EESCAPE:
+REG_ENOSYS:
+REG_EPAREN:
+REG_ERANGE:
+REG_ERPAREN:
+REG_ESIZE:
+REG_ESPACE:
+REG_ESUBREG:
+REG_EXTENDED:
+REG_ICASE:
+REG_NEWLINE:
+REG_NOERROR:
+REG_NOMATCH:
+REG_NOSUB:
+REG_NOTBOL:
+REG_NOTEOL:
+REG_STARTEND:
+RENAME_EXCHANGE:
+RENAME_NOREPLACE:
+RENAME_WHITEOUT:
+RE_BACKSLASH_ESCAPE_IN_LISTS:
+RE_BK_PLUS_QM:
+RE_CARET_ANCHORS_HERE:
+RE_CHAR_CLASSES:
+RE_CONTEXT_INDEP_ANCHORS:
+RE_CONTEXT_INDEP_OPS:
+RE_CONTEXT_INVALID_DUP:
+RE_CONTEXT_INVALID_OPS:
+RE_DEBUG:
+RE_DOT_NEWLINE:
+RE_DOT_NOT_NULL:
+RE_DUP_MAX:
+RE_HAT_LISTS_NOT_NEWLINE:
+RE_ICASE:
+RE_INTERVALS:
+RE_INVALID_INTERVAL_ORD:
+RE_LIMITED_OPS:
+RE_NEWLINE_ALT:
+RE_NO_BK_BRACES:
+RE_NO_BK_PARENS:
+RE_NO_BK_REFS:
+RE_NO_BK_VBAR:
+RE_NO_EMPTY_RANGES:
+RE_NO_GNU_OPS:
+RE_NO_POSIX_BACKTRACKING:
+RE_NO_SUB:
+RE_NREGS:
+RE_SYNTAX_AWK:
+RE_SYNTAX_ED:
+RE_SYNTAX_EGREP:
+RE_SYNTAX_EMACS:
+RE_SYNTAX_GNU_AWK:
+RE_SYNTAX_GREP:
+RE_SYNTAX_POSIX_AWK:
+RE_SYNTAX_POSIX_BASIC:
+RE_SYNTAX_POSIX_EGREP:
+RE_SYNTAX_POSIX_EXTENDED:
+RE_SYNTAX_POSIX_MINIMAL_BASIC:
+RE_SYNTAX_POSIX_MINIMAL_EXTENDED:
+RE_SYNTAX_SED:
+RE_TRANSLATE_TYPE:
+RE_UNMATCHED_RIGHT_PAREN_ORD:
+RTLD_DEFAULT:
+RTLD_DI_CONFIGADDR:
+RTLD_DI_LINKMAP:
+RTLD_DI_LMID:
+RTLD_DI_MAX:
+RTLD_DI_ORIGIN:
+RTLD_DI_PHDR:
+RTLD_DI_PROFILENAME:
+RTLD_DI_PROFILEOUT:
+RTLD_DI_SERINFO:
+RTLD_DI_SERINFOSIZE:
+RTLD_DI_TLS_DATA:
+RTLD_DI_TLS_MODID:
+RTLD_DL_LINKMAP:
+RTLD_DL_SYMENT:
+RTLD_NEXT:
+R_OK:
+SCHAR_MAX:
+SCHAR_MIN:
+SCHAR_WIDTH:
+SCM_CREDENTIALS:
+SCM_PIDFD:
+SCM_RIGHTS:
+SCM_SECURITY:
+SCOPE_DELIMITER:
+SEEK_CUR:
+SEEK_DATA:
+SEEK_END:
+SEEK_HOLE:
+SEEK_SET:
+SHRT_MAX:
+SHRT_MIN:
+SHRT_WIDTH:
+SHUT_RD:
+SHUT_RDWR:
+SHUT_WR:
+SIGRTMAX:
+SIGRTMIN:
+SIG_ATOMIC_MAX:
+SIG_ATOMIC_MIN:
+SIG_ATOMIC_WIDTH:
+SIZE_MAX:
+SIZE_WIDTH:
+SNAN:
+SNANF:
+SNANF128:
+SNANF128X:
+SNANF16:
+SNANF32:
+SNANF32X:
+SNANF64X:
+SNANL:
+SOL_AAL:
+SOL_ALG:
+SOL_ATM:
+SOL_BLUETOOTH:
+SOL_CAIF:
+SOL_DCCP:
+SOL_DECNET:
+SOL_IRDA:
+SOL_IUCV:
+SOL_KCM:
+SOL_LLC:
+SOL_MCTP:
+SOL_MPTCP:
+SOL_NETBEUI:
+SOL_NETLINK:
+SOL_NFC:
+SOL_PACKET:
+SOL_PNPIPE:
+SOL_PPPOL2TP:
+SOL_RAW:
+SOL_RDS:
+SOL_RXRPC:
+SOL_SMC:
+SOL_TIPC:
+SOL_TLS:
+SOL_VSOCK:
+SOL_X25:
+SOL_XDP:
+SOMAXCONN:
+SO_DEBUG:
+STDERR_FILENO:
+STDIN_FILENO:
+STDOUT_FILENO:
+SUN_LEN:
+SYS_NMLN:
+S_BLKSIZE:
+S_IEXEC:
+S_IFBLK:
+S_IFCHR:
+S_IFDIR:
+S_IFIFO:
+S_IFLNK:
+S_IFMT:
+S_IFREG:
+S_IFSOCK:
+S_IREAD:
+S_IRGRP:
+S_IROTH:
+S_IRUSR:
+S_IRWXG:
+S_IRWXO:
+S_IRWXU:
+S_ISBLK:
+S_ISCHR:
+S_ISDIR:
+S_ISFIFO:
+S_ISGID:
+S_ISLNK:
+S_ISREG:
+S_ISSOCK:
+S_ISUID:
+S_ISVTX:
+S_IWGRP:
+S_IWOTH:
+S_IWRITE:
+S_IWUSR:
+S_IXGRP:
+S_IXOTH:
+S_IXUSR:
+S_TYPEISMQ:
+S_TYPEISSEM:
+S_TYPEISSHM:
+TEMP_FAILURE_RETRY:
+TIMESPEC_TO_TIMEVAL:
+TIMEVAL_TO_TIMESPEC:
+TIME_ACTIVE:
+TIME_MONOTONIC:
+TIME_THREAD_ACTIVE:
+TIME_UTC:
+TMP_MAX:
+TRY_AGAIN:
+UCHAR_MAX:
+UCHAR_WIDTH:
+UINT16_C:
+UINT16_MAX:
+UINT16_WIDTH:
+UINT32_C:
+UINT32_MAX:
+UINT32_WIDTH:
+UINT64_C:
+UINT64_MAX:
+UINT64_WIDTH:
+UINT8_C:
+UINT8_MAX:
+UINT8_WIDTH:
+UINTMAX_C:
+UINTMAX_MAX:
+UINTMAX_WIDTH:
+UINTPTR_MAX:
+UINTPTR_WIDTH:
+UINT_FAST16_MAX:
+UINT_FAST16_WIDTH:
+UINT_FAST32_MAX:
+UINT_FAST32_WIDTH:
+UINT_FAST64_MAX:
+UINT_FAST64_WIDTH:
+UINT_FAST8_MAX:
+UINT_FAST8_WIDTH:
+UINT_LEAST16_MAX:
+UINT_LEAST16_WIDTH:
+UINT_LEAST32_MAX:
+UINT_LEAST32_WIDTH:
+UINT_LEAST64_MAX:
+UINT_LEAST64_WIDTH:
+UINT_LEAST8_MAX:
+UINT_LEAST8_WIDTH:
+UINT_MAX:
+UINT_WIDTH:
+UIO_MAXIOV:
+ULLONG_MAX:
+ULLONG_WIDTH:
+ULONG_MAX:
+ULONG_WIDTH:
+USHRT_MAX:
+USHRT_WIDTH:
+WAIT_ANY:
+WAIT_MYPGRP:
+WCHAR_MAX:
+WCHAR_MIN:
+WCHAR_WIDTH:
+WCOREDUMP:
+WCOREFLAG:
+WEOF:
+WEXITSTATUS:
+WIFCONTINUED:
+WIFEXITED:
+WIFSIGNALED:
+WIFSTOPPED:
+WINT_MAX:
+WINT_MIN:
+WINT_WIDTH:
+WSTOPSIG:
+WTERMSIG:
+W_EXITCODE:
+W_OK:
+W_STOPCODE:
+X_OK:
+#glob_t
+gl_closedir:void (*)(void *)
+gl_flags:int
+gl_lstat:int (*)( char *, stat *)
+gl_lstat:int (*)( char *,void *)
+gl_offs:__size_t
+gl_opendir:void *(*)( char *)
+gl_pathc:__size_t
+gl_pathv:char **
+gl_readdir::dirent *(*)(void *)
+gl_readdir:void *(*)(void *)
+gl_stat:int (*)( char *, stat *)
+gl_stat:int (*)( char *,void *)
+#glob64_t
+gl_closedir:void (*)(void *)
+gl_flags:int
+gl_lstat:int (*)( char *, stat64 *)
+gl_lstat:int (*)( char *,void *)
+gl_offs:__size_t
+gl_opendir:void *(*)( char *)
+gl_pathc:__size_t
+gl_pathv:char **
+gl_readdir::dirent64 *(*)(void *)
+gl_readdir:void *(*)(void *)
+gl_stat:int (*)( char *, stat64 *)
+gl_stat:int (*)( char *,void *)
+#imaxdiv_t
+quot:long int
+rem:long int
+#Dl_info
+dli_fbase:void *
+dli_fname:char *
+dli_saddr:void *
+dli_sname:char *
+#Dl_serpath
+dls_flags:unsigned int
+dls_name:char *
+#Dl_serinfo
+dls_cnt:unsigned int
+dls_serpath:Dl_serpath[1]
+dls_size:size_t
+#regmatch_t
+rm_eo:regoff_t
+rm_so:regoff_t
+#fd_set
+fds_bits:__fd_mask[]
+#div_t
+quot:int
+rem:int
+#ldiv_t
+quot:long int
+rem:long int
+#lldiv_t
+quot:long long int
+rem:long long int
+#addrinfo
+ai_addr::sockaddr *
+ai_addrlen:socklen_t
+ai_canonname:char *
+ai_family:int
+ai_flags:int
+ai_next::addrinfo *
+ai_protocol:int
+ai_socktype:int
+#cmsghdr
+cmsg_len:size_t
+cmsg_level:int
+cmsg_type:int
+#dirent
+d_ino:__ino_t
+d_name:char[256]
+d_off:__off_t
+d_reclen:unsigned short int
+d_type:unsigned char
+#dirent64
+d_ino:__ino64_t
+d_name:char[256]
+d_off:__off64_t
+d_reclen:unsigned short int
+d_type:unsigned char
+#dl_find_object
+dlfo_eh_count:int
+dlfo_eh_dbase:void *
+dlfo_eh_frame:void *
+dlfo_flags:unsigned long long int
+dlfo_link_map::link_map *
+dlfo_map_end:void *
+dlfo_map_start:void *
+dlfo_sframe:void *
+#epoll_data_t
+fd:int
+ptr:void *
+u32:uint32_t
+#epoll_event
+data:epoll_data_t
+events:uint32_t
+#epoll_params
+busy_poll_budget:uint16_t
+busy_poll_usecs:uint32_t
+prefer_busy_poll:uint8_t
+#gaicb
+ar_name:char *
+ar_request:addrinfo *
+ar_result::addrinfo *
+ar_service:char *
+#group
+gr_gid:__gid_t
+gr_mem:char **
+gr_name:char *
+gr_passwd:char *
+#group_filter
+gf_fmode:uint32_t
+gf_group::sockaddr_storage
+gf_interface:uint32_t
+gf_numsrc:uint32_t
+gf_slist::sockaddr_storage[1]
+#group_req
+gr_group::sockaddr_storage
+gr_interface:uint32_t
+#group_source_req
+gsr_group::sockaddr_storage
+gsr_interface:uint32_t
+gsr_source::sockaddr_storage
+#hostent
+h_addr_list:char **
+h_addrtype:int
+h_aliases:char **
+h_length:int
+h_name:char *
+#if_nameindex
+if_index:unsigned int
+if_name:char *
+#ifaddr
+ifa_addr::sockaddr
+ifa_ifp::iface *
+ifa_ifu::ifaddr::__anonf4c6998b020a
+ifa_next::ifaddr *
+#ifaddr::__anonf4c6998b020a
+ifu_broadaddr::sockaddr
+ifu_dstaddr::sockaddr
+#ifaddrs
+ifa_addr::sockaddr *
+ifa_data:void *
+ifa_flags:unsigned int
+ifa_ifu::ifaddrs::__anonf8298a43010a
+ifa_name:char *
+ifa_netmask::sockaddr *
+ifa_next::ifaddrs *
+#ifaddrs::__anonf8298a43010a
+ifu_broadaddr::sockaddr *
+ifu_dstaddr::sockaddr *
+#ifconf
+ifc_ifcu::ifconf::__anonf4c6998b050a
+ifc_len:int
+#ifconf::__anonf4c6998b050a
+ifcu_buf:__caddr_t
+ifcu_req::ifreq *
+#ifmap
+base_addr:unsigned short int
+dma:unsigned char
+irq:unsigned char
+mem_end:unsigned long int
+mem_start:unsigned long int
+port:unsigned char
+#ifreq
+ifr_ifrn::ifreq::__anonf4c6998b030a
+ifr_ifru::ifreq::__anonf4c6998b040a
+#ifreq::__anonf4c6998b030a
+ifrn_name:char[]
+#ifreq::__anonf4c6998b040a
+ifru_addr::sockaddr
+ifru_broadaddr::sockaddr
+ifru_data:__caddr_t
+ifru_dstaddr::sockaddr
+ifru_flags:short int
+ifru_hwaddr::sockaddr
+ifru_ivalue:int
+ifru_map::ifmap
+ifru_mtu:int
+ifru_netmask::sockaddr
+ifru_newname:char[]
+ifru_slave:char[]
+#in6_pktinfo
+ipi6_addr::in6_addr
+ipi6_ifindex:unsigned int
+#in_addr
+s_addr:in_addr_t
+#iovec
+iov_base:void *
+iov_len:size_t
+#ip6_mtuinfo
+ip6m_addr::sockaddr_in6
+ip6m_mtu:uint32_t
+#ip_mreq
+imr_interface::in_addr
+imr_multiaddr::in_addr
+#ip_mreq_source
+imr_interface::in_addr
+imr_multiaddr::in_addr
+imr_sourceaddr::in_addr
+#ip_mreqn
+imr_address::in_addr
+imr_ifindex:int
+imr_multiaddr::in_addr
+#ip_msfilter
+imsf_fmode:uint32_t
+imsf_interface::in_addr
+imsf_multiaddr::in_addr
+imsf_numsrc:uint32_t
+imsf_slist::in_addr[1]
+#ipv6_mreq
+ipv6mr_interface:unsigned int
+ipv6mr_multiaddr::in6_addr
+#itimerspec
+it_interval::timespec
+it_value::timespec
+#itimerval
+it_interval::timeval
+it_value::timeval
+#lconv
+currency_symbol:char *
+decimal_point:char *
+frac_digits:char
+grouping:char *
+int_curr_symbol:char *
+int_frac_digits:char
+int_n_cs_precedes:char
+int_n_sep_by_space:char
+int_n_sign_posn:char
+int_p_cs_precedes:char
+int_p_sep_by_space:char
+int_p_sign_posn:char
+mon_decimal_point:char *
+mon_grouping:char *
+mon_thousands_sep:char *
+n_cs_precedes:char
+n_sep_by_space:char
+n_sign_posn:char
+negative_sign:char *
+p_cs_precedes:char
+p_sep_by_space:char
+p_sign_posn:char
+positive_sign:char *
+thousands_sep:char *
+#linger
+l_linger:int
+l_onoff:int
+#mmsghdr
+msg_hdr::msghdr
+msg_len:unsigned int
+#msghdr
+msg_control:void *
+msg_controllen:size_t
+msg_flags:int
+msg_iov::iovec *
+msg_iovlen:size_t
+msg_name:void *
+msg_namelen:socklen_t
+#passwd
+pw_dir:char *
+pw_gecos:char *
+pw_gid:__gid_t
+pw_name:char *
+pw_passwd:char *
+pw_shell:char *
+pw_uid:__uid_t
+#protoent
+p_aliases:char **
+p_name:char *
+p_proto:int
+#random_data
+end_ptr:int32_t *
+fptr:int32_t *
+rand_deg:int
+rand_sep:int
+rand_type:int
+rptr:int32_t *
+state:int32_t *
+#regex_t
+re_nsub:size_t
+#re_registers
+end:regoff_t *
+num_regs:__re_size_t
+start:regoff_t *
+#rusage
+ru_stime::timeval
+ru_utime::timeval
+#rusage::__anon7f2d80e8010a
+ru_maxrss:long int
+#rusage::__anon7f2d80e8020a
+ru_ixrss:long int
+#rusage::__anon7f2d80e8030a
+ru_idrss:long int
+#rusage::__anon7f2d80e8040a
+ru_isrss:long int
+#rusage::__anon7f2d80e8050a
+ru_minflt:long int
+#rusage::__anon7f2d80e8060a
+ru_majflt:long int
+#rusage::__anon7f2d80e8070a
+ru_nswap:long int
+#rusage::__anon7f2d80e8080a
+ru_inblock:long int
+#rusage::__anon7f2d80e8090a
+ru_oublock:long int
+#rusage::__anon7f2d80e80a0a
+ru_msgsnd:long int
+#rusage::__anon7f2d80e80b0a
+ru_msgrcv:long int
+#rusage::__anon7f2d80e80c0a
+ru_nsignals:long int
+#rusage::__anon7f2d80e80d0a
+ru_nvcsw:long int
+#rusage::__anon7f2d80e80e0a
+ru_nivcsw:long int
+#servent
+s_aliases:char **
+s_name:char *
+s_port:int
+s_proto:char *
+#sockaddr
+sa_data:char[14]
+#sockaddr_in
+sin_addr::in_addr
+sin_port:in_port_t
+sin_zero:unsigned char[]
+#sockaddr_in6
+sin6_addr::in6_addr
+sin6_flowinfo:uint32_t
+sin6_port:in_port_t
+sin6_scope_id:uint32_t
+#sockaddr_un
+sun_path:char[108]
+#termios
+c_cc:cc_t[]
+c_cflag:tcflag_t
+c_iflag:tcflag_t
+c_lflag:tcflag_t
+c_line:cc_t
+c_oflag:tcflag_t
+#termios::__anon889dd42e010a
+c_ispeed:speed_t
+#termios::__anon889dd42e020a
+c_ospeed:speed_t
+#timespec
+tv_nsec:__syscall_slong_t
+tv_nsec:long int
+tv_nsec:long int
+tv_sec:__time64_t
+#timeval
+tv_sec:__time64_t
+tv_usec:__suseconds64_t
+#timezone
+tz_dsttime:int
+tz_minuteswest:int
+#tm
+tm_gmtoff:long int
+tm_hour:int
+tm_isdst:int
+tm_mday:int
+tm_min:int
+tm_mon:int
+tm_sec:int
+tm_wday:int
+tm_yday:int
+tm_year:int
+tm_zone:char *
+#ucred
+gid:gid_t
+pid:pid_t
+uid:uid_t
+#utimbuf
+actime:__time64_t
+modtime:__time64_t
+#utsname
+domainname:char[]
+machine:char[]
+nodename:char[]
+release:char[]
+sysname:char[]
+version:char[]
+#DIR
+#Lmid_t
+#active_reg_t
+#baud_t
+#blkcnt64_t
+#blkcnt_t
+#blksize_t
+#caddr_t
+#comparison_fn_t
+#daddr_t
+#dev_t
+#double_t
+#drand48_data
+#epoll_data
+#fd_mask
+#float_t
+#fpos64_t
+#fpos_t
+#fsblkcnt64_t
+#fsblkcnt_t
+#fsfilcnt64_t
+#fsfilcnt_t
+#fsid_t
+#gid_t
+#id_t
+#in6_addr
+#in_addr_t
+#in_port_t
+#ino64_t
+#ino_t
+#int_fast16_t
+#int_fast32_t
+#int_fast64_t
+#int_fast8_t
+#intmax_t
+#intptr_t
+#jmp_buf
+#key_t
+#loff_t
+#long_double_t
+#mode_t
+#nlink_t
+#off64_t
+#off_t
+#pid_t
+#quad_t
+#re_pattern_buffer
+#reg_errcode_t
+#reg_syntax_t
+#register_t
+#regoff_t
+#s_reg_t
+#sa_family_t
+#sig_t
+#sighandler_t
+#sigjmp_buf
+#size_t
+#sockaddr_storage
+#socklen_t
+#ssize_t
+#stat
+#suseconds_t
+#u_char
+#u_int
+#u_int16_t
+#u_int32_t
+#u_int64_t
+#u_int8_t
+#u_long
+#u_quad_t
+#u_short
+#uid_t
+#uint
+#uint_fast16_t
+#uint_fast32_t
+#uint_fast64_t
+#uint_fast8_t
+#uintmax_t
+#uintptr_t
+#ulong
+#useconds_t
+#ushort
+#va_list
+#wctrans_t

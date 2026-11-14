@@ -47,6 +47,7 @@ static void lines_clear(Buffer *b)
         free(b->lines[i].s);
     b->nlines = 0;
     b->stable = 0;
+    b->gen++;
 }
 
 static void push_line(Buffer *b, const char *s, size_t n)
@@ -334,6 +335,7 @@ static void touch(Buffer *b, size_t y)
 {
     if (b->stable > y)
         b->stable = y;
+    b->gen++;
     b->modified = 1;
 }
 

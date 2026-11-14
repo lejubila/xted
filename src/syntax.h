@@ -24,6 +24,20 @@ const char *syn_name(const Syntax *s);
 /* Comment markers of the language: *close is NULL for line comments.
  * Returns 0 if it has none (or s is NULL). */
 int syn_comment(const Syntax *s, const char **open, const char **close);
+/* Symbol rules of the language (directives decl/include/bind/attr, see langs.c and symbols.c).
+ * pat is the pattern text; for RULE_CLASS..RULE_NS it describes a definition. */
+enum { RULE_CLASS, RULE_FUNC, RULE_METHOD, RULE_PROP, RULE_CONST, RULE_VAR, RULE_NS,
+       RULE_INCLUDE, RULE_BIND, RULE_ATTR };
+typedef struct {
+    int kind;
+    const char *pat;
+} SynRule;
+const SynRule *syn_rules(const Syntax *s, size_t *n);
+size_t syn_rule_count(const Syntax *s);
+/* 1 if blocks are marked by indentation (Python), 0 for braces. */
+int syn_indent_scope(const Syntax *s);
+/* The operators that open a member list ("-> ::" for PHP), blank separated; NULL if none. */
+const char *syn_member_seps(const Syntax *s);
 /* Calls fn for every keyword/type/constant of the language. */
 void syn_each_word(const Syntax *s, void (*fn)(const char *w, size_t n, int cls, void *ctx),
                    void *ctx);

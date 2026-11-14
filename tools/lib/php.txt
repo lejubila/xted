@@ -1,0 +1,914 @@
+// PHP standard library: common functions and classes. Curated from the PHP manual; keep it sorted by area.
+#
+strlen($string)>int
+strtolower($string)>string
+strtoupper($string)>string
+ucfirst($string)>string
+ucwords($string, $separators)>string
+lcfirst($string)>string
+trim($string, $characters)>string
+ltrim($string, $characters)>string
+rtrim($string, $characters)>string
+chop($string, $characters)>string
+str_replace($search, $replace, $subject, &$count)>string
+str_ireplace($search, $replace, $subject, &$count)>string
+substr($string, $offset, $length)>string
+substr_count($haystack, $needle, $offset, $length)>int
+substr_replace($string, $replace, $offset, $length)>string
+strpos($haystack, $needle, $offset)>int
+stripos($haystack, $needle, $offset)>int
+strrpos($haystack, $needle, $offset)>int
+strripos($haystack, $needle, $offset)>int
+strstr($haystack, $needle, $before_needle)>string
+stristr($haystack, $needle, $before_needle)>string
+strrchr($haystack, $needle)>string
+str_contains($haystack, $needle)>bool
+str_starts_with($haystack, $needle)>bool
+str_ends_with($haystack, $needle)>bool
+str_pad($string, $length, $pad_string, $pad_type)>string
+str_repeat($string, $times)>string
+str_split($string, $length)>array
+str_word_count($string, $format, $characters)>int
+strrev($string)>string
+strcmp($string1, $string2)>int
+strcasecmp($string1, $string2)>int
+strncmp($string1, $string2, $length)>int
+strncasecmp($string1, $string2, $length)>int
+strnatcmp($string1, $string2)>int
+strnatcasecmp($string1, $string2)>int
+strtr($string, $from, $to)>string
+strval($value)>string
+strip_tags($string, $allowed_tags)>string
+sprintf($format, ...$values)>string
+printf($format, ...$values)>int
+vsprintf($format, $values)>string
+vprintf($format, $values)>int
+fprintf($stream, $format, ...$values)>int
+number_format($num, $decimals, $decimal_separator, $thousands_separator)>string
+nl2br($string, $use_xhtml)>string
+htmlspecialchars($string, $flags, $encoding, $double_encode)>string
+htmlspecialchars_decode($string, $flags)>string
+html_entity_decode($string, $flags, $encoding)>string
+htmlentities($string, $flags, $encoding, $double_encode)>string
+addslashes($string)>string
+stripslashes($string)>string
+quotemeta($string)>string
+chunk_split($string, $length, $separator)>string
+wordwrap($string, $width, $break, $cut_long_words)>string
+explode($separator, $string, $limit)>array
+implode($separator, $array)>string
+join($separator, $array)>string
+nl_langinfo($item)>string
+similar_text($string1, $string2, &$percent)>int
+levenshtein($string1, $string2)>int
+soundex($string)>string
+metaphone($string)>string
+md5($string, $binary)>string
+sha1($string, $binary)>string
+crc32($string)>int
+hash($algo, $data, $binary)>string
+hash_hmac($algo, $data, $key, $binary)>string
+hash_algos()>array
+hash_file($algo, $filename)>string
+password_hash($password, $algo, $options)>string
+password_verify($password, $hash)>bool
+password_needs_rehash($hash, $algo)>bool
+random_bytes($length)>string
+random_int($min, $max)>int
+bin2hex($string)>string
+hex2bin($string)>string
+base64_encode($string)>string
+base64_decode($string, $strict)>string
+urlencode($string)>string
+urldecode($string)>string
+rawurlencode($string)>string
+rawurldecode($string)>string
+http_build_query($data, $numeric_prefix, $arg_separator)>string
+parse_url($url, $component)>mixed
+parse_str($string, &$result)>void
+uniqid($prefix, $more_entropy)>string
+lcg_value()>float
+ord($character)>int
+chr($codepoint)>string
+dechex($num)>string
+hexdec($hex_string)>int
+decbin($num)>string
+bindec($binary_string)>int
+decoct($num)>string
+octdec($octal_string)>int
+base_convert($num, $from_base, $to_base)>string
+ctype_alpha($text)>bool
+ctype_alnum($text)>bool
+ctype_digit($text)>bool
+ctype_upper($text)>bool
+ctype_lower($text)>bool
+ctype_space($text)>bool
+ctype_punct($text)>bool
+ctype_xdigit($text)>bool
+mb_strlen($string, $encoding)>int
+mb_substr($string, $start, $length, $encoding)>string
+mb_strpos($haystack, $needle, $offset, $encoding)>int
+mb_strrpos($haystack, $needle, $offset, $encoding)>int
+mb_strtolower($string, $encoding)>string
+mb_strtoupper($string, $encoding)>string
+mb_str_split($string, $length, $encoding)>array
+mb_substr_count($haystack, $needle, $encoding)>int
+mb_str_pad($string, $length, $pad_string, $pad_type, $encoding)>string
+mb_convert_encoding($string, $to_encoding, $from_encoding)>string
+mb_convert_case($string, $mode, $encoding)>string
+mb_detect_encoding($string, $encodings, $strict)>string
+mb_check_encoding($value, $encoding)>bool
+mb_internal_encoding($encoding)>mixed
+mb_strwidth($string, $encoding)>int
+mb_strimwidth($string, $start, $width, $trim_marker, $encoding)>string
+iconv($from_encoding, $to_encoding, $string)>string
+utf8_encode($string)>string
+utf8_decode($string)>string
+preg_match($pattern, $subject, &$matches, $flags, $offset)>int
+preg_match_all($pattern, $subject, &$matches, $flags, $offset)>int
+preg_replace($pattern, $replacement, $subject, $limit, &$count)>string
+preg_replace_callback($pattern, $callback, $subject, $limit, &$count, $flags)>string
+preg_replace_callback_array($pattern, $subject, $limit, &$count, $flags)>string
+preg_split($pattern, $subject, $limit, $flags)>array
+preg_quote($str, $delimiter)>string
+preg_grep($pattern, $array, $flags)>array
+preg_last_error()>int
+preg_last_error_msg()>string
+count($value, $mode)>int
+sizeof($value, $mode)>int
+in_array($needle, $haystack, $strict)>bool
+array_search($needle, $haystack, $strict)>mixed
+array_keys($array, $filter_value, $strict)>array
+array_values($array)>array
+array_merge(...$arrays)>array
+array_merge_recursive(...$arrays)>array
+array_replace($array, ...$replacements)>array
+array_replace_recursive($array, ...$replacements)>array
+array_combine($keys, $values)>array
+array_flip($array)>array
+array_slice($array, $offset, $length, $preserve_keys)>array
+array_splice(&$array, $offset, $length, $replacement)>array
+array_map($callback, $array, ...$arrays)>array
+array_filter($array, $callback, $mode)>array
+array_reduce($array, $callback, $initial)>mixed
+array_walk(&$array, $callback, $arg)>bool
+array_walk_recursive(&$array, $callback, $arg)>bool
+array_key_exists($key, $array)>bool
+key_exists($key, $array)>bool
+array_key_first($array)>mixed
+array_key_last($array)>mixed
+array_is_list($array)>bool
+array_push(&$array, ...$values)>int
+array_pop(&$array)>mixed
+array_shift(&$array)>mixed
+array_unshift(&$array, ...$values)>int
+array_unique($array, $flags)>array
+array_reverse($array, $preserve_keys)>array
+array_sum($array)>int
+array_product($array)>int
+array_count_values($array)>array
+array_column($array, $column_key, $index_key)>array
+array_chunk($array, $length, $preserve_keys)>array
+array_fill($start_index, $count, $value)>array
+array_fill_keys($keys, $value)>array
+array_pad($array, $length, $value)>array
+array_flip($array)>array
+array_diff($array, ...$arrays)>array
+array_diff_key($array, ...$arrays)>array
+array_diff_assoc($array, ...$arrays)>array
+array_udiff($array, ...$rest)>array
+array_intersect($array, ...$arrays)>array
+array_intersect_key($array, ...$arrays)>array
+array_intersect_assoc($array, ...$arrays)>array
+array_rand($array, $num)>mixed
+array_change_key_case($array, $case)>array
+array_multisort(&$array, ...$rest)>bool
+range($start, $end, $step)>array
+compact($var_name, ...$var_names)>array
+extract(&$array, $flags, $prefix)>int
+list(...$vars)>array
+sort(&$array, $flags)>bool
+rsort(&$array, $flags)>bool
+usort(&$array, $callback)>bool
+uasort(&$array, $callback)>bool
+uksort(&$array, $callback)>bool
+asort(&$array, $flags)>bool
+arsort(&$array, $flags)>bool
+ksort(&$array, $flags)>bool
+krsort(&$array, $flags)>bool
+natsort(&$array)>bool
+natcasesort(&$array)>bool
+shuffle(&$array)>bool
+current($array)>mixed
+key($array)>mixed
+next(&$array)>mixed
+prev(&$array)>mixed
+reset(&$array)>mixed
+end(&$array)>mixed
+each(&$array)>array
+iterator_to_array($iterator, $preserve_keys)>array
+iterator_count($iterator)>int
+iterator_apply($iterator, $callback, $args)>int
+abs($num)>int
+ceil($num)>float
+floor($num)>float
+round($num, $precision, $mode)>float
+sqrt($num)>float
+pow($num, $exponent)>int
+intdiv($num1, $num2)>int
+fmod($num1, $num2)>float
+fdiv($num1, $num2)>float
+exp($num)>float
+log($num, $base)>float
+log10($num)>float
+log2($num)>float
+sin($num)>float
+cos($num)>float
+tan($num)>float
+asin($num)>float
+acos($num)>float
+atan($num)>float
+atan2($y, $x)>float
+sinh($num)>float
+cosh($num)>float
+tanh($num)>float
+pi()>float
+hypot($x, $y)>float
+deg2rad($num)>float
+rad2deg($num)>float
+is_nan($num)>bool
+is_finite($num)>bool
+is_infinite($num)>bool
+max($value, ...$values)>mixed
+min($value, ...$values)>mixed
+array_sum($array)>int
+rand($min, $max)>int
+mt_rand($min, $max)>int
+mt_srand($seed, $mode)>void
+srand($seed, $mode)>void
+mt_getrandmax()>int
+getrandmax()>int
+random_int($min, $max)>int
+bcadd($num1, $num2, $scale)>string
+bcsub($num1, $num2, $scale)>string
+bcmul($num1, $num2, $scale)>string
+bcdiv($num1, $num2, $scale)>string
+bcmod($num1, $num2, $scale)>string
+bcpow($num, $exponent, $scale)>string
+bcsqrt($num, $scale)>string
+bccomp($num1, $num2, $scale)>int
+gmp_add($num1, $num2)>GMP
+json_encode($value, $flags, $depth)>string
+json_decode($json, $associative, $depth, $flags)>mixed
+json_last_error()>int
+json_last_error_msg()>string
+serialize($value)>string
+unserialize($data, $options)>mixed
+var_dump($value, ...$values)>void
+var_export($value, $return)>string
+print_r($value, $return)>mixed
+debug_zval_refcount($value)>int
+debug_print_backtrace($options, $limit)>void
+debug_backtrace($options, $limit)>array
+error_log($message, $message_type, $destination, $additional_headers)>bool
+error_reporting($error_level)>int
+ini_set($option, $value)>string
+ini_get($option)>string
+set_error_handler($callback, $error_levels)>mixed
+set_exception_handler($callback)>callable
+restore_error_handler()>bool
+trigger_error($message, $error_level)>bool
+user_error($message, $error_level)>bool
+assert($assertion, $description)>bool
+register_shutdown_function($callback, ...$args)>void
+spl_autoload_register($callback, $throw, $prepend)>bool
+spl_object_id($object)>int
+spl_object_hash($object)>string
+is_null($value)>bool
+is_int($value)>bool
+is_integer($value)>bool
+is_long($value)>bool
+is_float($value)>bool
+is_double($value)>bool
+is_string($value)>bool
+is_bool($value)>bool
+is_array($value)>bool
+is_object($value)>bool
+is_numeric($value)>bool
+is_scalar($value)>bool
+is_callable($value, $syntax_only, &$callable_name)>bool
+is_iterable($value)>bool
+is_countable($value)>bool
+is_resource($value)>bool
+is_a($object_or_class, $class, $allow_string)>bool
+is_subclass_of($object_or_class, $class, $allow_string)>bool
+isset(...$vars)>bool
+empty($var)>bool
+unset(...$vars)>void
+intval($value, $base)>int
+floatval($value)>float
+doubleval($value)>float
+boolval($value)>bool
+settype(&$var, $type)>bool
+gettype($value)>string
+get_debug_type($value)>string
+get_class($object)>string
+get_parent_class($object_or_class)>string
+get_object_vars($object)>array
+get_class_vars($class)>array
+get_class_methods($object_or_class)>array
+method_exists($object_or_class, $method)>bool
+property_exists($object_or_class, $property)>bool
+class_exists($class, $autoload)>bool
+interface_exists($interface, $autoload)>bool
+trait_exists($trait, $autoload)>bool
+enum_exists($enum, $autoload)>bool
+function_exists($function)>bool
+class_implements($object_or_class, $autoload)>array
+class_uses($object_or_class, $autoload)>array
+call_user_func($callback, ...$args)>mixed
+call_user_func_array($callback, $args)>mixed
+func_get_args()>array
+func_get_arg($position)>mixed
+func_num_args()>int
+define($constant_name, $value, $case_insensitive)>bool
+defined($constant_name)>bool
+constant($name)>mixed
+usleep($microseconds)>void
+sleep($seconds)>int
+time()>int
+microtime($as_float)>mixed
+hrtime($as_number)>mixed
+date($format, $timestamp)>string
+gmdate($format, $timestamp)>string
+mktime($hour, $minute, $second, $month, $day, $year)>int
+gmmktime($hour, $minute, $second, $month, $day, $year)>int
+strtotime($datetime, $baseTimestamp)>int
+checkdate($month, $day, $year)>bool
+date_default_timezone_set($timezoneId)>bool
+date_default_timezone_get()>string
+date_create($datetime, $timezone)>DateTime
+date_diff($baseObject, $targetObject, $absolute)>DateInterval
+getdate($timestamp)>array
+localtime($timestamp, $associative)>array
+idate($format, $timestamp)>int
+strftime($format, $timestamp)>string
+cal_days_in_month($calendar, $month, $year)>int
+file_get_contents($filename, $use_include_path, $context, $offset, $length)>string
+file_put_contents($filename, $data, $flags, $context)>int
+file($filename, $flags, $context)>array
+fopen($filename, $mode, $use_include_path, $context)>resource
+fclose($stream)>bool
+fread($stream, $length)>string
+fwrite($stream, $data, $length)>int
+fputs($stream, $data, $length)>int
+fgets($stream, $length)>string
+fgetc($stream)>string
+fgetcsv($stream, $length, $separator, $enclosure, $escape)>array
+fputcsv($stream, $fields, $separator, $enclosure, $escape, $eol)>int
+fputs($stream, $data, $length)>int
+feof($stream)>bool
+fflush($stream)>bool
+fseek($stream, $offset, $whence)>int
+ftell($stream)>int
+rewind($stream)>bool
+ftruncate($stream, $size)>bool
+flock($stream, $operation, &$would_block)>bool
+fscanf($stream, $format, &...$vars)>mixed
+fpassthru($stream)>int
+readfile($filename, $use_include_path, $context)>int
+stream_get_contents($stream, $length, $offset)>string
+stream_context_create($options, $params)>resource
+file_exists($filename)>bool
+is_file($filename)>bool
+is_dir($filename)>bool
+is_link($filename)>bool
+is_readable($filename)>bool
+is_writable($filename)>bool
+is_writeable($filename)>bool
+is_executable($filename)>bool
+filesize($filename)>int
+filemtime($filename)>int
+fileatime($filename)>int
+filectime($filename)>int
+fileperms($filename)>int
+stat($filename)>array
+touch($filename, $mtime, $atime)>bool
+chmod($filename, $permissions)>bool
+chown($filename, $user)>bool
+copy($from, $to, $context)>bool
+rename($from, $to, $context)>bool
+unlink($filename, $context)>bool
+mkdir($directory, $permissions, $recursive, $context)>bool
+rmdir($directory, $context)>bool
+tempnam($directory, $prefix)>string
+tmpfile()>resource
+sys_get_temp_dir()>string
+realpath($path)>string
+basename($path, $suffix)>string
+dirname($path, $levels)>string
+pathinfo($path, $flags)>mixed
+glob($pattern, $flags)>array
+scandir($directory, $sorting_order, $context)>array
+opendir($directory, $context)>resource
+readdir($dir_handle)>string
+closedir($dir_handle)>void
+getcwd()>string
+chdir($directory)>bool
+disk_free_space($directory)>float
+fnmatch($pattern, $filename, $flags)>bool
+parse_ini_file($filename, $process_sections, $scanner_mode)>array
+parse_ini_string($ini_string, $process_sections, $scanner_mode)>array
+ob_start($callback, $chunk_size, $flags)>bool
+ob_get_clean()>string
+ob_get_contents()>string
+ob_end_clean()>bool
+ob_end_flush()>bool
+ob_get_flush()>string
+ob_flush()>void
+flush()>void
+header($header, $replace, $response_code)>void
+headers_sent(&$filename, &$line)>bool
+http_response_code($response_code)>mixed
+setcookie($name, $value, $expires_or_options, $path, $domain, $secure, $httponly)>bool
+session_start($options)>bool
+session_destroy()>bool
+session_id($id)>string
+session_regenerate_id($delete_old_session)>bool
+session_unset()>bool
+filter_var($value, $filter, $options)>mixed
+filter_input($type, $var_name, $filter, $options)>mixed
+filter_var_array($array, $options, $add_empty)>mixed
+getenv($name, $local_only)>string
+putenv($assignment)>bool
+php_sapi_name()>string
+phpversion($extension)>string
+php_uname($mode)>string
+memory_get_usage($real_usage)>int
+memory_get_peak_usage($real_usage)>int
+gc_collect_cycles()>int
+set_time_limit($seconds)>bool
+exit($status)>void
+die($status)>void
+exec($command, &$output, &$result_code)>string
+shell_exec($command)>string
+system($command, &$result_code)>string
+passthru($command, &$result_code)>void
+proc_open($command, $descriptor_spec, &$pipes, $cwd, $env_vars, $options)>resource
+escapeshellarg($arg)>string
+escapeshellcmd($command)>string
+mail($to, $subject, $message, $additional_headers, $additional_params)>bool
+gethostname()>string
+gethostbyname($hostname)>string
+ip2long($ip)>int
+long2ip($ip)>string
+inet_pton($ip)>string
+curl_init($url)>CurlHandle
+curl_setopt($handle, $option, $value)>bool
+curl_setopt_array($handle, $options)>bool
+curl_exec($handle)>mixed
+curl_getinfo($handle, $option)>mixed
+curl_error($handle)>string
+curl_errno($handle)>int
+curl_close($handle)>void
+fsockopen($hostname, $port, &$error_code, &$error_message, $timeout)>resource
+stream_socket_client($address, &$error_code, &$error_message, $timeout, $flags, $context)>resource
+gzcompress($data, $level, $encoding)>string
+gzuncompress($data, $max_length)>string
+gzencode($data, $level, $encoding)>string
+gzdecode($data, $max_length)>string
+gzdeflate($data, $level, $encoding)>string
+gzinflate($data, $max_length)>string
+openssl_encrypt($data, $cipher_algo, $passphrase, $options, $iv, &$tag)>string
+openssl_decrypt($data, $cipher_algo, $passphrase, $options, $iv, $tag)>string
+openssl_random_pseudo_bytes($length, &$strong_result)>string
+simplexml_load_string($data, $class_name, $options)>SimpleXMLElement
+simplexml_load_file($filename, $class_name, $options)>SimpleXMLElement
+mysqli_connect($hostname, $username, $password, $database, $port)>mysqli
+mysqli_query($mysql, $query, $result_mode)>mixed
+mysqli_fetch_assoc($result)>array
+array_flip($array)>array
+version_compare($version1, $version2, $operator)>mixed
+highlight_string($string, $return)>mixed
+levenshtein($string1, $string2)>int
+ctype_cntrl($text)>bool
+nl2br($string, $use_xhtml)>string
+money_format($format, $number)>string
+array_find($array, $callback)>mixed
+array_any($array, $callback)>bool
+array_all($array, $callback)>bool
+PHP_EOL:string
+PHP_INT_MAX:int
+PHP_INT_MIN:int
+PHP_INT_SIZE:int
+PHP_FLOAT_EPSILON:float
+PHP_FLOAT_MAX:float
+PHP_FLOAT_MIN:float
+PHP_VERSION:string
+PHP_MAJOR_VERSION:int
+PHP_MINOR_VERSION:int
+PHP_OS:string
+PHP_OS_FAMILY:string
+DIRECTORY_SEPARATOR:string
+PATH_SEPARATOR:string
+E_ALL:int
+E_ERROR:int
+E_WARNING:int
+E_NOTICE:int
+E_STRICT:int
+E_DEPRECATED:int
+E_USER_ERROR:int
+E_USER_WARNING:int
+E_USER_NOTICE:int
+M_PI:float
+M_E:float
+SORT_REGULAR:int
+SORT_NUMERIC:int
+SORT_STRING:int
+SORT_FLAG_CASE:int
+COUNT_RECURSIVE:int
+JSON_PRETTY_PRINT:int
+JSON_UNESCAPED_UNICODE:int
+JSON_UNESCAPED_SLASHES:int
+JSON_THROW_ON_ERROR:int
+JSON_ERROR_NONE:int
+ENT_QUOTES:int
+ENT_HTML5:int
+ENT_COMPAT:int
+LOCK_SH:int
+LOCK_EX:int
+LOCK_UN:int
+FILE_APPEND:int
+FILE_IGNORE_NEW_LINES:int
+FILE_SKIP_EMPTY_LINES:int
+FILE_USE_INCLUDE_PATH:int
+PREG_SPLIT_NO_EMPTY:int
+PREG_SET_ORDER:int
+PREG_PATTERN_ORDER:int
+ARRAY_FILTER_USE_KEY:int
+ARRAY_FILTER_USE_BOTH:int
+STR_PAD_LEFT:int
+STR_PAD_RIGHT:int
+STR_PAD_BOTH:int
+FILTER_VALIDATE_INT:int
+FILTER_VALIDATE_EMAIL:int
+FILTER_VALIDATE_URL:int
+FILTER_VALIDATE_BOOLEAN:int
+FILTER_VALIDATE_FLOAT:int
+FILTER_DEFAULT:int
+FILTER_SANITIZE_STRING:int
+STDIN:resource
+STDOUT:resource
+STDERR:resource
+#stdClass
+#Stringable
+__toString()>string
+#Countable
+count()>int
+#Traversable
+#Iterator:Traversable
+current()>mixed
+key()>mixed
+next()>void
+rewind()>void
+valid()>bool
+#IteratorAggregate:Traversable
+getIterator()>Traversable
+#ArrayAccess
+offsetExists($offset)>bool
+offsetGet($offset)>mixed
+offsetSet($offset, $value)>void
+offsetUnset($offset)>void
+#JsonSerializable
+jsonSerialize()>mixed
+#UnitEnum
+cases()>array
+#BackedEnum:UnitEnum
+from($value)>static
+tryFrom($value)>static
+#Throwable:Stringable
+getMessage()>string
+getCode()>int
+getFile()>string
+getLine()>int
+getTrace()>array
+getTraceAsString()>string
+getPrevious()>Throwable
+#Exception:Throwable
+__construct($message, $code, $previous)>void
+#Error:Throwable
+__construct($message, $code, $previous)>void
+#ErrorException:Exception
+getSeverity()>int
+#TypeError:Error
+#ValueError:Error
+#ArithmeticError:Error
+#DivisionByZeroError:ArithmeticError
+#ArgumentCountError:TypeError
+#AssertionError:Error
+#RuntimeException:Exception
+#LogicException:Exception
+#InvalidArgumentException:LogicException
+#DomainException:LogicException
+#LengthException:LogicException
+#OutOfRangeException:LogicException
+#BadFunctionCallException:LogicException
+#BadMethodCallException:BadFunctionCallException
+#OutOfBoundsException:RuntimeException
+#OverflowException:RuntimeException
+#RangeException:RuntimeException
+#UnderflowException:RuntimeException
+#UnexpectedValueException:RuntimeException
+#JsonException:Exception
+#Closure
+bind($closure, $newThis, $newScope)>Closure
+bindTo($newThis, $newScope)>Closure
+call($newThis, ...$args)>mixed
+fromCallable($callback)>Closure
+__invoke(...$args)>mixed
+#Generator:Iterator
+send($value)>mixed
+throw($exception)>mixed
+getReturn()>mixed
+#DateTimeInterface
+format($format)>string
+getTimestamp()>int
+getTimezone()>DateTimeZone
+getOffset()>int
+diff($targetObject, $absolute)>DateInterval
+#DateTime:DateTimeInterface
+__construct($datetime, $timezone)>void
+createFromFormat($format, $datetime, $timezone)>DateTime
+modify($modifier)>DateTime
+setDate($year, $month, $day)>DateTime
+setTime($hour, $minute, $second, $microsecond)>DateTime
+setTimestamp($timestamp)>DateTime
+setTimezone($timezone)>DateTime
+add($interval)>DateTime
+sub($interval)>DateTime
+createFromImmutable($object)>DateTime
+getLastErrors()>array
+#DateTimeImmutable:DateTimeInterface
+__construct($datetime, $timezone)>void
+createFromFormat($format, $datetime, $timezone)>DateTimeImmutable
+modify($modifier)>DateTimeImmutable
+setDate($year, $month, $day)>DateTimeImmutable
+setTime($hour, $minute, $second, $microsecond)>DateTimeImmutable
+setTimestamp($timestamp)>DateTimeImmutable
+setTimezone($timezone)>DateTimeImmutable
+add($interval)>DateTimeImmutable
+sub($interval)>DateTimeImmutable
+createFromMutable($object)>DateTimeImmutable
+#DateTimeZone
+__construct($timezone)>void
+getName()>string
+getOffset($datetime)>int
+listIdentifiers($timezoneGroup, $countryCode)>array
+#DateInterval
+__construct($duration)>void
+createFromDateString($datetime)>DateInterval
+format($format)>string
+y:int
+m:int
+d:int
+h:int
+i:int
+s:int
+f:float
+invert:int
+days:int
+#DatePeriod:IteratorAggregate
+__construct($start, $interval, $end, $options)>void
+getStartDate()>DateTimeInterface
+getEndDate()>DateTimeInterface
+getDateInterval()>DateInterval
+#ArrayIterator:Iterator
+__construct($array, $flags)>void
+count()>int
+getArrayCopy()>array
+offsetGet($key)>mixed
+offsetSet($key, $value)>void
+append($value)>void
+asort($flags)>bool
+ksort($flags)>bool
+uasort($callback)>bool
+uksort($callback)>bool
+#ArrayObject:IteratorAggregate
+__construct($array, $flags, $iteratorClass)>void
+count()>int
+getArrayCopy()>array
+exchangeArray($array)>array
+offsetExists($key)>bool
+offsetGet($key)>mixed
+offsetSet($key, $value)>void
+offsetUnset($key)>void
+append($value)>void
+getIterator()>ArrayIterator
+#SplDoublyLinkedList:Iterator
+push($value)>void
+pop()>mixed
+shift()>mixed
+unshift($value)>void
+top()>mixed
+bottom()>mixed
+isEmpty()>bool
+count()>int
+toArray()>array
+#SplQueue:SplDoublyLinkedList
+enqueue($value)>void
+dequeue()>mixed
+#SplStack:SplDoublyLinkedList
+#SplObjectStorage
+attach($object, $info)>void
+detach($object)>void
+contains($object)>bool
+count()>int
+getInfo()>mixed
+setInfo($info)>void
+#SplFixedArray:IteratorAggregate
+__construct($size)>void
+getSize()>int
+setSize($size)>bool
+toArray()>array
+fromArray($array, $preserveKeys)>SplFixedArray
+#SplPriorityQueue:Iterator
+insert($value, $priority)>bool
+extract()>mixed
+top()>mixed
+count()>int
+isEmpty()>bool
+#SplMinHeap:Iterator
+insert($value)>bool
+extract()>mixed
+top()>mixed
+count()>int
+isEmpty()>bool
+#SplMaxHeap:SplMinHeap
+#SplFileInfo
+getFilename()>string
+getExtension()>string
+getBasename($suffix)>string
+getPath()>string
+getPathname()>string
+getRealPath()>string
+getSize()>int
+getMTime()>int
+isFile()>bool
+isDir()>bool
+isReadable()>bool
+isWritable()>bool
+openFile($mode)>SplFileObject
+#SplFileObject:SplFileInfo
+__construct($filename, $mode)>void
+fgets()>string
+fgetcsv($separator, $enclosure, $escape)>array
+fwrite($data, $length)>int
+eof()>bool
+fseek($offset, $whence)>int
+ftell()>int
+current()>mixed
+rewind()>void
+seek($line)>void
+setFlags($flags)>void
+#DirectoryIterator:SplFileInfo
+isDot()>bool
+#RecursiveDirectoryIterator:DirectoryIterator
+getSubPathname()>string
+#RecursiveIteratorIterator:Iterator
+getDepth()>int
+#PDO
+__construct($dsn, $username, $password, $options)>void
+prepare($query, $options)>PDOStatement
+query($query, $fetchMode)>PDOStatement
+exec($statement)>int
+lastInsertId($name)>string
+beginTransaction()>bool
+commit()>bool
+rollBack()>bool
+inTransaction()>bool
+quote($string, $type)>string
+errorCode()>string
+errorInfo()>array
+setAttribute($attribute, $value)>bool
+getAttribute($attribute)>mixed
+getAvailableDrivers()>array
+#PDOStatement:IteratorAggregate
+execute($params)>bool
+fetch($mode, $cursorOrientation, $cursorOffset)>mixed
+fetchAll($mode, ...$args)>array
+fetchColumn($column)>mixed
+fetchObject($class, $constructorArgs)>object
+bindValue($param, $value, $type)>bool
+bindParam($param, &$var, $type, $maxLength, $driverOptions)>bool
+rowCount()>int
+columnCount()>int
+closeCursor()>bool
+errorCode()>string
+errorInfo()>array
+#PDOException:RuntimeException
+errorInfo:array
+#mysqli
+query($query, $result_mode)>mysqli_result
+prepare($query)>mysqli_stmt
+close()>bool
+real_escape_string($string)>string
+error:string
+errno:int
+insert_id:int
+affected_rows:int
+#mysqli_result
+fetch_assoc()>array
+fetch_all($mode)>array
+fetch_row()>array
+fetch_object($class, $constructor_args)>object
+num_rows:int
+free()>void
+#SimpleXMLElement
+xpath($expression)>array
+asXML($filename)>mixed
+children($namespaceOrPrefix, $isPrefix)>SimpleXMLElement
+attributes($namespaceOrPrefix, $isPrefix)>SimpleXMLElement
+getName()>string
+addChild($qualifiedName, $value, $namespace)>SimpleXMLElement
+addAttribute($qualifiedName, $value, $namespace)>void
+#DOMDocument
+load($filename, $options)>mixed
+loadXML($source, $options)>mixed
+loadHTML($source, $options)>mixed
+saveXML($node, $options)>string
+saveHTML($node)>string
+getElementById($elementId)>DOMElement
+getElementsByTagName($qualifiedName)>DOMNodeList
+createElement($localName, $value)>DOMElement
+createTextNode($data)>DOMText
+appendChild($node)>DOMNode
+documentElement:DOMElement
+#DOMNode
+appendChild($node)>DOMNode
+removeChild($child)>DOMNode
+getAttribute($qualifiedName)>string
+setAttribute($qualifiedName, $value)>DOMAttr
+textContent:string
+nodeValue:string
+nodeName:string
+childNodes:DOMNodeList
+parentNode:DOMNode
+#DOMElement:DOMNode
+#DOMNodeList
+item($index)>DOMNode
+count()>int
+length:int
+#ReflectionClass
+__construct($objectOrClass)>void
+getName()>string
+getShortName()>string
+getMethods($filter)>array
+getMethod($name)>ReflectionMethod
+getProperties($filter)>array
+getProperty($name)>ReflectionProperty
+getConstants($filter)>array
+getParentClass()>ReflectionClass
+getInterfaceNames()>array
+getConstructor()>ReflectionMethod
+hasMethod($name)>bool
+hasProperty($name)>bool
+implementsInterface($interface)>bool
+isInterface()>bool
+isAbstract()>bool
+isFinal()>bool
+isInstantiable()>bool
+newInstance(...$args)>object
+newInstanceArgs($args)>object
+newInstanceWithoutConstructor()>object
+getAttributes($name, $flags)>array
+#ReflectionObject:ReflectionClass
+#ReflectionMethod
+invoke($object, ...$args)>mixed
+invokeArgs($object, $args)>mixed
+setAccessible($accessible)>void
+getName()>string
+getParameters()>array
+getReturnType()>ReflectionType
+isPublic()>bool
+isStatic()>bool
+#ReflectionFunction
+invoke(...$args)>mixed
+getParameters()>array
+getName()>string
+#ReflectionProperty
+getValue($object)>mixed
+setValue($objectOrValue, $value)>void
+setAccessible($accessible)>void
+getName()>string
+getType()>ReflectionType
+#ReflectionNamedType
+getName()>string
+allowsNull()>bool
+isBuiltin()>bool
+#WeakMap
+count()>int
+#Attribute
+#Random\Randomizer
+getInt($min, $max)>int
+getBytes($length)>string
+shuffleArray($array)>array

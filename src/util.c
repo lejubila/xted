@@ -43,6 +43,18 @@ char *xstrdup(const char *s)
     return memcpy(xmalloc(n), s, n);
 }
 
+char *xstrndup(const char *s, size_t n)
+{
+    char *p;
+
+    while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\t' || s[n - 1] == '\r'))
+        n--;
+    p = xmalloc(n + 1);
+    memcpy(p, s, n);
+    p[n] = '\0';
+    return p;
+}
+
 void sbuf_free(SBuf *b)
 {
     free(b->p);

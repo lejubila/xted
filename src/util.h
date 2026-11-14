@@ -13,6 +13,8 @@ void die(const char *fmt, ...) KED_PRINTF(1, 2);
 void *xmalloc(size_t n);
 void *xrealloc(void *p, size_t n);
 char *xstrdup(const char *s);
+/* NUL-terminated copy of the first n bytes, trailing blanks dropped. */
+char *xstrndup(const char *s, size_t n);
 
 /* Growable byte string. Not NUL-terminated. */
 typedef struct {

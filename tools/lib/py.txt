@@ -1,0 +1,2572 @@
+#
+Ellipsis:
+False:
+None:
+NotImplemented:
+True:
+abs(x)>int
+aiter(async_iterable)>
+all(iterable)>
+anext(aiterator, default=unrepresentable)>
+any(iterable)>
+ascii(obj)>
+bin(number)>str
+breakpoint(*args, **kws)>
+callable(obj)>bool
+chr(i)>str
+compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1, ...)>
+copyright()>
+credits()>
+delattr(obj, name)>
+dir()>
+divmod(x, y)>
+eval(source, globals=None, locals=None)>
+exec(source, globals=None, locals=None, *, closure=None)>
+exit(code=None)>
+format(value, format_spec='')>str
+getattr()>
+globals()>
+hasattr(obj, name)>bool
+hash(obj)>int
+help(*args, **kwds)>
+hex(number)>str
+id(obj)>int
+input(prompt='')>str
+isinstance(obj, class_or_tuple)>bool
+issubclass(cls, class_or_tuple)>
+iter()>
+len(obj)>int
+license()>
+locals()>
+max()>
+min()>
+next()>
+oct(number)>str
+open(file, mode='r', buffering=-1, encoding=None, errors=None, ...)>TextIOWrapper
+ord(character)>int
+pow(base, exp, mod=None)>
+print(*args, sep=' ', end='\n', file=None, flush=False)>
+quit(code=None)>
+repr(obj)>str
+round(number, ndigits=None)>int
+setattr(obj, name, value)>
+sorted(iterable, *, key=None, reverse=False)>list
+sum(iterable, start=0)>int
+vars()>
+int()>int
+str()>str
+float()>float
+list()>list
+dict()>dict
+set()>set
+tuple()>tuple
+bool()>bool
+bytes()>bytes
+bytearray()>bytearray
+frozenset()>frozenset
+range()>range
+enumerate()>enumerate
+zip()>zip
+map()>map
+filter()>filter
+reversed()>reversed
+object()>object
+complex()>complex
+slice()>slice
+memoryview()>memoryview
+property()>property
+staticmethod()>staticmethod
+classmethod()>classmethod
+super()>super
+type()>type
+os:
+sys:
+re:
+json:
+math:
+random:
+time:
+datetime:
+collections:
+itertools:
+functools:
+pathlib:
+subprocess:
+argparse:
+logging:
+io:
+shutil:
+string:
+glob:
+copy:
+csv:
+tempfile:
+threading:
+socket:
+struct:
+hashlib:
+base64:
+request:
+parse:
+sqlite3:
+enum:
+dataclasses:
+typing:
+contextlib:
+operator:
+statistics:
+textwrap:
+platform:
+signal:
+traceback:
+uuid:
+heapq:
+bisect:
+queue:
+asyncio:
+unittest:
+pickle:
+zipfile:
+decimal:
+fractions:
+secrets:
+shlex:
+pprint:
+#str
+capitalize()>str
+casefold()>str
+center(width, fillchar=' ')>str
+count(sub[, start[, end]])>
+encode(encoding='utf-8', errors='strict')>
+endswith(suffix[, start[, end]])>
+expandtabs(tabsize=8)>str
+find(sub[, start[, end]])>
+format(*args, **kwargs)>str
+format_map(mapping)>str
+index(sub[, start[, end]])>
+isalnum()>
+isalpha()>
+isascii()>
+isdecimal()>
+isdigit()>
+isidentifier()>
+islower()>
+isnumeric()>
+isprintable()>
+isspace()>
+istitle()>
+isupper()>
+join(iterable)>str
+ljust(width, fillchar=' ')>str
+lower()>str
+lstrip(chars=None)>str
+maketrans(x, y=unrepresentable, z=unrepresentable)>
+partition(sep)>
+removeprefix(prefix)>str
+removesuffix(suffix)>str
+replace(old, new, count=-1)>str
+rfind(sub[, start[, end]])>
+rindex(sub[, start[, end]])>
+rjust(width, fillchar=' ')>str
+rpartition(sep)>
+rsplit(sep=None, maxsplit=-1)>
+rstrip(chars=None)>str
+split(sep=None, maxsplit=-1)>
+splitlines(keepends=False)>
+startswith(prefix[, start[, end]])>
+strip(chars=None)>str
+swapcase()>str
+title()>str
+translate(table)>str
+upper()>str
+zfill(width)>str
+#list
+append(object)>
+clear()>
+copy()>list
+count(value)>
+extend(iterable)>
+index(value, start=0, stop=9223372036854775807)>
+insert(index, object)>
+pop(index=-1)>
+remove(value)>
+reverse()>
+sort(*, key=None, reverse=False)>
+#dict
+clear()>
+copy()>dict
+fromkeys(type, iterable, value=None)>
+get(key, default=None)>
+items()>
+keys()>
+pop(key, default=unrepresentable)>
+popitem()>
+setdefault(key, default=None)>
+update()>
+values()>
+#set
+add(object)>
+clear()>
+copy()>set
+difference(*others)>set
+difference_update(*others)>
+discard(object)>
+intersection(*others)>set
+intersection_update(*others)>
+isdisjoint(other)>
+issubset(other)>
+issuperset(other)>
+pop()>
+remove(object)>
+symmetric_difference(other)>set
+symmetric_difference_update(other)>
+union(*others)>set
+update(*others)>
+#frozenset
+copy()>
+difference(*others)>
+intersection(*others)>
+isdisjoint(other)>
+issubset(other)>
+issuperset(other)>
+symmetric_difference(other)>
+union(*others)>
+#tuple
+count(value)>
+index(value, start=0, stop=9223372036854775807)>
+#int
+as_integer_ratio()>
+bit_count()>
+bit_length()>
+conjugate()>
+denominator:
+from_bytes(type, bytes, byteorder='big', *, signed=False)>
+imag:
+is_integer()>
+numerator:
+real:
+to_bytes(length=1, byteorder='big', *, signed=False)>
+#float
+as_integer_ratio()>
+conjugate()>
+from_number(type, number)>
+fromhex(type, string)>
+hex()>
+imag:
+is_integer()>
+real:
+#bytes
+capitalize()>
+center(width, fillchar=b' ')>
+count(sub[, start[, end]])>
+decode(encoding='utf-8', errors='strict')>str
+endswith(suffix[, start[, end]])>
+expandtabs(tabsize=8)>
+find(sub[, start[, end]])>
+fromhex(type, string)>
+hex(sep=unrepresentable, bytes_per_sep=1)>
+index(sub[, start[, end]])>
+isalnum()>
+isalpha()>
+isascii()>
+isdigit()>
+islower()>
+isspace()>
+istitle()>
+isupper()>
+join(iterable_of_bytes)>
+ljust(width, fillchar=b' ')>
+lower()>
+lstrip(bytes=None)>
+maketrans(frm, to)>
+partition(sep)>
+removeprefix(prefix)>
+removesuffix(suffix)>
+replace(old, new, count=-1)>
+rfind(sub[, start[, end]])>
+rindex(sub[, start[, end]])>
+rjust(width, fillchar=b' ')>
+rpartition(sep)>
+rsplit(sep=None, maxsplit=-1)>
+rstrip(bytes=None)>
+split(sep=None, maxsplit=-1)>
+splitlines(keepends=False)>
+startswith(prefix[, start[, end]])>
+strip(bytes=None)>
+swapcase()>
+title()>
+translate(table, delete=b'')>
+upper()>
+zfill(width)>
+#bytearray
+append(item)>
+capitalize()>
+center(width, fillchar=b' ')>
+clear()>
+copy()>
+count(sub[, start[, end]])>
+decode(encoding='utf-8', errors='strict')>
+endswith(suffix[, start[, end]])>
+expandtabs(tabsize=8)>
+extend(iterable_of_ints)>
+find(sub[, start[, end]])>
+fromhex(type, string)>
+hex(sep=unrepresentable, bytes_per_sep=1)>
+index(sub[, start[, end]])>
+insert(index, item)>
+isalnum()>
+isalpha()>
+isascii()>
+isdigit()>
+islower()>
+isspace()>
+istitle()>
+isupper()>
+join(iterable_of_bytes)>
+ljust(width, fillchar=b' ')>
+lower()>
+lstrip(bytes=None)>
+maketrans(frm, to)>
+partition(sep)>
+pop(index=-1)>
+remove(value)>
+removeprefix(prefix)>
+removesuffix(suffix)>
+replace(old, new, count=-1)>
+resize(size)>
+reverse()>
+rfind(sub[, start[, end]])>
+rindex(sub[, start[, end]])>
+rjust(width, fillchar=b' ')>
+rpartition(sep)>
+rsplit(sep=None, maxsplit=-1)>
+rstrip(bytes=None)>
+split(sep=None, maxsplit=-1)>
+splitlines(keepends=False)>
+startswith(prefix[, start[, end]])>
+strip(bytes=None)>
+swapcase()>
+title()>
+translate(table, delete=b'')>
+upper()>
+zfill(width)>
+#bool:int
+#complex
+conjugate()>
+from_number(type, number)>
+imag:
+real:
+#object
+#range
+count(object)>
+index(object)>
+start:
+step:
+stop:
+#slice
+indices(object)>
+start:
+step:
+stop:
+#memoryview
+c_contiguous:
+cast(format, shape=unrepresentable)>
+contiguous:
+count(value)>
+f_contiguous:
+format:
+hex(sep=unrepresentable, bytes_per_sep=1)>
+index(value, start=0, stop=9223372036854775807)>
+itemsize:
+nbytes:
+ndim:
+obj:
+readonly:
+release()>
+shape:
+strides:
+suboffsets:
+tobytes(order='C')>
+tolist()>
+toreadonly()>
+#TextIOWrapper:_TextIOBase
+buffer:
+close()>
+closed:
+detach()>
+encoding:
+errors:
+fileno()>
+flush()>
+isatty()>
+line_buffering:
+name:
+newlines:
+read(size=-1)>str
+readable()>
+readline(size=-1)>str
+reconfigure(*, encoding=None, errors=None, newline=None, line_buffering=None, ...)>
+seek(cookie, whence=0)>
+seekable()>
+tell()>
+truncate(pos=None)>
+writable()>
+write(text)>
+write_through:
+#BufferedReader:_BufferedIOBase
+close()>
+closed:
+detach()>
+fileno()>
+flush()>
+isatty()>
+mode:
+name:
+peek(size=0)>
+raw:
+read(size=-1)>
+read1(size=-1)>
+readable()>
+readinto(buffer)>
+readinto1(buffer)>
+readline(size=-1)>
+seek(target, whence=0)>
+seekable()>
+tell()>
+truncate(pos=None)>
+#BytesIO:_BufferedIOBase
+close()>
+closed:
+flush()>
+getbuffer()>
+getvalue()>
+isatty()>
+read(size=-1)>
+read1(size=-1)>
+readable()>
+readinto(buffer)>
+readline(size=-1)>
+readlines(size=None)>
+seek(pos, whence=0)>
+seekable()>
+tell()>
+truncate(size=None)>
+writable()>
+write(b)>
+writelines(lines)>
+#StringIO:_TextIOBase
+close()>
+closed:
+getvalue()>
+line_buffering:
+newlines:
+read(size=-1)>
+readable()>
+readline(size=-1)>
+seek(pos, whence=0)>
+seekable()>
+tell()>
+truncate(pos=None)>
+writable()>
+write(s)>
+#Path:PurePath
+absolute()>Path
+as_uri()>
+chmod(mode, *, follow_symlinks=True)>
+copy(target, **kwargs)>
+copy_into(target_dir, **kwargs)>
+cwd(cls)>Path
+exists(*, follow_symlinks=True)>bool
+expanduser()>Path
+from_uri(cls, uri)>
+glob(pattern, *, case_sensitive=None, recurse_symlinks=False)>
+group(*, follow_symlinks=True)>
+hardlink_to(target)>
+home(cls)>Path
+info:
+is_block_device()>
+is_char_device()>
+is_dir(*, follow_symlinks=True)>bool
+is_fifo()>
+is_file(*, follow_symlinks=True)>bool
+is_junction()>
+is_mount()>
+is_socket()>
+is_symlink()>
+iterdir()>
+lchmod(mode)>
+lstat()>
+mkdir(mode=511, parents=False, exist_ok=False)>
+move(target)>
+move_into(target_dir)>
+open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)>TextIOWrapper
+owner(*, follow_symlinks=True)>
+read_bytes()>bytes
+read_text(encoding=None, errors=None, newline=None)>str
+readlink()>
+rename(target)>
+replace(target)>
+resolve(strict=False)>Path
+rglob(pattern, *, case_sensitive=None, recurse_symlinks=False)>
+rmdir()>
+samefile(other_path)>
+stat(*, follow_symlinks=True)>stat_result
+symlink_to(target, target_is_directory=False)>
+touch(mode=438, exist_ok=True)>
+unlink(missing_ok=False)>
+walk(top_down=True, on_error=None, follow_symlinks=False)>
+write_bytes(data)>
+write_text(data, encoding=None, errors=None, newline=None)>
+#datetime:date
+astimezone()>datetime
+combine()>
+ctime()>
+date()>date
+dst()>
+fold:
+fromisoformat(type, object)>datetime
+fromtimestamp()>datetime
+hour:
+isoformat()>str
+max:datetime
+microsecond:
+min:datetime
+minute:
+now(type, tz=None)>datetime
+replace(year=unchanged, month=unchanged, day=unchanged, hour=unchanged, ...)>datetime
+resolution:timedelta
+second:
+strptime()>datetime
+time()>time
+timestamp()>float
+timetuple()>
+timetz()>
+tzinfo:
+tzname()>
+utcfromtimestamp()>
+utcnow(type)>datetime
+utcoffset()>
+utctimetuple()>
+#date
+ctime()>
+day:
+fromisocalendar()>
+fromisoformat(type, object)>date
+fromordinal()>
+fromtimestamp(type, timestamp)>
+isocalendar()>
+isoformat()>str
+isoweekday()>
+max:date
+min:date
+month:
+replace(year=unchanged, month=unchanged, day=unchanged)>date
+resolution:timedelta
+strftime()>str
+strptime()>
+timetuple()>
+today(type)>date
+toordinal()>
+weekday()>
+year:
+#time
+dst()>
+fold:
+fromisoformat(type, object)>
+hour:
+isoformat()>
+max:time
+microsecond:
+min:time
+minute:
+replace(hour=unchanged, minute=unchanged, second=unchanged, ...)>
+resolution:timedelta
+second:
+strftime()>
+strptime()>
+tzinfo:
+tzname()>
+utcoffset()>
+#timedelta
+days:
+max:timedelta
+microseconds:
+min:timedelta
+resolution:timedelta
+seconds:
+total_seconds()>float
+#Pattern
+findall(string, pos=0, endpos=9223372036854775807)>list
+finditer(string, pos=0, endpos=9223372036854775807)>
+flags:
+fullmatch(string, pos=0, endpos=9223372036854775807)>Match
+groupindex:
+groups:
+match(string, pos=0, endpos=9223372036854775807)>Match
+pattern:
+scanner(string, pos=0, endpos=9223372036854775807)>
+search(string, pos=0, endpos=9223372036854775807)>Match
+split(string, maxsplit=0)>list
+sub(repl, string, count=0)>str
+subn(repl, string, count=0)>
+#Match
+end(group=0)>int
+endpos:
+expand(template)>
+group()>str
+groupdict(default=None)>
+groups(default=None)>tuple
+lastgroup:
+lastindex:
+pos:
+re:
+regs:
+span(group=0)>tuple
+start(group=0)>int
+string:
+#deque
+append(item)>
+appendleft(item)>
+clear()>
+copy()>
+count(value)>
+extend(iterable)>
+extendleft(iterable)>
+index(value, [start, [stop]])>
+insert(index, value)>
+maxlen:
+pop()>
+popleft()>
+remove(value)>
+reverse()>
+rotate(n=1)>
+#Counter:dict
+copy()>Counter
+elements()>
+fromkeys(cls, iterable, v=None)>
+most_common(n=None)>list
+subtract(iterable=None, **kwds)>
+total()>
+update(iterable=None, **kwds)>
+#OrderedDict:dict
+clear()>
+copy()>
+fromkeys(type, iterable, value=None)>
+items()>
+keys()>
+move_to_end(key, last=True)>
+pop(key, default=unrepresentable)>
+popitem(last=True)>
+setdefault(key, default=None)>
+update()>
+values()>
+#defaultdict:dict
+copy()>
+default_factory:
+#Popen
+communicate(input=None, timeout=None)>tuple
+kill()>
+poll()>int
+send_signal(sig)>
+terminate()>
+universal_newlines:
+wait(timeout=None)>int
+#CompletedProcess
+check_returncode()>
+#ArgumentParser:_AttributeHolder
+add_subparsers(**kwargs)>
+convert_arg_line_to_args(arg_line)>
+error(message)>
+exit(status=0, message=None)>
+format_help()>
+format_usage()>
+parse_args(args=None, namespace=None)>Namespace
+parse_intermixed_args(args=None, namespace=None)>
+parse_known_args(args=None, namespace=None)>
+parse_known_intermixed_args(args=None, namespace=None)>
+print_help(file=None)>
+print_usage(file=None)>
+#Namespace:_AttributeHolder
+#Logger:Filterer
+addHandler(hdlr)>
+callHandlers(record)>
+critical(msg, *args, **kwargs)>
+debug(msg, *args, **kwargs)>
+error(msg, *args, **kwargs)>
+exception(msg, *args, exc_info=True, **kwargs)>
+fatal(msg, *args, **kwargs)>
+findCaller(stack_info=False, stacklevel=1)>
+getChild(suffix)>
+getChildren()>
+getEffectiveLevel()>
+handle(record)>
+hasHandlers()>
+info(msg, *args, **kwargs)>
+isEnabledFor(level)>
+log(level, msg, *args, **kwargs)>
+makeRecord(name, level, fn, lno, msg, args, exc_info, func=None, extra=None, ...)>
+manager:Manager
+removeHandler(hdlr)>
+root:RootLogger
+setLevel(level)>
+warn(msg, *args, **kwargs)>
+warning(msg, *args, **kwargs)>
+#Thread
+daemon:
+getName()>
+ident:
+isDaemon()>
+is_alive()>
+join(timeout=None)>
+name:
+native_id:
+run()>
+setDaemon(daemonic)>
+setName(name)>
+start()>
+#Lock
+acquire(blocking=True, timeout=-1)>
+acquire_lock(blocking=True, timeout=-1)>
+locked()>
+locked_lock()>
+release()>
+release_lock()>
+#Event
+clear()>
+isSet()>
+is_set()>
+set()>
+wait(timeout=None)>
+#socket
+accept()>tuple
+close()>
+detach()>
+dup()>
+family:
+get_inheritable()>
+makefile(mode='r', buffering=None, *, encoding=None, errors=None, newline=None)>TextIOWrapper
+sendfile(file, offset=0, count=None)>
+set_inheritable(inheritable)>
+type:
+#Queue
+empty()>
+full()>
+get(block=True, timeout=None)>
+get_nowait()>
+join()>
+put(item, block=True, timeout=None)>
+put_nowait(item)>
+qsize()>
+shutdown(immediate=False)>
+task_done()>
+#Connection
+DataError:
+DatabaseError:
+Error:
+IntegrityError:
+InterfaceError:
+InternalError:
+NotSupportedError:
+OperationalError:
+ProgrammingError:
+Warning:
+autocommit:
+backup(target, *, pages=-1, progress=None, name='main', sleep=0.25)>
+blobopen(table, column, rowid, *, readonly=False, name='main')>
+close()>
+commit()>
+create_aggregate(name, n_arg, aggregate_class)>
+create_collation(name, callback)>
+create_function(name, narg, func, *, deterministic=False)>
+create_window_function(name, num_params, aggregate_class)>
+cursor(factory=unrepresentable)>Cursor
+deserialize(data, *, name='main')>
+enable_load_extension(enable)>
+execute(sql, parameters=unrepresentable)>Cursor
+executemany(sql, parameters)>
+executescript(sql_script)>
+getconfig(op)>
+getlimit(category)>
+in_transaction:
+interrupt()>
+isolation_level:
+iterdump(*, filter=None)>
+load_extension(name, *, entrypoint=None)>
+rollback()>
+row_factory:
+serialize(*, name='main')>
+set_authorizer(authorizer_callback)>
+set_progress_handler(progress_handler, n)>
+set_trace_callback(trace_callback)>
+setconfig(op, enable=True)>
+setlimit(category, limit)>
+text_factory:
+total_changes:
+#Cursor
+arraysize:
+close()>
+connection:
+description:
+execute(sql, parameters=())>Cursor
+executemany(sql, seq_of_parameters)>
+executescript(sql_script)>
+fetchall()>list
+fetchmany(size=1)>
+fetchone()>tuple
+lastrowid:
+row_factory:
+rowcount:
+setinputsizes(sizes)>
+setoutputsize(size, column=None)>
+#DictReader
+fieldnames:
+#DictWriter
+writeheader()>
+writerow(rowdict)>
+writerows(rowdicts)>
+#Random
+VERSION:
+betavariate(alpha, beta)>
+binomialvariate(n=1, p=0.5)>
+choice(seq)>
+choices(population, weights=None, *, cum_weights=None, k=1)>
+expovariate(lambd=1.0)>
+gammavariate(alpha, beta)>
+gauss(mu=0.0, sigma=1.0)>
+getstate()>
+lognormvariate(mu, sigma)>
+normalvariate(mu=0.0, sigma=1.0)>
+paretovariate(alpha)>
+randbytes(n)>
+randint(a, b)>
+randrange(start, stop=None, step=1)>
+sample(population, k, *, counts=None)>
+seed(a=None, version=2)>
+setstate(state)>
+shuffle(x)>
+triangular(low=0.0, high=1.0, mode=None)>
+uniform(a, b)>
+vonmisesvariate(mu, kappa)>
+weibullvariate(alpha, beta)>
+#Decimal
+adjusted()>
+as_integer_ratio()>
+as_tuple()>
+canonical()>
+compare(other, context=None)>
+compare_signal(other, context=None)>
+compare_total(other, context=None)>
+compare_total_mag(other, context=None)>
+conjugate()>
+copy_abs()>
+copy_negate()>
+copy_sign(other, context=None)>
+exp(context=None)>
+fma(other, third, context=None)>
+from_float(type, f)>
+from_number(type, number)>
+imag:
+is_canonical()>
+is_finite()>
+is_infinite()>
+is_nan()>
+is_normal(context=None)>
+is_qnan()>
+is_signed()>
+is_snan()>
+is_subnormal(context=None)>
+is_zero()>
+ln(context=None)>
+log10(context=None)>
+logb(context=None)>
+logical_and(other, context=None)>
+logical_invert(context=None)>
+logical_or(other, context=None)>
+logical_xor(other, context=None)>
+max(other, context=None)>
+max_mag(other, context=None)>
+min(other, context=None)>
+min_mag(other, context=None)>
+next_minus(context=None)>
+next_plus(context=None)>
+next_toward(other, context=None)>
+normalize(context=None)>
+number_class(context=None)>
+quantize(exp, rounding=None, context=None)>
+radix()>
+real:
+remainder_near(other, context=None)>
+rotate(other, context=None)>
+same_quantum(other, context=None)>
+scaleb(other, context=None)>
+shift(other, context=None)>
+sqrt(context=None)>
+to_eng_string(context=None)>
+to_integral(rounding=None, context=None)>
+to_integral_exact(rounding=None, context=None)>
+to_integral_value(rounding=None, context=None)>
+#Fraction:Rational
+as_integer_ratio()>
+denominator:
+from_decimal(cls, dec)>
+from_float(cls, f)>
+from_number(cls, number)>
+is_integer()>
+limit_denominator(max_denominator=1000000)>
+numerator:
+#ZipFile
+close()>
+comment:
+extract(member, path=None, pwd=None)>
+extractall(path=None, members=None, pwd=None)>
+fp:NoneType
+getinfo(name)>
+infolist()>
+mkdir(zinfo_or_directory_name, mode=511)>
+namelist()>
+open(name, mode='r', pwd=None, *, force_zip64=False)>
+printdir(file=None)>
+read(name, pwd=None)>
+setpassword(pwd)>
+testzip()>
+write(filename, arcname=None, compress_type=None, compresslevel=None)>
+writestr(zinfo_or_arcname, data, compress_type=None, compresslevel=None)>
+#UUID
+bytes:
+bytes_le:
+clock_seq:
+clock_seq_hi_variant:
+clock_seq_low:
+fields:
+hex:
+int:
+is_safe:
+node:
+time:
+time_hi_version:
+time_low:
+time_mid:
+urn:
+variant:
+version:
+#BaseException
+add_note(note)>
+args:
+with_traceback(tb)>
+#Exception:BaseException
+#OSError:Exception
+characters_written:
+errno:
+filename:
+filename2:
+strerror:
+#ValueError:Exception
+#TypeError:Exception
+#KeyError:LookupError
+#IndexError:LookupError
+#RuntimeError:Exception
+#StopIteration:Exception
+value:
+#FileNotFoundError:OSError
+#ImportError:Exception
+msg:
+name:
+name_from:
+path:
+#AttributeError:Exception
+name:
+obj:
+#NameError:Exception
+name:
+#NotImplementedError:RuntimeError
+#AssertionError:Exception
+#LookupError:Exception
+#ArithmeticError:Exception
+#ZeroDivisionError:ArithmeticError
+#PermissionError:OSError
+#TimeoutError:OSError
+#UnicodeError:ValueError
+#KeyboardInterrupt:BaseException
+#os
+DirEntry()>DirEntry
+GenericAlias()>GenericAlias
+Mapping()>Mapping
+MutableMapping()>MutableMapping
+PathLike()>PathLike
+WCOREDUMP(status)>
+WEXITSTATUS(status)>
+WIFCONTINUED(status)>
+WIFEXITED(status)>
+WIFSIGNALED(status)>
+WIFSTOPPED(status)>
+WSTOPSIG(status)>
+WTERMSIG(status)>
+abort()>
+access(path, mode, *, dir_fd=None, effective_ids=False, follow_symlinks=True)>
+chdir(path)>
+chmod(path, mode, *, dir_fd=None, follow_symlinks=(os.name != 'nt'))>
+chown(path, uid, gid, *, dir_fd=None, follow_symlinks=True)>
+chroot(path)>
+close(fd)>
+closerange(fd_low, fd_high)>
+confstr(name)>
+copy_file_range(src, dst, count, offset_src=None, offset_dst=None)>
+cpu_count()>
+ctermid()>
+curdir:str
+device_encoding(fd)>
+dup(fd)>
+dup2(fd, fd2, inheritable=True)>
+environ:_Environ
+error()>error
+eventfd(initval, flags=524288)>
+eventfd_read(fd)>
+eventfd_write(fd, value)>
+execl(file, *args)>
+execle(file, *args)>
+execlp(file, *args)>
+execlpe(file, *args)>
+execv(path, argv)>
+execve(path, argv, env)>
+execvp(file, args)>
+execvpe(file, args, env)>
+fchdir(fd)>
+fchmod(fd, mode)>
+fchown(fd, uid, gid)>
+fdatasync(fd)>
+fdopen(fd, mode='r', buffering=-1, encoding=None, *args, **kwargs)>
+fork()>
+forkpty()>
+fpathconf(fd, name)>
+fsdecode(filename)>
+fsencode(filename)>
+fspath(path)>
+fstat(fd)>
+fstatvfs(fd)>
+fsync(fd)>
+ftruncate(fd, length)>
+fwalk(top='.', topdown=True, onerror=None, *, follow_symlinks=False, ...)>
+get_blocking(fd)>
+get_exec_path(env=None)>
+get_inheritable(fd)>
+get_terminal_size(fd=unrepresentable)>
+getcwd()>str
+getcwdb()>
+getegid()>
+getenv(key, default=None)>str
+getenvb(key, default=None)>
+geteuid()>
+getgid()>
+getgrouplist(user, group)>
+getgroups()>
+getloadavg()>
+getlogin()>
+getpgid(pid)>
+getpgrp()>
+getpid()>int
+getppid()>
+getpriority(which, who)>
+getrandom(size, flags=0)>
+getresgid()>
+getresuid()>
+getsid(pid)>
+getuid()>
+getxattr(path, attribute, *, follow_symlinks=True)>
+grantpt(fd)>
+initgroups(username, gid)>
+isatty(fd)>
+kill(pid, signal)>
+killpg(pgid, signal)>
+lchown(path, uid, gid)>
+linesep:str
+link(src, dst, *, src_dir_fd=None, dst_dir_fd=None, ...)>
+listdir(path=None)>list
+listxattr(path=None, *, follow_symlinks=True)>
+lockf(fd, command, length)>
+login_tty(fd)>
+lseek(fd, position, whence)>
+lstat(path, *, dir_fd=None)>
+major(device)>
+makedev(major, minor)>
+makedirs(name, mode=511, exist_ok=False)>
+memfd_create(name, flags=1)>
+minor(device)>
+mkdir(path, mode=511, *, dir_fd=None)>
+mkfifo(path, mode=438, *, dir_fd=None)>
+mknod(path, mode=384, device=0, *, dir_fd=None)>
+name:str
+nice(increment)>
+open(path, flags, mode=511, *, dir_fd=None)>
+openpty()>
+pardir:str
+path:path
+pathconf(path, name)>
+pidfd_open(pid, flags=0)>
+pipe()>
+pipe2(flags)>
+popen(cmd, mode='r', buffering=-1)>TextIOWrapper
+posix_fadvise(fd, offset, length, advice)>
+posix_fallocate(fd, offset, length)>
+posix_openpt(oflag)>
+posix_spawn(path, argv, env, *, file_actions=(), setpgroup=None, ...)>
+posix_spawnp(path, argv, env, *, file_actions=(), setpgroup=None, ...)>
+pread(fd, length, offset)>
+preadv(fd, buffers, offset, flags=0)>
+process_cpu_count()>
+ptsname(fd)>
+putenv(name, value)>
+pwrite(fd, buffer, offset)>
+pwritev(fd, buffers, offset, flags=0)>
+read(fd, length)>
+readinto(fd, buffer)>
+readlink(path, *, dir_fd=None)>
+readv(fd, buffers)>
+register_at_fork(*, before=unrepresentable, after_in_child=unrepresentable, ...)>
+reload_environ()>
+remove(path, *, dir_fd=None)>
+removedirs(name)>
+removexattr(path, attribute, *, follow_symlinks=True)>
+rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None)>
+renames(old, new)>
+replace(src, dst, *, src_dir_fd=None, dst_dir_fd=None)>
+rmdir(path, *, dir_fd=None)>
+scandir(path=None)>
+sched_get_priority_max(policy)>
+sched_get_priority_min(policy)>
+sched_getaffinity(pid)>
+sched_getparam(pid)>
+sched_getscheduler(pid)>
+sched_param()>sched_param
+sched_rr_get_interval(pid)>
+sched_setaffinity(pid, mask)>
+sched_setparam(pid, param)>
+sched_setscheduler(pid, policy, param)>
+sched_yield()>
+sendfile(out_fd, in_fd, offset, count)>
+sep:str
+set_blocking(fd, blocking)>
+set_inheritable(fd, inheritable)>
+setegid(egid)>
+seteuid(euid)>
+setgid(gid)>
+setgroups(groups)>
+setns(fd, nstype=0)>
+setpgid(pid, pgrp)>
+setpgrp()>
+setpriority(which, who, priority)>
+setregid(rgid, egid)>
+setresgid(rgid, egid, sgid)>
+setresuid(ruid, euid, suid)>
+setreuid(ruid, euid)>
+setsid()>
+setuid(uid)>
+setxattr(path, attribute, value, flags=0, *, follow_symlinks=True)>
+spawnl(mode, file, *args)>
+spawnle(mode, file, *args)>
+spawnlp(mode, file, *args)>
+spawnlpe(mode, file, *args)>
+spawnv(mode, file, args)>
+spawnve(mode, file, args, env)>
+spawnvp(mode, file, args)>
+spawnvpe(mode, file, args, env)>
+splice(src, dst, count, offset_src=None, offset_dst=None, flags=0)>
+stat(path, *, dir_fd=None, follow_symlinks=True)>stat_result
+stat_result()>stat_result
+statvfs(path)>
+statvfs_result()>statvfs_result
+strerror(code)>
+symlink(src, dst, target_is_directory=False, *, dir_fd=None)>
+sync()>
+sysconf(name)>
+system(command)>
+tcgetpgrp(fd)>
+tcsetpgrp(fd, pgid)>
+terminal_size()>terminal_size
+timerfd_create(clockid, *, flags=0)>
+timerfd_gettime(fd)>
+timerfd_gettime_ns(fd)>
+timerfd_settime(fd, *, flags=0, initial=0.0, interval=0.0)>
+timerfd_settime_ns(fd, *, flags=0, initial=0, interval=0)>
+times()>
+times_result()>times_result
+truncate(path, length)>
+ttyname(fd)>
+umask(mask)>
+uname()>
+uname_result()>uname_result
+unlink(path, *, dir_fd=None)>
+unlockpt(fd)>
+unsetenv(name)>
+unshare(flags)>
+urandom(size)>bytes
+utime(path, times=None, *, ns=unrepresentable, dir_fd=None, ...)>
+wait()>
+wait3(options)>
+wait4(pid, options)>
+waitid(idtype, id, options)>
+waitid_result()>waitid_result
+waitpid(pid, options)>
+waitstatus_to_exitcode(status)>
+walk(top, topdown=True, onerror=None, followlinks=False)>tuple
+write(fd, data)>
+writev(fd, buffers)>
+#sys
+activate_stack_trampoline(backend)>
+addaudithook(hook)>
+argv:list
+audit(event, *args)>
+breakpointhook(*args, **kwargs)>
+call_tracing(func, args)>
+deactivate_stack_trampoline()>
+displayhook(object)>
+exc_info()>
+excepthook((exc_type, exc_obj, exc_tb))>
+exception()>
+exit(status=None)>
+get_asyncgen_hooks()>
+get_coroutine_origin_tracking_depth()>
+get_int_max_str_digits()>
+getallocatedblocks()>
+getdefaultencoding()>
+getdlopenflags()>
+getfilesystemencodeerrors()>
+getfilesystemencoding()>
+getprofile()>
+getrecursionlimit()>
+getrefcount(object)>
+getsizeof()>
+getswitchinterval()>
+gettrace()>
+getunicodeinternedsize(*, _only_immortal=False)>
+intern(string)>
+is_finalizing()>
+is_remote_debug_enabled()>
+is_stack_trampoline_active()>
+maxsize:int
+path:list
+platform:str
+remote_exec(pid, script)>
+set_asyncgen_hooks()>
+set_coroutine_origin_tracking_depth(depth)>
+set_int_max_str_digits(maxdigits)>
+setdlopenflags(flags)>
+setprofile(function)>
+setrecursionlimit(limit)>
+setswitchinterval(interval)>
+settrace(function)>
+stderr:TextIOWrapper
+stdin:TextIOWrapper
+stdout:TextIOWrapper
+unraisablehook(unraisable)>
+version:str
+#re
+DEBUG:
+DOTALL:
+IGNORECASE:
+MULTILINE:
+Match()>Match
+Pattern()>Pattern
+PatternError()>PatternError
+RegexFlag()>RegexFlag
+Scanner()>Scanner
+VERBOSE:
+compile(pattern, flags=0)>Pattern
+error()>error
+escape(pattern)>str
+findall(pattern, string, flags=0)>list
+finditer(pattern, string, flags=0)>
+fullmatch(pattern, string, flags=0)>Match
+match(pattern, string, flags=0)>Match
+purge()>
+search(pattern, string, flags=0)>Match
+split(pattern, string, maxsplit=0, flags=0)>list
+sub(pattern, repl, string, count=0, flags=0)>str
+subn(pattern, repl, string, count=0, flags=0)>
+#json
+JSONDecodeError()>JSONDecodeError
+JSONDecoder()>JSONDecoder
+JSONEncoder()>JSONEncoder
+detect_encoding(b)>
+dump(obj, fp, *, skipkeys=False, ensure_ascii=True, check_circular=True, ...)>
+dumps(obj, *, skipkeys=False, ensure_ascii=True, check_circular=True, ...)>str
+load(fp, *, cls=None, object_hook=None, parse_float=None, ...)>dict
+loads(s, *, cls=None, object_hook=None, parse_float=None, parse_int=None, ...)>dict
+#math
+acos(x)>
+acosh(x)>
+asin(x)>
+asinh(x)>
+atan(x)>
+atan2(y, x)>
+atanh(x)>
+cbrt(x)>
+ceil(x)>int
+comb(n, k)>
+copysign(x, y)>
+cos(x)>
+cosh(x)>
+degrees(x)>
+dist(p, q)>
+e:float
+erf(x)>
+erfc(x)>
+exp(x)>
+exp2(x)>
+expm1(x)>
+fabs(x)>
+factorial(n)>
+floor(x)>int
+fma(x, y, z)>
+fmod(x, y)>
+frexp(x)>
+fsum(seq)>
+gamma(x)>
+gcd(*integers)>
+hypot(*coordinates)>
+inf:float
+isclose(a, b, *, rel_tol=1e-09, abs_tol=0.0)>
+isfinite(x)>
+isinf(x)>
+isnan(x)>
+isqrt(n)>
+lcm(*integers)>
+ldexp(x, i)>
+lgamma(x)>
+log()>
+log10(x)>
+log1p(x)>
+log2(x)>
+modf(x)>
+nan:float
+nextafter(x, y, *, steps=None)>
+perm(n, k=None)>
+pi:float
+pow(x, y)>
+prod(iterable, *, start=1)>
+radians(x)>
+remainder(x, y)>
+sin(x)>
+sinh(x)>
+sqrt(x)>float
+sumprod(p, q)>
+tan(x)>
+tanh(x)>
+tau:float
+trunc(x)>
+ulp(x)>
+#random
+Random()>Random
+SystemRandom()>SystemRandom
+betavariate(alpha, beta)>
+binomialvariate(n=1, p=0.5)>
+choice(seq)>object
+choices(population, weights=None, *, cum_weights=None, k=1)>
+expovariate(lambd=1.0)>
+gammavariate(alpha, beta)>
+gauss(mu=0.0, sigma=1.0)>
+getrandbits(k)>
+getstate()>
+lognormvariate(mu, sigma)>
+main((arg_list= None))>Union
+normalvariate(mu=0.0, sigma=1.0)>
+paretovariate(alpha)>
+randbytes(n)>
+randint(a, b)>int
+random()>float
+randrange(start, stop=None, step=1)>
+sample(population, k, *, counts=None)>
+seed(a=None, version=2)>
+setstate(state)>
+shuffle(x)>
+triangular(low=0.0, high=1.0, mode=None)>
+uniform(a, b)>float
+vonmisesvariate(mu, kappa)>
+weibullvariate(alpha, beta)>
+#time
+asctime()>
+clock_getres()>
+clock_gettime(clk_id)>
+clock_gettime_ns(clk_id)>
+clock_settime()>
+clock_settime_ns()>
+ctime()>
+get_clock_info()>
+gmtime()>
+localtime()>
+mktime(object)>
+monotonic()>float
+monotonic_ns()>
+perf_counter()>float
+perf_counter_ns()>
+process_time()>
+process_time_ns()>
+pthread_getcpuclockid()>
+sleep(object)>None
+strftime()>str
+strptime()>
+struct_time()>struct_time
+thread_time()>
+thread_time_ns()>
+time()>float
+time_ns()>
+tzset()>
+#datetime
+date()>date
+datetime()>datetime
+time()>time
+timedelta()>timedelta
+timezone()>timezone
+tzinfo()>tzinfo
+#collections
+ChainMap()>ChainMap
+Counter()>Counter
+OrderedDict()>OrderedDict
+UserDict()>UserDict
+UserList()>UserList
+UserString()>UserString
+defaultdict()>defaultdict
+deque()>deque
+namedtuple(typename, field_names, *, rename=False, defaults=None, module=None)>
+#itertools
+accumulate()>accumulate
+batched()>batched
+chain()>chain
+combinations()>combinations
+combinations_with_replacement()>combinations_with_replacement
+compress()>compress
+count()>count
+cycle()>cycle
+dropwhile()>dropwhile
+filterfalse()>filterfalse
+groupby()>groupby
+islice()>islice
+pairwise()>pairwise
+permutations()>permutations
+product()>product
+repeat()>repeat
+starmap()>starmap
+takewhile()>takewhile
+tee(iterable, n=2)>
+zip_longest()>zip_longest
+#functools
+GenericAlias()>GenericAlias
+MappingProxyType()>MappingProxyType
+MethodType()>MethodType
+RLock()>RLock
+UnionType()>UnionType
+cache(user_function)>
+cached_property()>cached_property
+cmp_to_key(mycmp)>
+get_cache_token()>
+itemgetter()>itemgetter
+lru_cache(maxsize=128, typed=False)>
+namedtuple(typename, field_names, *, rename=False, defaults=None, module=None)>
+partial()>partial
+partialmethod()>partialmethod
+recursive_repr(fillvalue='...')>
+reduce(function, iterable, initial=unrepresentable)>
+singledispatch(func)>
+singledispatchmethod()>singledispatchmethod
+total_ordering(cls)>
+update_wrapper(wrapper, wrapped, assigned=('__module__', '__name__', ...)>
+wraps(wrapped, assigned=('__module__', '__name__', '__qualname__', ...)>
+#pathlib
+DirEntryInfo()>DirEntryInfo
+Path()>Path
+PathInfo()>PathInfo
+PosixPath()>PosixPath
+PurePath()>PurePath
+PurePosixPath()>PurePosixPath
+PureWindowsPath()>PureWindowsPath
+S_ISBLK(object)>
+S_ISCHR(object)>
+S_ISDIR(object)>
+S_ISFIFO(object)>
+S_ISREG(object)>
+S_ISSOCK(object)>
+Sequence()>Sequence
+UnsupportedOperation()>UnsupportedOperation
+WindowsPath()>WindowsPath
+chain()>chain
+copy_info(info, target, follow_symlinks=True)>
+copyfileobj(source_f, target_f)>
+ensure_different_files(source, target)>
+ensure_distinct_paths(source, target)>
+magic_open(path, mode='r', buffering=-1, encoding=None, errors=None, newline=None)>
+#subprocess
+CalledProcessError()>CalledProcessError
+CompletedProcess()>CompletedProcess
+DEVNULL:
+PIPE:
+Popen()>Popen
+STDOUT:
+SubprocessError()>SubprocessError
+TimeoutExpired()>TimeoutExpired
+call(*popenargs, timeout=None, **kwargs)>
+check_call(*popenargs, **kwargs)>
+check_output(*popenargs, timeout=None, **kwargs)>bytes
+getoutput(cmd, *, encoding=None, errors=None)>
+getstatusoutput(cmd, *, encoding=None, errors=None)>
+list2cmdline(seq)>
+run(*popenargs, input=None, capture_output=False, timeout=None, ...)>CompletedProcess
+#argparse
+Action()>Action
+ArgumentDefaultsHelpFormatter()>ArgumentDefaultsHelpFormatter
+ArgumentError()>ArgumentError
+ArgumentParser()>ArgumentParser
+ArgumentTypeError()>ArgumentTypeError
+BooleanOptionalAction()>BooleanOptionalAction
+FileType()>FileType
+HelpFormatter()>HelpFormatter
+MetavarTypeHelpFormatter()>MetavarTypeHelpFormatter
+Namespace()>Namespace
+RawDescriptionHelpFormatter()>RawDescriptionHelpFormatter
+RawTextHelpFormatter()>RawTextHelpFormatter
+ngettext(msgid1, msgid2, n)>
+#logging
+BufferingFormatter()>BufferingFormatter
+CRITICAL:
+DEBUG:
+ERROR:
+FileHandler()>FileHandler
+Filter()>Filter
+Filterer()>Filterer
+Formatter()>Formatter
+GenericAlias()>GenericAlias
+Handler()>Handler
+INFO:
+LogRecord()>LogRecord
+Logger()>Logger
+LoggerAdapter()>LoggerAdapter
+Manager()>Manager
+NullHandler()>NullHandler
+PercentStyle()>PercentStyle
+PlaceHolder()>PlaceHolder
+RootLogger()>RootLogger
+StrFormatStyle()>StrFormatStyle
+StreamHandler()>StreamHandler
+StringTemplateStyle()>StringTemplateStyle
+Template()>Template
+WARNING:
+addLevelName(level, levelName)>
+basicConfig(**kwargs)>
+captureWarnings(capture)>
+critical(msg, *args, **kwargs)>
+currentframe()>
+debug(msg, *args, **kwargs)>
+disable(level=50)>
+error(msg, *args, **kwargs)>
+exception(msg, *args, exc_info=True, **kwargs)>
+fatal(msg, *args, **kwargs)>
+getHandlerByName(name)>
+getHandlerNames()>
+getLevelName(level)>
+getLevelNamesMapping()>
+getLogRecordFactory()>
+getLogger(name=None)>Logger
+getLoggerClass()>
+info(msg, *args, **kwargs)>
+log(level, msg, *args, **kwargs)>
+makeLogRecord(dict)>
+setLogRecordFactory(factory)>
+setLoggerClass(klass)>
+shutdown(handlerList=[weakref at 0x762303821da0; to 'logging._StderrHandler, ...)>
+warn(msg, *args, **kwargs)>
+warning(msg, *args, **kwargs)>
+#io
+BlockingIOError()>BlockingIOError
+BufferedIOBase()>BufferedIOBase
+BufferedRWPair()>BufferedRWPair
+BufferedRandom()>BufferedRandom
+BufferedReader()>BufferedReader
+BufferedWriter()>BufferedWriter
+BytesIO()>BytesIO
+FileIO()>FileIO
+GenericAlias()>GenericAlias
+IOBase()>IOBase
+IncrementalNewlineDecoder()>IncrementalNewlineDecoder
+RawIOBase()>RawIOBase
+Reader()>Reader
+StringIO()>StringIO
+TextIOBase()>TextIOBase
+TextIOWrapper()>TextIOWrapper
+UnsupportedOperation()>UnsupportedOperation
+Writer()>Writer
+open(file, mode='r', buffering=-1, encoding=None, errors=None, ...)>TextIOWrapper
+open_code(path)>
+text_encoding(encoding, stacklevel=2)>
+#shutil
+Error()>Error
+ReadError()>ReadError
+RegistryError()>RegistryError
+SameFileError()>SameFileError
+SpecialFileError()>SpecialFileError
+chown(path, user=None, group=None, *, dir_fd=None, follow_symlinks=True)>
+copy(src, dst, *, follow_symlinks=True)>
+copy2(src, dst, *, follow_symlinks=True)>
+copyfile(src, dst, *, follow_symlinks=True)>
+copyfileobj(fsrc, fdst, length=0)>
+copymode(src, dst, *, follow_symlinks=True)>
+copystat(src, dst, *, follow_symlinks=True)>
+copytree(src, dst, symlinks=False, ignore=None, ...)>
+disk_usage(path)>
+get_archive_formats()>
+get_terminal_size(fallback=(80, 24))>
+get_unpack_formats()>
+ignore_patterns(*patterns)>
+make_archive(base_name, format, root_dir=None, base_dir=None, verbose=0, ...)>
+move(src, dst, copy_function=function copy2 at 0x76230336f8a0)>
+register_archive_format(name, function, extra_args=None, description='')>
+register_unpack_format(name, extensions, function, extra_args=None, description='')>
+rmtree(path, ignore_errors=False, onerror=None, *, onexc=None, dir_fd=None)>
+unpack_archive(filename, extract_dir=None, format=None, *, filter=None)>
+unregister_archive_format(name)>
+unregister_unpack_format(name)>
+which(cmd, mode=1, path=None)>str
+#string
+Formatter()>Formatter
+Template()>Template
+ascii_letters:str
+ascii_lowercase:str
+ascii_uppercase:str
+capwords(s, sep=None)>
+digits:str
+hexdigits:str
+printable:str
+punctuation:str
+whitespace:str
+#glob
+escape(pathname)>
+glob(pathname, *, root_dir=None, dir_fd=None, recursive=False, ...)>list
+glob0(dirname, pattern)>
+glob1(dirname, pattern)>
+has_magic(s)>
+iglob(pathname, *, root_dir=None, dir_fd=None, recursive=False, ...)>
+translate(pat, *, recursive=False, include_hidden=False, seps=None)>
+#copy
+Error()>Error
+copy(x)>
+deepcopy(x, memo=None, _nil=[])>
+error()>error
+replace(obj, **changes)>
+#csv
+Dialect()>Dialect
+DictReader()>DictReader
+DictWriter()>DictWriter
+Error()>Error
+Sniffer()>Sniffer
+StringIO()>StringIO
+excel()>excel
+excel_tab()>excel_tab
+field_size_limit(new_limit=unrepresentable)>
+get_dialect(name)>
+list_dialects()>
+reader(iterable, dialect='excel', **fmtparams)>
+register_dialect(name, dialect='excel', **fmtparams)>
+unix_dialect()>unix_dialect
+unregister_dialect(name)>
+writer(fileobj, dialect='excel', **fmtparams)>
+#tempfile
+NamedTemporaryFile(mode='w+b', buffering=-1, encoding=None, newline=None, suffix=None, ...)>
+SpooledTemporaryFile()>SpooledTemporaryFile
+TemporaryDirectory()>TemporaryDirectory
+TemporaryFile(mode='w+b', buffering=-1, encoding=None, newline=None, suffix=None, ...)>
+gettempdir()>
+gettempdirb()>
+gettempprefix()>
+gettempprefixb()>
+mkdtemp(suffix=None, prefix=None, dir=None)>str
+mkstemp(suffix=None, prefix=None, dir=None, text=False)>
+mktemp(suffix='', prefix='tmp', dir=None)>
+#threading
+Barrier()>Barrier
+BoundedSemaphore()>BoundedSemaphore
+BrokenBarrierError()>BrokenBarrierError
+Condition()>Condition
+Event()>Event
+ExceptHookArgs()>ExceptHookArgs
+Lock()>Lock
+RLock(*args, **kwargs)>
+Semaphore()>Semaphore
+Thread()>Thread
+ThreadError()>ThreadError
+Timer()>Timer
+WeakSet()>WeakSet
+activeCount()>
+active_count()>
+currentThread()>
+current_thread()>
+enumerate()>
+excepthook(args)>
+get_ident()>
+get_native_id()>
+getprofile()>
+gettrace()>
+local()>local
+main_thread()>
+setprofile(func)>
+setprofile_all_threads(func)>
+settrace(func)>
+settrace_all_threads(func)>
+stack_size(size=0)>
+#socket
+AddressFamily()>AddressFamily
+AddressInfo()>AddressInfo
+CMSG_LEN()>
+CMSG_SPACE()>
+IntEnum()>IntEnum
+IntFlag()>IntFlag
+MsgFlag()>MsgFlag
+SocketIO()>SocketIO
+SocketKind()>SocketKind
+SocketType()>SocketType
+close(object)>
+create_connection(address, timeout=object object at 0x762304120810, ...)>
+create_server(address, *, family=AddressFamily.AF_INET: 2, backlog=None, ...)>
+dup(object)>
+error()>error
+fromfd(fd, family, type, proto=0)>
+gaierror()>gaierror
+getaddrinfo(host, port, family=0, type=0, proto=0, flags=0)>
+getdefaulttimeout()>
+getfqdn(name='')>
+gethostbyaddr()>
+gethostbyname()>
+gethostbyname_ex()>
+gethostname()>
+getnameinfo()>
+getprotobyname()>
+getservbyname()>
+getservbyport()>
+has_dualstack_ipv6()>
+herror()>herror
+htonl(integer)>
+htons(integer)>
+if_indextoname(if_index)>
+if_nameindex()>
+if_nametoindex(oname)>
+inet_aton(ip_addr)>
+inet_ntoa(packed_ip)>
+inet_ntop()>
+inet_pton()>
+ntohl(integer)>
+ntohs(integer)>
+recv_fds(sock, bufsize, maxfds, flags=0)>
+send_fds(sock, buffers, fds, flags=0, address=None)>
+setdefaulttimeout(object)>
+sethostname()>
+socket()>socket
+socketpair(family=None, type=SocketKind.SOCK_STREAM: 1, proto=0)>
+timeout()>timeout
+#struct
+Struct()>Struct
+calcsize(format)>
+error()>error
+iter_unpack(format, buffer)>
+pack()>
+pack_into()>
+unpack(format, buffer)>
+unpack_from(format, buffer, offset=0)>
+#hashlib
+blake2b()>blake2b
+blake2s()>blake2s
+file_digest(fileobj, digest, *, _bufsize=262144)>
+md5(data=b'', *, usedforsecurity=True, string=None)>
+new(name, *args, **kwargs)>
+pbkdf2_hmac(hash_name, password, salt, iterations, dklen=None)>
+scrypt(password, *, salt, n, r, p, maxmem=0, dklen=64)>
+sha1(data=b'', *, usedforsecurity=True, string=None)>
+sha224(data=b'', *, usedforsecurity=True, string=None)>
+sha256(data=b'', *, usedforsecurity=True, string=None)>object
+sha384(data=b'', *, usedforsecurity=True, string=None)>
+sha3_224(data=b'', *, usedforsecurity=True, string=None)>
+sha3_256(data=b'', *, usedforsecurity=True, string=None)>
+sha3_384(data=b'', *, usedforsecurity=True, string=None)>
+sha3_512(data=b'', *, usedforsecurity=True, string=None)>
+sha512(data=b'', *, usedforsecurity=True, string=None)>
+shake_128(data=b'', *, usedforsecurity=True, string=None)>
+shake_256(data=b'', *, usedforsecurity=True, string=None)>
+#base64
+a85decode(b, *, foldspaces=False, adobe=False, ignorechars=b' \t\n\r\x0b')>
+a85encode(b, *, foldspaces=False, wrapcol=0, pad=False, adobe=False)>
+b16decode(s, casefold=False)>
+b16encode(s)>
+b32decode(s, casefold=False, map01=None)>
+b32encode(s)>
+b32hexdecode(s, casefold=False)>
+b32hexencode(s)>
+b64decode(s, altchars=None, validate=False)>
+b64encode(s, altchars=None)>bytes
+b85decode(b)>
+b85encode(b, pad=False)>
+decode(input, output)>
+decodebytes(s)>
+encode(input, output)>
+encodebytes(s)>
+main()>
+standard_b64decode(s)>
+standard_b64encode(s)>
+urlsafe_b64decode(s)>
+urlsafe_b64encode(s)>
+z85decode(s)>
+z85encode(s)>
+#request
+AbstractBasicAuthHandler()>AbstractBasicAuthHandler
+AbstractDigestAuthHandler()>AbstractDigestAuthHandler
+AbstractHTTPHandler()>AbstractHTTPHandler
+BaseHandler()>BaseHandler
+CacheFTPHandler()>CacheFTPHandler
+ContentTooShortError()>ContentTooShortError
+DataHandler()>DataHandler
+FTPHandler()>FTPHandler
+FileHandler()>FileHandler
+HTTPBasicAuthHandler()>HTTPBasicAuthHandler
+HTTPCookieProcessor()>HTTPCookieProcessor
+HTTPDefaultErrorHandler()>HTTPDefaultErrorHandler
+HTTPDigestAuthHandler()>HTTPDigestAuthHandler
+HTTPError()>HTTPError
+HTTPErrorProcessor()>HTTPErrorProcessor
+HTTPHandler()>HTTPHandler
+HTTPPasswordMgr()>HTTPPasswordMgr
+HTTPPasswordMgrWithDefaultRealm()>HTTPPasswordMgrWithDefaultRealm
+HTTPPasswordMgrWithPriorAuth()>HTTPPasswordMgrWithPriorAuth
+HTTPRedirectHandler()>HTTPRedirectHandler
+HTTPSHandler()>HTTPSHandler
+OpenerDirector()>OpenerDirector
+ProxyBasicAuthHandler()>ProxyBasicAuthHandler
+ProxyDigestAuthHandler()>ProxyDigestAuthHandler
+ProxyHandler()>ProxyHandler
+Request()>Request
+URLError()>URLError
+UnknownHandler()>UnknownHandler
+addclosehook()>addclosehook
+addinfourl()>addinfourl
+build_opener(*handlers)>
+ftperrors()>
+ftpwrapper()>ftpwrapper
+getproxies()>
+getproxies_environment()>
+install_opener(opener)>
+localhost()>
+noheaders()>
+parse_http_list(s)>
+parse_keqv_list(l)>
+pathname2url(pathname, *, add_scheme=False)>
+proxy_bypass(host, proxies=None)>
+proxy_bypass_environment(host, proxies=None)>
+quote(string, safe='/', encoding=None, errors=None)>
+request_host(request)>
+thishost()>
+unquote(string, encoding='utf-8', errors='replace')>
+unquote_to_bytes(string)>
+unwrap(url)>
+url2pathname(url, *, require_scheme=False, resolve_host=False)>
+urlcleanup()>
+urljoin(base, url, allow_fragments=True)>
+urlopen(url, data=None, timeout=object object at 0x762304120810, *, ...)>
+urlparse(url, scheme='', allow_fragments=True)>
+urlretrieve(url, filename=None, reporthook=None, data=None)>
+urlsplit(url, scheme='', allow_fragments=True)>
+urlunparse(components)>
+#parse
+DefragResult()>DefragResult
+DefragResultBytes()>DefragResultBytes
+ParseResult()>ParseResult
+ParseResultBytes()>ParseResultBytes
+ResultBase()>ResultBase
+SplitResult()>SplitResult
+SplitResultBytes()>SplitResultBytes
+clear_cache()>
+namedtuple(typename, field_names, *, rename=False, defaults=None, module=None)>
+parse_qs(qs, keep_blank_values=False, strict_parsing=False, ...)>
+parse_qsl(qs, keep_blank_values=False, strict_parsing=False, ...)>
+quote(string, safe='/', encoding=None, errors=None)>
+quote_from_bytes(bs, safe='/')>
+quote_plus(string, safe='', encoding=None, errors=None)>
+splitattr(url)>
+splithost(url)>
+splitnport(host, defport=-1)>
+splitpasswd(user)>
+splitport(host)>
+splitquery(url)>
+splittag(url)>
+splittype(url)>
+splituser(host)>
+splitvalue(attr)>
+to_bytes(url)>
+unquote(string, encoding='utf-8', errors='replace')>
+unquote_plus(string, encoding='utf-8', errors='replace')>
+unquote_to_bytes(string)>
+unwrap(url)>
+urldefrag(url)>
+urlencode(query, doseq=False, safe='', encoding=None, errors=None, ...)>
+urljoin(base, url, allow_fragments=True)>
+urlparse(url, scheme='', allow_fragments=True)>
+urlsplit(url, scheme='', allow_fragments=True)>
+urlunparse(components)>
+urlunsplit(components)>
+#sqlite3
+Binary()>Binary
+Blob()>Blob
+Connection()>Connection
+Cursor()>Cursor
+DataError()>DataError
+DatabaseError()>DatabaseError
+Date()>Date
+DateFromTicks(ticks)>
+Error()>Error
+IntegrityError()>IntegrityError
+InterfaceError()>InterfaceError
+InternalError()>InternalError
+NotSupportedError()>NotSupportedError
+OperationalError()>OperationalError
+PrepareProtocol()>PrepareProtocol
+ProgrammingError()>ProgrammingError
+Row()>Row
+Time()>Time
+TimeFromTicks(ticks)>
+Timestamp()>Timestamp
+TimestampFromTicks(ticks)>
+Warning()>Warning
+adapt(obj, proto=PrepareProtocolType, alt=unrepresentable)>
+complete_statement(statement)>
+connect(database, timeout=5.0, detect_types=0, isolation_level='', ...)>Connection
+enable_callback_tracebacks(enable)>
+register_adapter(type, adapter)>
+register_converter(typename, converter)>
+#enum
+DynamicClassAttribute()>DynamicClassAttribute
+Enum()>Enum
+EnumCheck()>EnumCheck
+EnumDict()>EnumDict
+EnumMeta()>EnumMeta
+EnumType()>EnumType
+Flag()>Flag
+FlagBoundary()>FlagBoundary
+IntEnum()>IntEnum
+IntFlag()>IntFlag
+MappingProxyType()>MappingProxyType
+ReprEnum()>ReprEnum
+StrEnum()>StrEnum
+auto()>auto
+bin(num, max_bits=None)>
+global_enum(cls, update_str=False)>
+global_enum_repr()>
+global_flag_repr()>
+global_str()>
+member()>member
+nonmember()>nonmember
+pickle_by_enum_name(proto)>
+pickle_by_global_name(proto)>
+property()>property
+show_flag_values(value)>
+unique(enumeration)>
+verify()>verify
+#dataclasses
+Field()>Field
+FrozenInstanceError()>FrozenInstanceError
+InitVar()>InitVar
+asdict(obj, *, dict_factory=class 'dict')>
+astuple(obj, *, tuple_factory=class 'tuple')>
+dataclass(cls=None, *, init=True, repr=True, eq=True, order=False, ...)>
+field(*, default=dataclasses._MISSING_TYPE object at 0x7623037a9be0, ...)>
+fields(class_or_instance)>
+is_dataclass(obj)>
+make_dataclass(cls_name, fields, *, bases=(), namespace=None, init=True, ...)>
+recursive_repr(fillvalue='...')>
+replace(obj, **changes)>
+#typing
+ABCMeta()>ABCMeta
+AbstractSet(*args, **kwargs)>
+Annotated(*args, **kwds)>
+Any()>Any
+AsyncGenerator(*args, **kwargs)>
+AsyncIterable(*args, **kwargs)>
+AsyncIterator(*args, **kwargs)>
+Awaitable(*args, **kwargs)>
+BinaryIO()>BinaryIO
+ByteString(*args, **kwargs)>
+Callable(*args, **kwargs)>
+ChainMap(*args, **kwargs)>
+ClassVar(*args, **kwds)>
+Collection(*args, **kwargs)>
+Concatenate(*args, **kwds)>
+Container(*args, **kwargs)>
+Coroutine(*args, **kwargs)>
+Counter(*args, **kwargs)>
+DefaultDict(*args, **kwargs)>
+Deque(*args, **kwargs)>
+Dict(*args, **kwargs)>
+Final(*args, **kwds)>
+FrozenSet(*args, **kwargs)>
+Generator(*args, **kwargs)>
+Generic()>Generic
+GenericAlias()>GenericAlias
+Hashable(*args, **kwargs)>
+IO()>IO
+ItemsView(*args, **kwargs)>
+Iterable(*args, **kwargs)>
+Iterator(*args, **kwargs)>
+KeysView(*args, **kwargs)>
+List(*args, **kwargs)>
+Literal(*args, **kwds)>
+LiteralString(*args, **kwds)>
+Mapping(*args, **kwargs)>
+MappingView(*args, **kwargs)>
+MutableMapping(*args, **kwargs)>
+MutableSequence(*args, **kwargs)>
+MutableSet(*args, **kwargs)>
+NamedTuple(typename, fields=sentinel, **kwargs)>
+NamedTupleMeta()>NamedTupleMeta
+Never(*args, **kwds)>
+NewType()>NewType
+NoReturn(*args, **kwds)>
+NotRequired(*args, **kwds)>
+Optional(*args, **kwds)>
+OrderedDict(*args, **kwargs)>
+ParamSpec()>ParamSpec
+ParamSpecArgs()>ParamSpecArgs
+ParamSpecKwargs()>ParamSpecKwargs
+Protocol()>Protocol
+ReadOnly(*args, **kwds)>
+Required(*args, **kwds)>
+Reversible(*args, **kwargs)>
+Self(*args, **kwds)>
+Sequence(*args, **kwargs)>
+Set(*args, **kwargs)>
+Sized(*args, **kwargs)>
+SupportsAbs()>SupportsAbs
+SupportsBytes()>SupportsBytes
+SupportsComplex()>SupportsComplex
+SupportsFloat()>SupportsFloat
+SupportsIndex()>SupportsIndex
+SupportsInt()>SupportsInt
+SupportsRound()>SupportsRound
+Text()>Text
+TextIO()>TextIO
+Tuple(*args, **kwargs)>
+Type(*args, **kwargs)>
+TypeAlias(*args, **kwds)>
+TypeAliasType()>TypeAliasType
+TypeGuard(*args, **kwds)>
+TypeIs(*args, **kwds)>
+TypeVar()>TypeVar
+TypeVarTuple()>TypeVarTuple
+TypedDict(typename, fields=sentinel, *, total=True)>
+Union()>Union
+Unpack(*args, **kwds)>
+ValuesView(*args, **kwargs)>
+abstractmethod(funcobj)>
+assert_never((arg, /))>Never
+assert_type(val, typ)>
+cast(typ, val)>
+clear_overloads()>
+dataclass_transform((*, eq_default= True, order_default= False, kw_only_default= False, ...)>_IdentityCallable
+defaultdict()>defaultdict
+evaluate_forward_ref(forward_ref, *, owner=None, globals=None, locals=None, ...)>
+final(f)>
+get_args(tp)>
+get_origin(tp)>
+get_overloads(func)>
+get_protocol_members((tp, /))>frozenset
+get_type_hints(obj, globalns=None, localns=None, include_extras=False, *, format=None)>
+is_protocol((tp, /))>bool
+is_typeddict(tp)>
+no_type_check(arg)>
+no_type_check_decorator(decorator)>
+overload(func)>
+override((method, /))>F
+reveal_type((obj, /))>T
+runtime_checkable(cls)>
+#contextlib
+AbstractAsyncContextManager()>AbstractAsyncContextManager
+AbstractContextManager()>AbstractContextManager
+AsyncContextDecorator()>AsyncContextDecorator
+AsyncExitStack()>AsyncExitStack
+ContextDecorator()>ContextDecorator
+ExitStack()>ExitStack
+GenericAlias()>GenericAlias
+MethodType()>MethodType
+aclosing()>aclosing
+asynccontextmanager(func)>
+chdir()>chdir
+closing()>closing
+contextmanager(func)>
+deque()>deque
+nullcontext()>nullcontext
+redirect_stderr()>redirect_stderr
+redirect_stdout()>redirect_stdout
+suppress()>suppress
+wraps(wrapped, assigned=('__module__', '__name__', '__qualname__', ...)>
+#operator
+abs(a)>
+add(a, b)>
+and_(a, b)>
+attrgetter()>attrgetter
+call(obj, *args, **kwargs)>
+concat(a, b)>
+contains(a, b)>
+countOf(a, b)>
+delitem(a, b)>
+eq(a, b)>
+floordiv(a, b)>
+ge(a, b)>
+getitem(a, b)>
+gt(a, b)>
+iadd(a, b)>
+iand(a, b)>
+iconcat(a, b)>
+ifloordiv(a, b)>
+ilshift(a, b)>
+imatmul(a, b)>
+imod(a, b)>
+imul(a, b)>
+index(a)>
+indexOf(a, b)>
+inv(a)>
+invert(a)>
+ior(a, b)>
+ipow(a, b)>
+irshift(a, b)>
+is_(a, b)>
+is_none(a)>
+is_not(a, b)>
+is_not_none(a)>
+isub(a, b)>
+itemgetter()>itemgetter
+itruediv(a, b)>
+ixor(a, b)>
+le(a, b)>
+length_hint(obj, default=0)>
+lshift(a, b)>
+lt(a, b)>
+matmul(a, b)>
+methodcaller()>methodcaller
+mod(a, b)>
+mul(a, b)>
+ne(a, b)>
+neg(a)>
+not_(a)>
+or_(a, b)>
+pos(a)>
+pow(a, b)>
+rshift(a, b)>
+setitem(a, b, c)>
+sub(a, b)>
+truediv(a, b)>
+truth(a)>
+xor(a, b)>
+#statistics
+Counter()>Counter
+Decimal()>Decimal
+Fraction()>Fraction
+LinearRegression()>LinearRegression
+NormalDist()>NormalDist
+StatisticsError()>StatisticsError
+acos(x)>
+asin(x)>
+atan(x)>
+bisect_left(a, x, lo=0, hi=None, *, key=None)>
+bisect_right(a, x, lo=0, hi=None, *, key=None)>
+correlation(x, y, *, method='linear')>
+cos(x)>
+cosh(x)>
+count()>count
+covariance(x, y)>
+defaultdict()>defaultdict
+erfc(x)>
+exp(x)>
+fabs(x)>
+fmean(data, weights=None)>
+fsum(seq)>
+geometric_mean(data)>
+groupby()>groupby
+harmonic_mean(data, weights=None)>
+hypot(*coordinates)>
+isfinite(x)>
+isinf(x)>
+itemgetter()>itemgetter
+kde(data, h, kernel='normal', *, cumulative=False)>
+kde_random(data, h, kernel='normal', *, seed=None)>
+linear_regression(x, y, *, proportional=False)>
+log()>
+mean(data)>
+median(data)>
+median_grouped(data, interval=1.0)>
+median_high(data)>
+median_low(data)>
+mode(data)>
+multimode(data)>
+namedtuple(typename, field_names, *, rename=False, defaults=None, module=None)>
+pi:float
+pstdev(data, mu=None)>
+pvariance(data, mu=None)>
+quantiles(data, *, n=4, method='exclusive')>
+reduce(function, iterable, initial=unrepresentable)>
+repeat()>repeat
+sin(x)>
+sqrt(x)>
+stdev(data, xbar=None)>
+sumprod(p, q)>
+tan(x)>
+tau:float
+variance(data, xbar=None)>
+#textwrap
+TextWrapper()>TextWrapper
+dedent(text)>str
+fill(text, width=70, **kwargs)>
+indent(text, prefix, predicate=None)>
+shorten(text, width, **kwargs)>
+wrap(text, width=70, **kwargs)>
+#platform
+AndroidVer()>AndroidVer
+IOSVersionInfo()>IOSVersionInfo
+android_ver(release='', api_level=0, manufacturer='', model='', device='', ...)>
+architecture(executable='/usr/bin/python3', bits='', linkage='')>
+freedesktop_os_release()>
+invalidate_caches()>
+ios_ver(system='', release='', model='', is_simulator=False)>
+java_ver(release='', vendor='', vminfo=('', '', ''), osinfo=('', '', ''))>
+libc_ver(executable=None, lib='', version='', chunksize=16384)>
+mac_ver(release='', versioninfo=('', '', ''), machine='')>
+machine()>
+node()>
+platform(aliased=False, terse=False)>
+processor()>
+python_branch()>
+python_build()>
+python_compiler()>
+python_implementation()>
+python_revision()>
+python_version()>
+python_version_tuple()>
+release()>
+system()>str
+system_alias(system, release, version)>
+uname()>
+uname_result()>uname_result
+version()>
+win32_edition()>
+win32_is_iot()>
+win32_ver(release='', version='', csd='', ptype='')>
+#signal
+Handlers()>Handlers
+ItimerError()>ItimerError
+Sigmasks()>Sigmasks
+Signals()>Signals
+alarm(seconds)>
+default_int_handler(signalnum, frame)>
+getitimer(which)>
+getsignal(signalnum)>
+pause()>
+pidfd_send_signal(pidfd, signalnum, siginfo=None, flags=0)>
+pthread_kill(thread_id, signalnum)>
+pthread_sigmask(how, mask)>
+raise_signal(signalnum)>
+set_wakeup_fd(fd, *, warn_on_full_buffer=True)>
+setitimer(which, seconds, interval=0.0)>
+siginterrupt(signalnum, flag)>
+signal(signalnum, handler)>
+sigpending()>
+sigtimedwait(sigset, timeout)>
+sigwait(sigset)>
+sigwaitinfo(sigset)>
+strsignal(signalnum)>
+struct_siginfo()>struct_siginfo
+valid_signals()>
+#traceback
+FrameSummary()>FrameSummary
+StackSummary()>StackSummary
+TracebackException()>TracebackException
+clear_frames(tb)>
+extract_stack(f=None, limit=None)>
+extract_tb(tb, limit=None)>
+format_exc(limit=None, chain=True)>
+format_exception(exc, value=implicit, tb=implicit, limit=None, chain=True, **kwargs)>
+format_exception_only(exc, value=implicit, *, show_group=False, **kwargs)>
+format_list(extracted_list)>
+format_stack(f=None, limit=None)>
+format_tb(tb, limit=None)>
+print_exc(limit=None, file=None, chain=True)>
+print_exception(exc, value=implicit, tb=implicit, limit=None, file=None, ...)>
+print_last(limit=None, file=None, chain=True)>
+print_list(extracted_list, file=None)>
+print_stack(f=None, limit=None, file=None)>
+print_tb(tb, limit=None, file=None)>
+suppress()>suppress
+walk_stack(f)>
+walk_tb(tb)>
+#uuid
+Enum()>Enum
+SafeUUID()>SafeUUID
+UUID()>UUID
+bytes_()>bytes_
+getnode()>
+int_()>int_
+main()>
+uuid1(node=None, clock_seq=None)>
+uuid3(namespace, name)>
+uuid4()>UUID
+uuid5(namespace, name)>
+uuid6(node=None, clock_seq=None)>
+uuid7()>
+uuid8(a=None, b=None, c=None)>
+#heapq
+heapify(heap)>
+heapify_max(heap)>
+heappop(heap)>
+heappop_max(heap)>
+heappush(heap, item)>
+heappush_max(heap, item)>
+heappushpop(heap, item)>
+heappushpop_max(heap, item)>
+heapreplace(heap, item)>
+heapreplace_max(heap, item)>
+merge(*iterables, key=None, reverse=False)>
+nlargest(n, iterable, key=None)>
+nsmallest(n, iterable, key=None)>
+#bisect
+bisect(a, x, lo=0, hi=None, *, key=None)>
+bisect_left(a, x, lo=0, hi=None, *, key=None)>
+bisect_right(a, x, lo=0, hi=None, *, key=None)>
+insort(a, x, lo=0, hi=None, *, key=None)>
+insort_left(a, x, lo=0, hi=None, *, key=None)>
+insort_right(a, x, lo=0, hi=None, *, key=None)>
+#queue
+Empty()>Empty
+Full()>Full
+LifoQueue()>LifoQueue
+PriorityQueue()>PriorityQueue
+Queue()>Queue
+ShutDown()>ShutDown
+SimpleQueue()>SimpleQueue
+deque()>deque
+heappop(heap)>
+heappush(heap, item)>
+time()>
+#asyncio
+AbstractEventLoop()>AbstractEventLoop
+AbstractServer()>AbstractServer
+Barrier()>Barrier
+BaseEventLoop()>BaseEventLoop
+BaseProtocol()>BaseProtocol
+BaseTransport()>BaseTransport
+BoundedSemaphore()>BoundedSemaphore
+BrokenBarrierError()>BrokenBarrierError
+BufferedProtocol()>BufferedProtocol
+CancelledError()>CancelledError
+Condition()>Condition
+DatagramProtocol()>DatagramProtocol
+DatagramTransport()>DatagramTransport
+Event()>Event
+EventLoop()>EventLoop
+FrameCallGraphEntry()>FrameCallGraphEntry
+Future()>Future
+FutureCallGraph()>FutureCallGraph
+Handle()>Handle
+IncompleteReadError()>IncompleteReadError
+InvalidStateError()>InvalidStateError
+LifoQueue()>LifoQueue
+LimitOverrunError()>LimitOverrunError
+Lock()>Lock
+PriorityQueue()>PriorityQueue
+Protocol()>Protocol
+Queue()>Queue
+QueueEmpty()>QueueEmpty
+QueueFull()>QueueFull
+QueueShutDown()>QueueShutDown
+ReadTransport()>ReadTransport
+Runner()>Runner
+SelectorEventLoop()>SelectorEventLoop
+Semaphore()>Semaphore
+SendfileNotAvailableError()>SendfileNotAvailableError
+Server()>Server
+StreamReader()>StreamReader
+StreamReaderProtocol()>StreamReaderProtocol
+StreamWriter()>StreamWriter
+SubprocessProtocol()>SubprocessProtocol
+SubprocessTransport()>SubprocessTransport
+Task()>Task
+TaskGroup()>TaskGroup
+Timeout()>Timeout
+TimeoutError()>TimeoutError
+TimerHandle()>TimerHandle
+Transport()>Transport
+WriteTransport()>WriteTransport
+all_tasks(loop=None)>
+as_completed(fs, *, timeout=None)>
+capture_call_graph((future= None, *, depth= 1, limit= None))>Union
+create_eager_task_factory(custom_task_constructor)>
+create_subprocess_exec(program, *args, stdin=None, stdout=None, stderr=None, limit=65536, ...)>
+create_subprocess_shell(cmd, stdin=None, stdout=None, stderr=None, limit=65536, **kwds)>
+create_task(coro, **kwargs)>
+current_task(loop=None)>
+eager_task_factory(loop, coro, *, eager_start=True, **kwargs)>
+ensure_future(coro_or_future, *, loop=None)>
+format_call_graph((future= None, *, depth= 1, limit= None))>str
+future_add_to_awaited_by(fut, waiter)>
+future_discard_from_awaited_by(fut, waiter)>
+gather(*coros_or_futures, return_exceptions=False)>
+get_event_loop()>
+get_event_loop_policy()>
+get_running_loop()>
+iscoroutine(obj)>
+iscoroutinefunction(func)>
+isfuture(obj)>
+new_event_loop()>
+open_connection(host=None, port=None, *, limit=65536, **kwds)>
+open_unix_connection(path=None, *, limit=65536, **kwds)>
+print_call_graph((future= None, *, file= None, depth= 1, limit= None))>
+run(main, *, debug=None, loop_factory=None)>
+run_coroutine_threadsafe(coro, loop)>
+set_event_loop(loop)>
+set_event_loop_policy(policy)>
+shield(arg)>
+sleep(delay, result=None)>
+start_server(client_connected_cb, host=None, port=None, *, limit=65536, **kwds)>
+start_unix_server(client_connected_cb, path=None, *, limit=65536, **kwds)>
+timeout((delay))>Timeout
+timeout_at((when))>Timeout
+to_thread(func, *args, **kwargs)>
+wait(fs, *, timeout=None, return_when='ALL_COMPLETED')>
+wait_for(fut, timeout)>
+wrap_future(future, *, loop=None)>
+#unittest
+BaseTestSuite()>BaseTestSuite
+FunctionTestCase()>FunctionTestCase
+SkipTest()>SkipTest
+TestCase()>TestCase
+TestLoader()>TestLoader
+TestProgram()>TestProgram
+TestResult()>TestResult
+TestSuite()>TestSuite
+TextTestResult()>TextTestResult
+TextTestRunner()>TextTestRunner
+addModuleCleanup(function, *args, **kwargs)>
+doModuleCleanups()>
+enterModuleContext(cm)>
+expectedFailure(test_item)>
+installHandler()>
+main()>main
+registerResult(result)>
+removeHandler(method=None)>
+removeResult(result)>
+skip(reason)>
+skipIf(condition, reason)>
+skipUnless(condition, reason)>
+#pickle
+FunctionType()>FunctionType
+PickleBuffer()>PickleBuffer
+PickleError()>PickleError
+Pickler()>Pickler
+PicklingError()>PicklingError
+Unpickler()>Unpickler
+UnpicklingError()>UnpicklingError
+batched()>batched
+decode_long(data)>
+dump(obj, file, protocol=None, *, fix_imports=True, buffer_callback=None)>
+dumps(obj, protocol=None, *, fix_imports=True, buffer_callback=None)>
+encode_long(x)>
+load(file, *, fix_imports=True, encoding='ASCII', errors='strict', ...)>
+loads(data, *, fix_imports=True, encoding='ASCII', errors='strict', ...)>
+maxsize:int
+pack()>
+partial()>partial
+unpack(format, buffer)>
+whichmodule(obj, name)>
+#zipfile
+BadZipFile()>BadZipFile
+BadZipfile()>BadZipfile
+CompleteDirs()>CompleteDirs
+LZMACompressor()>LZMACompressor
+LZMADecompressor()>LZMADecompressor
+LargeZipFile()>LargeZipFile
+Path()>Path
+PyZipFile()>PyZipFile
+ZipExtFile()>ZipExtFile
+ZipFile()>ZipFile
+ZipInfo()>ZipInfo
+crc32(data, value=0)>
+error()>error
+is_zipfile(filename)>
+main(args=None)>
+#decimal
+Clamped()>Clamped
+Context()>Context
+ConversionSyntax()>ConversionSyntax
+Decimal()>Decimal
+DecimalException()>DecimalException
+DecimalTuple()>DecimalTuple
+DivisionByZero()>DivisionByZero
+DivisionImpossible()>DivisionImpossible
+DivisionUndefined()>DivisionUndefined
+FloatOperation()>FloatOperation
+IEEEContext(bits)>
+Inexact()>Inexact
+InvalidContext()>InvalidContext
+InvalidOperation()>InvalidOperation
+Overflow()>Overflow
+Rounded()>Rounded
+Subnormal()>Subnormal
+Underflow()>Underflow
+getcontext()>
+localcontext(ctx=None, **kwargs)>
+setcontext(context)>
+#fractions
+Fraction()>Fraction
+#secrets
+SystemRandom()>SystemRandom
+choice(seq)>
+compare_digest(a, b)>
+randbelow(exclusive_upper_bound)>
+randbits(k)>
+token_bytes(nbytes=None)>
+token_hex(nbytes=None)>
+token_urlsafe(nbytes=None)>
+#shlex
+StringIO()>StringIO
+join(split_command)>
+quote(s)>
+shlex()>shlex
+split(s, comments=False, posix=True)>list
+#pprint
+PrettyPrinter()>PrettyPrinter
+isreadable(object)>
+isrecursive(object)>
+pformat(object, indent=1, width=80, depth=None, *, compact=False, ...)>
+pp(object, *args, sort_dicts=False, **kwargs)>
+pprint(object, stream=None, indent=1, width=80, depth=None, *, ...)>
+saferepr(object)>
+#path
+abspath(path)>str
+basename(p)>str
+commonpath(paths)>
+commonprefix(m)>
+dirname(p)>str
+exists(path)>bool
+expanduser(path)>str
+expandvars(path)>
+getatime(filename)>
+getctime(filename)>
+getmtime(filename)>
+getsize(filename)>int
+isabs(s)>
+isdevdrive(path)>
+isdir(s)>bool
+isfile(path)>bool
+isjunction(path)>
+islink(path)>
+ismount(path)>
+join(a, *p)>str
+lexists(path)>
+normcase(s)>
+normpath(path)>
+realpath(filename, *, strict=False)>str
+relpath(path, start=None)>
+samefile(f1, f2)>
+sameopenfile(fp1, fp2)>
+samestat(s1, s2)>
+split(p)>
+splitdrive(p)>
+splitext(p)>tuple
+splitroot(p)>

@@ -1,0 +1,651 @@
+// C++ standard library (namespace std): algorithms, containers, strings, streams, smart pointers. Curated.
+#std
+sort(first, last, comp)>void
+stable_sort(first, last, comp)>void
+partial_sort(first, middle, last)>void
+nth_element(first, nth, last)>void
+reverse(first, last)>void
+rotate(first, middle, last)>iterator
+shuffle(first, last, g)>void
+unique(first, last, pred)>iterator
+find(first, last, value)>iterator
+find_if(first, last, pred)>iterator
+find_if_not(first, last, pred)>iterator
+find_first_of(first, last, s_first, s_last)>iterator
+adjacent_find(first, last)>iterator
+search(first, last, s_first, s_last)>iterator
+count(first, last, value)>size_t
+count_if(first, last, pred)>size_t
+all_of(first, last, pred)>bool
+any_of(first, last, pred)>bool
+none_of(first, last, pred)>bool
+for_each(first, last, f)>F
+transform(first, last, d_first, op)>iterator
+copy(first, last, d_first)>iterator
+copy_if(first, last, d_first, pred)>iterator
+copy_n(first, count, result)>iterator
+move(first, last, d_first)>iterator
+fill(first, last, value)>void
+fill_n(first, count, value)>iterator
+generate(first, last, g)>void
+remove(first, last, value)>iterator
+remove_if(first, last, pred)>iterator
+replace(first, last, old_value, new_value)>void
+replace_if(first, last, pred, new_value)>void
+swap(a, b)>void
+iter_swap(a, b)>void
+min(a, b)>T
+max(a, b)>T
+minmax(a, b)>pair
+min_element(first, last)>iterator
+max_element(first, last)>iterator
+clamp(v, lo, hi)>T
+lower_bound(first, last, value)>iterator
+upper_bound(first, last, value)>iterator
+binary_search(first, last, value)>bool
+equal_range(first, last, value)>pair
+equal(first1, last1, first2)>bool
+mismatch(first1, last1, first2)>pair
+lexicographical_compare(first1, last1, first2, last2)>bool
+merge(first1, last1, first2, last2, d_first)>iterator
+set_union(first1, last1, first2, last2, d_first)>iterator
+set_intersection(first1, last1, first2, last2, d_first)>iterator
+set_difference(first1, last1, first2, last2, d_first)>iterator
+includes(first1, last1, first2, last2)>bool
+is_sorted(first, last)>bool
+is_permutation(first1, last1, first2)>bool
+next_permutation(first, last)>bool
+prev_permutation(first, last)>bool
+make_heap(first, last)>void
+push_heap(first, last)>void
+pop_heap(first, last)>void
+sort_heap(first, last)>void
+accumulate(first, last, init)>T
+reduce(first, last, init)>T
+inner_product(first1, last1, first2, init)>T
+partial_sum(first, last, d_first)>iterator
+iota(first, last, value)>void
+gcd(m, n)>int
+lcm(m, n)>int
+abs(x)>int
+sqrt(x)>double
+pow(base, exp)>double
+floor(x)>double
+ceil(x)>double
+round(x)>double
+fabs(x)>double
+sin(x)>double
+cos(x)>double
+tan(x)>double
+exp(x)>double
+log(x)>double
+log10(x)>double
+atan2(y, x)>double
+fmod(x, y)>double
+isnan(x)>bool
+isinf(x)>bool
+move(t)>T
+forward(t)>T
+make_pair(a, b)>pair
+make_tuple(...args)>tuple
+make_shared(...args)>shared_ptr
+make_unique(...args)>unique_ptr
+make_optional(value)>optional
+tie(...args)>tuple
+get(t)>T
+to_string(value)>string
+stoi(str, pos, base)>int
+stol(str, pos, base)>long
+stoll(str, pos, base)>long
+stoul(str, pos, base)>unsigned long
+stof(str, pos)>float
+stod(str, pos)>double
+getline(is, str, delim)>istream
+begin(c)>iterator
+end(c)>iterator
+size(c)>size_t
+empty(c)>bool
+distance(first, last)>ptrdiff_t
+advance(it, n)>void
+next(it, n)>iterator
+prev(it, n)>iterator
+back_inserter(c)>back_insert_iterator
+inserter(c, i)>insert_iterator
+ref(t)>reference_wrapper
+cref(t)>reference_wrapper
+bind(f, ...args)>function
+invoke(f, ...args)>R
+apply(f, t)>R
+exchange(obj, new_value)>T
+swap_ranges(first1, last1, first2)>iterator
+async(policy, f, ...args)>future
+this_thread:this_thread
+chrono:chrono
+cout:ostream
+cerr:ostream
+clog:ostream
+cin:istream
+endl:ostream
+flush:ostream
+npos:size_t
+nullopt:nullopt_t
+nullptr:nullptr_t
+terminate()>void
+exit(status)>void
+abort()>void
+getenv(name)>char
+printf(format, ...)>int
+snprintf(buffer, size, format, ...)>int
+strlen(s)>size_t
+memcpy(dest, src, n)>void
+#string
+npos:size_t
+size()>size_t
+length()>size_t
+empty()>bool
+clear()>void
+capacity()>size_t
+reserve(n)>void
+resize(n, c)>void
+shrink_to_fit()>void
+c_str()>char
+data()>char
+append(str)>string
+push_back(c)>void
+pop_back()>void
+insert(pos, str)>string
+erase(pos, len)>string
+replace(pos, len, str)>string
+substr(pos, len)>string
+find(str, pos)>size_t
+rfind(str, pos)>size_t
+find_first_of(chars, pos)>size_t
+find_last_of(chars, pos)>size_t
+find_first_not_of(chars, pos)>size_t
+compare(str)>int
+starts_with(prefix)>bool
+ends_with(suffix)>bool
+contains(s)>bool
+front()>char
+back()>char
+at(pos)>char
+begin()>iterator
+end()>iterator
+rbegin()>iterator
+rend()>iterator
+copy(dest, count, pos)>size_t
+swap(other)>void
+assign(str)>string
+#string_view
+size()>size_t
+length()>size_t
+empty()>bool
+data()>char
+substr(pos, len)>string_view
+find(str, pos)>size_t
+starts_with(prefix)>bool
+ends_with(suffix)>bool
+remove_prefix(n)>void
+remove_suffix(n)>void
+front()>char
+back()>char
+at(pos)>char
+begin()>iterator
+end()>iterator
+#vector
+size()>size_t
+empty()>bool
+capacity()>size_t
+reserve(n)>void
+resize(n, value)>void
+shrink_to_fit()>void
+clear()>void
+push_back(value)>void
+emplace_back(...args)>reference
+pop_back()>void
+insert(pos, value)>iterator
+emplace(pos, ...args)>iterator
+erase(pos)>iterator
+front()>T
+back()>T
+at(pos)>T
+data()>T
+begin()>iterator
+end()>iterator
+rbegin()>iterator
+rend()>iterator
+cbegin()>iterator
+cend()>iterator
+assign(count, value)>void
+swap(other)>void
+#deque
+size()>size_t
+empty()>bool
+clear()>void
+push_back(value)>void
+push_front(value)>void
+emplace_back(...args)>reference
+emplace_front(...args)>reference
+pop_back()>void
+pop_front()>void
+insert(pos, value)>iterator
+erase(pos)>iterator
+front()>T
+back()>T
+at(pos)>T
+begin()>iterator
+end()>iterator
+resize(n)>void
+#list
+size()>size_t
+empty()>bool
+clear()>void
+push_back(value)>void
+push_front(value)>void
+emplace_back(...args)>reference
+emplace_front(...args)>reference
+pop_back()>void
+pop_front()>void
+insert(pos, value)>iterator
+erase(pos)>iterator
+front()>T
+back()>T
+begin()>iterator
+end()>iterator
+sort(comp)>void
+reverse()>void
+unique()>void
+remove(value)>void
+remove_if(pred)>void
+merge(other)>void
+splice(pos, other)>void
+#forward_list
+push_front(value)>void
+pop_front()>void
+front()>T
+empty()>bool
+clear()>void
+begin()>iterator
+end()>iterator
+sort()>void
+reverse()>void
+#array
+size()>size_t
+empty()>bool
+fill(value)>void
+front()>T
+back()>T
+at(pos)>T
+data()>T
+begin()>iterator
+end()>iterator
+swap(other)>void
+#map
+size()>size_t
+empty()>bool
+clear()>void
+insert(value)>pair
+insert_or_assign(k, obj)>pair
+emplace(...args)>pair
+try_emplace(k, ...args)>pair
+erase(key)>size_t
+find(key)>iterator
+count(key)>size_t
+contains(key)>bool
+at(key)>T
+lower_bound(key)>iterator
+upper_bound(key)>iterator
+equal_range(key)>pair
+begin()>iterator
+end()>iterator
+rbegin()>iterator
+rend()>iterator
+swap(other)>void
+#unordered_map
+size()>size_t
+empty()>bool
+clear()>void
+insert(value)>pair
+insert_or_assign(k, obj)>pair
+emplace(...args)>pair
+try_emplace(k, ...args)>pair
+erase(key)>size_t
+find(key)>iterator
+count(key)>size_t
+contains(key)>bool
+at(key)>T
+reserve(n)>void
+rehash(n)>void
+load_factor()>float
+bucket_count()>size_t
+begin()>iterator
+end()>iterator
+swap(other)>void
+#set
+size()>size_t
+empty()>bool
+clear()>void
+insert(value)>pair
+emplace(...args)>pair
+erase(key)>size_t
+find(key)>iterator
+count(key)>size_t
+contains(key)>bool
+lower_bound(key)>iterator
+upper_bound(key)>iterator
+begin()>iterator
+end()>iterator
+rbegin()>iterator
+rend()>iterator
+swap(other)>void
+#unordered_set
+size()>size_t
+empty()>bool
+clear()>void
+insert(value)>pair
+emplace(...args)>pair
+erase(key)>size_t
+find(key)>iterator
+count(key)>size_t
+contains(key)>bool
+reserve(n)>void
+begin()>iterator
+end()>iterator
+#multimap:map
+#multiset:set
+#unordered_multimap:unordered_map
+#stack
+push(value)>void
+emplace(...args)>reference
+pop()>void
+top()>T
+size()>size_t
+empty()>bool
+#queue
+push(value)>void
+emplace(...args)>reference
+pop()>void
+front()>T
+back()>T
+size()>size_t
+empty()>bool
+#priority_queue
+push(value)>void
+emplace(...args)>void
+pop()>void
+top()>T
+size()>size_t
+empty()>bool
+#pair
+first:T
+second:T
+swap(other)>void
+#tuple
+swap(other)>void
+#optional
+has_value()>bool
+value()>T
+value_or(default_value)>T
+reset()>void
+emplace(...args)>T
+operator_bool()>bool
+#variant
+index()>size_t
+valueless_by_exception()>bool
+#any
+has_value()>bool
+type()>type_info
+reset()>void
+#bitset
+set(pos, value)>bitset
+reset(pos)>bitset
+flip(pos)>bitset
+test(pos)>bool
+count()>size_t
+size()>size_t
+any()>bool
+none()>bool
+all()>bool
+to_string()>string
+to_ulong()>unsigned long
+#span
+size()>size_t
+empty()>bool
+data()>T
+front()>T
+back()>T
+first(count)>span
+last(count)>span
+subspan(offset, count)>span
+begin()>iterator
+end()>iterator
+#unique_ptr
+get()>T
+release()>T
+reset(ptr)>void
+swap(other)>void
+operator_bool()>bool
+#shared_ptr
+get()>T
+reset(ptr)>void
+use_count()>long
+unique()>bool
+swap(other)>void
+operator_bool()>bool
+#weak_ptr
+lock()>shared_ptr
+expired()>bool
+use_count()>long
+reset()>void
+#function
+operator_bool()>bool
+swap(other)>void
+target()>T
+#thread
+join()>void
+detach()>void
+joinable()>bool
+get_id()>id
+hardware_concurrency()>unsigned
+swap(other)>void
+#this_thread
+sleep_for(duration)>void
+sleep_until(time)>void
+yield()>void
+get_id()>id
+#mutex
+lock()>void
+unlock()>void
+try_lock()>bool
+#recursive_mutex:mutex
+#shared_mutex:mutex
+lock_shared()>void
+unlock_shared()>void
+#lock_guard
+#unique_lock
+lock()>void
+unlock()>void
+try_lock()>bool
+owns_lock()>bool
+release()>mutex
+#condition_variable
+wait(lock, pred)>void
+wait_for(lock, rel_time, pred)>bool
+notify_one()>void
+notify_all()>void
+#atomic
+load(order)>T
+store(desired, order)>void
+exchange(desired, order)>T
+compare_exchange_strong(expected, desired)>bool
+compare_exchange_weak(expected, desired)>bool
+fetch_add(arg, order)>T
+fetch_sub(arg, order)>T
+#future
+get()>T
+wait()>void
+valid()>bool
+wait_for(rel_time)>future_status
+#promise
+get_future()>future
+set_value(value)>void
+set_exception(p)>void
+#chrono
+now()>time_point
+duration_cast(d)>duration
+milliseconds(count)>duration
+seconds(count)>duration
+microseconds(count)>duration
+nanoseconds(count)>duration
+minutes(count)>duration
+hours(count)>duration
+steady_clock:steady_clock
+system_clock:system_clock
+high_resolution_clock:high_resolution_clock
+#steady_clock
+now()>time_point
+#system_clock
+now()>time_point
+to_time_t(t)>time_t
+from_time_t(t)>time_point
+#duration
+count()>long
+#time_point
+time_since_epoch()>duration
+#ios_base
+precision(prec)>streamsize
+width(wide)>streamsize
+flags(fmtfl)>fmtflags
+setf(fmtfl)>fmtflags
+unsetf(mask)>void
+#ios:ios_base
+good()>bool
+fail()>bool
+eof()>bool
+bad()>bool
+clear(state)>void
+rdstate()>iostate
+setstate(state)>void
+operator_bool()>bool
+rdbuf()>streambuf
+tie(tiestr)>ostream
+#istream:ios
+get()>int
+getline(s, count, delim)>istream
+read(s, count)>istream
+peek()>int
+ignore(count, delim)>istream
+putback(c)>istream
+unget()>istream
+gcount()>streamsize
+seekg(pos)>istream
+tellg()>streampos
+#ostream:ios
+put(c)>ostream
+write(s, count)>ostream
+flush()>ostream
+seekp(pos)>ostream
+tellp()>streampos
+#iostream:ostream
+#ifstream:istream
+open(filename, mode)>void
+close()>void
+is_open()>bool
+#ofstream:ostream
+open(filename, mode)>void
+close()>void
+is_open()>bool
+#fstream:iostream
+open(filename, mode)>void
+close()>void
+is_open()>bool
+#stringstream:iostream
+str()>string
+#istringstream:istream
+str()>string
+#ostringstream:ostream
+str()>string
+#filesystem
+exists(p)>bool
+is_directory(p)>bool
+is_regular_file(p)>bool
+create_directory(p)>bool
+create_directories(p)>bool
+remove(p)>bool
+remove_all(p)>uintmax_t
+rename(old_p, new_p)>void
+copy(from, to)>void
+copy_file(from, to)>bool
+file_size(p)>uintmax_t
+current_path()>path
+absolute(p)>path
+canonical(p)>path
+directory_iterator:directory_iterator
+recursive_directory_iterator:recursive_directory_iterator
+#path
+string()>string
+filename()>path
+stem()>path
+extension()>path
+parent_path()>path
+root_path()>path
+relative_path()>path
+has_filename()>bool
+has_extension()>bool
+is_absolute()>bool
+is_relative()>bool
+empty()>bool
+replace_extension(replacement)>path
+append(p)>path
+c_str()>char
+#exception
+what()>char
+#runtime_error:exception
+#logic_error:exception
+#invalid_argument:logic_error
+#out_of_range:logic_error
+#length_error:logic_error
+#domain_error:logic_error
+#range_error:runtime_error
+#overflow_error:runtime_error
+#underflow_error:runtime_error
+#bad_alloc:exception
+#bad_cast:exception
+#regex
+mark_count()>unsigned
+flags()>flag_type
+#smatch
+str(n)>string
+size()>size_t
+empty()>bool
+prefix()>sub_match
+suffix()>sub_match
+position(n)>difference_type
+length(n)>difference_type
+ready()>bool
+#random_device
+entropy()>double
+#mt19937
+seed(value)>void
+min()>result_type
+max()>result_type
+discard(z)>void
+#uniform_int_distribution
+min()>T
+max()>T
+reset()>void
+#uniform_real_distribution
+min()>T
+max()>T
+reset()>void
+#numeric_limits
+max()>T
+min()>T
+lowest()>T
+epsilon()>T
+infinity()>T
+quiet_NaN()>T
+#initializer_list
+size()>size_t
+begin()>iterator
+end()>iterator

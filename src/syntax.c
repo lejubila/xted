@@ -47,6 +47,10 @@ struct Syntax {
     int number, calls, sigil;
     int nocase;             /* word lists ignore case */
     char *cmt, *cmt_end;    /* comment markers for the toggle command; cmt_end may be NULL */
+    SynRule *rules;         /* symbol rules (decl/include/bind/attr), see langs.c */
+    size_t nrules, rulecap;
+    int indent_scope;       /* blocks are marked by indentation, not braces */
+    char *seps;             /* member access operators, blank separated ("-> ::") */
     uint8_t call_cls, sigil_cls;
     uint8_t opch[256], idstart[256], idch[256];
     uint8_t *scratch;
@@ -187,6 +191,10 @@ void syn_free(Syntax *s)
     free(s->name);
     free(s->cmt);
     free(s->cmt_end);
+    for (i = 0; i < s->nrules; i++)
+        free((char *)s->rules[i].pat);
+    free(s->rules);
+    free(s->seps);
     free(s->scratch);
     free(s);
 }
@@ -194,6 +202,27 @@ void syn_free(Syntax *s)
 const char *syn_name(const Syntax *s)
 {
     return s ? s->name : "Testo";
+}
+
+const SynRule *syn_rules(const Syntax *s, size_t *n)
+{
+    *n = s ? s->nrules : 0;
+    return s ? s->rules : NULL;
+}
+
+size_t syn_rule_count(const Syntax *s)
+{
+    return s ? s->nrules : 0;
+}
+
+int syn_indent_scope(const Syntax *s)
+{
+    return s && s->indent_scope;
+}
+
+const char *syn_member_seps(const Syntax *s)
+{
+    return s ? s->seps : NULL;
 }
 
 int syn_comment(const Syntax *s, const char **open, const char **close)
@@ -432,6 +461,44 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             }
             if (r->ml && !r->end)
                 PERR("riga %zu: una regione fino a fine riga non può essere ml", lineno);
+        } else if (tok_is(t[0], "decl") || tok_is(t[0], "include") || tok_is(t[0], "bind") ||
+                   tok_is(t[0], "attr")) {
+            static const char *const kinds[] = { "class", "func", "method", "prop", "const",
+                                                 "var", "ns" };
+            int kind = -1, first = 1;
+            size_t k, plen;
+
+            if (tok_is(t[0], "decl")) {
+                first = 2;
+                for (k = 0; nt > 1 && k < sizeof kinds / sizeof kinds[0]; k++)
+                    if (tok_is(t[1], kinds[k]))
+                        kind = (int)k;
+                if (kind < 0)
+                    PERR("riga %zu: decl richiede class, func, method, prop, const, var o ns",
+                         lineno);
+            } else {
+                kind = tok_is(t[0], "include") ? RULE_INCLUDE
+                       : tok_is(t[0], "bind") ? RULE_BIND : RULE_ATTR;
+            }
+            if (nt <= (size_t)first)
+                PERR("riga %zu: manca il modello", lineno);
+            plen = (size_t)(ln + len - t[first].p);
+            if (s->nrules == s->rulecap) {
+                s->rulecap = s->rulecap ? s->rulecap * 2 : 16;
+                s->rules = xrealloc(s->rules, s->rulecap * sizeof *s->rules);
+            }
+            s->rules[s->nrules].kind = kind;
+            s->rules[s->nrules].pat = xstrndup(t[first].p, plen);
+            s->nrules++;
+        } else if (tok_is(t[0], "scope")) {
+            if (nt < 2 || !(tok_is(t[1], "indent") || tok_is(t[1], "brace")))
+                PERR("riga %zu: scope richiede indent o brace", lineno);
+            s->indent_scope = tok_is(t[1], "indent");
+        } else if (tok_is(t[0], "member")) {
+            if (nt < 2)
+                PERR("riga %zu: member richiede degli operatori", lineno);
+            free(s->seps);
+            s->seps = xstrndup(t[1].p, (size_t)(ln + len - t[1].p));
         } else {
             PERR("riga %zu: direttiva sconosciuta", lineno);
         }
