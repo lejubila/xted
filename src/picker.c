@@ -25,6 +25,8 @@ void picker_open(Picker *p, const char *title)
     p->qlen = 0;
     p->nshown = 0;
     p->sel = p->top = 0;
+    p->loading = 0;
+    p->spin = 0;
 }
 
 void picker_add(Picker *p, const char *text)
@@ -67,6 +69,15 @@ void picker_filter(Picker *p)
     }
     free(scores);
     p->sel = p->top = 0;
+}
+
+void picker_refilter(Picker *p)
+{
+    long keep = p->sel > 0 ? picker_chosen(p) : -1;
+
+    picker_filter(p);
+    if (keep >= 0)
+        picker_select_item(p, (size_t)keep);
 }
 
 void picker_type(Picker *p, unsigned cp)

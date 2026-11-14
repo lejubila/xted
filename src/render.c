@@ -778,6 +778,17 @@ static void picker_row(SBuf *o, const Editor *e, int k)
         sbuf_adds(o, " \xe2\x80\xba ");
         used += 3;
         used += fit_cols(o, p->query, p->qlen, cols > used ? cols - used : 0);
+        if (p->loading) {
+            char ind[48];
+            size_t n = (size_t)snprintf(ind, sizeof ind, " Caricamento %c %zu ",
+                                        "|/-\\"[p->spin & 3], p->nitems);
+
+            if (cols > used + n) {
+                spaces(o, cols - used - n);
+                sbuf_adds(o, ind);
+                used = cols;
+            }
+        }
         spaces(o, cols > used ? cols - used : 0);
         sbuf_adds(o, "\x1b[0m");
     } else {

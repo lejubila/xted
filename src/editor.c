@@ -228,6 +228,7 @@ void editor_free(Editor *e)
     for (i = 0; i < e->ndocs; i++)
         doc_free(e->docs[i]);
     free(e->docs);
+    files_scan_free(e->fscan);
     picker_free(&e->picker);
     free(e->outline);
     find_free(e);
@@ -614,6 +615,9 @@ static void resize(Editor *e)
 
 /* Renders when idle, then returns the next key. -1 when the terminal is
  * gone (e->quit is set). */
+static void files_scan_stop(Editor *e);
+static void files_scan_pump(Editor *e);
+
 static int next_key(Editor *e, Key *k)
 {
     for (;;) {
@@ -633,8 +637,11 @@ static int next_key(Editor *e, Key *k)
             prepare_frame(e);
             render_frame(e->render, e);
             term_watch(run_fd(e));
+            /* the walk of the project for Ctrl+P ends with the list */
+            if (e->fscan && (!e->picker.on || e->picker_kind != PK_FILES))
+                files_scan_stop(e);
             /* a scan of the project cut short by the time limit goes on while the user waits */
-            if (e->comp.scanning && (timeout < 0 || timeout > COMPLETE_IDLE_MS))
+            if ((e->comp.scanning || e->fscan) && (timeout < 0 || timeout > COMPLETE_IDLE_MS))
                 timeout = COMPLETE_IDLE_MS;
             if (run_timeout(e) >= 0 && (timeout < 0 || run_timeout(e) < timeout))
                 timeout = run_timeout(e);
@@ -643,6 +650,8 @@ static int next_key(Editor *e, Key *k)
                 resize(e);
             if ((ev & TERM_EV_FD) || (!ev && run_timeout(e) >= 0))
                 run_pump(e);
+            if (!ev && e->fscan)
+                files_scan_pump(e);
             if (!ev && e->comp.scanning)
                 complete_resume(&e->comp, e->docs, e->ndocs, e->doc, e->cy, e->cx);
             if (!(ev & TERM_EV_KEY))
@@ -1254,14 +1263,39 @@ static void cmd_symbols(Editor *e)
     }
 }
 
+#define FILES_STEP_US 15000     /* time one step of the project walk may take */
+
+static void files_scan_stop(Editor *e)
+{
+    files_scan_free(e->fscan);
+    e->fscan = NULL;
+    e->picker.loading = 0;
+}
+
+/* One step of the walk that fills the file list: the list is refiltered and, at the end,
+ * the indicator goes away. */
+static void files_scan_pump(Editor *e)
+{
+    int done = files_scan_step(e->fscan, add_file_item, &e->picker, FILES_STEP_US);
+
+    e->picker.spin++;
+    picker_refilter(&e->picker);
+    if (done) {
+        files_scan_stop(e);
+        if (e->picker.nitems == 0)
+            editor_set_msg(e, MSG_TTL_MS, "Nessun file trovato");
+    }
+}
+
 static void cmd_quick_open(Editor *e)
 {
+    files_scan_stop(e);
     picker_open(&e->picker, "File");
     e->picker_kind = PK_FILES;
-    files_scan(e->root ? e->root : ".", add_file_item, &e->picker);
-    picker_filter(&e->picker);
-    if (e->picker.nitems == 0)
-        editor_set_msg(e, MSG_TTL_MS, "Nessun file trovato");
+    e->fscan = files_scan_begin(e->root ? e->root : ".", NULL);
+    e->picker.loading = 1;
+    /* a small project is complete before the first frame; a big one goes on in the loop */
+    files_scan_pump(e);
 }
 
 static void picker_accept(Editor *e)

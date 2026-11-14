@@ -36,7 +36,7 @@ Più file aperti contemporaneamente come buffer, mostrati in tab e affiancabili 
 - **Tab bar** in alto con nome file e indicatore di modifica (`*`).
 - **Split** orizzontale e verticale, anche dello stesso file; spostamento del focus tra i pannelli.
 - **File browser** integrato (albero della directory corrente) in un pannello laterale attivabile.
-- **Apertura rapida** con ricerca fuzzy dei file nel progetto (stile Ctrl+P).
+- **Apertura rapida** con ricerca fuzzy dei file nel progetto (stile Ctrl+P). L'elenco si apre subito e si riempie a passi mentre la cartella viene letta (anche su dischi di rete lenti): si può già filtrare e scegliere, e sulla riga del titolo compare «Caricamento» con un contatore finché la lettura non finisce.
 - **Salvataggio**: salva, salva con nome, salva tutti; scrittura atomica (file temporaneo + `rename`) preservando i permessi.
 - **Protezione**: conferma prima di chiudere file non salvati; avviso se il file è cambiato su disco (ricarica o ignora).
 - **Backup e recupero**: file di swap/autosalvataggio periodico e recupero dopo crash.

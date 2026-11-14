@@ -118,6 +118,7 @@ typedef struct Editor {
     size_t nxc, xc_cap;
     int undo_hold;          /* inside cur_each: one undo group for all cursors */
     int picker_kind;        /* PK_* */
+    FScan *fscan;           /* PK_FILES: the walk of the project, still going on (else NULL) */
     size_t *outline;        /* PK_SYMBOLS: line and byte of each item (pairs) */
     size_t noutline;
 

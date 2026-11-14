@@ -20,6 +20,8 @@ typedef struct {
     size_t qlen;
     size_t sel;             /* position in shown */
     size_t top;             /* first visible position in shown */
+    int loading;            /* items are still being added: the renderer shows an indicator */
+    unsigned spin;          /* steps of that loading so far */
 } Picker;
 
 /* Starts a new list: drops the previous items. */
@@ -27,6 +29,9 @@ void picker_open(Picker *p, const char *title);
 void picker_add(Picker *p, const char *text);
 /* Call after the last picker_add (and after the query changes). */
 void picker_filter(Picker *p);
+/* Filters again after items were added while the list is open: the highlighted item stays
+ * highlighted if the user has moved to one. */
+void picker_refilter(Picker *p);
 void picker_type(Picker *p, unsigned cp);
 void picker_backspace(Picker *p);
 void picker_move(Picker *p, long delta);
