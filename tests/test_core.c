@@ -3588,6 +3588,164 @@ static void test_call_body(void)
     call_body_is("m", CAND_FUNC, "m(a, ...)", 1, "m(${1:a})$0");
 }
 
+/* The call at a position, the parameter to highlight, the variables of a function. */
+static char loc_names[256];
+
+static void loc_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret, int rank)
+{
+    (void)ctx;
+    (void)kind;
+    (void)sig;
+    (void)ret;
+    (void)rank;
+    strcat(loc_names, name);
+    strcat(loc_names, " ");
+}
+
+static int loc_has(const char *name)
+{
+    char w[80];
+
+    snprintf(w, sizeof w, " %s ", name);
+    return strstr(loc_names - 0, w) != NULL || strncmp(loc_names, w + 1, strlen(w) - 1) == 0;
+}
+
+static size_t col_after(const Doc *d, size_t y, const char *what)
+{
+    const char *p = strstr(d->buf.lines[y].s, what);
+
+    return p ? (size_t)(p - d->buf.lines[y].s) + strlen(what) : 0;
+}
+
+static void test_params(void)
+{
+    char dir[64], path[128], err[128], hint[256];
+    Doc d;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    SymCall call;
+    size_t from, to, hf, ht;
+
+    CHECK(sym_param_span("const char *dest, const char *src, size_t n", 1, &from, &to) &&
+          strncmp("const char *dest, const char *src, size_t n" + from, "const char *src", to - from) == 0 &&
+          to - from == 15);
+    CHECK(!sym_param_span("a, b", 2, &from, &to));
+    CHECK(sym_param_span("fmt, ...", 4, &from, &to) && to - from == 3);
+    CHECK(sym_param_span("map<a,b> m, int n", 1, &from, &to) && to - from == 5);
+    CHECK(!sym_param_span("", 0, &from, &to));
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "calls.c",
+             "#include <string.h>\n"
+             "int add(int a, int b)\n"
+             "{\n"
+             "    int total = 0;\n"
+             "    char *buf, *tmp;\n"
+             "    for (int i = 0; i < 3; i++) {\n"
+             "        total += add(i, total);\n"
+             "    }\n"
+             "    strncpy(buf, tmp, 2);\n"
+             "}\n"
+             "int other(int z) { return z; }\n"
+             "static int proto(int p);\n"
+             "int later;\n");
+    snprintf(path, sizeof path, "%s/calls.c", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    docs[0] = &d;
+
+    CHECK(sym_call_at(d.syn, &d.buf, 6, col_after(&d, 6, "add(i, "), &call));
+    CHECK(strcmp(call.name, "add") == 0 && call.arg == 1 && !call.decl);
+    CHECK(sym_call_at(d.syn, &d.buf, 1, col_after(&d, 1, "int add("), &call));
+    CHECK(strcmp(call.name, "add") == 0 && call.decl && call.typepos);
+    CHECK(sym_call_at(d.syn, &d.buf, 1, col_after(&d, 1, "int add(int a, "), &call) && call.decl && call.arg == 1 &&
+          call.typepos);
+    CHECK(sym_call_at(d.syn, &d.buf, 1, col_after(&d, 1, "int add(int a, int "), &call) && !call.typepos);
+    CHECK(sym_call_at(d.syn, &d.buf, 5, col_after(&d, 5, "for ("), &call) && call.name[0] == '\0' && !call.decl);
+    CHECK(!sym_call_at(d.syn, &d.buf, 3, 4, &call));            /* no open parenthesis */
+    CHECK(!sym_call_at(d.syn, &d.buf, 7, 0, &call));
+
+    /* the signature of the call at the cursor, with the current parameter */
+    CHECK(sym_call_hint(c, docs, 1, &d, 6, col_after(&d, 6, "add(i, "), hint, sizeof hint, &hf, &ht) &&
+          strcmp(hint, "add(int a, int b)") == 0 && ht - hf == 5 && strncmp(hint + hf, "int b", 5) == 0);
+    CHECK(sym_call_hint(c, docs, 1, &d, 8, col_after(&d, 8, "strncpy(buf, "), hint, sizeof hint, &hf, &ht) &&
+          strncmp(hint, "strncpy(", 8) == 0 && ht > hf);
+    CHECK(!sym_call_hint(c, docs, 1, &d, 6, col_after(&d, 6, "total += "), hint, sizeof hint, &hf, &ht));
+
+    loc_names[0] = '\0';
+    sym_locals(c, &d, 8, col_after(&d, 8, "    "), loc_cb, NULL);
+    CHECK(loc_has("a") && loc_has("b") && loc_has("total") && loc_has("buf") && loc_has("tmp") && loc_has("i"));
+    CHECK(!loc_has("z") && !loc_has("p"));
+    loc_names[0] = '\0';
+    sym_locals(c, &d, 10, 0, loc_cb, NULL);                       /* inside other() */
+    CHECK(loc_has("z") && !loc_has("total"));
+    loc_names[0] = '\0';
+    sym_locals(c, &d, 12, 0, loc_cb, NULL);                       /* after a prototype: nothing */
+    CHECK(!loc_has("p") && !loc_has("z"));
+    syn_free(d.syn);
+    buf_free(&d.buf);
+
+    put_file(dir, "k.py",
+             "def work(items, limit=3, *rest, **kw):\n"
+             "    total = 0\n"
+             "    a, b = 1, 2\n"
+             "    count: int = 3\n"
+             "    for item, n in items:\n"
+             "        total += n\n"
+             "    with open(items) as fh:\n"
+             "        pass\n"
+             "    if total == 1:\n"
+             "        x = 1\n"
+             "\n"
+             "def other(q):\n"
+             "    return q\n"
+             "\n"
+             "value = 1\n");
+    snprintf(path, sizeof path, "%s/k.py", dir);
+    sym_cache_free(c);
+    c = sym_cache_new();            /* a Doc at the same address would reuse the old index */
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    loc_names[0] = '\0';
+    sym_locals(c, &d, 9, 0, loc_cb, NULL);
+    CHECK(loc_has("items") && loc_has("limit") && loc_has("rest") && loc_has("kw"));
+    CHECK(loc_has("total") && loc_has("a") && loc_has("b") && loc_has("count") && loc_has("item") &&
+          loc_has("n") && loc_has("fh") && loc_has("x") == 0);        /* x is on the cursor line: not yet */
+    loc_names[0] = '\0';
+    sym_locals(c, &d, 12, 0, loc_cb, NULL);
+    CHECK(loc_has("q") && !loc_has("total"));
+    loc_names[0] = '\0';
+    sym_locals(c, &d, 14, 0, loc_cb, NULL);                       /* module level */
+    CHECK(loc_names[0] == '\0');
+    CHECK(sym_call_at(d.syn, &d.buf, 0, 12, &call) && call.decl && strcmp(call.name, "work") == 0);
+    syn_free(d.syn);
+    buf_free(&d.buf);
+
+    put_file(dir, "m.php",
+             "<?php\n"
+             "function f(Rep $r, $x) {\n"
+             "    $v = 1;\n"
+             "    $this->go($v, \"a $s\");\n"
+             "}\n");
+    snprintf(path, sizeof path, "%s/m.php", dir);
+    sym_cache_free(c);
+    c = sym_cache_new();
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    loc_names[0] = '\0';
+    sym_locals(c, &d, 3, 0, loc_cb, NULL);
+    CHECK(loc_has("r") && loc_has("x") && loc_has("v") && !loc_has("this") && !loc_has("s"));
+    CHECK(sym_call_at(d.syn, &d.buf, 3, col_after(&d, 3, "go($v, "), &call) && call.arg == 1 &&
+          strcmp(call.name, "go") == 0);
+    CHECK(sym_call_at(d.syn, &d.buf, 1, col_after(&d, 1, "function f("), &call) && call.decl && call.typepos);
+    CHECK(sym_call_at(d.syn, &d.buf, 1, col_after(&d, 1, "function f(Rep "), &call) && !call.typepos);
+    CHECK(sym_call_at(d.syn, &d.buf, 1, col_after(&d, 1, "function f(Rep $r, "), &call) && call.typepos);
+    CHECK(sym_call_at(d.syn, &d.buf, 1, col_after(&d, 1, "function f(Rep $r, $"), &call) && !call.typepos);
+    syn_free(d.syn);
+    buf_free(&d.buf);
+    sym_cache_free(c);
+}
+
 /* Names longer than any keyword (13+ letters) are still classes, methods and types. */
 static void test_long_names(void)
 {
@@ -4193,6 +4351,7 @@ int main(void)
     test_complete();
     test_symbols();
     test_call_body();
+    test_params();
     test_long_names();
     test_alias_static();
     test_laravel();

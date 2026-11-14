@@ -25,6 +25,8 @@ typedef struct {
     char prefix[256];
     size_t plen;
     int use_ctx;            /* after PHP's `use`: qualified names are the candidates */
+    int types_only;         /* where a parameter's type goes: classes and type words only */
+    int bonus;              /* added to the score of what is being reported (local variables) */
 } Gather;
 
 static int word_cp(const char *s, size_t len, size_t i, size_t *n)
@@ -92,6 +94,8 @@ static void consider_sig(Gather *g, const char *w, size_t n, int kind, size_t di
     char tmp[256];
     int score;
 
+    if (g->types_only && kind != CAND_CLASS && kind != CAND_KEYWORD)
+        return;
     if (n < g->plen || (n == g->plen && kind != CAND_SNIPPET && !(kind == CAND_CLASS && sig)) ||
         n >= sizeof tmp ||
         g->n >= MAX_RAW)
@@ -109,7 +113,7 @@ static void consider_sig(Gather *g, const char *w, size_t n, int kind, size_t di
     g->v[g->n].w = xstrdup(tmp);
     g->v[g->n].sig = sig && sig[0] ? xstrdup(sig) : NULL;
     g->v[g->n].kind = kind;
-    g->v[g->n].score = score;
+    g->v[g->n].score = score + g->bonus;
     g->v[g->n].dist = dist;
     g->n++;
 }
@@ -247,8 +251,22 @@ static void scan_line(Gather *g, const Line *l, size_t dist, int is_cursor_line,
 
 static void kw_cb(const char *w, size_t n, int cls, void *ctx)
 {
-    (void)cls;
+    const Gather *g = ctx;
+
+    if (g->types_only && cls != SC_TYPE)
+        return;
     consider(ctx, w, n, CAND_KEYWORD, 0);
+}
+
+/* A parameter or a variable of the function around the cursor */
+static void local_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret,
+                     int rank)
+{
+    (void)kind;
+    (void)sig;
+    (void)ret;
+    (void)rank;
+    consider(ctx, name, strlen(name), CAND_LOCAL, 0);
 }
 
 static int raw_cmp(const void *pa, const void *pb)
@@ -331,14 +349,30 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
     } else {
         size_t ns, k;
         const SnipDef *sd = snip_lang(cur->syn ? syn_name(cur->syn) : NULL, &ns);
+        SymCall call;
+        int in_call = 0;
 
+        if (syn_rule_count(cur->syn) > 0 && sym_call_at(cur->syn, b, y, start, &call)) {
+            in_call = 1;
+            /* the type of a parameter in a definition: nothing else makes sense there */
+            if (call.decl && call.typepos) {
+                g.types_only = 1;
+                budget = 0;
+            }
+        }
         /* snippets first: a snippet named like a keyword wins */
-        for (k = 0; k < ns; k++)
+        for (k = 0; k < ns && !g.types_only; k++)
             consider(&g, sd[k].name, strlen(sd[k].name), CAND_SNIPPET, 0);
         if (syn_rule_count(cur->syn) > 0) {
             if (!c->sc)
                 c->sc = sym_cache_new();
             sym_budget(c->sc, COMPLETE_SCAN_MS);
+            /* PHP variables are written with a $ the user has typed: names come without it */
+            if (!g.types_only && !(php && (start == 0 || b->lines[y].s[start - 1] != '$'))) {
+                g.bonus = in_call ? 10 : 6;
+                sym_locals(c->sc, cur, y, start, local_cb, &g);
+                g.bonus = 0;
+            }
             sym_globals(c->sc, docs, ndocs, cur, sym_cb, &g);
             if (php && plen >= 3 && (start == 0 || b->lines[y].s[start - 1] != '$'))
                 sym_classes(c->sc, cur, g.prefix, plen, 0, class_cb, &g);

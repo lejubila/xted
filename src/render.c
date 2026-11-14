@@ -203,7 +203,7 @@ static void emit_popup(SBuf *o, const Editor *e, const Ovl *ov)
         sbuf_adds(o, "snippet");
         used = w - 1;
     } else if (ov->cand->kind >= CAND_FUNC && w > used + 3) {
-        static const char tag[] = { 'f', 'c', 'm', 'p', 'k' };
+        static const char tag[] = { 'f', 'c', 'm', 'p', 'k', 'v' };
 
         spaces(o, w - used - 2);
         sbuf_adds(o, "\x1b[2m");
@@ -611,13 +611,14 @@ static void tab_row(SBuf *o, const Editor *e)
     free(wd);
 }
 
-static void status_row(SBuf *o, const Win *w, int active, int scan)
+static void status_row(SBuf *o, const Win *w, int active, int scan, const Editor *e)
 {
     const Doc *d = w->doc;
     SBuf right = SBUF_INIT;
     const char *name = d->title ? d->title : d->buf.path ? d->buf.path : "[Senza nome]";
     char mark[16];
     size_t cols = (size_t)w->w, lmax, used = 0, marklen;
+    int hint_on;
 
     snprintf(mark, sizeof mark, "%s%s", d->buf.modified ? " [+]" : "", d->readonly && !d->scratch ? " [RO]" : "");
     marklen = strlen(mark);
@@ -625,7 +626,8 @@ static void status_row(SBuf *o, const Win *w, int active, int scan)
         sbuf_addf(&right, " Scansione %c ", "|/-\\"[scan & 3]);
     else if (scan >= 0)
         sbuf_addf(&right, " %c ", "|/-\\"[scan & 3]);
-    if (cols >= 48) {
+    hint_on = active && e->hint[0] && cols >= 48;
+    if (cols >= 48 && !hint_on) {
         char style[24] = "";
 
         if (cols >= 62)
@@ -635,7 +637,7 @@ static void status_row(SBuf *o, const Win *w, int active, int scan)
                   d->buf.crlf ? "CRLF" : "LF", style, w->view.cy + 1,
                   editor_view_col(&d->buf, &w->view, d->tabw) + 1);
     }
-    else if (cols >= 20)
+    else if (cols >= 20)    /* also while a call is shown: the room goes to its signature */
         sbuf_addf(&right, " Ln %zu, Col %zu ", w->view.cy + 1,
                   editor_view_col(&d->buf, &w->view, d->tabw) + 1);
 
@@ -643,12 +645,39 @@ static void status_row(SBuf *o, const Win *w, int active, int scan)
     lmax = cols > right.len ? cols - right.len : cols;
     sbuf_adds(o, active ? "\x1b[7m" : "\x1b[7;2m");
     if (lmax >= 1 + marklen) {
+        size_t room = lmax - 1 - marklen, nmax = room;
+        int hint = hint_on && room >= 30;
+
+        /* with a call to show, the name keeps a third of the room (at least 16 columns) */
+        if (hint && nmax > (room / 3 >= 16 ? room / 3 : 16))
+            nmax = room / 3 >= 16 ? room / 3 : 16;
         sbuf_adds(o, " ");
-        used = 1 + fit_tail(o, name, strlen(name), lmax - 1 - marklen);
+        used = 1 + fit_tail(o, name, strlen(name), hint ? nmax : room);
         sbuf_adds(o, mark);
         used += marklen;
+        if (hint && lmax > used + 12) {
+            size_t n = strlen(e->hint), a = e->hint_a, b = e->hint_b;
+
+            if (b > n || a >= b)
+                a = b = 0;
+            spaces(o, 2);
+            used += 2;
+            used += fit_cols(o, e->hint, a ? a : n, lmax - used - 1);
+            if (a < b) {
+                size_t cap = lmax > used + 3 ? lmax - used - 3 : 0, m;
+
+                if (cap > 0) {
+                    sbuf_adds(o, "[\x1b[1m");
+                    m = fit_cols(o, e->hint + a, b - a, cap);
+                    sbuf_adds(o, "\x1b[22m]");
+                    used += m + 2;
+                    if (m == utf8_cols(e->hint + a, b - a, b - a, 8) && lmax > used)
+                        used += fit_cols(o, e->hint + b, n - b, lmax - used - 1);
+                }
+            }
+        }
     }
-    spaces(o, lmax - used);
+    spaces(o, lmax > used ? lmax - used : 0);
     if (cols > right.len)
         sbuf_add(o, right.p, right.len);
     sbuf_adds(o, "\x1b[0m");
@@ -818,7 +847,8 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
         }
         else
             status_row(o, w, w == e->layout.active,
-                       w == e->layout.active && e->comp.scanning ? (int)(e->comp.spin & 3) : -1);
+                       w == e->layout.active && e->comp.scanning ? (int)(e->comp.spin & 3) : -1,
+                       e);
         x += w->w;
     }
 }

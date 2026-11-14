@@ -144,6 +144,12 @@ typedef struct Editor {
     int match_on;           /* the bracket at/before the cursor has a partner */
     size_t by, bx, my, mx;  /* that bracket and its partner */
 
+    char hint[256];         /* "name(params)" of the call at the cursor, for the status bar */
+    size_t hint_a, hint_b;  /* the current parameter inside it */
+    const Doc *hint_doc;    /* where it was computed, to do it again only after a change */
+    size_t hint_y, hint_x;
+    unsigned long hint_gen;
+
     char msg[256];
     long msg_until;         /* monotonic ms when msg expires; 0 = sticky */
 

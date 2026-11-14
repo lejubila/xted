@@ -1683,35 +1683,44 @@ static void find_cb(void *ctx, const char *name, int kind, const char *sig, cons
     put(f->ret, sizeof f->ret, ret, strlen(ret));
 }
 
-/* A function (global) named name: its return type. */
-static int env_function(const Env *e, const char *name, char *ret, size_t cap)
+/* A function (global) named f->name: its signature and return type. */
+static int env_func_find(const Env *e, FindCtx *f)
 {
     size_t i, j;
     StdCtx sc;
-    FindCtx f;
 
     for (i = 0; i < e->n; i++)
         for (j = 0; j < e->v[i]->n; j++) {
             const Sym *s = &e->v[i]->v[j];
 
-            if (s->kind == RULE_FUNC && s->owner < 0 && strcmp(s->name, name) == 0) {
-                put(ret, cap, s->ret, strlen(s->ret));
+            if (s->kind == RULE_FUNC && s->owner < 0 && strcmp(s->name, f->name) == 0) {
+                f->found = 1;
+                f->kind = RULE_FUNC;
+                put(f->sig, sizeof f->sig, s->sig, strlen(s->sig));
+                put(f->ret, sizeof f->ret, s->ret, strlen(s->ret));
                 return 1;
             }
         }
-    memset(&f, 0, sizeof f);
-    f.name = name;
     sc.fn = find_cb;
-    sc.ctx = &f;
+    sc.ctx = f;
     sc.member = 0;
     for (i = 0; i < e->nlib; i++)
         if (e->lib[i])
             std_globals(e->lib[i], std_cb, &sc);
-    if (f.found && f.kind == RULE_FUNC) {
-        put(ret, cap, f.ret, strlen(f.ret));
-        return 1;
-    }
-    return 0;
+    return f->found && f->kind == RULE_FUNC;
+}
+
+/* A function (global) named name: its return type. */
+static int env_function(const Env *e, const char *name, char *ret, size_t cap)
+{
+    FindCtx f;
+
+    memset(&f, 0, sizeof f);
+    f.name = name;
+    if (!env_func_find(e, &f))
+        return 0;
+    put(ret, cap, f.ret, strlen(f.ret));
+    return 1;
 }
 
 /* A global variable (a module-level one, or a library object such as document): its type. */
@@ -2464,4 +2473,622 @@ void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn
             if (e.lib[i] == c->lib[LIB_CPP])
                 std_members(e.lib[i], "std", 3, std_cb, &sc);
         }
+}
+
+/* ---- calls, parameters and local variables ------------------------------ */
+
+#define CALL_LINES 40
+#define CALL_NOT " if while for foreach switch catch elif return and or not in else with until unless match "
+#define CALL_DECLKW " function def fn func fun sub "
+#define CALL_NOT_DECL \
+    " return else goto case break continue delete throw typedef do if while switch sizeof " \
+    "using namespace new not and or in extends implements "
+#define CALL_QUAL \
+    " const struct enum union unsigned signed volatile static final readonly public private " \
+    "protected var register extern inline ref out in mut "
+
+static int in_words(const char *list, const char *w, size_t n)
+{
+    size_t i = 0;
+
+    while (list[i]) {
+        size_t j;
+
+        while (list[i] == ' ')
+            i++;
+        for (j = i; list[j] && list[j] != ' '; j++)
+            ;
+        if (j > i && j - i == n && memcmp(list + i, w, n) == 0)
+            return 1;
+        i = j;
+    }
+    return 0;
+}
+
+static size_t ident_back(const char *s, size_t end, size_t *start)
+{
+    size_t b = end;
+
+    while (b > 0 && is_idc((unsigned char)s[b - 1]))
+        b--;
+    *start = b;
+    return end - b;
+}
+
+static int cl_skip(const uint8_t *cl, size_t i)
+{
+    return cl && (cl[i] == SC_COMMENT || cl[i] == SC_STRING);
+}
+
+/* C: the name at ns is preceded by a type at the start of a statement ("static int foo(") */
+static int c_decl_before(const char *s, size_t ns)
+{
+    size_t p = ns, ids = 0;
+
+    for (;;) {
+        size_t b, n;
+
+        while (p > 0 && (is_blank(s[p - 1]) || s[p - 1] == '*' || s[p - 1] == '&'))
+            p--;
+        if (p == 0 || !is_idc((unsigned char)s[p - 1]))
+            break;
+        n = ident_back(s, p, &b);
+        if (in_words(CALL_NOT_DECL, s + b, n))
+            return 0;
+        ids++;
+        p = b;
+    }
+    return ids > 0 && (p == 0 || strchr(";{}", s[p - 1]) != NULL);
+}
+
+/* Is the word that ends the segment s[from, to) of a parameter list where a type goes? */
+static int type_pos(const char *lang, const char *s, size_t from, size_t to)
+{
+    size_t i = from;
+    int ids = 0, colon = 0, eq = 0, dollar = 0;
+    long d = 0;
+
+    while (i < to) {
+        char c = s[i];
+
+        if (is_idc((unsigned char)c)) {
+            size_t b = i;
+
+            while (i < to && is_idc((unsigned char)s[i]))
+                i++;
+            if (!in_words(CALL_QUAL, s + b, i - b))
+                ids++;
+            continue;
+        }
+        if (c == '(' || c == '[' || c == '<' || c == '{')
+            d++;
+        else if (c == ')' || c == ']' || c == '>' || c == '}')
+            d--;
+        else if (c == '$')
+            dollar = 1;
+        else if (c == '=' && d == 0)
+            eq = 1;
+        else if (c == ':' && d == 0)
+            colon = 1;
+        else if (c == '|' && d == 0)
+            ids = 0;
+        i++;
+    }
+    if (strncmp(lang, "PHP", 3) == 0 || strcmp(lang, "C") == 0)
+        return ids == 0 && !eq && !dollar;
+    return colon && !eq;
+}
+
+int sym_call_at(Syntax *syn, const Buffer *b, size_t y, size_t x, SymCall *o)
+{
+    long depth = 0;
+    int commas = 0;
+    size_t ly = y, lines, i = 0, seg_y = (size_t)-1, seg_x = 0, ns, ne, n, q, pb, pn;
+    const char *lang, *s;
+
+    memset(o, 0, sizeof *o);
+    if (!syn || y >= b->nlines)
+        return 0;
+    lang = syn_name(syn);
+    for (lines = 0; lines < CALL_LINES; lines++) {
+        const Line *l = &b->lines[ly];
+        const uint8_t *cl;
+
+        syn_update(syn, (Buffer *)b, ly);
+        cl = syn_classes(syn, b, ly);
+        for (i = lines == 0 && x < l->len ? x : l->len; i > 0; i--) {
+            char c = l->s[i - 1];
+
+            if (cl_skip(cl, i - 1))
+                continue;
+            if (c == ')' || c == ']' || c == '}') {
+                depth++;
+            } else if (c == '(' || c == '[' || c == '{') {
+                if (depth > 0)
+                    depth--;
+                else if (c == '(')
+                    goto found;
+                else
+                    return 0;
+            } else if (depth == 0 && c == ',') {
+                if (commas++ == 0) {
+                    seg_y = ly;
+                    seg_x = i;
+                }
+            } else if (depth == 0 && c == ';') {
+                return 0;
+            }
+        }
+        if (ly == 0)
+            return 0;
+        ly--;
+    }
+    return 0;
+found:
+    s = b->lines[ly].s;
+    o->y = ly;
+    o->x = i - 1;
+    o->arg = commas;
+    ne = i - 1;
+    while (ne > 0 && is_blank(s[ne - 1]))
+        ne--;
+    n = ident_back(s, ne, &ns);
+    if (n == 0 || n >= PM_NAME || isdigit((unsigned char)s[ns]))
+        goto params;
+    if (in_words(CALL_DECLKW, s + ns, n)) {
+        o->decl = 1;                    /* an anonymous function */
+        goto params;
+    }
+    if (in_words(CALL_NOT, s + ns, n))
+        goto params;
+    memcpy(o->name, s + ns, n);
+    o->name[n] = '\0';
+    o->name_x = ns;
+    q = ns;
+    while (q > 0 && is_blank(s[q - 1]))
+        q--;
+    pn = q > 0 && is_idc((unsigned char)s[q - 1]) ? ident_back(s, q, &pb) : 0;
+    if (pn && in_words(CALL_DECLKW, s + pb, pn))
+        o->decl = 1;
+    else if (pn == 3 && memcmp(s + pb, "new", 3) == 0)
+        o->isnew = 1;
+    else if (pn == 5 && memcmp(s + pb, "class", 5) == 0)
+        o->name[0] = '\0';
+    else if (strcmp(lang, "C") == 0 && c_decl_before(s, ns))
+        o->decl = 1;
+params:
+    if (o->decl) {
+        size_t sy = seg_y == (size_t)-1 ? ly : seg_y, sx = seg_y == (size_t)-1 ? o->x + 1 : seg_x;
+
+        if (sy != y)
+            sx = 0;
+        if (y < b->nlines && sx <= x && x <= b->lines[y].len)
+            o->typepos = type_pos(lang, b->lines[y].s, sx, x);
+    }
+    return 1;
+}
+
+int sym_param_span(const char *sig, int arg, size_t *from, size_t *to)
+{
+    size_t i, n = strlen(sig), start = 0, last = 0;
+    int idx = 0;
+    long d = 0;
+
+    if (n == 0)
+        return 0;
+    for (i = 0; i <= n; i++) {
+        char c = i < n ? sig[i] : ',';
+
+        if (i < n && (c == '(' || c == '[' || c == '<' || c == '{'))
+            d++;
+        else if (i < n && (c == ')' || c == ']' || c == '}' ||
+                           (c == '>' && i > 0 && sig[i - 1] != '-' && sig[i - 1] != '=')))
+            d--;
+        else if (c == ',' && d <= 0) {
+            last = start;
+            if (idx == arg)
+                goto got;
+            idx++;
+            start = i + 1;
+        }
+    }
+    /* more arguments than parameters: fine after a variadic one */
+    if (strstr(sig + last, "...") == NULL && sig[last] != '*' && strstr(sig + last, " *") != sig + last)
+        return 0;
+    start = last;
+    i = n;
+got:
+    while (start < i && sig[start] == ' ')
+        start++;
+    while (i > start && sig[i - 1] == ' ')
+        i--;
+    *from = start;
+    *to = i;
+    return i > start;
+}
+
+int sym_call_hint(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t x,
+                  char *out, size_t cap, size_t *hl_from, size_t *hl_to)
+{
+    SymCall call;
+    Env e;
+    FindCtx f;
+    char t[PM_NAME];
+    size_t from, to, pre;
+
+    *hl_from = *hl_to = 0;
+    if (!cur->syn || syn_rule_count(cur->syn) == 0 ||
+        !sym_call_at(cur->syn, &cur->buf, y, x, &call) || !call.name[0] || call.decl)
+        return 0;
+    memset(&f, 0, sizeof f);
+    f.name = call.name;
+    env_build(c, docs, ndocs, cur, &e);
+    if (call.isnew) {
+        static const char *const ctors[] = { "__construct", "constructor", "__init__" };
+        size_t k;
+
+        for (k = 0; k < 3 && !f.found; k++) {
+            f.name = ctors[k];
+            env_members(&e, call.name, find_cb, &f, 0);
+        }
+    } else {
+        size_t sep = sym_member_at(cur->syn, &cur->buf, call.y, call.name_x);
+
+        if (sep != (size_t)-1) {
+            env_alias(c, &e, cur, call.y, sep);
+            resolve_chain(&e, cur, call.y, sep, t, sizeof t);
+            if (t[0])
+                env_members(&e, t, find_cb, &f, 0);
+        } else {
+            env_func_find(&e, &f);
+        }
+    }
+    if (!f.found || (f.kind != RULE_FUNC && f.kind != RULE_METHOD))
+        return 0;
+    snprintf(out, cap, "%s(%s)", call.name, f.sig);
+    pre = strlen(call.name) + 1;
+    if (sym_param_span(f.sig, call.arg, &from, &to) && pre + to < cap) {
+        *hl_from = pre + from;
+        *hl_to = pre + to;
+    }
+    return 1;
+}
+
+/* -- local variables -- */
+
+static int lang_family(const char *n)
+{
+    if (strncmp(n, "PHP", 3) == 0)
+        return 1;
+    if (strcmp(n, "Python") == 0)
+        return 2;
+    if (strcmp(n, "JavaScript") == 0 || strcmp(n, "TypeScript") == 0)
+        return 3;
+    return strcmp(n, "C") == 0 ? 4 : 0;
+}
+
+static void local_emit(SymFn fn, void *ctx, const char *w, size_t n)
+{
+    char name[PM_NAME];
+
+    if (n == 0 || n >= PM_NAME || isdigit((unsigned char)w[0]) || in_words(" self this cls void ", w, n))
+        return;
+    put(name, sizeof name, w, n);
+    fn(ctx, name, RULE_VAR, "", "", 0);
+}
+
+/* The names in a parameter list ("int a, char *b", "$x = 1, Foo $y", "a, b: int = 3"). */
+static void local_params(const char *sig, int fam, SymFn fn, void *ctx)
+{
+    size_t i = 0, n = strlen(sig);
+
+    while (i <= n) {
+        size_t j = i, e, b, k;
+        long d = 0;
+        int paren = 0;
+        size_t eq = (size_t)-1, colon = (size_t)-1;
+
+        while (j < n && !(sig[j] == ',' && d <= 0)) {
+            char c = sig[j];
+
+            if (c == '(' || c == '[' || c == '<' || c == '{')
+                d++;
+            else if (c == ')' || c == ']' || c == '>' || c == '}')
+                d--;
+            if (c == '(' && fam == 4)
+                paren = 1;
+            if (d == 0 && c == '=' && eq == (size_t)-1)
+                eq = j;
+            else if (d == 0 && c == ':' && colon == (size_t)-1 && eq == (size_t)-1)
+                colon = j;
+            j++;
+        }
+        e = eq != (size_t)-1 ? eq : colon != (size_t)-1 ? colon : j;
+        for (k = i; k < e; k++)
+            if (sig[k] == '[') {
+                e = k;
+                break;
+            }
+        while (e > i && (is_blank(sig[e - 1]) || sig[e - 1] == '?'))
+            e--;
+        if (!paren && ident_back(sig, e, &b) > 0) {
+            size_t p = b;
+
+            while (p > i && (is_blank(sig[p - 1]) || sig[p - 1] == '*' || sig[p - 1] == '&'))
+                p--;
+            /* C: a lone "int" is an unnamed parameter */
+            if (fam != 4 || (p > i && is_idc((unsigned char)sig[p - 1])))
+                local_emit(fn, ctx, sig + b, e - b);
+        }
+        i = j + 1;
+    }
+}
+
+/* C: a declaration "type [*] name" at the start of a statement; returns where to go on. */
+static size_t c_stmt(const char *s, size_t i, size_t lim, const uint8_t *cl, SymFn fn, void *ctx)
+{
+    size_t p = i, ids = 0, lb = 0, ln = 0;
+
+    for (;;) {
+        while (p < lim && is_blank(s[p]))
+            p++;
+        if (p >= lim)
+            break;
+        if (is_idc((unsigned char)s[p])) {
+            size_t b = p;
+
+            while (p < lim && is_idc((unsigned char)s[p]))
+                p++;
+            if (in_words(CALL_NOT_DECL, s + b, p - b))
+                return p;
+            ids++;
+            lb = b;
+            ln = p - b;
+        } else if (ids > 0 && (s[p] == '*' || s[p] == '&')) {
+            p++;
+        } else if (ids > 0 && p + 1 < lim && s[p] == ':' && s[p + 1] == ':') {
+            p += 2;
+        } else if (ids > 0 && s[p] == '<') {
+            int d = 0;
+
+            for (; p < lim; p++) {
+                d += s[p] == '<';
+                d -= s[p] == '>';
+                if (d == 0) {
+                    p++;
+                    break;
+                }
+            }
+        } else {
+            break;
+        }
+    }
+    if (ids >= 2 && p < lim && strchr("=;,[)", s[p]) && !cl_skip(cl, p)) {
+        local_emit(fn, ctx, s + lb, ln);
+        /* int a, *b, c; */
+        while (s[p] == ',' && p < lim) {
+            size_t b;
+
+            p++;
+            while (p < lim && (is_blank(s[p]) || s[p] == '*'))
+                p++;
+            b = p;
+            while (p < lim && is_idc((unsigned char)s[p]))
+                p++;
+            if (p == b || p >= lim || !strchr("=;,[", s[p]))
+                break;
+            local_emit(fn, ctx, s + b, p - b);
+        }
+    }
+    return p > i ? p : i + 1;
+}
+
+static void local_line(int fam, const char *s, size_t lim, const uint8_t *cl, SymFn fn, void *ctx)
+{
+    size_t i = 0;
+    int start = 1;              /* C: at the start of a statement */
+
+    while (i < lim) {
+        size_t b, j;
+
+        if (cl_skip(cl, i) || is_blank(s[i])) {
+            i++;
+            continue;
+        }
+        if (fam == 1) {
+            if (s[i] == '$' && i + 1 < lim && is_idc((unsigned char)s[i + 1])) {
+                for (j = i + 1; j < lim && is_idc((unsigned char)s[j]); j++)
+                    ;
+                local_emit(fn, ctx, s + i + 1, j - i - 1);
+                i = j;
+            } else {
+                i++;
+            }
+            continue;
+        }
+        if (!is_idc((unsigned char)s[i]) || (i > 0 && is_idc((unsigned char)s[i - 1]))) {
+            if (fam == 4 && start == 0 && (s[i] == ';' || s[i] == '{' || s[i] == '}'))
+                start = 1;
+            i++;
+            continue;
+        }
+        b = i;
+        for (j = i; j < lim && is_idc((unsigned char)s[j]); j++)
+            ;
+        i = j;
+        if (fam == 4) {
+            if (j - b == 3 && memcmp(s + b, "for", 3) == 0) {
+                while (i < lim && is_blank(s[i]))
+                    i++;
+                if (i < lim && s[i] == '(') {
+                    i++;
+                    start = 1;
+                }
+                continue;
+            }
+            if (start) {
+                i = c_stmt(s, b, lim, cl, fn, ctx);
+                start = 0;
+            }
+            continue;
+        }
+        if ((fam == 3 && (in_words(" let const var ", s + b, j - b))) ||
+            ((fam == 2 || fam == 3) && j - b == 2 && memcmp(s + b, "as", 2) == 0)) {
+            size_t p = j;
+
+            while (p < lim && is_blank(s[p]))
+                p++;
+            for (j = p; j < lim && is_idc((unsigned char)s[j]); j++)
+                ;
+            local_emit(fn, ctx, s + p, j - p);
+            i = j;
+        } else if (fam == 2 && j - b == 3 && memcmp(s + b, "for", 3) == 0) {
+            size_t p = j;
+
+            for (;;) {
+                while (p < lim && (is_blank(s[p]) || s[p] == ',' || s[p] == '('))
+                    p++;
+                for (j = p; j < lim && is_idc((unsigned char)s[j]); j++)
+                    ;
+                if (j == p || (j - p == 2 && memcmp(s + p, "in", 2) == 0))
+                    break;
+                local_emit(fn, ctx, s + p, j - p);
+                p = j;
+            }
+            i = p;
+        } else if (fam == 2) {
+            /* a target at the start of the line: "a, b = ...", "x: int = ..." */
+            size_t k = 0, p = b, lead = 0;
+            size_t nb[4], nl[4];
+
+            while (lead < b && is_blank(s[lead]))
+                lead++;
+            if (lead != b)
+                continue;
+            for (;;) {
+                size_t e = p;
+
+                while (e < lim && is_idc((unsigned char)s[e]))
+                    e++;
+                if (e == p || k >= 4)
+                    break;
+                nb[k] = p;
+                nl[k++] = e - p;
+                p = e;
+                while (p < lim && is_blank(s[p]))
+                    p++;
+                if (p < lim && s[p] == ',') {
+                    p++;
+                    while (p < lim && is_blank(s[p]))
+                        p++;
+                    continue;
+                }
+                break;
+            }
+            if (k == 0 || k > 4)
+                continue;
+            if (p < lim && s[p] == ':' && k == 1) {
+                size_t q;
+
+                for (q = p; q < lim; q++)
+                    if (s[q] == '=' && (q + 1 >= lim || s[q + 1] != '=') && s[q - 1] != '=')
+                        break;
+                if (q >= lim)
+                    continue;
+            } else if (!(p < lim && s[p] == '=' && (p + 1 >= lim || s[p + 1] != '='))) {
+                continue;
+            }
+            for (j = 0; j < k; j++)
+                local_emit(fn, ctx, s + nb[j], nl[j]);
+        }
+    }
+}
+
+static const Sym *enclosing_func(const SymIndex *x, size_t y)
+{
+    const Sym *best = NULL;
+    size_t i;
+
+    for (i = 0; i < x->n; i++)
+        if ((x->v[i].kind == RULE_FUNC || x->v[i].kind == RULE_METHOD) && x->v[i].name[0] &&
+            x->v[i].y0 <= y && (!best || x->v[i].y0 >= best->y0))
+            best = &x->v[i];
+    return best;
+}
+
+/* Has the function declared at line y0 already ended above line y? */
+static int func_ended(Syntax *syn, const Buffer *b, size_t y0, size_t y)
+{
+    size_t k, i, d0 = 0;
+    long depth = 0;
+    int opened = 0;
+
+    if (y - y0 > 3000)
+        return 0;
+    if (syn_indent_scope(syn)) {
+        while (d0 < b->lines[y0].len && is_blank(b->lines[y0].s[d0]))
+            d0++;
+        for (k = y0 + 1; k <= y; k++) {
+            const Line *l = &b->lines[k];
+            size_t ind = 0;
+
+            while (ind < l->len && is_blank(l->s[ind]))
+                ind++;
+            if (ind == l->len || l->s[ind] == ')' || l->s[ind] == ']')
+                continue;
+            if (ind <= d0)
+                return 1;
+        }
+        return 0;
+    }
+    for (k = y0; k < y; k++) {
+        const Line *l = &b->lines[k];
+        const uint8_t *cl;
+
+        syn_update(syn, (Buffer *)b, k);
+        cl = syn_classes(syn, b, k);
+        for (i = 0; i < l->len; i++) {
+            if (cl_skip(cl, i))
+                continue;
+            if (l->s[i] == '{') {
+                depth++;
+                opened = 1;
+            } else if (l->s[i] == '}') {
+                depth--;
+                if (opened && depth <= 0)
+                    return 1;
+            } else if (l->s[i] == ';' && !opened && depth == 0) {
+                return 1;           /* a prototype: no body */
+            }
+        }
+    }
+    return 0;
+}
+
+void sym_locals(SymCache *c, Doc *cur, size_t y, size_t xlimit, SymFn fn, void *ctx)
+{
+    const SymIndex *x;
+    const Sym *f;
+    Syntax *syn = cur->syn;
+    int fam;
+    size_t k;
+
+    if (!syn || y >= cur->buf.nlines)
+        return;
+    fam = lang_family(syn_name(syn));
+    if (!fam)
+        return;
+    x = index_of_doc(c, cur);
+    f = enclosing_func(x, y);
+    if (!f || f->y0 >= cur->buf.nlines || func_ended(syn, &cur->buf, f->y0, y))
+        return;
+    local_params(f->sig, fam, fn, ctx);
+    for (k = f->y0; k <= y; k++) {
+        const Line *l = &cur->buf.lines[k];
+        const uint8_t *cl;
+
+        syn_update(syn, &cur->buf, k);
+        cl = syn_classes(syn, &cur->buf, k);
+        local_line(fam, l->s, k == y && xlimit < l->len ? xlimit : l->len, cl, fn, ctx);
+    }
 }

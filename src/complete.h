@@ -14,7 +14,7 @@
 #define COMPLETE_IDLE_MS 5      /* pause between the steps of a scan that goes on while idle */
 
 enum { CAND_WORD = 0, CAND_KEYWORD, CAND_SNIPPET, CAND_FUNC, CAND_CLASS, CAND_METHOD, CAND_PROP,
-       CAND_CONST };
+       CAND_CONST, CAND_LOCAL };
 
 typedef struct {
     char *text;             /* what is inserted (for a snippet: its name) */

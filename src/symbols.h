@@ -101,4 +101,32 @@ void sym_classes(SymCache *c, Doc *cur, const char *prefix, size_t plen, int ful
 int sym_type_before(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t sep,
                     char *out, size_t n);
 
+
+/* ---- calls, parameters and local variables ------------------------------ */
+
+/* The parenthesis that is open at a position: a call "foo(a, |" or the parameters of a
+ * definition. */
+typedef struct {
+    char name[PM_NAME];     /* what precedes the parenthesis ("" for a plain one) */
+    int arg;                /* index of the argument at the position (commas at its level) */
+    int decl;               /* the parameters of a definition (function, def, "int foo(") */
+    int typepos;            /* declaration, and the word at the position is where a type goes */
+    int isnew;              /* "new Name(" */
+    size_t y, x;            /* the parenthesis */
+    size_t name_x;          /* where the name starts on line y */
+} SymCall;
+
+/* Looks back (at most 40 lines, outside strings and comments) from byte x of line y for the
+ * unclosed "(". Returns 1 and fills o if there is one, else 0. */
+int sym_call_at(Syntax *syn, const Buffer *b, size_t y, size_t x, SymCall *o);
+/* Where parameter number arg of the list sig starts and ends (variadic ones take the rest). */
+int sym_param_span(const char *sig, int arg, size_t *from, size_t *to);
+/* For a call to a known function or method, "name(params)" in out and the byte range of the
+ * current parameter (both 0 if none). Returns 1 if the callee was found. */
+int sym_call_hint(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t x,
+                  char *out, size_t cap, size_t *hl_from, size_t *hl_to);
+/* The parameters of the function around line y and the variables it declares above that point
+ * (only up to byte xlimit of line y), reported as RULE_VAR with no signature. */
+void sym_locals(SymCache *c, Doc *cur, size_t y, size_t xlimit, SymFn fn, void *ctx);
+
 #endif

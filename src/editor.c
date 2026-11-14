@@ -583,6 +583,23 @@ static void prepare_frame(Editor *e)
     }
     e->match_on = syn_match_bracket(e->doc->syn, e->buf, e->cy, e->cx,
                                     &e->by, &e->bx, &e->my, &e->mx);
+    /* the call the cursor is in: its signature goes to the status bar */
+    if (e->hint_doc != e->doc || e->hint_y != e->cy || e->hint_x != e->cx ||
+        e->hint_gen != e->buf->gen) {
+        e->hint_doc = e->doc;
+        e->hint_y = e->cy;
+        e->hint_x = e->cx;
+        e->hint_gen = e->buf->gen;
+        e->hint[0] = '\0';
+        if (e->doc->autosuggest && !cur_multi(e) && !e->prompt_on) {
+            if (!e->comp.sc)
+                e->comp.sc = sym_cache_new();
+            sym_budget(e->comp.sc, COMPLETE_SCAN_MS);
+            if (!sym_call_hint(e->comp.sc, e->docs, e->ndocs, e->doc, e->cy, e->cx, e->hint,
+                               sizeof e->hint, &e->hint_a, &e->hint_b))
+                e->hint[0] = '\0';
+        }
+    }
 }
 
 static void resize(Editor *e)
