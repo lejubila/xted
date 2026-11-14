@@ -29,7 +29,7 @@ typedef struct {
     size_t n, cap;
     size_t sel, top;        /* highlighted candidate, first visible one */
     size_t min_prefix;      /* letters needed before candidates are looked up (0: the default) */
-    int picked;             /* the user chose with the arrows: Enter then accepts */
+    int picked;             /* the user chose with the arrows: Tab then accepts inside a snippet */
     size_t y, x;            /* where the word being completed starts */
     size_t rows;            /* rows the renderer could show last time (0: COMPLETE_ROWS) */
     SymCache *sc;           /* indexes of the symbols of files and of the standard library */

@@ -1867,6 +1867,20 @@ static void complete_accept(Editor *e)
     free(text);
 }
 
+/* Accepting inside a snippet session: keep the current stop's length right (a new snippet
+ * from the choice replaces the session; a changed line count ends it). */
+static void accept_in_snippet(Editor *e)
+{
+    SnipSession old = e->snip;
+    size_t y = old.on ? old.stop[old.cur].y : 0, nl = e->buf->nlines;
+    size_t len = old.on ? e->buf->lines[y].len : 0;
+
+    complete_accept(e);
+    if (old.on && e->snip.on && memcmp(&old, &e->snip, sizeof old) == 0)
+        snip_adjust(&e->snip, nl, e->buf->nlines, len,
+                    y < e->buf->nlines ? e->buf->lines[y].len : 0, e->cy, e->cx);
+}
+
 /* Keys that belong to an open popup. Returns 1 if the key was used. */
 static int handle_complete(Editor *e, Key k)
 {
@@ -1880,16 +1894,18 @@ static int handle_complete(Editor *e, Key k)
         complete_move(&e->comp, 1);
         return 1;
     case KEY_ENTER:
-        /* Enter only accepts a choice made with the arrows: typed or pasted
-         * text with newlines must not be rewritten under the user's hands */
-        if (!e->comp.picked) {
+        /* Enter takes the highlighted candidate (the first one unless moved with the arrows) */
+        buf_undo_close(e->buf);
+        accept_in_snippet(e);
+        return 1;
+    case KEY_TAB:
+        /* inside a snippet Tab keeps moving between placeholders unless a choice was made */
+        if (e->snip.on && !e->comp.picked) {
             complete_close(&e->comp);
             return 0;
         }
-        /* fall through */
-    case KEY_TAB:
         buf_undo_close(e->buf);
-        complete_accept(e);
+        accept_in_snippet(e);
         return 1;
     case KEY_ESC:
         complete_close(&e->comp);
@@ -1910,7 +1926,7 @@ static void update_complete(Editor *e, Key k)
 
     /* keys already waiting (fast typing, a paste without bracketing) are not worth a scan each */
     if ((word || op || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&
-        !e->snip.on && !cur_multi(e) && e->doc->autosuggest && !term_has_input()) {
+        !cur_multi(e) && e->doc->autosuggest && !term_has_input()) {
         e->comp.min_prefix = (size_t)e->doc->suggest_min;
         complete_open(&e->comp, e->docs, e->ndocs, e->doc, e->cy, e->cx);
     }
