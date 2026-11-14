@@ -68,6 +68,7 @@ typedef struct {
     void (*add)(const char *, void *);
     void *ctx;
     size_t count;
+    const char *const *prune;
 } Scan;
 
 static void scan_dir(Scan *s, const char *root, const char *rel, int depth)
@@ -83,7 +84,13 @@ static void scan_dir(Scan *s, const char *root, const char *rel, int depth)
 
         if (lstat(full, &st) == 0) {
             if (S_ISDIR(st.st_mode)) {
-                if (depth < SCAN_MAX_DEPTH)
+                size_t pi;
+                int skip = 0;
+
+                for (pi = 0; s->prune && s->prune[pi]; pi++)
+                    if (strcmp(s->prune[pi], names[i]) == 0)
+                        skip = 1;
+                if (!skip && depth < SCAN_MAX_DEPTH)
                     scan_dir(s, root, r, depth + 1);
             } else if (S_ISREG(st.st_mode) ||
                        (S_ISLNK(st.st_mode) && stat(full, &st) == 0 && S_ISREG(st.st_mode))) {
@@ -100,15 +107,22 @@ static void scan_dir(Scan *s, const char *root, const char *rel, int depth)
     free(dir);
 }
 
-size_t files_scan(const char *root, void (*add)(const char *rel, void *ctx), void *ctx)
+size_t files_scan_prune(const char *root, void (*add)(const char *rel, void *ctx), void *ctx,
+                        const char *const *prune)
 {
     Scan s;
 
     s.add = add;
     s.ctx = ctx;
     s.count = 0;
+    s.prune = prune;
     scan_dir(&s, root, "", 0);
     return s.count;
+}
+
+size_t files_scan(const char *root, void (*add)(const char *rel, void *ctx), void *ctx)
+{
+    return files_scan_prune(root, add, ctx, NULL);
 }
 
 /* ---- tree -------------------------------------------------------------- */

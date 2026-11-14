@@ -4,6 +4,7 @@
 #include "utf8.h"
 #include "util.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +24,7 @@ typedef struct {
     size_t setsize, setn;
     char prefix[256];
     size_t plen;
+    int use_ctx;            /* after PHP's `use`: qualified names are the candidates */
 } Gather;
 
 static int word_cp(const char *s, size_t len, size_t i, size_t *n)
@@ -90,7 +92,8 @@ static void consider_sig(Gather *g, const char *w, size_t n, int kind, size_t di
     char tmp[256];
     int score;
 
-    if (n < g->plen || (n == g->plen && kind != CAND_SNIPPET) || n >= sizeof tmp ||
+    if (n < g->plen || (n == g->plen && kind != CAND_SNIPPET && !(kind == CAND_CLASS && sig)) ||
+        n >= sizeof tmp ||
         g->n >= MAX_RAW)
         return;
     memcpy(tmp, w, n);
@@ -151,7 +154,62 @@ static void sym_cb(void *ctx, const char *name, int kind, const char *sig, const
         n += (size_t)snprintf(buf + n, sizeof buf - n, "(%s)", sig);
     if (ck != CAND_CLASS && ret[0] && n < sizeof buf)
         snprintf(buf + n, sizeof buf - n, ": %s", ret);
-    consider_sig(ctx, name, strlen(name), ck, (size_t)rank, buf);
+    consider_sig(ctx, name, strlen(name), ck, (size_t)rank, ck == CAND_CLASS && rank < 2 ? NULL : buf);
+}
+
+/* A class of the project for the suggestions: after `use` the qualified name itself, elsewhere
+ * the short name with the qualified one as its signature (so accepting it can add the use). */
+static void class_cb(void *ctx, const char *fq, int rank)
+{
+    Gather *g = ctx;
+
+    if (g->use_ctx) {
+        if (g->n < MAX_RAW && set_add(g, fq, strlen(fq))) {
+            g->v[g->n].w = xstrdup(fq);
+            g->v[g->n].sig = NULL;
+            g->v[g->n].kind = CAND_CLASS;
+            /* the closer the last segment is to what was typed, the better; the project first */
+            {
+                const char *last = strrchr(fq, '\\');
+                size_t extra = strlen(last ? last + 1 : fq);
+
+                g->v[g->n].score = 100 - rank * 20 - (int)(extra > 15 ? 15 : extra) +
+                                   (strncmp(fq, "App\\", 4) == 0 ? 4 : 0);
+            }
+            g->v[g->n].dist = 1;
+            g->n++;
+        }
+    } else {
+        const char *last = strrchr(fq, '\\');
+
+        last = last ? last + 1 : fq;
+        consider_sig(g, last, strlen(last), CAND_CLASS, 2, fq);
+    }
+}
+
+/* True if the word at [start, x) of a PHP line follows `use` (maybe qualified: use A\B\C);
+ * *qs is where the qualified name begins. */
+static int use_context(const Buffer *b, size_t y, size_t start, size_t *qs)
+{
+    const Line *l = &b->lines[y];
+    size_t s = start, k;
+
+    while (s > 0 && (l->s[s - 1] == '\\' || (l->s[s - 1] & 0x80) || isalnum((unsigned char)l->s[s - 1]) ||
+                     l->s[s - 1] == '_'))
+        s--;
+    k = s;
+    while (k > 0 && l->s[k - 1] == ' ')
+        k--;
+    if (k == s || k < 3 || memcmp(l->s + k - 3, "use", 3) != 0)
+        return 0;
+    for (s = 0; s < k - 3; s++)
+        if (l->s[s] != ' ' && l->s[s] != '\t')
+            return 0;
+    *qs = start;
+    while (*qs > 0 && (l->s[*qs - 1] == '\\' || isalnum((unsigned char)l->s[*qs - 1]) ||
+                       l->s[*qs - 1] == '_'))
+        (*qs)--;
+    return 1;
 }
 
 static void scan_line(Gather *g, const Line *l, size_t dist, int is_cursor_line, size_t skip_x)
@@ -219,16 +277,24 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
 {
     Gather g;
     const Buffer *b = &cur->buf;
-    size_t start, plen, i, budget = COMPLETE_SCAN_LINES, d, take, sep = (size_t)-1;
+    size_t start, plen, i, budget = COMPLETE_SCAN_LINES, d, take, sep = (size_t)-1, qs = 0;
+    int php = cur->syn && strncmp(syn_name(cur->syn), "PHP", 3) == 0, use_ctx = 0;
 
     complete_close(c);
     plen = complete_prefix(b, y, x, &start);
-    if (syn_rule_count(cur->syn) > 0)
+    if (php && use_context(b, y, start, &qs)) {
+        use_ctx = 1;
+        start = qs;
+        plen = x - qs;
+    } else if (syn_rule_count(cur->syn) > 0) {
         sep = sym_member_at(cur->syn, b, y, start);
+    }
     if (plen >= sizeof g.prefix ||
-        (sep == (size_t)-1 && plen < (c->min_prefix ? c->min_prefix : COMPLETE_MIN_PREFIX)))
+        (!use_ctx && sep == (size_t)-1 &&
+         plen < (c->min_prefix ? c->min_prefix : COMPLETE_MIN_PREFIX)))
         return 0;
     memset(&g, 0, sizeof g);
+    g.use_ctx = use_ctx;
     memcpy(g.prefix, b->lines[y].s + start, plen);
     g.prefix[plen] = '\0';
     g.plen = plen;
@@ -237,7 +303,12 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
     g.set = xmalloc(g.setsize * sizeof *g.set);
     memset(g.set, 0, g.setsize * sizeof *g.set);
 
-    if (sep != (size_t)-1) {
+    if (use_ctx) {
+        if (!c->sc)
+            c->sc = sym_cache_new();
+        sym_classes(c->sc, cur, g.prefix, plen, 1, class_cb, &g);
+        budget = 0;
+    } else if (sep != (size_t)-1) {
         if (!c->sc)
             c->sc = sym_cache_new();
         sym_members(c->sc, docs, ndocs, cur, y, sep, sym_cb, &g);
@@ -249,12 +320,15 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
         /* snippets first: a snippet named like a keyword wins */
         for (k = 0; k < ns; k++)
             consider(&g, sd[k].name, strlen(sd[k].name), CAND_SNIPPET, 0);
-        syn_each_word(cur->syn, kw_cb, &g);
         if (syn_rule_count(cur->syn) > 0) {
             if (!c->sc)
                 c->sc = sym_cache_new();
             sym_globals(c->sc, docs, ndocs, cur, sym_cb, &g);
+            if (php && plen >= 3 && (start == 0 || b->lines[y].s[start - 1] != '$'))
+                sym_classes(c->sc, cur, g.prefix, plen, 0, class_cb, &g);
         }
+        /* after the symbols: a library class called like a keyword (Exception) keeps its use */
+        syn_each_word(cur->syn, kw_cb, &g);
     }
     /* the current document outward from the cursor line */
     for (d = 0; budget > 0; d++) {

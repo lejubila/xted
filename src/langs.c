@@ -28,6 +28,9 @@
  *                             class is a method. First matching decl at a statement start wins.
  *   include PATTERN           names a file (~ a quoted string, & a dotted module path, % a class)
  *   bind PATTERN              ties a variable (@) to a type (%), searched upwards from the cursor
+ *   synonym PATTERN           a class known by another name (@ the alias, % the class)
+ *   docmember PATTERN         a member declared in the doc comment above a class (@method, @property):
+ *                             a pattern with a "(" is a method, otherwise a property
  *   attr PATTERN              a member created by assignment inside a method (this.x = ...)
  *   member OPS                operators that open the member list: member -> ::
  *   scope indent              blocks are marked by indentation (default: braces)
@@ -87,6 +90,7 @@ static const char *const lang_c[] = {
     "bind auto @ = new %",
     "bind auto @ = % (",
     "bind @ = new %",
+    "synonym using @ = %",
     "bind const|struct|enum|union|volatile|static|unsigned|constexpr* % @ =;|=|(|[|,|)|{|:",
     NULL
 };
@@ -126,6 +130,7 @@ static const char *const lang_python[] = {
     "decl var @ : %",
     "decl var @ =",
     "include from & import",
+    "synonym from & import % as @",
     "include import &",
     "attr self . @ = % (",
     "attr self . @ : %",
@@ -305,6 +310,12 @@ static const char *const lang_markdown[] = {
     "attr $ this -> @ = new %", \
     "attr $ this -> @ =", \
     "bind $ @ = new %", \
+    "bind $ @ = % (", \
+    "synonym use % as @", \
+    "docmember @method static? % @ ( ^", \
+    "docmember @method static? @ ( ^", \
+    "docmember @property|@property-read|@property-write % $ @", \
+    "docmember @see %", \
     "bind var % $ @", \
     "bind % $ @"
 

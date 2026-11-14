@@ -462,7 +462,8 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             if (r->ml && !r->end)
                 PERR("riga %zu: una regione fino a fine riga non può essere ml", lineno);
         } else if (tok_is(t[0], "decl") || tok_is(t[0], "include") || tok_is(t[0], "bind") ||
-                   tok_is(t[0], "attr")) {
+                   tok_is(t[0], "attr") || tok_is(t[0], "synonym") ||
+                   tok_is(t[0], "docmember")) {
             static const char *const kinds[] = { "class", "func", "method", "prop", "const",
                                                  "var", "ns" };
             int kind = -1, first = 1;
@@ -478,7 +479,9 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                          lineno);
             } else {
                 kind = tok_is(t[0], "include") ? RULE_INCLUDE
-                       : tok_is(t[0], "bind") ? RULE_BIND : RULE_ATTR;
+                       : tok_is(t[0], "bind") ? RULE_BIND
+                       : tok_is(t[0], "synonym") ? RULE_ALIAS
+                       : tok_is(t[0], "docmember") ? RULE_DOC : RULE_ATTR;
             }
             if (nt <= (size_t)first)
                 PERR("riga %zu: manca il modello", lineno);

@@ -4,7 +4,7 @@ Nov 7, 2026 · @David
 
 ## Obiettivi e vincoli
 
-Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 400 KB, avvio sotto 50 ms.
+Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 420 KB, avvio sotto 50 ms.
 
 - **Zero dipendenze**: niente ncurses, niente librerie esterne; controllo del terminale via termios e sequenze ANSI/VT100 scritte a mano.
 - **Linguaggio**: C99 (alternativa: Rust senza crate esterni, ma binario più grande).

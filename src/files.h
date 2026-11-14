@@ -12,6 +12,10 @@
  * SCAN_MAX_FILES; returns the number of files reported. */
 size_t files_scan(const char *root, void (*add)(const char *rel, void *ctx), void *ctx);
 
+/* Like files_scan, also skipping the folders called prune (a NULL-terminated list). */
+size_t files_scan_prune(const char *root, void (*add)(const char *rel, void *ctx), void *ctx,
+                        const char *const *prune);
+
 /* dir + "/" + name (just name when dir is "."); malloc'ed. */
 char *files_join(const char *dir, const char *name);
 

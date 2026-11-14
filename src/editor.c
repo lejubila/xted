@@ -1769,7 +1769,13 @@ static void complete_accept(Editor *e)
     SBuf body = SBUF_INIT;
     const Line *ln = &e->buf->lines[e->cy];
     int call = 0;
+    char *fq = NULL;
 
+    /* a class of the project or the library: accepting it may add its "use" */
+    if (c->kind == CAND_CLASS && c->sig && e->doc->syn &&
+        strncmp(syn_name(e->doc->syn), "PHP", 3) == 0 &&
+        (strchr(c->sig, '\\') || strcmp(c->sig, c->text) == 0))
+        fq = xstrdup(c->sig);
     /* a call already there ("foo|(") only gets the name */
     if (!snippet && !(e->cx < ln->len && ln->s[e->cx] == '('))
         call = complete_call_body(c, &body);
@@ -1782,6 +1788,7 @@ static void complete_accept(Editor *e)
         edit_expand_snippet(e, from, &d);
         sbuf_free(&body);
         free(text);
+        free(fq);
         return;
     }
     if (call == 2) {
@@ -1790,6 +1797,7 @@ static void complete_accept(Editor *e)
             e->cx--;                    /* between the parentheses */
         sbuf_free(&body);
         free(text);
+        free(fq);
         return;
     }
     if (snippet)
@@ -1797,9 +1805,11 @@ static void complete_accept(Editor *e)
             if (strcmp(sd[i].name, text) == 0) {
                 edit_expand_snippet(e, from, &sd[i]);
                 free(text);
+                free(fq);
                 return;
             }
-    edit_replace_word(e, from, text, strlen(text));
+    edit_replace_class(e, from, text, strlen(text), fq);
+    free(fq);
     free(text);
 }
 
@@ -1842,7 +1852,7 @@ static void update_complete(Editor *e, Key k)
     int word = !(k.mods & (MOD_ALT | MOD_CTRL)) && is_printable(k.code) && cp_is_word(k.code);
     int bs = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == KEY_BACKSPACE || k.code == 8);
     /* the end of a member operator (-> :: .) opens the list of members: complete_open decides */
-    int op = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == '>' || k.code == ':' || k.code == '.');
+    int op = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == '>' || k.code == ':' || k.code == '.' || k.code == '\\');
 
     /* keys already waiting (fast typing, a paste without bracketing) are not worth a scan each */
     if ((word || op || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&

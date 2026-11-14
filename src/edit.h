@@ -61,6 +61,10 @@ void edit_join_lines(Editor *e);
 /* Replaces the text from byte from_x of the cursor line up to the cursor with s. */
 void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n);
 
+/* Like edit_replace_word for a class chosen in the suggestions; in a PHP file also adds the
+ * "use fq;" statement when the class is not yet imported (fq NULL: just the word). One undo step. */
+void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq);
+
 /* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */
 void edit_store_clip(Editor *e, char *text, size_t n, const char *verb);
 

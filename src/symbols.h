@@ -14,6 +14,7 @@ enum { PM_NAME = 64, PM_PARAMS = 128, PM_PATH = 256 };
 typedef struct {
     char name[PM_NAME];     /* @ */
     char type[PM_NAME];     /* % (last segment of a qualified name) */
+    char qual[PM_PATH];     /* % the whole qualified name, without generics */
     char params[PM_PARAMS]; /* ^ (text up to the matching parenthesis) */
     char path[PM_PATH];     /* ~ a quoted string, & a dotted module path */
     size_t end;             /* where the match ends */
@@ -29,6 +30,7 @@ typedef struct {
     char *name, *sig, *ret;     /* ret: the type; for a class, its base class */
     int kind;                   /* RULE_CLASS, RULE_FUNC, RULE_METHOD, RULE_PROP, RULE_CONST, RULE_VAR */
     long owner;                 /* index of the class a member belongs to, -1 for none */
+    int hidden;                 /* private or protected */
     size_t y0, y1;              /* lines of a class (its block) */
 } Sym;
 
@@ -77,6 +79,15 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
 /* Functions, classes, constants and variables visible from cur: the file, the open documents,
  * the files it includes, the standard library. */
 void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn, void *ctx);
+
+/* PHP: the classes of the project that can be imported with "use": config/app.php aliases, then
+ * Composer's classmap, then the PSR-4 directories of the project. A class is reported with its
+ * qualified name when its last segment starts with prefix (case ignored), or, if full is set,
+ * when the qualified name does. rank: 0 the last segment is the prefix, 1 it starts with it,
+ * 2 only the namespace matches. */
+typedef void (*ClassFn)(void *ctx, const char *fq, int rank);
+void sym_classes(SymCache *c, Doc *cur, const char *prefix, size_t plen, int full, ClassFn fn,
+                 void *ctx);
 
 /* The type name (class) of the expression before the operator at (y, sep), "" if unknown;
  * writes at most n bytes. Used by the tests. */

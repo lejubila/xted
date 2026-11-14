@@ -94,6 +94,36 @@ static int lit_match(const char *p, size_t pl, const char *s, size_t len, size_t
     return 0;
 }
 
+/* One qualified name at *pi (an optional "?" or leading "\\", then segments joined by "\\" or
+ * "::"): *qs where it starts, *ls where its last segment starts. */
+static int qual_name(const char *s, size_t len, size_t *pi, size_t *qs, size_t *ls)
+{
+    size_t i = *pi, st;
+
+    if (i < len && s[i] == '?')
+        i++;
+    if (i < len && s[i] == '\\')
+        i++;
+    *qs = i;
+    for (;;) {
+        st = i;
+        while (i < len && is_idc((unsigned char)s[i]))
+            i++;
+        if (i == st)
+            return 0;
+        *ls = st;
+        if (i < len && s[i] == '\\')
+            i++;
+        else if (i + 1 < len && s[i] == ':' && s[i + 1] == ':' && i + 2 < len &&
+                 is_idc((unsigned char)s[i + 2]))
+            i += 2;
+        else
+            break;
+    }
+    *pi = i;
+    return 1;
+}
+
 int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch *m)
 {
     const char *p = pat;
@@ -124,32 +154,44 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
                 return 0;
             put(m->name, sizeof m->name, s + st, i - st);
         } else if (il == 1 && *p == '%') {
-            size_t st, ls;
+            size_t qs, ls, qe;
+            int got = 0;
 
-            if (i < len && s[i] == '?')
-                i++;
-            if (i < len && s[i] == '\\')
-                i++;
+            /* a type, or a union (A|B|null) of which the first real type is kept */
             for (;;) {
-                st = i;
-                while (i < len && is_idc((unsigned char)s[i]))
-                    i++;
-                if (i == st)
+                size_t from_bar = i;
+
+                if (!qual_name(s, len, &i, &qs, &ls)) {
+                    if (!got)
+                        return 0;
+                    i = from_bar - 1;
+                    break;
+                }
+                qe = i;
+                if (!is_reject(s + ls, qe - ls)) {
+                    size_t n = qe - ls;
+                    int nullish = (n == 4 && (memcmp(s + ls, "null", 4) == 0 ||
+                                              memcmp(s + ls, "void", 4) == 0)) ||
+                                  (n == 5 && memcmp(s + ls, "false", 5) == 0);
+
+                    if (!got || (!nullish && m->type[0] != '\0' &&
+                                 (strcmp(m->type, "null") == 0 || strcmp(m->type, "void") == 0 ||
+                                  strcmp(m->type, "false") == 0))) {
+                        put(m->type, sizeof m->type, s + ls, n);
+                        put(m->qual, sizeof m->qual, s + qs, qe - qs);
+                    }
+                    got = 1;
+                } else if (!got) {
                     return 0;
-                ls = st;
-                if (i < len && s[i] == '\\')
+                }
+                if (i < len && s[i] == '<')
+                    i = skip_angle(s, len, i);
+                if (i + 1 < len && s[i] == '|' &&
+                    (is_idc((unsigned char)s[i + 1]) || s[i + 1] == '\\' || s[i + 1] == '?'))
                     i++;
-                else if (i + 1 < len && s[i] == ':' && s[i + 1] == ':' && i + 2 < len &&
-                         is_idc((unsigned char)s[i + 2]))
-                    i += 2;
                 else
                     break;
             }
-            if (is_reject(s + ls, i - ls))
-                return 0;
-            put(m->type, sizeof m->type, s + ls, i - ls);
-            if (i < len && s[i] == '<')
-                i = skip_angle(s, len, i);
             while (i < len && (is_blank(s[i]) || s[i] == '*' || s[i] == '&'))
                 i++;
         } else if (il == 1 && *p == '^') {
@@ -277,6 +319,7 @@ static long ix_add(SymIndex *x, int kind, const char *name, const char *sig, con
     s->ret = xstrdup(ret);
     s->kind = kind;
     s->owner = owner;
+    s->hidden = 0;
     s->y0 = y;
     s->y1 = (size_t)-1;
     return (long)x->n++;
@@ -408,6 +451,9 @@ typedef struct {
 } Frame;
 
 #define MAX_FRAMES 48
+#define DOC_MAX 96
+static const char *last_segment(const char *q);
+static int token_start(const char *s, size_t i);
 
 typedef struct {
     SymIndex *x;
@@ -420,6 +466,13 @@ typedef struct {
     int pend;                   /* the next '{' opens this kind of block (-1: none) */
     long pend_owner;
     size_t last_code;
+    struct {                    /* members declared in the doc comment above the next class */
+        int method;             /* 1 method, 0 property, 2 @see (sig: the qualified class) */
+        char name[PM_NAME], sig[PM_PARAMS], ret[PM_NAME];
+        size_t y;
+    } doc[DOC_MAX];
+    size_t ndoc;
+    int has_doc;                /* the language has docmember rules */
 } Build;
 
 static void push(Build *B, int kind, long owner, long indent)
@@ -507,10 +560,33 @@ static int try_decl(Build *B, size_t y, const char *s, size_t len, size_t i, siz
             return kind;
         }
         if (kind == RULE_CLASS) {
+            size_t d;
+
             B->pend_owner = ix_add(B->x, RULE_CLASS, m.name, "", m.type, -1, y);
             B->pend = F_CLASS;
+            for (d = 0; d < B->ndoc; d++) {
+                if (B->doc[d].method == 2) {
+                    /* a Laravel facade forwards to the classes of its @see tags: they are
+                     * loaded with the file and searched for members (nameless entry) */
+                    char spec[PM_PARAMS + 1];
+
+                    if (strcmp(m.type, "Facade") != 0)
+                        continue;
+                    spec[0] = ':';
+                    put(spec + 1, PM_PARAMS, B->doc[d].sig, strlen(B->doc[d].sig));
+                    ix_inc(B->x, spec);
+                    ix_add(B->x, RULE_VAR, "", "@see", last_segment(B->doc[d].sig),
+                           B->pend_owner, B->doc[d].y);
+                } else if (B->doc[d].method)
+                    ix_add(B->x, RULE_METHOD, B->doc[d].name, B->doc[d].sig, B->doc[d].ret,
+                           B->pend_owner, B->doc[d].y);
+                else
+                    add_prop(B, B->pend_owner, B->doc[d].name, B->doc[d].ret, B->doc[d].y);
+            }
+            B->ndoc = 0;
             return kind;
         }
+        B->ndoc = 0;
         if (kind == RULE_FUNC && owner >= 0)
             kind = RULE_METHOD;
         if (m.type[0])
@@ -527,7 +603,16 @@ static int try_decl(Build *B, size_t y, const char *s, size_t len, size_t i, siz
                 sg += sg[4] == ',' ? 5 : 4;
             while (*sg == ' ')
                 sg++;
-            ix_add(B->x, kind, m.name, sg, ret, owner, y);
+            {
+                long ni = ix_add(B->x, kind, m.name, sg, ret, owner, y);
+                size_t a;
+
+                /* hidden from outside the class: a facade does not forward it */
+                for (a = i; a < m.end && a < len; a++)
+                    if (token_start(s, a) && (strncmp(s + a, "private", 7) == 0 ||
+                                              strncmp(s + a, "protected", 9) == 0))
+                        B->x->v[ni].hidden = 1;
+            }
         }
         return kind;
     }
@@ -555,10 +640,11 @@ static int try_other(Build *B, size_t y, const char *s, size_t len, size_t i, si
             if (m.path[0]) {
                 ix_inc(B->x, m.path);
             } else if (m.type[0]) {
-                char spec[PM_NAME + 1];
+                char spec[PM_PATH + 1];
 
                 spec[0] = ':';
-                memcpy(spec + 1, m.type, strlen(m.type) + 1);
+                put(spec + 1, sizeof spec - 1, m.qual[0] ? m.qual : m.type,
+                    strlen(m.qual[0] ? m.qual : m.type));
                 ix_inc(B->x, spec);
             } else {
                 continue;
@@ -571,6 +657,38 @@ static int try_other(Build *B, size_t y, const char *s, size_t len, size_t i, si
         return 1;
     }
     return 0;
+}
+
+static int token_start(const char *s, size_t i);
+static const char *last_segment(const char *q);
+
+/* @method / @property tags in a comment line: the members of the class that follows. */
+static void scan_doc(Build *B, size_t y, const char *s, size_t len, const uint8_t *cls)
+{
+    size_t i, k;
+    PatMatch m;
+
+    for (i = 0; i < len && B->ndoc < DOC_MAX; i++) {
+        if (s[i] != '@' || cls[i] != SC_COMMENT)
+            continue;
+        for (k = 0; k < B->nr; k++) {
+            int see;
+
+            if (B->r[k].kind != RULE_DOC || !pat_match(B->r[k].pat, s, len, i, &m))
+                continue;
+            see = m.name[0] == '\0' && m.qual[0] != '\0';
+            if (m.name[0] == '\0' && !see)
+                continue;
+            B->doc[B->ndoc].method = see ? 2 : strchr(B->r[k].pat, '(') != NULL;
+            put(B->doc[B->ndoc].name, PM_NAME, m.name, strlen(m.name));
+            put(B->doc[B->ndoc].sig, PM_PARAMS, see ? m.qual : m.params,
+                strlen(see ? m.qual : m.params));
+            put(B->doc[B->ndoc].ret, PM_NAME, m.type, strlen(m.type));
+            B->doc[B->ndoc].y = y;
+            B->ndoc++;
+            break;
+        }
+    }
 }
 
 static int token_start(const char *s, size_t i)
@@ -698,6 +816,9 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
     B.x = x;
     B.b = b;
     B.r = syn_rules(syn, &B.nr);
+    for (i = 0; i < B.nr; i++)
+        if (B.r[i].kind == RULE_DOC)
+            B.has_doc = 1;
     B.indent = syn_indent_scope(syn);
     B.pend = -1;
     B.nf = 1;
@@ -713,6 +834,8 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
                 cls = xrealloc(cls, clscap);
             }
             st = syn_line(syn, st, l->s, l->len, cls);
+            if (B.has_doc && l->len && memchr(l->s, '@', l->len))
+                scan_doc(&B, y, l->s, l->len, cls);
             if (B.indent)
                 scan_indent(&B, y, l->s, l->len, cls);
             else
@@ -737,7 +860,7 @@ static const char *const lib_ids[LIB_N] = { "php", "c", "cpp", "py", "js" };
 #define OPEN_MAX 8
 #define INC_DEPTH 3
 #define FILE_MAX_BYTES (2L * 1024 * 1024)
-#define PROJECT_FILES_MAX 20000
+#define PROJECT_FILES_MAX 40000
 
 struct SymCache {
     SymIndex **v;
@@ -746,6 +869,16 @@ struct SymCache {
     char **files;
     size_t nfiles;
     int files_done;
+    char **al_name, **al_qual;      /* class aliases of config/app.php (Laravel facades) */
+    size_t nal;
+    int al_done;
+    char **ps_prefix, **ps_dir;     /* Composer's PSR-4 map: namespace prefix -> directory */
+    size_t nps;
+    int ps_done;
+    char **cls;                     /* qualified names of the project's classes */
+    size_t ncls, clscap;
+    int cls_done;
+    char root[PATH_MAX];            /* the project (where vendor/ or composer.json is); "" = cwd */
     StdLib *lib[LIB_N];
     int lib_tried[LIB_N];
 };
@@ -758,6 +891,85 @@ SymCache *sym_cache_new(void)
     return c;
 }
 
+/* What was read from the project (file list, aliases, PSR-4 map, class names). */
+static void free_project(SymCache *c)
+{
+    size_t i;
+
+    for (i = 0; i < c->nfiles; i++)
+        free(c->files[i]);
+    for (i = 0; i < c->nal; i++) {
+        free(c->al_name[i]);
+        free(c->al_qual[i]);
+    }
+    for (i = 0; i < c->nps; i++) {
+        free(c->ps_prefix[i]);
+        free(c->ps_dir[i]);
+    }
+    for (i = 0; i < c->ncls; i++)
+        free(c->cls[i]);
+    free(c->files);
+    free(c->al_name);
+    free(c->al_qual);
+    free(c->ps_prefix);
+    free(c->ps_dir);
+    free(c->cls);
+    c->files = NULL;
+    c->al_name = c->al_qual = c->ps_prefix = c->ps_dir = c->cls = NULL;
+    c->nfiles = c->nal = c->nps = c->ncls = c->clscap = 0;
+    c->files_done = c->al_done = c->ps_done = c->cls_done = 0;
+}
+
+/* The project of the file at key: the nearest directory above it with Composer's vendor/ or a
+ * composer.json, so that the lookups work whatever directory the editor was started in. */
+static void set_root(SymCache *c, const char *key)
+{
+    char dir[PATH_MAX], probe_path[PATH_MAX + 40];
+    char *sl;
+    struct stat st;
+    char found[PATH_MAX];
+
+    found[0] = '\0';
+    if (key && key[0] == '/') {
+        snprintf(dir, sizeof dir, "%s", key);
+        while ((sl = strrchr(dir, '/')) != NULL) {
+            *sl = '\0';
+            snprintf(probe_path, sizeof probe_path, "%s/vendor/composer/autoload_psr4.php", dir);
+            if (stat(probe_path, &st) == 0) {
+                snprintf(found, sizeof found, "%s", dir);
+                break;
+            }
+            snprintf(probe_path, sizeof probe_path, "%s/composer.json", dir);
+            if (stat(probe_path, &st) == 0) {
+                snprintf(found, sizeof found, "%s", dir);
+                break;
+            }
+            if (dir[0] == '\0')
+                break;
+        }
+    }
+    if (strcmp(found, c->root) == 0)
+        return;
+    free_project(c);
+    memcpy(c->root, found, strlen(found) + 1);
+}
+
+/* rel (relative to the project) as a path usable from the working directory. */
+static void rooted(const SymCache *c, char *out, size_t n, const char *rel)
+{
+    size_t rl = strlen(c->root), l = strlen(rel);
+
+    if (rl + 1 + l + 1 > n) {
+        out[0] = '\0';
+        return;
+    }
+    if (rl) {
+        memcpy(out, c->root, rl);
+        out[rl++] = '/';
+    }
+    memcpy(out + rl, rel, l + 1);
+}
+
 void sym_cache_free(SymCache *c)
 {
     size_t i;
@@ -766,12 +978,10 @@ void sym_cache_free(SymCache *c)
         return;
     for (i = 0; i < c->n; i++)
         sym_index_free(c->v[i]);
-    for (i = 0; i < c->nfiles; i++)
-        free(c->files[i]);
+    free_project(c);
     for (i = 0; i < LIB_N; i++)
         std_close(c->lib[i]);
     free(c->v);
-    free(c->files);
     free(c);
 }
 
@@ -937,26 +1147,199 @@ static void collect_file(const char *rel, void *ctx)
     c->files[c->nfiles++] = xstrdup(rel);
 }
 
-/* A project file called Name.<ext>, for a class mentioned by name (PHP `use`). */
-static char *find_class_file(SymCache *c, const char *name, const char *ext)
+/* The last segment of a qualified name (A\\B\\Foo, A::Foo). */
+static const char *last_segment(const char *q)
 {
-    size_t i, nl = strlen(name), el = strlen(ext);
+    const char *p, *r = q;
 
+    for (p = q; *p; p++)
+        if (*p == '\\' || *p == ':' || *p == '.')
+            r = p + 1;
+    return r;
+}
+
+/* How many trailing directories of path (before base) match the namespace of qual, ignoring
+ * case: Illuminate\\Support\\Facades\\Route against .../Illuminate/Support/Facades/Route.php. */
+static int ns_score(const char *path, const char *base, const char *qual)
+{
+    const char *seg[16];
+    size_t len[16], n = 0, k;
+    const char *p = qual, *name = last_segment(qual), *st = qual;
+    int score = 0;
+    const char *pe = base;
+
+    for (; p < name && n < 16; p++)
+        if (*p == '\\' || *p == ':' || *p == '.') {
+            if (p > st) {
+                seg[n] = st;
+                len[n++] = (size_t)(p - st);
+            }
+            st = p + 1;
+        }
+    while (n > 0 && pe > path) {
+        const char *ps = pe - 1;                /* pe is just after a '/' */
+        size_t dl;
+
+        while (ps > path && ps[-1] != '/')
+            ps--;
+        dl = (size_t)(pe - 1 - ps);
+        n--;
+        if (dl != len[n])
+            break;
+        for (k = 0; k < dl; k++)
+            if (tolower((unsigned char)ps[k]) != tolower((unsigned char)seg[n][k]))
+                return score;
+        score++;
+        pe = ps;
+    }
+    return score;
+}
+
+/* Composer's vendor/composer/autoload_psr4.php: 'App\\' => array($baseDir . '/app'), read once. */
+static void load_psr4(SymCache *c)
+{
+    FILE *f;
+    char line[1024];
+
+    if (c->ps_done)
+        return;
+    c->ps_done = 1;
+    rooted(c, line, sizeof line, "vendor/composer/autoload_psr4.php");
+    f = fopen(line, "r");
+    if (!f)
+        return;
+    while (fgets(line, sizeof line, f)) {
+        char *p = line, *q, prefix[PM_PATH];
+        size_t n = 0;
+
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p != '\'')
+            continue;
+        for (p++; *p && *p != '\'' && n + 1 < sizeof prefix; p++) {
+            if (*p == '\\' && p[1] == '\\')
+                p++;                    /* written doubled in PHP source */
+            prefix[n++] = *p;
+        }
+        prefix[n] = '\0';
+        if (*p != '\'')
+            continue;
+        for (q = strstr(p, "=>"); q && *q; ) {
+            char *a = strstr(q, "Dir . '"), *b;
+            char dir[PATH_MAX];
+
+            if (!a)
+                break;
+            b = strchr(a + 7, '\'');
+            if (!b)
+                break;
+            /* $vendorDir or $baseDir */
+            if (a >= line + 6 && memcmp(a - 6, "vendor", 6) == 0)
+                snprintf(dir, sizeof dir, "vendor%.*s", (int)(b - a - 7), a + 7);
+            else
+                snprintf(dir, sizeof dir, ".%.*s", (int)(b - a - 7), a + 7);
+            c->ps_prefix = xrealloc(c->ps_prefix, (c->nps + 1) * sizeof *c->ps_prefix);
+            c->ps_dir = xrealloc(c->ps_dir, (c->nps + 1) * sizeof *c->ps_dir);
+            c->ps_prefix[c->nps] = xstrdup(prefix);
+            c->ps_dir[c->nps++] = xstrdup(dir);
+            q = b + 1;
+        }
+    }
+    fclose(f);
+}
+
+/* The file of a namespaced class by the PSR-4 map: every matching prefix is tried, the longest
+ * first (as Composer does). */
+static char *psr4_file(SymCache *c, const char *qual)
+{
+    size_t i, last = (size_t)-1;
+
+    load_psr4(c);
+    for (;;) {
+        size_t best = (size_t)-1, bl = 0;
+
+        for (i = 0; i < c->nps; i++) {
+            size_t pl = strlen(c->ps_prefix[i]);
+
+            if (pl <= strlen(qual) && strncmp(c->ps_prefix[i], qual, pl) == 0 &&
+                (last == (size_t)-1 || pl < last) && (best == (size_t)-1 || pl > bl)) {
+                best = i;
+                bl = pl;
+            }
+        }
+        if (best == (size_t)-1)
+            return NULL;
+        for (i = 0; i < c->nps; i++) {
+            char path[PATH_MAX], *r;
+            struct stat st;
+            size_t k, n;
+
+            if (strlen(c->ps_prefix[i]) != bl || strcmp(c->ps_prefix[i], c->ps_prefix[best]) != 0)
+                continue;
+            rooted(c, path, sizeof path, c->ps_dir[i]);
+            n = strlen(path);
+            path[n++] = '/';
+            for (k = bl; qual[k] && n + 5 < sizeof path; k++)
+                path[n++] = qual[k] == '\\' ? '/' : qual[k];
+            memcpy(path + n, ".php", 5);
+            if (stat(path, &st) == 0 && S_ISREG(st.st_mode) &&
+                (r = realpath(path, NULL)) != NULL)
+                return r;
+        }
+        last = bl;
+    }
+}
+
+/* A project file called Name.<ext>, for a class mentioned by name (PHP `use`): when qual has
+ * a namespace, the file whose directories best match it. */
+static char *find_class_file(SymCache *c, const char *qual, const char *ext)
+{
+    size_t i, el = strlen(ext);
+    const char *name = last_segment(qual);
+    size_t nl = strlen(name);
+    long best = -1;
+    int best_score = -1;
+
+    if (strcmp(ext, "php") == 0 && strchr(qual, '\\')) {
+        char *f = psr4_file(c, qual);
+
+        if (f)
+            return f;
+    }
     if (!c->files_done) {
-        files_scan(".", collect_file, c);
+        /* vendor is Composer's business (the map above); walking it can take seconds */
+        static const char *const prune[] = { "vendor", NULL };
+
+        char top[PATH_MAX];
+
+        rooted(c, top, sizeof top, ".");
+        files_scan_prune(top, collect_file, c, prune);
         c->files_done = 1;
     }
     for (i = 0; i < c->nfiles; i++) {
         const char *f = c->files[i], *base = strrchr(f, '/');
         size_t bl;
+        int sc;
 
         base = base ? base + 1 : f;
         bl = strlen(base);
-        if (bl == nl + 1 + el && memcmp(base, name, nl) == 0 && base[nl] == '.' &&
-            memcmp(base + nl + 1, ext, el) == 0)
-            return realpath(f, NULL);
+        if (!(bl == nl + 1 + el && memcmp(base, name, nl) == 0 && base[nl] == '.' &&
+              memcmp(base + nl + 1, ext, el) == 0))
+            continue;
+        sc = ns_score(f, base, qual);
+        if (sc > best_score) {
+            best_score = sc;
+            best = (long)i;
+        }
     }
-    return NULL;
+    if (best < 0)
+        return NULL;
+    {
+        char path[PATH_MAX];
+
+        rooted(c, path, sizeof path, c->files[best]);
+        return realpath(path, NULL);
+    }
 }
 
 static char *probe(const char *dir, const char *spec, const char *ext)
@@ -1036,6 +1419,7 @@ typedef struct {
     size_t n;
     StdLib *lib[2];
     size_t nlib;
+    const Doc *cur;             /* for the aliases written in it */
 } Env;
 
 static void env_add(Env *e, SymIndex *x, int depth)
@@ -1097,7 +1481,8 @@ static void env_includes(SymCache *c, Env *e, size_t k)
 
     resolve_includes(x);
     for (j = 0; j < x->ninc; j++) {
-        if (x->inc[j][0] == ':' && !x->incp[j] && !env_has_class(e, x->inc[j] + 1)) {
+        if (x->inc[j][0] == ':' && !x->incp[j] &&
+            !env_has_class(e, last_segment(x->inc[j] + 1))) {
             char *f = find_class_file(c, x->inc[j] + 1, ext_of(x->key));
 
             x->incp[j] = f ? f : xstrdup("");
@@ -1113,6 +1498,7 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
     const char *lang = syn_name(cur->syn);
 
     memset(e, 0, sizeof *e);
+    e->cur = cur;
     if (strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0) {
         e->lib[e->nlib++] = lib_get(c, LIB_PHP);
     } else if (strcmp(lang, "Python") == 0) {
@@ -1125,6 +1511,7 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
         e->lib[e->nlib++] = lib_get(c, LIB_C);
     }
     env_add(e, index_of_doc(c, cur), 0);
+    set_root(c, e->v[0]->key);
     for (i = 0; i < ndocs && others < OPEN_MAX; i++)
         if (docs[i] != cur && docs[i]->syn == cur->syn && !docs[i]->scratch) {
             env_add(e, index_of_doc(c, docs[i]), 1);
@@ -1170,7 +1557,7 @@ static void std_cb(void *ctx, const char *name, size_t nl, const char *params, s
 }
 
 /* Members of class cls from every index and library, then those of its base classes. */
-static int env_members(const Env *e, const char *cls, SymFn fn, void *ctx, int depth)
+static int members_of(const Env *e, const char *cls, SymFn fn, void *ctx, int depth, int pub)
 {
     size_t i, j, ci;
     int found = 0;
@@ -1187,15 +1574,22 @@ static int env_members(const Env *e, const char *cls, SymFn fn, void *ctx, int d
             if (c->kind != RULE_CLASS || strcmp(c->name, cls) != 0)
                 continue;
             found = 1;
-            for (j = ci + 1; j < x->n; j++)
-                if (x->v[j].owner == (long)ci && x->v[j].name[0])
+            for (j = ci + 1; j < x->n; j++) {
+                if (x->v[j].owner != (long)ci)
+                    continue;
+                if (x->v[j].name[0]) {
+                    if (pub && x->v[j].hidden)
+                        continue;
                     fn(ctx, x->v[j].name, x->v[j].kind, x->v[j].sig, x->v[j].ret, i == 0 ? 0 : 1);
+                } else if (strcmp(x->v[j].sig, "@see") == 0 && strcmp(x->v[j].ret, cls) != 0)
+                    members_of(e, x->v[j].ret, fn, ctx, depth + 1, 1);
+            }
             if (c->ret[0]) {
                 char base[PM_NAME];
 
                 norm_type(c->ret, base, sizeof base);
                 if (strcmp(base, cls) != 0)
-                    env_members(e, base, fn, ctx, depth + 1);
+                    members_of(e, base, fn, ctx, depth + 1, pub);
             }
         }
     }
@@ -1208,6 +1602,11 @@ static int env_members(const Env *e, const char *cls, SymFn fn, void *ctx, int d
             std_members(e->lib[i], cls, strlen(cls), std_cb, &sc);
         }
     return found;
+}
+
+static int env_members(const Env *e, const char *cls, SymFn fn, void *ctx, int depth)
+{
+    return members_of(e, cls, fn, ctx, depth, 0);
 }
 
 typedef struct {
@@ -1483,6 +1882,11 @@ static const Sym *enclosing_class(const Env *e, size_t y)
     return best;
 }
 
+static int is_ident(char c)
+{
+    return isalnum((unsigned char)c) || c == '_';
+}
+
 /* The type a name was last bound to above the cursor: "x = new Foo", "Foo $x", "x: Foo". */
 static int find_bind(const Syntax *syn, const Buffer *b, size_t y, size_t xlimit,
                      const char *name, char *type, size_t cap)
@@ -1503,7 +1907,27 @@ static int find_bind(const Syntax *syn, const Buffer *b, size_t y, size_t xlimit
             for (k = 0; k < nr; k++)
                 if (r[k].kind == RULE_BIND && pat_match(r[k].pat, l->s, limit, i, &m) &&
                     strcmp(m.name, name) == 0 && m.type[0]) {
-                    put(type, cap, m.type, strlen(m.type));
+                    /* "x = Foo::make(": remembered as "Foo::make", see settle */
+                    size_t n = strlen(m.type), q;
+                    int stat = 0;
+
+                    for (q = i + 1; q + 1 < m.end && !stat; q++)
+                        if (l->s[q] == ':' && l->s[q + 1] == ':' && is_ident(l->s[q - 1])) {
+                            size_t c0 = q, m0 = q + 2;
+
+                            while (c0 > i && is_ident(l->s[c0 - 1]))
+                                c0--;
+                            if (m.end - m0 >= n && memcmp(l->s + m0, m.type, n) == 0 &&
+                                c0 < q && q - c0 + 2 + n < cap) {
+                                memcpy(type, l->s + c0, q - c0);
+                                memcpy(type + (q - c0), "::", 2);
+                                memcpy(type + (q - c0) + 2, m.type, n);
+                                type[q - c0 + 2 + n] = '\0';
+                                stat = 1;
+                            }
+                        }
+                    if (!stat)
+                        put(type, cap, m.type, n);
                     found = 1;
                     break;
                 }
@@ -1519,14 +1943,80 @@ static int find_bind(const Syntax *syn, const Buffer *b, size_t y, size_t xlimit
 
 /* Turns a type as written into a class that exists: a class name stays, a function name
  * gives its return type. */
+/* The class an alias of the current file stands for ("use A\\Foo as Bar"); "" if none. */
+static void alias_of(const Env *e, const char *name, char *out, size_t cap)
+{
+    size_t nr, k, y, n;
+    const SynRule *r;
+
+    out[0] = '\0';
+    if (!e->cur || !e->cur->syn)
+        return;
+    r = syn_rules(e->cur->syn, &nr);
+    n = e->cur->buf.nlines < 400 ? e->cur->buf.nlines : 400;      /* they sit at the top */
+    for (y = 0; y < n; y++) {
+        const Line *l = &e->cur->buf.lines[y];
+        size_t i;
+
+        for (i = 0; i < l->len; i++) {
+            PatMatch m;
+
+            if (!token_start(l->s, i))
+                continue;
+            for (k = 0; k < nr; k++)
+                if (r[k].kind == RULE_ALIAS && pat_match(r[k].pat, l->s, l->len, i, &m) &&
+                    strcmp(m.name, name) == 0 && m.type[0]) {
+                    put(out, cap, m.type, strlen(m.type));
+                    return;
+                }
+        }
+    }
+}
+
+static int is_self_name(const char *n);
+
 static void settle(const Env *e, const char *raw, char *out, size_t cap)
 {
     char t[PM_NAME], r[PM_NAME];
+    const char *colon = strstr(raw, "::");
 
-    norm_type(raw, t, sizeof t);
     out[0] = '\0';
+    if (colon) {
+        /* "Foo::make": a static call; the declared return type, else the class itself
+         * (the usual factory) */
+        char cls[PM_NAME], c2[PM_NAME];
+        FindCtx f;
+
+        put(cls, sizeof cls, raw, (size_t)(colon - raw));
+        settle(e, cls, c2, sizeof c2);
+        if (!c2[0])
+            return;
+        memset(&f, 0, sizeof f);
+        f.name = colon + 2;
+        env_members(e, c2, find_cb, &f, 0);
+        if (!f.found || !f.ret[0]) {
+            put(out, cap, c2, strlen(c2));
+            return;
+        }
+        norm_type(f.ret, r, sizeof r);
+        if (is_self_name(r))
+            put(out, cap, c2, strlen(c2));
+        else
+            settle(e, r, out, cap);
+        return;
+    }
+    norm_type(raw, t, sizeof t);
     if (!t[0])
         return;
+    if (!env_has_class(e, t)) {
+        char a[PM_NAME];
+
+        alias_of(e, t, a, sizeof a);
+        if (a[0] && env_has_class(e, a)) {
+            put(out, cap, a, strlen(a));
+            return;
+        }
+    }
     if (env_has_class(e, t)) {
         put(out, cap, t, strlen(t));
         return;
@@ -1627,6 +2117,203 @@ static void resolve_chain(const Env *e, Doc *cur, size_t y, size_t sep, char *ou
     put(out, cap, t, strlen(t));
 }
 
+/* The global class aliases of a Laravel project: 'URL' => Illuminate\\Support\\Facades\\URL::class
+ * in config/app.php, read once. */
+static void load_aliases(SymCache *c)
+{
+    FILE *f;
+    char line[512];
+
+    if (c->al_done)
+        return;
+    c->al_done = 1;
+    rooted(c, line, sizeof line, "config/app.php");
+    f = fopen(line, "r");
+    if (!f)
+        return;
+    while (fgets(line, sizeof line, f)) {
+        char *p = line, *q, *arrow, name[PM_NAME], qual[PM_PATH];
+        size_t n;
+
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p != '\'' && *p != '"')
+            continue;
+        q = strchr(p + 1, *p);
+        arrow = q ? strstr(q, "=>") : NULL;
+        if (!arrow || (size_t)(q - p - 1) >= sizeof name || q == p + 1)
+            continue;
+        memcpy(name, p + 1, (size_t)(q - p - 1));
+        name[q - p - 1] = '\0';
+        p = arrow + 2;
+        while (*p == ' ' || *p == '\t' || *p == '\\')
+            p++;
+        for (n = 0; is_idc((unsigned char)p[n]) || p[n] == '\\'; n++)
+            ;
+        if (n == 0 || n >= sizeof qual || strncmp(p + n, "::class", 7) != 0)
+            continue;
+        memcpy(qual, p, n);
+        qual[n] = '\0';
+        c->al_name = xrealloc(c->al_name, (c->nal + 1) * sizeof *c->al_name);
+        c->al_qual = xrealloc(c->al_qual, (c->nal + 1) * sizeof *c->al_qual);
+        c->al_name[c->nal] = xstrdup(name);
+        c->al_qual[c->nal++] = xstrdup(qual);
+    }
+    fclose(f);
+}
+
+/* A global alias (Laravel facade: URL, Route, Session) written before the operator at (y, sep)
+ * and not defined by any loaded file: its file joins the world. */
+static void env_alias(SymCache *c, Env *e, Doc *cur, size_t y, size_t sep)
+{
+    Seg rev[SEG_MAX];
+    const char *seps = syn_member_seps(cur->syn), *lang = syn_name(cur->syn);
+    const Seg *s0;
+    size_t n, i;
+
+    if (!seps || (strcmp(lang, "PHP") != 0 && strcmp(lang, "PHP/HTML") != 0))
+        return;
+    n = chain_parse(cur->buf.lines[y].s, sep, seps, rev);
+    if (n == 0)
+        return;
+    s0 = &rev[n - 1];
+    if (s0->dollar || s0->call || s0->isnew || env_has_class(e, s0->name))
+        return;
+    load_aliases(c);
+    for (i = 0; i < c->nal; i++)
+        if (strcmp(c->al_name[i], s0->name) == 0) {
+            char *f = find_class_file(c, c->al_qual[i], "php");
+
+            if (f) {
+                env_add(e, index_of_path(c, f), 1);
+                free(f);
+            }
+            return;
+        }
+}
+
+static void add_class(SymCache *c, const char *fq, size_t n)
+{
+    if (c->ncls >= 60000 || n == 0)
+        return;
+    if (c->ncls == c->clscap) {
+        c->clscap = c->clscap ? c->clscap * 2 : 1024;
+        c->cls = xrealloc(c->cls, c->clscap * sizeof *c->cls);
+    }
+    c->cls[c->ncls++] = xstrndup(fq, n);
+}
+
+typedef struct {
+    SymCache *c;
+    const char *prefix;         /* the namespace of the PSR-4 directory being walked */
+} WalkCtx;
+
+static void walk_add(const char *rel, void *ctx)
+{
+    WalkCtx *w = ctx;
+    size_t n = strlen(rel), i, pl;
+    char fq[PM_PATH];
+
+    if (n < 5 || strcmp(rel + n - 4, ".php") != 0 || strlen(w->prefix) + n >= sizeof fq)
+        return;
+    pl = strlen(w->prefix);
+    memcpy(fq, w->prefix, pl);
+    memcpy(fq + pl, rel, n - 4);
+    fq[pl + n - 4] = '\0';
+    for (i = 0; fq[i]; i++)
+        if (fq[i] == '/')
+            fq[i] = '\\';
+    add_class(w->c, fq, strlen(fq));
+}
+
+/* config/app.php aliases, then vendor/composer/autoload_classmap.php (every class when Composer
+ * was run with -o), else the project's own PSR-4 directories. */
+static void load_classes(SymCache *c)
+{
+    FILE *f;
+    char line[1024];
+    size_t i, optimized = 0;
+
+    if (c->cls_done)
+        return;
+    c->cls_done = 1;
+    load_aliases(c);
+    for (i = 0; i < c->nal; i++)
+        add_class(c, c->al_qual[i], strlen(c->al_qual[i]));
+    rooted(c, line, sizeof line, "vendor/composer/autoload_classmap.php");
+    f = fopen(line, "r");
+    while (f && fgets(line, sizeof line, f)) {
+        char fq[PM_PATH], *p = line;
+        size_t n = 0;
+
+        while (*p == ' ')
+            p++;
+        if (*p != '\'')
+            continue;
+        for (p++; *p && *p != '\'' && n + 1 < sizeof fq; p++) {
+            if (*p == '\\' && p[1] == '\\')
+                p++;
+            fq[n++] = *p;
+        }
+        if (*p != '\'' || strstr(fq, "Composer\\") == fq)
+            continue;
+        add_class(c, fq, n);
+        optimized++;
+    }
+    if (f)
+        fclose(f);
+    if (optimized < 200) {
+        load_psr4(c);
+        for (i = 0; i < c->nps; i++) {
+            WalkCtx w;
+            char top[PATH_MAX];
+            static const char *const prune[] = { "vendor", NULL };
+
+            if (c->ps_dir[i][0] != '.')
+                continue;               /* the project's own directories, not vendor */
+            w.c = c;
+            w.prefix = c->ps_prefix[i];
+            rooted(c, top, sizeof top, c->ps_dir[i]);
+            files_scan_prune(top, walk_add, &w, prune);
+        }
+    }
+}
+
+static int prefix_ci(const char *s, const char *p, size_t pl)
+{
+    size_t i;
+
+    for (i = 0; i < pl; i++)
+        if (s[i] == '\0' || tolower((unsigned char)s[i]) != tolower((unsigned char)p[i]))
+            return 0;
+    return 1;
+}
+
+void sym_classes(SymCache *c, Doc *cur, const char *prefix, size_t plen, int full, ClassFn fn,
+                 void *ctx)
+{
+    const char *lang = syn_name(cur->syn);
+    size_t i, found = 0;
+
+    if (strcmp(lang, "PHP") != 0 && strcmp(lang, "PHP/HTML") != 0)
+        return;
+    set_root(c, index_of_doc(c, cur)->key);
+    load_classes(c);
+    for (i = 0; i < c->ncls && found < 400; i++) {
+        const char *fq = c->cls[i], *last = last_segment(fq);
+        int rank;
+
+        if (prefix_ci(last, prefix, plen))
+            rank = strlen(last) == plen ? 0 : 1;
+        else if (full && prefix_ci(fq, prefix, plen))
+            rank = 2;
+        else
+            continue;
+        fn(ctx, fq, rank);
+        found++;
+    }
+}
+
 typedef struct {
     SymFn fn;
     void *ctx;
@@ -1640,6 +2327,7 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
     size_t i, j;
 
     env_build(c, docs, ndocs, cur, &e);
+    env_alias(c, &e, cur, y, sep);
     resolve_chain(&e, cur, y, sep, t, sizeof t);
     if (t[0] && env_members(&e, t, fn, ctx, 0))
         return 1;
@@ -1660,6 +2348,7 @@ int sym_type_before(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_
     Env e;
 
     env_build(c, docs, ndocs, cur, &e);
+    env_alias(c, &e, cur, y, sep);
     resolve_chain(&e, cur, y, sep, out, n);
     return out[0] != '\0';
 }

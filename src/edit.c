@@ -4,8 +4,10 @@
 #include "utf8.h"
 #include "util.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <sys/wait.h>
 #include <string.h>
 
@@ -765,6 +767,167 @@ void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n)
     buf_delete(e->buf, e->cy, from_x, e->cx - from_x);
     buf_insert(e->buf, e->cy, from_x, s, n);
     e->cx = from_x + n;
+    finish(e);
+}
+
+static int is_word_ch(char c)
+{
+    return isalnum((unsigned char)c) || c == '_';
+}
+
+/* True if the line holds name as a whole word. */
+static int has_word(const Line *l, const char *name, size_t nl)
+{
+    size_t i;
+
+    for (i = 0; i + nl <= l->len; i++)
+        if (memcmp(l->s + i, name, nl) == 0 && (i == 0 || !is_word_ch(l->s[i - 1])) &&
+            (i + nl == l->len || !is_word_ch(l->s[i + nl])))
+            return 1;
+    return 0;
+}
+
+static int starts_with(const Line *l, const char *w)
+{
+    size_t n = strlen(w);
+
+    return l->len >= n && memcmp(l->s, w, n) == 0 && (l->len == n || !is_word_ch(l->s[n]));
+}
+
+/* The "use Class;" statement for a class of the project or of the library: nothing if it is
+ * imported or defined in the file, or in the namespace of the file. Keeps the use block sorted. */
+static void add_use(Editor *e, const char *fq)
+{
+    const Buffer *b = e->buf;
+    const char *name = strrchr(fq, '\\');
+    size_t nl, y, nsl = (size_t)-1, php = (size_t)-1, first_use = (size_t)-1, last_use = 0, at;
+    size_t ins = (size_t)-1, added = 0;
+    int header = 1;
+    char stmt[264], pre[2] = "", post[2] = "";
+    size_t sl, lim = b->nlines < 600 ? b->nlines : 600;
+
+    name = name ? name + 1 : fq;
+    nl = strlen(name);
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        size_t i = 0;
+
+        while (i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'))
+            i++;
+        {
+            Line t = *l;
+
+            t.s += i;
+            t.len -= i;
+            if (php == (size_t)-1 && t.len >= 5 && memcmp(t.s, "<?php", 5) == 0)
+                php = y;
+            if (header && starts_with(&t, "namespace") && nsl == (size_t)-1) {
+                nsl = y;
+            } else if (header && starts_with(&t, "use")) {
+                if (has_word(&t, name, nl))
+                    return;                         /* imported (maybe with as) */
+                if (memchr(t.s, '{', t.len) == NULL && memchr(t.s, '(', t.len) == NULL &&
+                    !has_word(&t, "function", 8) && !has_word(&t, "const", 5)) {
+                    if (first_use == (size_t)-1)
+                        first_use = y;
+                    last_use = y;
+                    /* the first use line that sorts after fq: the new one goes before it */
+                    if (ins == (size_t)-1 && t.len > 4) {
+                        char cur[256];
+                        size_t cl = t.len - 4 < sizeof cur - 1 ? t.len - 4 : sizeof cur - 1;
+
+                        memcpy(cur, t.s + 4, cl);
+                        cur[cl] = '\0';
+                        while (cl > 0 && (cur[cl - 1] == ';' || cur[cl - 1] == ' '))
+                            cur[--cl] = '\0';
+                        if (strcasecmp(cur, fq) > 0)
+                            ins = y;
+                    }
+                }
+            } else if (t.len > 0 && (starts_with(&t, "class") || starts_with(&t, "abstract") ||
+                                     starts_with(&t, "final") || starts_with(&t, "interface") ||
+                                     starts_with(&t, "trait") || starts_with(&t, "enum") ||
+                                     starts_with(&t, "function"))) {
+                header = 0;
+            }
+            if (t.len > 6 && (starts_with(&t, "class") || starts_with(&t, "interface") ||
+                              starts_with(&t, "trait") || starts_with(&t, "enum") ||
+                              starts_with(&t, "abstract") || starts_with(&t, "final"))) {
+                /* defined in this very file */
+                size_t k;
+
+                for (k = 0; k + nl <= t.len; k++)
+                    if (memcmp(t.s + k, name, nl) == 0 && k > 0 && t.s[k - 1] == ' ' &&
+                        (k + nl == t.len || !is_word_ch(t.s[k + nl])))
+                        return;
+            }
+        }
+    }
+    /* the namespace of the file: a class of the same one needs no use */
+    if (nsl != (size_t)-1) {
+        const Line *l = &b->lines[nsl];
+        size_t i = 0, k;
+        const char *sep = strrchr(fq, '\\');
+
+        while (i < l->len && l->s[i] != ' ')
+            i++;
+        while (i < l->len && l->s[i] == ' ')
+            i++;
+        for (k = l->len; k > i && (l->s[k - 1] == ';' || l->s[k - 1] == ' '); k--)
+            ;
+        if (sep && (size_t)(sep - fq) == k - i && memcmp(fq, l->s + i, k - i) == 0)
+            return;
+    } else if (!strchr(fq, '\\')) {
+        return;                                     /* a global class in a file without namespace */
+    }
+    sl = (size_t)snprintf(stmt, sizeof stmt, "use %s;\n", fq);
+    if (sl >= sizeof stmt)
+        return;
+    if (first_use != (size_t)-1) {
+        at = ins != (size_t)-1 ? ins : last_use + 1;
+    } else {
+        size_t base = nsl != (size_t)-1 ? nsl : php;
+
+        if (base == (size_t)-1)
+            return;
+        at = base + 1;
+        if (at < b->nlines && b->lines[at].len == 0)
+            at++;                                   /* after the blank line */
+        else
+            pre[0] = '\n';
+        if (at >= b->nlines || b->lines[at].len > 0)
+            post[0] = '\n';
+    }
+    if (at >= b->nlines)
+        return;
+    {
+        SBuf text = SBUF_INIT;
+        size_t yy = at, xx = 0, i;
+
+        sbuf_adds(&text, pre);
+        sbuf_add(&text, stmt, sl);
+        sbuf_adds(&text, post);
+        for (i = 0; i < text.len; i++)
+            if (text.p[i] == '\n')
+                added++;
+        buf_insert_text(e->buf, &yy, &xx, text.p, text.len);
+        sbuf_free(&text);
+    }
+    if (at <= e->cy)
+        e->cy += added;
+}
+
+void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq)
+{
+    if (from_x > e->cx)
+        return;
+    begin(e);
+    e->sel_on = 0;
+    buf_delete(e->buf, e->cy, from_x, e->cx - from_x);
+    buf_insert(e->buf, e->cy, from_x, s, n);
+    e->cx = from_x + n;
+    if (fq && fq[0])
+        add_use(e, fq);
     finish(e);
 }
 

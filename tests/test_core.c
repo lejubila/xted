@@ -3378,6 +3378,119 @@ static void test_long_names(void)
     doc_release(&d);
 }
 
+/* "use X as Y" and static factories give the type of a variable. */
+static void test_alias_static(void)
+{
+    char dir[64], path[128], err[128], t[64];
+    Doc d;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    size_t y, sep;
+    static const char *const want[] = { "Foo", "Foo", "Other", "Foo" };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "al.php",
+             "<?php\n"
+             "use App\\Services\\Foo as Bar;\n"
+             "class Foo { public static function make() {} public static function o(): Other {}\n"
+             "  public static function me(): static {} }\n"
+             "class Other {}\n"
+             "function f()\n"
+             "{\n"
+             "    $a = new Bar();\n"
+             "    $a->\n"
+             "    $b = Foo::make();\n"
+             "    $b->\n"
+             "    $c = Foo::o();\n"
+             "    $c->\n"
+             "    $e = \\App\\Foo::me();\n"
+             "    $e->\n"
+             "    $g = Foo::BAR;\n"
+             "    $g->\n"
+             "}\n");
+    snprintf(path, sizeof path, "%s/al.php", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    docs[0] = &d;
+    for (y = 8; y <= 14; y += 2) {
+        sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+        t[0] = '\0';
+        sym_type_before(c, docs, 1, &d, y, sep, t, sizeof t);
+        CHECK(strcmp(t, want[(y - 8) / 2]) == 0);
+    }
+    sep = sym_member_at(d.syn, &d.buf, 16, d.buf.lines[16].len);
+    CHECK(!sym_type_before(c, docs, 1, &d, 16, sep, t, sizeof t));     /* a constant: unknown */
+    sym_cache_free(c);
+    doc_release(&d);
+}
+
+/* Laravel: facades documented with @method, global aliases, Composer's PSR-4 map. */
+static void test_laravel(void)
+{
+    char dir[64], path[256], err[128], t[64], cwd[512];
+    Doc d;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    static Got g;
+    size_t y, sep;
+    static const char *const sub[] = { "config", "vendor", "vendor/composer", "vendor/lv",
+                                       "vendor/lv/src", "vendor/lv/src/Support",
+                                       "vendor/lv/src/Support/Facades", "vendor/decoy" };
+    size_t i;
+
+    CHECK(getcwd(cwd, sizeof cwd) != NULL);
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof sub / sizeof sub[0]; i++) {
+        snprintf(path, sizeof path, "%s/%s", dir, sub[i]);
+        CHECK(mkdir(path, 0700) == 0);
+    }
+    put_file(dir, "config/app.php",
+             "<?php\nreturn [\n    'aliases' => [\n"
+             "        'URL' => Lv\\Support\\Facades\\URL::class,\n    ],\n];\n");
+    put_file(dir, "vendor/composer/autoload_psr4.php",
+             "<?php\n$vendorDir = dirname(dirname(__FILE__));\nreturn array(\n"
+             "    'Lv\\Support\\' => array($vendorDir . '/nothing'),\n"
+             "    'Lv\\' => array($vendorDir . '/lv/src'),\n);\n");
+    put_file(dir, "vendor/lv/src/Support/Facades/URL.php",
+             "<?php\nnamespace Lv\\Support\\Facades;\n/**\n"
+             " * @method static string to(string $path, $extra = [])\n"
+             " * @method static \\Lv\\Other|null make()\n"
+             " * @property string $tag\n */\nclass URL extends Facade {}\n");
+    put_file(dir, "vendor/lv/src/Store.php",
+             "<?php\nnamespace Lv;\nclass Store {\n    public function remember($k) {}\n"
+             "    protected function secret() {}\n}\n");
+    put_file(dir, "vendor/lv/src/Support/Facades/Cache.php",
+             "<?php\nnamespace Lv\\Support\\Facades;\n/**\n * @see \\Lv\\Store\n */\n"
+             "class Cache extends Facade {}\n");
+    put_file(dir, "vendor/decoy/URL.php", "<?php\nclass URL { public function wrong() {} }\n");
+    put_file(dir, "main.php",
+             "<?php\nuse Lv\\Support\\Facades\\URL as U;\nuse Lv\\Support\\Facades\\Cache;\n"
+             "URL::\nU::\nCache::\n");
+    /* the working directory is not the project: the root comes from the file's location */
+    memset(&d, 0, sizeof d);
+    snprintf(path, sizeof path, "%s/main.php", dir);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    docs[0] = &d;
+    for (y = 3; y <= 3; y++) {                  /* URL:: through the alias in config/app.php */
+        sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+        memset(&g, 0, sizeof g);
+        CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+        CHECK(has_sym(&g, "to") && has_sym(&g, "make") && has_sym(&g, "tag") &&
+              !has_sym(&g, "wrong"));
+        CHECK(strstr(g.got, "[to 2 (string $path, $extra = []) string]") != NULL);
+        CHECK(sym_type_before(c, docs, 1, &d, y, sep, t, sizeof t) && strcmp(t, "URL") == 0);
+    }
+    /* a facade documented only with @see forwards to the public methods of that class */
+    y = 5;
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "remember") && !has_sym(&g, "secret"));
+    CHECK(chdir(cwd) == 0);
+    sym_cache_free(c);
+    doc_release(&d);
+}
+
 static void test_symbols(void)
 {
     char dir[64], path[128], err[128];
@@ -3759,6 +3872,8 @@ int main(void)
     test_symbols();
     test_call_body();
     test_long_names();
+    test_alias_static();
+    test_laravel();
     test_snippets();
     test_cursors();
     test_folding();
