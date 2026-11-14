@@ -797,8 +797,25 @@ static void picker_row(SBuf *o, const Editor *e, int k)
         if (pos < p->nshown) {
             sbuf_adds(o, pos == p->sel ? "\x1b[7m " : " ");
             used = 1;
-            used += fit_cols(o, p->items[p->shown[pos]], strlen(p->items[p->shown[pos]]),
-                             cols - used);
+            const char *it = p->items[p->shown[pos]];
+            const char *sep = e->picker_kind == PK_BUFFERS ? strstr(it, "   ") : NULL;
+
+            if (sep) {
+                /* a buffer: its name stands out, the path is in the colour of comments */
+                sbuf_adds(o, "\x1b[1m");
+                used += fit_cols(o, it, (size_t)(sep - it), cols - used);
+                sbuf_adds(o, "\x1b[22m");
+                if (pos == p->sel)
+                    sbuf_adds(o, "\x1b[2m");
+                else if (e->color_depth != COLOR_NONE)
+                    theme_fg(o, e->color_depth, e->theme->cls[SC_COMMENT]);
+                else
+                    sbuf_adds(o, "\x1b[2m");
+                used += fit_cols(o, sep, strlen(sep), cols - used);
+                sbuf_adds(o, pos != p->sel && e->color_depth != COLOR_NONE ? "\x1b[39m" : "\x1b[22m");
+            } else {
+                used += fit_cols(o, it, strlen(it), cols - used);
+            }
         }
         spaces(o, cols - used);
         if (pos == p->sel && pos < p->nshown)
