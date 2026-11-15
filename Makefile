@@ -18,6 +18,7 @@ endif
 
 PROG     = xted
 PREFIX  ?= /usr/local
+MANDIR  ?= $(PREFIX)/share/man
 
 WARN     = -std=c99 -Wall -Wextra -pedantic
 DEFS     = -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DXTED_DATADIR='"$(PREFIX)/share/xted"'
@@ -59,6 +60,9 @@ install: $(PROG)
 	install -m 755 $(PROG) $(DESTDIR)$(PREFIX)/bin/$(PROG)
 	install -d $(DESTDIR)$(PREFIX)/share/xted/lang
 	install -m 644 lang/* $(DESTDIR)$(PREFIX)/share/xted/lang/
+	install -d $(DESTDIR)$(MANDIR)/man1 $(DESTDIR)$(MANDIR)/it/man1
+	install -m 644 man/xted.1 $(DESTDIR)$(MANDIR)/man1/xted.1
+	install -m 644 man/it/xted.1 $(DESTDIR)$(MANDIR)/it/man1/xted.1
 	@if [ -e $(DESTDIR)$(PREFIX)/bin/xt ] && [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" != "$(PROG)" ]; then \
 	    echo "xt esiste già in $(DESTDIR)$(PREFIX)/bin e non è un collegamento a $(PROG): non lo tocco"; \
 	else \
@@ -69,6 +73,7 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(PROG)
 	rm -f $(addprefix $(DESTDIR)$(PREFIX)/share/xted/,$(wildcard lang/*))
 	-rmdir $(DESTDIR)$(PREFIX)/share/xted/lang $(DESTDIR)$(PREFIX)/share/xted
+	rm -f $(DESTDIR)$(MANDIR)/man1/xted.1 $(DESTDIR)$(MANDIR)/it/man1/xted.1
 	@if [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" = "$(PROG)" ]; then rm -f $(DESTDIR)$(PREFIX)/bin/xt; fi
 
 .PHONY: all test clean install uninstall

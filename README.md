@@ -33,10 +33,13 @@ Servono un compilatore C (`gcc` o `clang`) e `make`. Nient'altro.
 make                  # build ottimizzata: ./xted
 make install          # in /usr/local/bin: xted e il collegamento xt
 make install PREFIX=$HOME/.local        # senza permessi di amministratore
+man xted                                 # la pagina del manuale (inglese e italiano)
 make uninstall
 ```
 
-`make install` non sovrascrive un comando `xt` che non sia il suo collegamento a `xted`.
+`make install` installa anche i cataloghi di lingua (`$PREFIX/share/xted/lang/`) e le pagine
+del manuale (`man/xted.1` in inglese, `man/it/xted.1` in italiano, in `$MANDIR`, di norma
+`$PREFIX/share/man`). Non sovrascrive un comando `xt` che non sia il suo collegamento a `xted`.
 
 Altre modalità di compilazione:
 
@@ -456,7 +459,7 @@ salvataggio delle impostazioni, comandi e comportamento dell'editor senza termin
 
 Le fasi 1–9 della roadmap di `SPEC.md` sono completate: nucleo, editing, sintassi,
 multifile, ricerca, produttività, strumenti, configurazione e rifiniture. Resta fuori il
-client LSP (opzionale). Non ci sono ancora una pagina `man` né la guida integrata con `F1`.
+client LSP (opzionale). Non c'è ancora la guida integrata con `F1`.
 
 ## Licenza
 

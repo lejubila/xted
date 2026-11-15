@@ -1,0 +1,423 @@
+.TH XTED 1 "novembre 2026" "xted" "Comandi utente"
+.SH NOME
+xted, xt \- editor di testo da terminale
+.SH SINOSSI
+.B xted
+.RI [ file [: riga [: colonna ]]]\ ...
+.br
+.B xted
+.B \-
+.br
+.B xted
+.I cartella
+.br
+.B xted
+.B \-h
+.SH DESCRIZIONE
+.B xted
+è un editor di testo per il terminale, scritto in C99 con la sola libreria C POSIX: niente
+ncurses, niente terminfo, nessun'altra libreria.
+È un unico binario che parte in meno di 50 ms.
+.B xt
+è un nome breve per lo stesso programma (un collegamento creato da
+.BR "make install" ).
+.PP
+L'editor non è modale e usa scorciatoie familiari (Ctrl+S, Ctrl+C, Ctrl+V, Ctrl+Z).
+Per programmare ha l'evidenziazione della sintassi, l'indentazione automatica, i suggerimenti dei
+simboli del file, dei file inclusi e della libreria standard (PHP, C, C++, Python, JavaScript e
+TypeScript), gli snippet, il multi-cursore, il folding e il salto alle definizioni.
+Non richiede alcun language server.
+.SH OPZIONI
+.TP
+.IR file [: riga [: colonna ]]
+Apre il file e porta il cursore alla riga (e colonna) indicata.
+Più file diventano più buffer, mostrati in tab.
+Il suffisso si legge come posizione solo se non esiste un file con quel nome esatto.
+.TP
+.B \-
+Legge il testo da standard input (una volta sola).
+.TP
+.I cartella
+Apre il browser dei file su quella cartella.
+.TP
+.BR \-h ", " \-\^\-help
+Stampa una breve guida ed esce.
+.PP
+Senza argomenti si ripristinano i file aperti e le posizioni del cursore dell'ultima sessione
+nella cartella corrente.
+.SH TASTI
+Tutte le scorciatoie si possono cambiare (vedi
+.BR CONFIGURAZIONE ).
+Compaiono accanto a ogni comando nella palette dei comandi.
+.SS File e buffer
+.TP
+.B Ctrl+S
+Salva.
+.B Alt+S
+salva con nome,
+.B Alt+A
+salva tutto.
+.TP
+.B Ctrl+O
+Apre un file.
+.TP
+.B Ctrl+P
+Apertura rapida: ricerca fuzzy dei file del progetto.
+.TP
+.B Ctrl+E
+Elenco dei buffer.
+.TP
+.B Ctrl+W
+Chiude il buffer.
+.B Alt+.\&
+e
+.B Alt+,
+(o
+.B Ctrl+PgGiù
+e
+.BR Ctrl+PgSu )
+vanno al buffer successivo e al precedente.
+.TP
+.B Ctrl+B
+Mostra o nasconde il browser dei file.
+.TP
+.B Ctrl+Q
+Esce.
+.SS Pannelli
+.TP
+.B Alt+\e
+Divide in verticale.
+.B Alt+\-
+divide in orizzontale.
+.TP
+.B Alt+E
+Modalità di ridimensionamento (le frecce spostano il bordo).
+.TP
+.B Alt+Q
+Chiude il pannello.
+.TP
+.BR Alt+O ", " Alt+Destra ", " Ctrl+Tab
+Pannello successivo.
+.BR Alt+Sinistra " e " Ctrl+Shift+Tab
+vanno al precedente.
+.SS Ricerca e navigazione
+.TP
+.B Ctrl+F
+Cerca, in modo incrementale.
+.B Ctrl+R
+sostituisce,
+.B Alt+F
+cerca nei file del progetto.
+.TP
+.BR F3 ", " Alt+N
+Occorrenza successiva.
+.BR Shift+F3 " e " Alt+P
+vanno alla precedente.
+.TP
+.B Ctrl+G
+Va a una riga (e colonna).
+.TP
+.B Ctrl+T
+Va a un simbolo: classi, funzioni, metodi, proprietà e costanti del file.
+.TP
+.B F12
+Va alla definizione, con un file
+.B tags
+prodotto da ctags.
+.TP
+.B Alt+M
+Parentesi corrispondente.
+.SS Modifica
+.TP
+.BR Ctrl+Z ", " Ctrl+Y
+Annulla, ripeti.
+.TP
+.BR Ctrl+A ", " Alt+L ", " Alt+W
+Seleziona tutto, la riga, la parola.
+.TP
+.BR Ctrl+C ", " Ctrl+X ", " Ctrl+V
+Copia, taglia, incolla.
+.B Alt+V
+incolla la voce precedente della cronologia.
+.TP
+.BR Ctrl+K ", " Ctrl+J
+Elimina le righe, unisce le righe.
+.TP
+.BR Alt+Su ", " Alt+Giù
+Sposta la riga in su o in giù.
+.B Alt+Y
+la duplica.
+.TP
+.B Alt+/
+Commenta o decommenta.
+.TP
+.B Alt+K
+Filtra la selezione con un comando di shell.
+.TP
+.BR Tab ", " Shift+Tab
+Indenta o toglie l'indentazione.
+.TP
+.BR Ctrl+D ", " Alt+D
+Aggiunge un cursore alla prossima occorrenza della parola, o a tutte.
+.B Alt+Shift+Su
+e
+.B Alt+Shift+Giù
+aggiungono un cursore sopra o sotto.
+.TP
+.B Alt+Z
+Piega o espande il blocco.
+.SS Esecuzione di comandi
+.TP
+.B Alt+R
+Esegue un comando di shell; l'output compare in un pannello
+.BR [Output] .
+.B F5
+lo ripete,
+.B Shift+F5
+lo interrompe.
+.TP
+.BR F8 ", " Shift+F8
+Errore successivo e precedente (il formato
+.I file:riga:colonna
+di gcc, tsc, Python).
+.SS Altro
+.TP
+.B Alt+X
+Palette dei comandi.
+.TP
+.B Alt+T
+Cambia il tema.
+.TP
+.B Ctrl+L
+Ridisegna lo schermo.
+.SH BARRA DI RICERCA
+Con la barra di ricerca aperta:
+.B Alt+C
+alterna maiuscole e minuscole,
+.B Alt+W
+la parola intera e
+.B Alt+R
+le espressioni regolari (POSIX estese).
+.B Invio
+accetta,
+.B Esc
+annulla.
+I tasti utilizzabili compaiono a destra della barra.
+Nella sostituzione, a ogni occorrenza chiede
+.RB \(lq "Sostituire? (s = sì, n = no, t = tutte, Esc = fine)" \(rq.
+.SH PALETTE DEI COMANDI
+.B Alt+X
+elenca tutti i comandi, filtrati mentre si digita una parte del nome.
+Con la ricerca vuota i comandi sono in sezioni: prima le azioni, poi le impostazioni che
+cambiano il comportamento dell'editor.
+Ogni riga mostra il nome, il valore corrente di un'impostazione (un cerchio pieno se è attiva) e
+tutte le scorciatoie del comando.
+.B Invio
+su un'azione la esegue e chiude la palette; su un'impostazione la cambia e lascia la palette
+aperta.
+.PP
+Le impostazioni sono: mouse, autosuggest, coppie automatiche di parentesi e virgolette,
+indicatori Git, appunti di sistema, indentazione (tabulatore, 2, 4 o 8 spazi), tema e lingua (con
+il file del catalogo in uso).
+.B Salva le impostazioni...\&
+scrive le scelte in un file di configurazione.
+.SH CONFIGURAZIONE
+Tutto ha un valore predefinito: l'editor funziona senza alcuna configurazione.
+La cartella è
+.IB $XDG_CONFIG_HOME /xted
+oppure
+.BR ~/.config/xted :
+.TP
+.B config
+Impostazioni e scorciatoie.
+.TP
+.B syntax/
+Altri linguaggi, un file ciascuno, nel formato descritto all'inizio di
+.BR src/langs.c .
+.TP
+.B themes/
+Altri temi colore, un file ciascuno.
+.TP
+.B lang/
+Cataloghi di traduzione, un file per lingua.
+.SS Il file config
+Righe
+.IR chiave " = " valore ,
+commenti con
+.BR # .
+Le chiavi prima della prima sezione valgono per tutti i linguaggi; una sezione
+.RI [ Linguaggio ]
+le cambia per quel linguaggio;
+.B [keys]
+contiene le scorciatoie.
+.TP
+.B theme
+.B dark
+(predefinito),
+.B light
+o un tema tuo (anche
+.BR scuro " e " chiaro ).
+.TP
+.BR mouse ", " git ", " clipboard
+.BR on " oppure " off .
+L'impostazione clipboard invia le copie anche agli appunti di sistema (OSC 52).
+.TP
+.B language
+.BR auto " (dall'ambiente), " en ", " it
+o il codice di un qualsiasi catalogo trovato.
+.TP
+.BR tab_width ", " indent_width
+Larghezza di un tabulatore e spazi di un livello di indentazione (da 1 a 16).
+.TP
+.B expand_tab
+Tab inserisce spazi.
+.TP
+.B trim_trailing_space
+Toglie gli spazi finali al salvataggio.
+.TP
+.B final_newline
+.BR keep " oppure " always .
+.TP
+.BR autosuggest ", " autopair
+Suggerimenti mentre si scrive, e chiusura automatica di parentesi e virgolette.
+.TP
+.B suggest_min
+Lettere scritte prima che compaiano i suggerimenti (da 1 a 10).
+.PP
+Nella sezione
+.B [keys]
+una riga come
+.B ctrl+shift+d = duplicate_down
+assegna un tasto a un comando; il valore
+.B none
+toglie una scorciatoia.
+.SS Il file di progetto
+Un file chiamato
+.B .xted
+nella cartella del progetto (o sopra i file) ha lo stesso formato.
+Le sue chiavi per linguaggio hanno la precedenza sul file utente per i documenti del progetto; le
+sue chiavi globali (theme, mouse, git, clipboard, language) si leggono all'avvio da quello più
+vicino al primo file.
+.SS Ordine di precedenza
+Per le impostazioni di un documento: un comando dato nella sessione, il
+.B .xted
+del progetto, il file utente,
+.BR .editorconfig ,
+lo stile rilevato nel testo (tabulatori o spazi), i valori predefiniti.
+.PP
+.B .editorconfig
+si legge dalla cartella del file verso l'alto:
+.BR indent_style ,
+.BR indent_size ,
+.BR tab_width ,
+.B trim_trailing_whitespace
+e
+.BR insert_final_newline .
+.SS Salvare le impostazioni
+.B Salva le impostazioni...\&
+nella palette chiede dove scrivere ciò che è stato cambiato con i comandi: il file utente, il
+.B .xted
+del progetto, o
+.B .editorconfig
+(solo l'indentazione).
+I file si modificano riga per riga e si scrivono in modo atomico, quindi commenti e ordine si
+conservano.
+.SH LINGUA
+I testi dell'editor sono in inglese nel codice e si traducono da cataloghi, che sono file di
+testo e non fanno parte del binario.
+Un catalogo ha il nome della lingua (\c
+.BR it ).
+Ha una riga per testo: il testo inglese, un tab, la traduzione;
+.B #
+inizia un commento,
+.B @name
+dà il nome della lingua, e
+.BR \e\^n ,
+.B \et
+e
+.B \e\e
+sono escape.
+Una traduzione le cui conversioni
+.BR printf (3)
+differiscono da quelle dell'originale viene ignorata.
+.PP
+I cataloghi si cercano in
+.BR ~/.config/xted/lang/ ,
+in
+.B lang/
+e
+.B ../share/xted/lang/
+accanto all'eseguibile, e in
+.BR $PREFIX/share/xted/lang/ .
+Se la lingua o il suo file mancano si usa l'inglese.
+.SH FILE
+.TP
+.B ~/.config/xted/config
+Configurazione dell'utente.
+.TP
+.B .xted
+Configurazione di un progetto.
+.TP
+.B .editorconfig
+Letto per indentazione, spazi finali e newline finale.
+.TP
+.B tags
+Un file ctags, usato dal salto alla definizione.
+.TP
+.B ~/.local/state/xted/sessions/
+Un file per ogni cartella da cui è stato avviato l'editor, con i file aperti e i cursori.
+.SH AMBIENTE
+.TP
+.B XDG_CONFIG_HOME
+Cartella di base della configurazione (predefinita
+.BR ~/.config ).
+.TP
+.B XDG_STATE_HOME
+Cartella di base delle sessioni (predefinita
+.BR ~/.local/state ).
+.TP
+.BR LC_ALL ", " LC_MESSAGES ", " LANG
+Scelgono la lingua con
+.B language = auto
+(per esempio
+.B it_IT.UTF-8
+è l'italiano).
+.TP
+.BR COLORTERM ", " TERM
+Decidono se i colori sono truecolor, 256 o 16.
+.TP
+.B NO_COLOR
+Spegne i colori.
+.SH CODICE DI USCITA
+.TP
+.B 0
+Uscita normale.
+.TP
+.B 1
+Non è stato possibile aprire un file, oppure manca un terminale interattivo.
+.TP
+.B 2
+Opzione o uso errati.
+.SH NOTE
+.B xted
+rimette sempre il terminale com'era, anche su
+.BR SIGTERM ,
+.B SIGHUP
+o un arresto anomalo.
+Ctrl+C è la scorciatoia per copiare e non interrompe il programma.
+.SH VEDERE ANCHE
+.BR ctags (1),
+.BR git (1),
+.BR vi (1),
+.BR nano (1)
+.PP
+La documentazione completa è nei file
+.B README.md
+e
+.B SPEC.md
+dei sorgenti.
+.SH AUTORE
+David Bigagli.
+.SH LICENZA
+MIT. Vedi il file
+.BR LICENSE .

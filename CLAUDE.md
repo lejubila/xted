@@ -60,6 +60,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/cfgsave.[ch]` | Scrittura delle impostazioni: `cfgsave_write` (file di `xted` a righe `chiave = valore` e `[sezione]`: sostituisce la riga, aggiunge in fondo alla sezione, conserva commenti e ordine, scrive su file temporaneo e rinomina), `cfgsave_editorconfig` (nella sezione più specifica che corrisponde al file del `.editorconfig` più vicino, o ne crea uno con `root = true`), `cfgsave_find_project`/`cfgsave_project_root` (`.xted` di progetto); senza terminale |
 | `src/i18n.[ch]` | Traduzioni: `tr("English text")` dà la traduzione del testo dal catalogo della lingua in uso (file `lang/<codice>`, una riga `testo inglese<TAB>traduzione`, cartelle: `<config>/lang`, `lang/` e `../share/xted/lang` accanto all'eseguibile, `XTED_DATADIR/lang`), o il testo stesso; i testi nel codice sono in inglese, il catalogo non è nel binario; una traduzione con conversioni `printf` diverse viene scartata; `i18n_set` (`auto` legge `LC_ALL`, `LC_MESSAGES`, `LANG`), chiave `language`, comando `language` |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
+| `man/` | Pagine del manuale: `xted.1` (inglese) e `it/xted.1` (italiano), installate da `make install`; vanno aggiornate quando cambiano opzioni, scorciatoie o chiavi di configurazione |
 | `tests/` | Test automatici |
 
 - Le cartelle di configurazione e di stato si chiamavano `ked`: `app_dir` (util.c) usa ancora quella vecchia se è l'unica che esiste, e le sessioni con intestazione `ked-session` si leggono ancora.

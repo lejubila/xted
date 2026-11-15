@@ -140,7 +140,7 @@ L'interfaccia è minimale ma informativa; tutto è configurabile da un file di t
 - Nessun lavoro in background inutile; il ciclo principale attende input con `poll()`.
 - Compilazione senza warning con `-Wall -Wextra -pedantic`; verifica con AddressSanitizer e Valgrind.
 - Test automatici sul buffer, undo/redo, ricerca e parser di sintassi.
-- Pagina `man` e `README` con l'elenco dei comandi.
+- Pagina `man` (`man/xted.1` in inglese, `man/it/xted.1` in italiano) e `README` con l'elenco dei comandi.
 
 ## Roadmap a fasi e istruzioni per Claude Code
 

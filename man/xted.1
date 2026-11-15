@@ -1,0 +1,422 @@
+.TH XTED 1 "November 2026" "xted" "User Commands"
+.SH NAME
+xted, xt \- terminal text editor
+.SH SYNOPSIS
+.B xted
+.RI [ file [: line [: column ]]]\ ...
+.br
+.B xted
+.B \-
+.br
+.B xted
+.I directory
+.br
+.B xted
+.B \-h
+.SH DESCRIPTION
+.B xted
+is a text editor for the terminal, written in C99 with nothing but the POSIX C library: no
+ncurses, no terminfo, no other library.
+It is a single binary that starts in under 50 ms.
+.B xt
+is a short name for the same program (a link made by
+.BR "make install" ).
+.PP
+The editor is not modal and uses familiar shortcuts (Ctrl+S, Ctrl+C, Ctrl+V, Ctrl+Z).
+For programming it has syntax highlighting, automatic indentation, suggestions of the symbols of
+the file, of the files it includes and of the standard library (PHP, C, C++, Python,
+JavaScript and TypeScript), snippets, multiple cursors, folding and jumps to definitions.
+It needs no language server.
+.SH OPTIONS
+.TP
+.IR file [: line [: column ]]
+Open the file, and move the cursor to the line (and column) given.
+Several files are opened as several buffers, shown as tabs.
+The suffix is read as a position only when no file with that exact name exists.
+.TP
+.B \-
+Read the text from standard input (only once).
+.TP
+.I directory
+Open the file browser on that directory.
+.TP
+.BR \-h ", " \-\^\-help
+Print a short help and exit.
+.PP
+Without arguments, the files that were open and the cursor positions of the last session in the
+current folder are restored.
+.SH KEYS
+All shortcuts can be changed (see
+.BR CONFIGURATION ).
+They are listed next to each command in the command palette.
+.SS Files and buffers
+.TP
+.B Ctrl+S
+Save.
+.B Alt+S
+saves as,
+.B Alt+A
+saves all.
+.TP
+.B Ctrl+O
+Open a file.
+.TP
+.B Ctrl+P
+Quick open: fuzzy search of the files of the project.
+.TP
+.B Ctrl+E
+List of the buffers.
+.TP
+.B Ctrl+W
+Close the buffer.
+.B Alt+.\&
+and
+.B Alt+,
+(or
+.B Ctrl+PgDn
+and
+.BR Ctrl+PgUp )
+go to the next and the previous buffer.
+.TP
+.B Ctrl+B
+Show or hide the file browser.
+.TP
+.B Ctrl+Q
+Quit.
+.SS Panes
+.TP
+.B Alt+\e
+Split vertically.
+.B Alt+\-
+splits horizontally.
+.TP
+.B Alt+E
+Resize mode (arrow keys move the border).
+.TP
+.B Alt+Q
+Close the pane.
+.TP
+.BR Alt+O ", " Alt+Right ", " Ctrl+Tab
+Next pane.
+.BR Alt+Left " and " Ctrl+Shift+Tab
+go to the previous one.
+.SS Search and navigation
+.TP
+.B Ctrl+F
+Find, incrementally.
+.B Ctrl+R
+replaces,
+.B Alt+F
+searches in the files of the project.
+.TP
+.BR F3 ", " Alt+N
+Next match.
+.BR Shift+F3 " and " Alt+P
+go to the previous one.
+.TP
+.B Ctrl+G
+Go to a line (and column).
+.TP
+.B Ctrl+T
+Go to a symbol: classes, functions, methods, properties and constants of the file.
+.TP
+.B F12
+Go to the definition, with a
+.B tags
+file made by ctags.
+.TP
+.B Alt+M
+Matching bracket.
+.SS Editing
+.TP
+.BR Ctrl+Z ", " Ctrl+Y
+Undo, redo.
+.TP
+.BR Ctrl+A ", " Alt+L ", " Alt+W
+Select all, the line, the word.
+.TP
+.BR Ctrl+C ", " Ctrl+X ", " Ctrl+V
+Copy, cut, paste.
+.B Alt+V
+pastes the previous entry of the history.
+.TP
+.BR Ctrl+K ", " Ctrl+J
+Delete lines, join lines.
+.TP
+.BR Alt+Up ", " Alt+Down
+Move the line up or down.
+.B Alt+Y
+duplicates it.
+.TP
+.B Alt+/
+Comment or uncomment.
+.TP
+.B Alt+K
+Filter the selection through a shell command.
+.TP
+.BR Tab ", " Shift+Tab
+Indent or unindent.
+.TP
+.BR Ctrl+D ", " Alt+D
+Add a cursor at the next occurrence of the word, or at all of them.
+.B Alt+Shift+Up
+and
+.B Alt+Shift+Down
+add a cursor above or below.
+.TP
+.B Alt+Z
+Fold or unfold the block.
+.SS Running commands
+.TP
+.B Alt+R
+Run a shell command; the output appears in an
+.B [Output]
+pane.
+.B F5
+repeats it,
+.B Shift+F5
+stops it.
+.TP
+.BR F8 ", " Shift+F8
+Next and previous error (the
+.I file:line:column
+format of gcc, tsc, Python).
+.SS Other
+.TP
+.B Alt+X
+Command palette.
+.TP
+.B Alt+T
+Change the theme.
+.TP
+.B Ctrl+L
+Redraw the screen.
+.SH SEARCH BAR
+While the search bar is open:
+.B Alt+C
+switches case sensitivity,
+.B Alt+W
+whole words and
+.B Alt+R
+regular expressions (POSIX extended).
+.B Enter
+accepts,
+.B Esc
+cancels.
+The keys that can be used are shown at the right of the bar.
+When replacing, each match asks
+.RB \(lq "Replace? (y = yes, n = no, a = all, Esc = done)" \(rq.
+.SH COMMAND PALETTE
+.B Alt+X
+lists all the commands, narrowed down while a part of the name is typed.
+With an empty search the commands are in sections: first the actions, then the settings that
+change the behavior of the editor.
+Each row shows the name, the present value of a setting (a filled circle when it is on) and
+all the shortcuts of the command.
+.B Enter
+on an action runs it and closes the palette; on a setting it changes it and leaves the palette
+open.
+.PP
+The settings are: mouse, autosuggest, automatic pairs of brackets and quotes, Git markers,
+system clipboard, indentation (tab, 2, 4 or 8 spaces), theme and language (with the catalog file
+in use).
+.B Save settings...\&
+writes the choices into a configuration file.
+.SH CONFIGURATION
+Everything has a default: the editor works with no configuration.
+The folder is
+.IB $XDG_CONFIG_HOME /xted
+or
+.BR ~/.config/xted :
+.TP
+.B config
+Settings and shortcuts.
+.TP
+.B syntax/
+More languages, one file each, in the format described at the top of
+.BR src/langs.c .
+.TP
+.B themes/
+More color themes, one file each.
+.TP
+.B lang/
+Translation catalogs, one file per language.
+.SS The config file
+Lines of
+.IR key " = " value ,
+comments with
+.BR # .
+Keys before the first section apply to all languages; a section
+.RI [ Language ]
+changes them for that language;
+.B [keys]
+holds the shortcuts.
+.TP
+.B theme
+.B dark
+(default),
+.B light
+or a theme of your own.
+.TP
+.BR mouse ", " git ", " clipboard
+.BR on " or " off .
+The clipboard setting also sends the copies to the system clipboard (OSC 52).
+.TP
+.B language
+.BR auto " (from the environment), " en ", " it
+or the code of any catalog found.
+.TP
+.BR tab_width ", " indent_width
+Width of a tab, and spaces of one indentation level (1 to 16).
+.TP
+.B expand_tab
+Tab inserts spaces.
+.TP
+.B trim_trailing_space
+Remove the trailing spaces when saving.
+.TP
+.B final_newline
+.BR keep " or " always .
+.TP
+.BR autosuggest ", " autopair
+Suggestions while typing, and automatic closing brackets and quotes.
+.TP
+.B suggest_min
+Letters typed before the suggestions appear (1 to 10).
+.PP
+In the
+.B [keys]
+section a line such as
+.B ctrl+shift+d = duplicate_down
+binds a key to a command; the value
+.B none
+removes a shortcut.
+.SS The project file
+A file called
+.B .xted
+in the folder of the project (or above the files) has the same format.
+Its language keys win over the user's file for the documents of the project; its global keys
+(theme, mouse, git, clipboard, language) are read at start from the one nearest to the first file.
+.SS Order of precedence
+For the settings of a document: a command given in the session, the project's
+.BR .xted ,
+the user's file,
+.BR .editorconfig ,
+the style found in the text (tabs or spaces), the defaults.
+.PP
+.B .editorconfig
+is read from the folder of the file upwards:
+.BR indent_style ,
+.BR indent_size ,
+.BR tab_width ,
+.B trim_trailing_whitespace
+and
+.BR insert_final_newline .
+.SS Saving the settings
+.B Save settings...\&
+in the palette asks where to write what was changed with commands: the user's file, the
+project's
+.BR .xted ,
+or
+.B .editorconfig
+(indentation only).
+Files are changed line by line and written atomically, so comments and order are kept.
+.SH LANGUAGE
+The texts of the editor are English in the code and are translated from catalogs, which are text
+files and not part of the binary.
+A catalog is named after the language (\c
+.BR it ).
+It has a line per text: the English text, a tab, the translation;
+.B #
+starts a comment,
+.B @name
+gives the name of the language, and
+.BR \e\^n ,
+.B \et
+and
+.B \e\e
+are escapes.
+A translation whose
+.BR printf (3)
+conversions differ from the original is ignored.
+.PP
+Catalogs are searched in
+.BR ~/.config/xted/lang/ ,
+in
+.B lang/
+and
+.B ../share/xted/lang/
+next to the executable, and in
+.BR $PREFIX/share/xted/lang/ .
+If the language or its file is missing, English is used.
+.SH FILES
+.TP
+.B ~/.config/xted/config
+User configuration.
+.TP
+.B .xted
+Configuration of a project.
+.TP
+.B .editorconfig
+Read for indentation, trailing spaces and final newline.
+.TP
+.B tags
+A ctags file, used by the jump to the definition.
+.TP
+.B ~/.local/state/xted/sessions/
+One file per folder from which the editor was started, with the open files and the cursors.
+.SH ENVIRONMENT
+.TP
+.B XDG_CONFIG_HOME
+Base folder of the configuration (default
+.BR ~/.config ).
+.TP
+.B XDG_STATE_HOME
+Base folder of the sessions (default
+.BR ~/.local/state ).
+.TP
+.BR LC_ALL ", " LC_MESSAGES ", " LANG
+Choose the language when
+.B language = auto
+(for example
+.B it_IT.UTF-8
+is Italian).
+.TP
+.BR COLORTERM ", " TERM
+Decide whether colors are truecolor, 256 or 16.
+.TP
+.B NO_COLOR
+Turns the colors off.
+.SH EXIT STATUS
+.TP
+.B 0
+Normal exit.
+.TP
+.B 1
+A file could not be opened, or there is no interactive terminal.
+.TP
+.B 2
+Wrong option or use.
+.SH NOTES
+.B xted
+always puts the terminal back as it was, also on
+.BR SIGTERM ,
+.B SIGHUP
+or a crash.
+Ctrl+C is the copy shortcut and does not interrupt the program.
+.SH SEE ALSO
+.BR ctags (1),
+.BR git (1),
+.BR vi (1),
+.BR nano (1)
+.PP
+The full documentation is in the files
+.B README.md
+and
+.B SPEC.md
+of the source tree.
+.SH AUTHOR
+David Bigagli.
+.SH LICENSE
+MIT. See the file
+.BR LICENSE .
