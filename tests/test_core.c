@@ -4440,6 +4440,98 @@ static void test_py_import(void)
     rm_rf(dir);
 }
 
+/* Accepting a Node module or one of its classes adds the import or require it needs. */
+static void test_js_import(void)
+{
+    char dir[64], path[128], err[128];
+    Editor e;
+    Doc *d;
+    size_t i;
+    struct { const char *file, *text, *typed, *head; size_t y, x; int changes; } t[] = {
+        { "a.js", "const path = require('path');\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "const fs = require('fs');\nconst path = require('path');\n\nfunction f() {\n", 3, 4, 1 },
+        { "b.ts", "import path from 'path';\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "import fs from 'fs';\nimport path from 'path';\n\nfunction f() {\n", 3, 4, 1 },
+        { "c.ts", "import path from \"path\"\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "import fs from \"fs\"\nimport path from \"path\"\n\nfunction f() {\n", 3, 4, 1 },
+        { "d.ts", "import fs from 'fs';\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "import fs from 'fs';\n\nfunction f() {\n", 3, 4, 0 },
+        { "e.ts", "import fs from 'fs';\n\nfunction f() {\n    \n}\n", "EventEm",
+          "import { EventEmitter } from 'events';\nimport fs from 'fs';\n\nfunction f() {\n", 3, 4, 1 },
+        { "f.ts", "import { Readable } from 'stream';\n\nfunction f() {\n    \n}\n", "Writab",
+          "import { Readable, Writable } from 'stream';\n\nfunction f() {\n", 3, 4, 1 },
+        { "g.js", "'use strict';\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "'use strict';\n\nconst fs = require('fs');\n\nfunction f() {\n", 3, 4, 1 },
+        { "h.js", "const fs = require('fs');\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "const fs = require('fs');\n\nfunction f() {\n", 3, 4, 0 },
+        { "i.js", "let fs = 3;\nfunction f() {\n    \n}\n", "fs.readF", "let fs = 3;\nfunction f() {\n", 2, 4, 0 },
+        { "j.ts", "import * as path from 'path';\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "import * as fs from 'fs';\nimport * as path from 'path';\n\nfunction f() {\n", 3, 4, 1 },
+        { "k.ts", "function f() {\n    \n}\n", "fs.readF", "import fs from 'fs';\n\nfunction f() {\n", 1, 4, 1 },
+        { "l.ts", "function f() {\n    \n}\n", "Buff", "function f() {\n", 1, 4, 0 },
+        { "m.ts", "import {\n  a,\n  fs,\n} from './x';\n\nfunction f() {\n    \n}\n", "fs.readF",
+          "import {\n  a,\n  fs,\n} from './x';\n\nfunction f() {\n", 6, 4, 0 },
+        { "n.ts", "// header\n/* more\n   text */\nfunction f() {\n    \n}\n", "fs.readF",
+          "// header\n/* more\n   text */\n\nimport fs from 'fs';\n\nfunction f() {\n", 4, 4, 1 },
+    };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char *q;
+        size_t y, nl0;
+        SBuf all = SBUF_INIT;
+
+        put_file(dir, t[i].file, t[i].text);
+        snprintf(path, sizeof path, "%s/%s", dir, t[i].file);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        nl0 = e.buf->nlines;
+        e.cy = t[i].y;
+        e.cx = t[i].x;
+        for (q = t[i].typed; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        if (e.comp.on)
+            kkey(&e, KEY_ENTER, 0);
+        for (y = 0; y < e.buf->nlines; y++) {
+            sbuf_add(&all, e.buf->lines[y].s, e.buf->lines[y].len);
+            sbuf_adds(&all, "\n");
+        }
+        sbuf_add(&all, "", 1);
+        if (strncmp(all.p, t[i].head, strlen(t[i].head)) != 0)
+            fprintf(stderr, "case %zu (%s):\n%s---\n", i, t[i].file, all.p);
+        CHECK(strncmp(all.p, t[i].head, strlen(t[i].head)) == 0);
+        if (t[i].changes) {
+            edit_undo(&e);                      /* one Undo takes back the import and the word */
+            CHECK(e.buf->nlines == nl0);
+        }
+        sbuf_free(&all);
+        editor_free(&e);
+    }
+    /* package.json with "type": "module": a .js file without imports uses import */
+    put_file(dir, "package.json", "{ \"name\": \"x\", \"type\": \"module\" }\n");
+    put_file(dir, "z.js", "function f() {\n    \n}\n");
+    snprintf(path, sizeof path, "%s/z.js", dir);
+    editor_init(&e);
+    d = editor_open_doc(&e, path, err, sizeof err);
+    CHECK(d != NULL);
+    editor_activate(&e, d);
+    e.cy = 1;
+    e.cx = 4;
+    {
+        const char *q;
+
+        for (q = "fs.readF"; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+    }
+    if (e.comp.on)
+        kkey(&e, KEY_ENTER, 0);
+    CHECK(line_is(e.buf, 0, "import fs from 'fs';") && line_is(e.buf, 1, "") && line_is(e.buf, 2, "function f() {"));
+    editor_free(&e);
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -4985,6 +5077,7 @@ int main(void)
     test_i18n();
     test_c_include();
     test_py_import();
+    test_js_import();
     test_config_merge();
     test_snippets();
     test_cursors();

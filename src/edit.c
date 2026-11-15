@@ -1501,6 +1501,304 @@ int edit_add_py_import(Editor *e, const char *mod, const char *name)
     return 1;
 }
 
+/* The first occurrence of the NUL-terminated needle in the n bytes of hay, or NULL. */
+static const char *strstr_n(const char *hay, size_t n, const char *needle)
+{
+    size_t nl = strlen(needle), i;
+
+    for (i = 0; i + nl <= n; i++)
+        if (memcmp(hay + i, needle, nl) == 0)
+            return hay + i;
+    return NULL;
+}
+
+/* True if the nearest package.json above the file says "type": "module". */
+static int js_pkg_module(const char *path)
+{
+    char dir[4096], file[4200], buf[8192];
+    size_t n;
+
+    if (!path || strlen(path) >= sizeof dir)
+        return 0;
+    snprintf(dir, sizeof dir, "%s", path);
+    for (;;) {
+        char *slash = strrchr(dir, '/');
+        FILE *f;
+
+        if (!slash)
+            return 0;
+        *slash = '\0';
+        snprintf(file, sizeof file, "%s/package.json", dir[0] ? dir : "");
+        f = fopen(file, "r");
+        if (f) {
+            n = fread(buf, 1, sizeof buf - 1, f);
+            fclose(f);
+            buf[n] = '\0';
+            {
+                const char *t = strstr(buf, "\"type\"");
+
+                return t && strstr(t, "\"module\"") != NULL && strstr(t, "\"module\"") - t < 20;
+            }
+        }
+        if (!dir[0])
+            return 0;
+    }
+}
+
+/* True if the file declares or imports name at its top level: an import, or const, let, var,
+ * function, class, type, interface, enum with name before the "=" or the "(". */
+static int js_declared(const Buffer *b, const char *name)
+{
+    static const char *const kw[] = { "const ", "let ", "var ", "function ", "async function ", "class ",
+                                      "type ", "interface ", "enum ", "export const ", "export let ",
+                                      "export var ", "export function ", "export class ", "export default class ",
+                                      "export type ", "export interface ", "export enum ", NULL };
+    size_t y, lim = b->nlines < 2000 ? b->nlines : 2000, k, i;
+    int in_import = 0;
+
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        Line t = *l;
+
+        for (i = 0; i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'); i++)
+            ;
+        if (in_import || (l->len - i > 7 && memcmp(l->s + i, "import ", 7) == 0 && i == 0)) {
+            size_t end = l->len;
+            const char *from = strstr_n(l->s + i, l->len - i, " from ");
+
+            if (from)
+                end = (size_t)(from - l->s);
+            t.len = end;
+            if (py_has_word(&t, i, name))
+                return 1;
+            in_import = end == l->len && !memchr(l->s, '\'', l->len) && !memchr(l->s, '"', l->len);
+            continue;
+        }
+        for (k = 0; kw[k]; k++) {
+            size_t kl = strlen(kw[k]);
+
+            if (l->len - i > kl && memcmp(l->s + i, kw[k], kl) == 0) {
+                size_t j;
+
+                for (j = i + kl; j < l->len && l->s[j] != '=' && l->s[j] != '('; j++)
+                    ;
+                t.len = j;
+                if (py_has_word(&t, i + kl, name))
+                    return 1;
+                break;
+            }
+        }
+    }
+    return 0;
+}
+
+/* The text of the last quoted string of a line, and its quote; 0 if none. */
+static int js_last_string(const Line *l, char *out, size_t n, char *quote)
+{
+    size_t i = l->len, j;
+
+    while (i > 0 && l->s[i - 1] != '\'' && l->s[i - 1] != '"')
+        i--;
+    if (i < 2)
+        return 0;
+    *quote = l->s[i - 1];
+    for (j = i - 1; j > 0 && l->s[j - 1] != *quote; j--)
+        ;
+    if (j == 0 || i - 1 - j + 1 > n)
+        return 0;
+    memcpy(out, l->s + j, i - 1 - j);
+    out[i - 1 - j] = '\0';
+    return 1;
+}
+
+int edit_add_js_import(Editor *e, const char *mod, const char *name, int def, char *stmt, size_t sn)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 400 ? b->nlines : 400, y, blk_start = (size_t)-1, blk_end = 0, ins = (size_t)-1;
+    size_t ext = (size_t)-1, top = 0, at, added = 0;
+    int esm = 0, cjs = 0, semi = -1, star = 0, blk_open = 1, sorted = 1, top_done = 0, in_comment = 0;
+    char quote = 0, cur[200], prev[200] = "", q;
+    const char *path = e->doc->buf.path, *ext_name;
+    SBuf text = SBUF_INIT;
+    char pre[2] = "", post[2] = "";
+
+    if (js_declared(b, name))
+        return 0;
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        int is_import = l->len > 7 && memcmp(l->s, "import ", 7) == 0 && l->s[7] != '(';
+        int is_req = (l->len > 6 && (memcmp(l->s, "const ", 6) == 0 || memcmp(l->s, "let ", 4) == 0 ||
+                                     memcmp(l->s, "var ", 4) == 0)) &&
+                     l->len > 10 && strstr_n(l->s, l->len, "require(") != NULL;
+
+        if (is_import || is_req) {
+            size_t last = y;
+            const Line *fin = l;
+
+            if (is_import) {
+                esm = 1;
+                /* a statement may take several lines: up to the one with the module string */
+                while (last + 1 < lim && !(strstr_n(b->lines[last].s, b->lines[last].len, " from ") ||
+                                           strstr_n(b->lines[last].s, b->lines[last].len, "from ") ||
+                                           memchr(b->lines[last].s, '\'', b->lines[last].len) ||
+                                           memchr(b->lines[last].s, '"', b->lines[last].len)))
+                    last++;
+                fin = &b->lines[last];
+                if (strstr_n(l->s, l->len, "* as "))
+                    star = 1;
+            } else {
+                cjs = 1;
+            }
+            if (js_last_string(fin, cur, sizeof cur, &q)) {
+                if (!quote)
+                    quote = q;
+                if (blk_open) {
+                    if (prev[0] && strcmp(prev, cur) > 0)
+                        sorted = 0;
+                    if (ins == (size_t)-1 && strcmp(cur, mod) > 0)
+                        ins = y;
+                    snprintf(prev, sizeof prev, "%s", cur);
+                }
+                if (!def && strcmp(cur, mod) == 0 && last == y && memchr(l->s, '{', l->len) &&
+                    memchr(l->s, '}', l->len) && !strstr_n(l->s, l->len, "import type") &&
+                    !(is_import && strstr_n(l->s, l->len, "* as ")))
+                    ext = y;
+            }
+            if (semi < 0 && fin->len > 0)
+                semi = fin->s[fin->len - 1] == ';';
+            if (blk_start == (size_t)-1)
+                blk_start = y;
+            if (blk_open)
+                blk_end = last;
+            y = last;
+            top_done = 1;
+            continue;
+        }
+        if (l->len == 0) {
+            if (blk_start != (size_t)-1)
+                blk_open = 0;
+            else if (!top_done && top == y)
+                top = y + 1;
+            continue;
+        }
+        if (blk_start != (size_t)-1 && l->s[0] != '/' && l->s[0] != '*')
+            blk_open = 0;
+        if (!top_done) {
+            /* where the imports go in a file that has none: after the comments and "use strict" */
+            if (in_comment) {
+                size_t i;
+
+                top = y + 1;
+                for (i = 0; i + 1 < l->len; i++)
+                    if (l->s[i] == '*' && l->s[i + 1] == '/')
+                        in_comment = 0;
+            } else if (l->len >= 2 && l->s[0] == '/' && l->s[1] == '*') {
+                size_t i;
+
+                in_comment = 1;
+                top = y + 1;
+                for (i = 2; i + 1 < l->len; i++)
+                    if (l->s[i] == '*' && l->s[i + 1] == '/')
+                        in_comment = 0;
+            } else if ((l->len >= 2 && l->s[0] == '/' && l->s[1] == '/') || l->s[0] == '#' ||
+                       strstr_n(l->s, l->len, "use strict") != NULL) {
+                top = y + 1;
+            } else {
+                top_done = 1;
+            }
+        }
+    }
+    ext_name = path ? strrchr(path, '.') : NULL;
+    if (!esm && !cjs) {
+        if (ext_name && (strcmp(ext_name, ".ts") == 0 || strcmp(ext_name, ".tsx") == 0 ||
+                         strcmp(ext_name, ".mts") == 0 || strcmp(ext_name, ".jsx") == 0 ||
+                         strcmp(ext_name, ".mjs") == 0))
+            esm = 1;
+        else if (!(ext_name && strcmp(ext_name, ".cjs") == 0))
+            esm = js_pkg_module(path);
+    }
+    if (!quote)
+        quote = '\'';
+    if (semi < 0)
+        semi = 1;
+    /* "import { a } from 'mod'" gets ", name" */
+    if (!def && ext != (size_t)-1) {
+        const Line *l = &b->lines[ext];
+        size_t xx = l->len, yy = ext;
+        SBuf add = SBUF_INIT;
+
+        while (xx > 0 && l->s[xx - 1] != '}')
+            xx--;
+        if (xx > 0) {
+            xx--;
+            while (xx > 0 && (l->s[xx - 1] == ' ' || l->s[xx - 1] == '\t'))
+                xx--;
+            sbuf_adds(&add, ", ");
+            sbuf_adds(&add, name);
+            buf_insert_text(e->buf, &yy, &xx, add.p, add.len);
+            snprintf(stmt, sn, "%.*s", (int)add.len, add.p);
+            sbuf_free(&add);
+            return 1;
+        }
+        sbuf_free(&add);
+    }
+    {
+        char line[600];
+
+        if (esm && def)
+            snprintf(line, sizeof line, star ? "import * as %s from %c%s%c%s" : "import %s from %c%s%c%s", name, quote, mod,
+                     quote, semi ? ";" : "");
+        else if (esm)
+            snprintf(line, sizeof line, "import { %s } from %c%s%c%s", name, quote, mod, quote, semi ? ";" : "");
+        else if (def)
+            snprintf(line, sizeof line, "const %s = require(%c%s%c)%s", name, quote, mod, quote, semi ? ";" : "");
+        else
+            snprintf(line, sizeof line, "const { %s } = require(%c%s%c)%s", name, quote, mod, quote, semi ? ";" : "");
+        snprintf(stmt, sn, "%s", line);
+        sbuf_adds(&text, line);
+        sbuf_adds(&text, "\n");
+    }
+    if (blk_start != (size_t)-1) {
+        at = ins != (size_t)-1 && sorted ? ins : blk_end + 1;
+    } else {
+        at = top;
+        if (at > 0 && at <= b->nlines && b->lines[at - 1].len > 0)
+            pre[0] = '\n';
+        if (at < b->nlines && b->lines[at].len > 0)
+            post[0] = '\n';
+    }
+    {
+        SBuf all = SBUF_INIT;
+        size_t yy = at, xx = 0, k;
+
+        sbuf_adds(&all, pre);
+        sbuf_add(&all, text.p, text.len);
+        sbuf_adds(&all, post);
+        if (at >= b->nlines) {
+            yy = b->nlines - 1;
+            xx = b->lines[yy].len;
+            if (xx > 0) {
+                SBuf t2 = SBUF_INIT;
+
+                sbuf_adds(&t2, "\n");
+                sbuf_add(&t2, all.p, all.len);
+                sbuf_free(&all);
+                all = t2;
+            }
+            at = b->nlines;
+        }
+        for (k = 0; k < all.len; k++)
+            if (all.p[k] == '\n')
+                added++;
+        buf_insert_text(e->buf, &yy, &xx, all.p, all.len);
+        sbuf_free(&all);
+    }
+    sbuf_free(&text);
+    if (at <= e->cy)
+        e->cy += added;
+    return 1;
+}
+
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq)
 {
     if (from_x > e->cx)

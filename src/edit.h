@@ -81,6 +81,12 @@ int edit_add_include(Editor *e, const char *hdr);
  * of imports in order, or after the docstring if there are none. Returns 1 if the text changed. It
  * does not open an undo group. */
 int edit_add_py_import(Editor *e, const char *mod, const char *name);
+/* Adds the import of a Node module to a JavaScript or TypeScript file unless the file has the name
+ * already: "import fs from 'fs'" (def 1) or "import { EventEmitter } from 'events'" (def 0), or the
+ * require() form in a file that uses it; quotes, semicolons and "import * as" follow what the file does.
+ * An existing "import { a } from 'mod'" on one line is extended. stmt gets the text added. Returns 1
+ * if the text changed. It does not open an undo group. */
+int edit_add_js_import(Editor *e, const char *mod, const char *name, int def, char *stmt, size_t n);
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq);
 
 /* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */

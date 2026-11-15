@@ -1,4 +1,7 @@
 // JavaScript / TypeScript standard library, DOM essentials and Node globals. Curated.
+// A line "@module" after the start of a section names the Node module it comes from: "@=fs" is a default
+// import (import fs from 'fs'), "@events" a named one (import { EventEmitter } from 'events'). The editor
+// adds that import when the name is accepted and the file does not have it.
 #
 parseInt(string, radix)>number
 parseFloat(string)>number
@@ -766,17 +769,20 @@ write(string, offset, length, encoding)>number
 readUInt8(offset)>number
 length:number
 #Writable
+@stream
 write(chunk, encoding, callback)>boolean
 end(chunk, encoding, callback)>void
 on(event, listener)>Writable
 isTTY:boolean
 columns:number
 #Readable
+@stream
 on(event, listener)>Readable
 pipe(destination, options)>Writable
 read(size)>any
 setEncoding(encoding)>Readable
 #fs
+@=fs
 readFileSync(path, options)>string
 writeFileSync(file, data, options)>void
 appendFileSync(path, data, options)>void
@@ -797,6 +803,7 @@ createWriteStream(path, options)>Writable
 promises:fsPromises
 watch(filename, options, listener)>FSWatcher
 #fsPromises
+@=fs/promises
 readFile(path, options)>Promise
 writeFile(file, data, options)>Promise
 readdir(path, options)>Promise
@@ -806,6 +813,7 @@ unlink(path)>Promise
 rm(path, options)>Promise
 access(path, mode)>Promise
 #Stats
+@fs
 isFile()>boolean
 isDirectory()>boolean
 isSymbolicLink()>boolean
@@ -814,6 +822,7 @@ mtime:Date
 mtimeMs:number
 mode:number
 #path
+@=path
 join(...paths)>string
 resolve(...paths)>string
 dirname(path)>string
@@ -827,6 +836,7 @@ format(pathObject)>string
 sep:string
 delimiter:string
 #os
+@=os
 platform()>string
 arch()>string
 cpus()>Array
@@ -837,16 +847,19 @@ totalmem()>number
 freemem()>number
 EOL:string
 #child_process
+@=child_process
 exec(command, options, callback)>ChildProcess
 execSync(command, options)>Buffer
 spawn(command, args, options)>ChildProcess
 spawnSync(command, args, options)>Object
 fork(modulePath, args, options)>ChildProcess
 #http
+@=http
 createServer(options, requestListener)>Server
 request(options, callback)>Object
 get(url, options, callback)>Object
 #EventEmitter
+@events
 on(eventName, listener)>EventEmitter
 once(eventName, listener)>EventEmitter
 off(eventName, listener)>EventEmitter
@@ -856,6 +869,7 @@ removeListener(eventName, listener)>EventEmitter
 removeAllListeners(eventName)>EventEmitter
 listenerCount(eventName)>number
 #util
+@=util
 promisify(original)>Function
 inspect(object, options)>string
 format(format, ...args)>string

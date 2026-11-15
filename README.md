@@ -168,6 +168,14 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     già presente diventa `from modulo import a, b, Path`; senza import si inserisce dopo i commenti
     iniziali e il docstring. Non fa nulla se il nome è già importato, se il file lo assegna o lo
     definisce (`os = …`), e per i nomi predefiniti (`str`, `ValueError`, …).
+  - In JavaScript e TypeScript, scegliendo un modulo di Node (`fs`, `path`, `os`, `http`, `util`,
+    `child_process`), una sua classe (`EventEmitter`, `Readable`, …) o un membro dopo il nome del modulo
+    (`fs.readFile`) l'editor aggiunge `import fs from 'fs'`, `import { EventEmitter } from 'events'` oppure,
+    in un file che usa `require`, `const fs = require('fs')`. Lo stile segue il file: ESM se ha già `import`
+    (o per `.ts`, `.mjs`, `.jsx`, o se il `package.json` più vicino ha `"type": "module"`), CJS se ha già
+    `require`; apici, punto e virgola e `import * as` come nelle righe esistenti. Un `import { a } from 'mod'`
+    su una riga viene esteso (`{ a, b }`). La riga va tra gli import in ordine di modulo, oppure dopo i
+    commenti e `'use strict'` se non ce ne sono. Niente se il nome è già importato o dichiarato nel file.
 - **Snippet** con segnaposti navigabili con Tab (`for` → ciclo completo, e così via).
 - **Esecuzione di comandi** (`Alt+R`, poi `F5` per ripeterlo, `Shift+F5` per interromperlo):
   l'output compare in un pannello `[Output]`. `F8` e `Shift+F8` saltano all'errore

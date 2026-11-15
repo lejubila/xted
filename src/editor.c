@@ -2096,7 +2096,8 @@ static void accept_cand(Editor *e)
 /* What accepting the highlighted candidate must add to the file, if it is a symbol of the standard
  * library the file does not have yet. */
 typedef struct {
-    int kind;               /* 0 nothing, 1 C include, 2 Python import, 3 Python from-import */
+    int kind;               /* 0 nothing, 1 C include, 2 Python import, 3 Python from-import,
+                               4 JS/TS default import, 5 JS/TS named import */
     char mod[64];           /* the header, or the module */
     char name[64];          /* the imported name (from-import) */
 } Needs;
@@ -2171,6 +2172,43 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
         std_close(l);
         return;
     }
+    if (strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0) {
+        StdLib *l = std_open("js");
+        const char *h;
+
+        if (!l)
+            return;
+        if (qualified) {
+            /* fs.readFile: the word before the dot is a Node module the file may not import yet */
+            size_t s = e->comp.x - 1, n;
+            char q[64];
+
+            while (s > 0 && (isalnum((unsigned char)ln->s[s - 1]) || ln->s[s - 1] == '_' || ln->s[s - 1] == '$'))
+                s--;
+            n = e->comp.x - 1 - s;
+            if (n > 0 && n < sizeof q && (s == 0 || ln->s[s - 1] != '.')) {
+                memcpy(q, ln->s + s, n);
+                q[n] = '\0';
+                h = std_header(l, q, n, &hl, 1);
+                if (h && hl > 1 && h[0] == '=' && hl - 1 < sizeof nd->mod) {
+                    nd->kind = 4;
+                    snprintf(nd->mod, sizeof nd->mod, "%.*s", (int)hl - 1, h + 1);
+                    snprintf(nd->name, sizeof nd->name, "%s", q);
+                }
+            }
+        } else if (c->kind == CAND_CLASS) {
+            h = std_header(l, c->text, strlen(c->text), &hl, 1);
+            if (h && hl > 0 && hl < sizeof nd->mod) {
+                int def = h[0] == '=';
+
+                snprintf(nd->mod, sizeof nd->mod, "%.*s", (int)hl - def, h + def);
+                nd->kind = def ? 4 : 5;
+                snprintf(nd->name, sizeof nd->name, "%s", c->text);
+            }
+        }
+        std_close(l);
+        return;
+    }
     if (strcmp(lang, "C") != 0 ||
         (c->kind != CAND_FUNC && c->kind != CAND_CONST && c->kind != CAND_CLASS && c->kind != CAND_PROP))
         return;
@@ -2211,9 +2249,11 @@ static void complete_accept(Editor *e)
         } else if (nd.kind == 2) {
             added = edit_add_py_import(e, nd.mod, NULL);
             snprintf(what, sizeof what, "import %s", nd.mod);
-        } else {
+        } else if (nd.kind == 3) {
             added = edit_add_py_import(e, nd.mod, nd.name);
             snprintf(what, sizeof what, "from %s import %s", nd.mod, nd.name);
+        } else {
+            added = edit_add_js_import(e, nd.mod, nd.name, nd.kind == 4, what, sizeof what);
         }
     }
     accept_cand(e);
