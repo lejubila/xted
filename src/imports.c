@@ -932,3 +932,172 @@ int imp_php_use_fn(Editor *e, const char *what, const char *fq)
     return 1;
 }
 
+
+/* ---- Go and Rust --------------------------------------------------------- */
+
+/* The import path of a Go import line ("fmt", f "fmt", _ "x"), or "" when it has none. */
+static void go_spec(const Line *l, char *out, size_t n)
+{
+    char q;
+
+    if (!js_last_string(l, out, n, &q) || q != '"')
+        out[0] = '\0';
+}
+
+static void go_spec_text(const char *text, char *out, size_t n)
+{
+    Line l;
+
+    l.s = (char *)text;
+    l.len = strlen(text);
+    go_spec(&l, out, n);
+}
+
+int imp_go(Editor *e, const char *path)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 400 ? b->nlines : 400, y, pk = (size_t)-1, blk = (size_t)-1, ins = (size_t)-1;
+    size_t grp_end = (size_t)-1, s0 = (size_t)-1, s1 = 0;
+    char spec[256], line[300];
+
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+
+        if (pk == (size_t)-1 && l->len > 8 && memcmp(l->s, "package ", 8) == 0)
+            pk = y;
+        if (l->len >= 8 && memcmp(l->s, "import (", 8) == 0) {
+            int gap = 0;
+
+            blk = y;
+            for (y++; y < b->nlines && !(b->lines[y].len > 0 && b->lines[y].s[0] == ')'); y++) {
+                const Line *m = &b->lines[y];
+
+                if (m->len == 0) {
+                    gap = 1;                /* gofmt's groups: the first is the standard library */
+                    continue;
+                }
+                go_spec(m, spec, sizeof spec);
+                if (!spec[0])
+                    continue;
+                if (strcmp(spec, path) == 0)
+                    return 0;
+                if (!gap) {
+                    grp_end = y;
+                    if (ins == (size_t)-1 && strcmp(spec, path) > 0)
+                        ins = y;
+                }
+            }
+            if (grp_end == (size_t)-1)
+                grp_end = blk;
+            continue;
+        }
+        if (l->len > 7 && memcmp(l->s, "import ", 7) == 0) {
+            go_spec(l, spec, sizeof spec);
+            if (strcmp(spec, path) == 0)
+                return 0;
+            if (s0 == (size_t)-1)
+                s0 = y;
+            if (y == s1 + 1 || s0 == y)
+                s1 = y;
+        }
+    }
+    if (blk != (size_t)-1) {
+        snprintf(line, sizeof line, "\t\"%s\"\n", path);
+        insert_lines(e, ins != (size_t)-1 ? ins : grp_end + 1, line, 0, 0);
+        return 1;
+    }
+    if (s0 != (size_t)-1) {
+        /* import "os" on its own line: the imports become a block, in order */
+        SBuf t = SBUF_INIT;
+        char (*v)[300] = xmalloc((s1 - s0 + 2) * sizeof *v);
+        size_t n = 0, i, yy = s0, xx = 0, added;
+        int put = 0;
+
+        for (y = s0; y <= s1; y++) {
+            const Line *l = &b->lines[y];
+            size_t k = 7;
+
+            while (k < l->len && l->s[k] == ' ')
+                k++;
+            snprintf(v[n++], sizeof v[0], "%.*s", (int)(l->len - k), l->s + k);
+        }
+        sbuf_adds(&t, "import (\n");
+        for (i = 0; i <= n; i++) {
+            /* the new path before the first that sorts after it */
+            if (!put && (i == n || (go_spec_text(v[i], spec, sizeof spec), strcmp(spec, path) > 0))) {
+                sbuf_addf(&t, "\t\"%s\"\n", path);
+                put = 1;
+            }
+            if (i < n)
+                sbuf_addf(&t, "\t%s\n", v[i]);
+        }
+        sbuf_adds(&t, ")");
+        free(v);
+        buf_delete_range(e->buf, s0, 0, s1, b->lines[s1].len);
+        buf_insert_text(e->buf, &yy, &xx, t.p, t.len);
+        added = n + 3 - (s1 - s0 + 1);
+        sbuf_free(&t);
+        if (e->cy > s1)
+            e->cy += added;
+        return 1;
+    }
+    snprintf(line, sizeof line, "import \"%s\"\n", path);
+    insert_block(e, pk != (size_t)-1 ? pk + 1 : 0, line);
+    return 1;
+}
+
+int imp_rust(Editor *e, const char *path)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 400 ? b->nlines : 400, y, first = (size_t)-1, last = 0, ins = (size_t)-1;
+    size_t at = 0, pl = strlen(path);
+    const char *name = path;
+    char line[300];
+    size_t k;
+
+    for (k = 0; k + 2 <= pl; k++)
+        if (path[k] == ':' && path[k + 1] == ':')
+            name = path + k + 2;
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        size_t i = 0;
+
+        if (l->len > 8 && memcmp(l->s, "pub use ", 8) == 0)
+            i = 4;
+        if (l->len - i > 4 && memcmp(l->s + i, "use ", 4) == 0) {
+            const char *u = l->s + i + 4;
+            size_t ul = l->len - i - 4, pre = (size_t)(name - path);
+
+            while (ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '))
+                ul--;
+            /* use std::collections::HashMap; or use std::collections::{HashMap, ...}; or ::* */
+            if (ul == pl && memcmp(u, path, pl) == 0)
+                return 0;
+            if (pre > 2 && ul > pre && memcmp(u, path, pre) == 0 && (u[pre] == '{' || u[pre] == '*')) {
+                Line t = *l;
+
+                if (u[pre] == '*' || has_word(&t, i + 4 + pre, name))
+                    return 0;
+            }
+            if (first == (size_t)-1)
+                first = y;
+            if (y == last + 1 || y == first) {
+                last = y;
+                if (ins == (size_t)-1 && (size_t)ul > 0 && strncmp(u, path, ul < pl ? ul : pl) > 0)
+                    ins = y;
+            }
+            continue;
+        }
+        /* where the uses go in a file without any: past //! comments and #![...] attributes */
+        if (first == (size_t)-1 && ((l->len >= 3 && memcmp(l->s, "//!", 3) == 0) ||
+                                    (l->len >= 3 && memcmp(l->s, "#![", 3) == 0)))
+            at = y + 1;
+    }
+    snprintf(line, sizeof line, "use %s;\n", path);
+    if (first != (size_t)-1) {
+        insert_lines(e, ins != (size_t)-1 ? ins : last + 1, line, 0, 0);
+        return 1;
+    }
+    insert_block(e, at, line);
+    return 1;
+}

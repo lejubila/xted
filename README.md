@@ -144,7 +144,7 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   estensione, nome del file e shebang. Costrutti multiriga (commenti, stringhe, heredoc) e
   linguaggi incorporati (JS e CSS in HTML, HTML in PHP) sono gestiti.
 - **Autosuggest**: popup con membri dopo `->`, `::` e `.`, simboli del file, dei file inclusi
-  e della libreria standard (PHP, C, C++, Python, JavaScript/TypeScript), parole degli altri
+  e della libreria standard (PHP, C, C++, Python, JavaScript/TypeScript, Go, Rust), parole degli altri
   buffer, parole chiave e snippet. Ogni riga mostra la firma completa con i parametri e una
   lettera per il tipo (`f` funzione, `c` classe, `m` metodo, `p` attributo, `k` costante,
   `v` variabile locale). Dentro una chiamata hanno la precedenza le variabili locali e i
@@ -153,6 +153,14 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   Confermando una funzione si inserisce la chiamata con gli argomenti come segnaposti.
   - `Tab` accetta (dentro uno snippet solo dopo aver scelto con le frecce), `Invio` sceglie
     la voce evidenziata (la prima se non ci si è mossi) e non va a capo, `Esc` chiude.
+  - In Go, scegliendo un membro dopo il pacchetto (`fmt.Println`, `http.Get`) o il pacchetto stesso si
+    aggiunge `"fmt"` (o `"net/http"`) nel blocco `import ( … )` in ordine; un `import "os"` su una riga
+    diventa un blocco, e senza import si scrive `import "fmt"` dopo `package`. I metodi con ricevitore
+    (`func (s *Server) Start()`) sono metodi di `Server`.
+  - In Rust, scegliendo un tipo o un modulo fuori dal prelude (`HashMap`, `HashMap::new`, `fs::read`)
+    si aggiunge `use std::collections::HashMap;` (o `use std::fs;`) tra gli `use` in ordine, oppure
+    dopo i commenti `//!` e gli attributi `#![…]`; un `use std::collections::{HashMap, …}` conta già.
+    I metodi dei blocchi `impl Tipo` e `impl Trait for Tipo` sono metodi del tipo.
   - In PHP, scegliendo un metodo o una costante dopo `Nome::` (`Route::get`, `User::find`) si aggiunge
     `use` della classe se manca (alias di `config/app.php`, poi le classi del progetto e di `vendor`).
     Con Composer, le funzioni e costanti dei file di `"autoload": {"files"}` vengono proposte, e per

@@ -14,7 +14,7 @@ Usage: tools/packlib.py            (from the repository root)
 import os
 import sys
 
-IDS = ["php", "c", "cpp", "py", "js"]
+IDS = ["php", "c", "cpp", "py", "js", "go", "rust"]
 
 
 def compress(data):

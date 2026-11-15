@@ -24,8 +24,9 @@
  *                             on the next lines; bol = only at line start; ns = START not
  *                             followed by a blank. The first region that matches wins.
  *   decl KIND PATTERN         a definition for the autosuggest index. KIND: class func method
- *                             prop const var ns (ns: a block that is only a scope). A func inside a
- *                             class is a method. First matching decl at a statement start wins.
+ *                             prop const var ns (ns: a block that is only a scope) recv (a method
+ *                             written outside its type, % the type: Go). A func inside a class is
+ *                             a method. First matching decl at a statement start wins.
  *   include PATTERN           names a file (~ a quoted string, & a dotted module path, % a class)
  *   bind PATTERN              ties a variable (@) to a type (%), searched upwards from the cursor
  *   synonym PATTERN           a class known by another name (@ the alias, % the class)
@@ -522,6 +523,20 @@ static const char *const lang_go[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^:",
+    "member .",
+    "decl recv func ( @ % ) @ ( ^",
+    "decl func func @ <> ( ^",
+    "decl class type @ struct",
+    "decl class type @ interface",
+    "decl class type @ %",
+    "decl method @ ( ^",
+    "decl prop @ %",
+    "decl const const @",
+    "decl var var @",
+    "include import ~",
+    "bind @ := & % {",
+    "bind @ := % {",
+    "bind var @ %",
     NULL
 };
 
@@ -544,6 +559,21 @@ static const char *const lang_rust[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^?:",
+    "member . ::",
+    "decl func pub? async? unsafe? const? fn @ <> ( ^ -> %",
+    "decl func pub? async? unsafe? const? fn @ <> ( ^",
+    "decl class pub? struct @",
+    "decl class pub? enum @",
+    "decl class pub? trait @",
+    "decl class impl <> % for @",
+    "decl class impl <> @",
+    "decl prop pub? @ : %",
+    "decl const pub? const @ :",
+    "decl const pub? static mut? @ :",
+    "decl ns pub? mod @",
+    "bind let mut? @ : %",
+    "bind let mut? @ = % (",
+    "bind let mut? @ = % {",
     NULL
 };
 

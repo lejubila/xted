@@ -129,6 +129,17 @@ class Run:
                 os._exit(127)
         self.pid, self.fd = pid, fd
         self.status = None
+        self.reaped = False
+        # keys sent before the editor takes the terminal (raw mode, alternate screen) would be
+        # echoed by the tty instead of read: wait for its first frame
+        end = time.time() + 10
+        while time.time() < end and b"\x1b[?1049h" not in self.out:
+            self._read(0.1)
+            pid, st = os.waitpid(self.pid, os.WNOHANG)
+            if pid:                         # it ended at once (a wrong argument, no terminal)
+                self.status = os.waitstatus_to_exitcode(st)
+                self.reaped = True
+                break
         self.wait(0.5)
 
     def _read(self, timeout):
@@ -178,16 +189,17 @@ class Run:
     def finish(self, timeout=3.0):
         """Waits for the editor to end (after the keys that quit it); kills it if it does not."""
         end = time.time() + timeout
-        while time.time() < end:
+        while not self.reaped and time.time() < end:
             self._read(0.1)
             pid, st = os.waitpid(self.pid, os.WNOHANG)
             if pid:
                 self.status = os.waitstatus_to_exitcode(st)
                 break
         else:
-            os.kill(self.pid, signal.SIGKILL)
-            os.waitpid(self.pid, 0)
-            self.status = None
+            if not self.reaped:
+                os.kill(self.pid, signal.SIGKILL)
+                os.waitpid(self.pid, 0)
+                self.status = None
         try:
             os.close(self.fd)
         except OSError:

@@ -4985,6 +4985,95 @@ static void test_sym_cache_pressure(void)
     rm_rf(dir);
 }
 
+/* Go and Rust: the index (methods of a type written outside it, impl blocks), the standard
+ * library after a package or a module, and the import or use it needs. */
+static void test_go_rust(void)
+{
+    char dir[64], path[128], err[128];
+    Doc d;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    static Got g;
+    size_t y, sep;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "s.go", "package main\n\ntype Server struct {\n\tPort int\n\tName string\n}\n\n"
+                          "func (s *Server) Start(addr string) error {\n\treturn nil\n}\n\n"
+                          "func NewServer() *Server {\n\treturn &Server{}\n}\n\nfunc main() {\n"
+                          "\tsrv := &Server{}\n\tsrv.\n\tfmt.\n}\n");
+    snprintf(path, sizeof path, "%s/s.go", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    out_text[0] = '\0';
+    sym_outline(c, &d, out_cb, NULL);
+    CHECK(strstr(out_text, "Server()") && strstr(out_text, "Server.Start(addr string)") &&
+          strstr(out_text, "NewServer()") && strstr(out_text, "main()"));
+    docs[0] = &d;
+    y = 17;                                     /* srv. : the fields and the method */
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "Start") && has_sym(&g, "Port") && has_sym(&g, "Name"));
+    y = 18;                                     /* fmt. : the package of the library */
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    sym_members(c, docs, 1, &d, y, sep, got_cb, &g);
+    CHECK(has_sym(&g, "Println") && has_sym(&g, "Sprintf"));
+    doc_release(&d);
+    sym_cache_free(c);
+    c = sym_cache_new();                        /* the next Doc has the same address */
+
+    put_file(dir, "p.rs", "use std::fmt;\n\npub struct Point {\n    pub x: f64,\n    y: f64,\n}\n\n"
+                          "impl Point {\n    pub fn new(x: f64, y: f64) -> Point {\n        Point { x, y }\n    }\n"
+                          "    fn dist(&self, other: &Point) -> f64 {\n        0.0\n    }\n}\n\n"
+                          "trait Shape {\n    fn area(&self) -> f64;\n}\n\nfn main() {\n"
+                          "    let p = Point::new(1.0, 2.0);\n    p.\n    HashMap::\n}\n");
+    snprintf(path, sizeof path, "%s/p.rs", dir);
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    out_text[0] = '\0';
+    sym_outline(c, &d, out_cb, NULL);
+    CHECK(strstr(out_text, "Point()") && strstr(out_text, "Point.new(x: f64, y: f64)") &&
+          strstr(out_text, "Point.dist(other: &Point)") && strstr(out_text, "Shape()") &&
+          strstr(out_text, "main()"));
+    docs[0] = &d;
+    y = 22;                                     /* p. : the fields and the methods of impl */
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+    CHECK(has_sym(&g, "dist") && has_sym(&g, "x"));
+    y = 23;                                     /* HashMap:: : the library type */
+    sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+    memset(&g, 0, sizeof g);
+    sym_members(c, docs, 1, &d, y, sep, got_cb, &g);
+    CHECK(has_sym(&g, "new") && has_sym(&g, "insert"));
+    doc_release(&d);
+    sym_cache_free(c);
+
+    /* the imports */
+    php_case(dir, "a.go", "package main\n\nfunc main() {\n\t\n}\n", "fmt.Printl", 3,
+             "package main\n\nimport \"fmt\"\n\nfunc main() {\n", 1);
+    php_case(dir, "b.go", "package main\n\nimport (\n\t\"os\"\n\t\"strings\"\n)\n\nfunc main() {\n\t\n}\n", "fmt.Printl", 8,
+             "import (\n\t\"fmt\"\n\t\"os\"\n\t\"strings\"\n)\n", 1);
+    php_case(dir, "c.go", "package main\n\nimport \"os\"\n\nfunc main() {\n\t\n}\n", "fmt.Printl", 5,
+             "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n", 1);
+    php_case(dir, "d.go", "package main\n\nimport \"fmt\"\n\nfunc main() {\n\t\n}\n", "http.Ge", 5,
+             "import (\n\t\"fmt\"\n\t\"net/http\"\n)\n", 1);
+    php_case(dir, "e.go", "package main\n\nimport \"fmt\"\n\nfunc main() {\n\t\n}\n", "fmt.Printl", 5,
+             "package main\n\nimport \"fmt\"\n\nfunc main() {\n", 0);
+    php_case(dir, "a.rs", "fn main() {\n    \n}\n", "HashMap::ne", 1,
+             "use std::collections::HashMap;\n\nfn main() {\n", 1);
+    php_case(dir, "b.rs", "use std::fs;\nuse std::io;\n\nfn main() {\n    \n}\n", "HashMap::ne", 4,
+             "use std::collections::HashMap;\nuse std::fs;\nuse std::io;\n", 1);
+    php_case(dir, "c.rs", "use std::collections::{HashMap, HashSet};\n\nfn main() {\n    \n}\n", "HashMap::ne", 3,
+             "use std::collections::{HashMap, HashSet};\n\nfn main() {\n", 0);
+    php_case(dir, "d.rs", "fn main() {\n    \n}\n", "fs::read_to_st", 1, "use std::fs;\n\nfn main() {\n", 1);
+    php_case(dir, "e.rs", "fn main() {\n    \n}\n", "Vec::ne", 1, "fn main() {\n", 0);
+    php_case(dir, "f.rs", "//! Crate docs\n#![allow(dead_code)]\n\nfn main() {\n    \n}\n", "HashMap::ne", 4,
+             "//! Crate docs\n#![allow(dead_code)]\n\nuse std::collections::HashMap;\n\nfn main() {\n", 1);
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5537,6 +5626,7 @@ int main(void)
     test_php_static_use();
     test_php_require_and_use_function();
     test_sym_cache_pressure();
+    test_go_rust();
     test_config_merge();
     test_snippets();
     test_cursors();

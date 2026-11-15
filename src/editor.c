@@ -2101,7 +2101,7 @@ typedef struct {
                                4 JS/TS default import, 5 JS/TS named import, 6 C local include,
                                7 Python import from a module of the project,
                                8 PHP use of the class before ::, 9 PHP require_once,
-                               10 PHP use function / use const */
+                               10 PHP use function / use const, 11 Go import, 12 Rust use */
     char mod[256];          /* the header, or the module */
     char name[64];          /* the imported name (from-import) */
 } Needs;
@@ -2194,6 +2194,49 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
     }
     if (!c->std)
         return;
+    if (strcmp(lang, "Go") == 0 || strcmp(lang, "Rust") == 0) {
+        int go = lang[0] == 'G';
+        StdLib *l = std_open(go ? "go" : "rust");
+        const char *h = NULL;
+        size_t s, n;
+        char q[64];
+
+        if (!l)
+            return;
+        /* fmt.Println, fs::read_to_string, HashMap::new: the package or module before the
+         * operator; else the name itself (a package in Go, a type or module in Rust) */
+        if (go ? qualified : (e->comp.x >= 2 && e->comp.x <= ln->len && ln->s[e->comp.x - 1] == ':' &&
+                             ln->s[e->comp.x - 2] == ':')) {
+            s = e->comp.x - (go ? 1 : 2);
+            n = s;
+            while (s > 0 && (isalnum((unsigned char)ln->s[s - 1]) || ln->s[s - 1] == '_'))
+                s--;
+            n -= s;
+            if (n > 0 && n < sizeof q && (s == 0 || (ln->s[s - 1] != '.' && ln->s[s - 1] != ':'))) {
+                memcpy(q, ln->s + s, n);
+                q[n] = '\0';
+                h = std_header(l, q, n, &hl, 1);
+            }
+        } else if (c->kind == CAND_CLASS) {
+            h = std_header(l, c->text, strlen(c->text), &hl, 1);
+            /* in Go only a package is written alone: its types come after it (strings.Builder) */
+            if (h && go) {
+                const char *sl;
+                size_t tl = strlen(c->text);
+
+                for (sl = h + hl; sl > h && sl[-1] != '/'; sl--)
+                    ;
+                if ((size_t)(h + hl - sl) != tl || memcmp(sl, c->text, tl) != 0)
+                    h = NULL;
+            }
+        }
+        if (h && hl > 0 && hl < sizeof nd->mod) {
+            nd->kind = go ? 11 : 12;
+            snprintf(nd->mod, sizeof nd->mod, "%.*s", (int)hl, h);
+        }
+        std_close(l);
+        return;
+    }
     if (strcmp(lang, "Python") == 0) {
         StdLib *l = std_open("py");
         const char *h;
@@ -2309,6 +2352,12 @@ static void complete_accept(Editor *e)
         } else if (nd.kind == 2) {
             added = imp_python(e, nd.mod, NULL, 0);
             snprintf(what, sizeof what, "import %s", nd.mod);
+        } else if (nd.kind == 11) {
+            added = imp_go(e, nd.mod);
+            snprintf(what, sizeof what, "import \"%s\"", nd.mod);
+        } else if (nd.kind == 12) {
+            added = imp_rust(e, nd.mod);
+            snprintf(what, sizeof what, "use %s;", nd.mod);
         } else if (nd.kind == 9) {
             added = imp_php_require(e, nd.mod);
             snprintf(what, sizeof what, "require_once __DIR__ . '/%s';", nd.mod);

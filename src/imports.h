@@ -36,4 +36,11 @@ int imp_php_use_fn(Editor *e, const char *what, const char *fq);
  * namespace; the block of uses stays sorted. Returns 1 if a line was added. No undo group. */
 int imp_php_use(Editor *e, const char *fq);
 
+/* Go: "fmt" into the block import ( ... ), in order in its first group; an import on its own line
+ * becomes a block; with none, import "fmt" after the package line. */
+int imp_go(Editor *e, const char *path);
+/* Rust: use std::collections::HashMap; among the uses, in order; with none, past the //! comments
+ * and the #![...] attributes at the top. A use std::collections::{HashMap, ...} counts. */
+int imp_rust(Editor *e, const char *path);
+
 #endif

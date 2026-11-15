@@ -258,7 +258,7 @@ line %d: unknown key «%s»	riga %d: chiave sconosciuta «%s»
 line %zu: a region up to the end of the line cannot be ml	riga %zu: una regione fino a fine riga non può essere ml
 line %zu: calls needs a class	riga %zu: calls richiede una classe
 line %zu: comment needs a symbol	riga %zu: comment richiede un simbolo
-line %zu: decl needs class, func, method, prop, const, var or ns	riga %zu: decl richiede class, func, method, prop, const, var o ns
+line %zu: decl needs class, func, method, prop, const, var, ns or recv	riga %zu: decl richiede class, func, method, prop, const, var, ns o recv
 line %zu: embed needs a language, a class, a start and an end	riga %zu: embed richiede linguaggio, classe, inizio e fine
 line %zu: embeds must come before the other regions	riga %zu: le embed vanno scritte prima delle altre regioni
 line %zu: idchars needs characters	riga %zu: idchars richiede dei caratteri

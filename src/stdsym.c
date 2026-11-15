@@ -124,6 +124,12 @@ StdLib *std_open(const char *id)
     } else if (strcmp(id, "js") == 0) {
         z = std_js;
         zn = sizeof std_js;
+    } else if (strcmp(id, "go") == 0) {
+        z = std_go;
+        zn = sizeof std_go;
+    } else if (strcmp(id, "rust") == 0) {
+        z = std_rust;
+        zn = sizeof std_rust;
     } else {
         return NULL;
     }

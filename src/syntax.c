@@ -475,8 +475,10 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                 for (k = 0; nt > 1 && k < sizeof kinds / sizeof kinds[0]; k++)
                     if (tok_is(t[1], kinds[k]))
                         kind = (int)k;
+                if (nt > 1 && tok_is(t[1], "recv"))
+                    kind = RULE_RECV;
                 if (kind < 0)
-                    PERR(tr("line %zu: decl needs class, func, method, prop, const, var or ns"),
+                    PERR(tr("line %zu: decl needs class, func, method, prop, const, var, ns or recv"),
                          lineno);
             } else {
                 kind = tok_is(t[0], "include") ? RULE_INCLUDE

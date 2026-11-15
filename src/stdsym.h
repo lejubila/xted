@@ -10,7 +10,7 @@ typedef struct StdLib StdLib;
 
 enum { STD_FUNC, STD_VAR, STD_CONST, STD_CLASS };
 
-/* id: "php", "c", "cpp", "py" or "js". NULL for an unknown id. */
+/* id: "php", "c", "cpp", "py", "js", "go" or "rust". NULL for an unknown id. */
 StdLib *std_open(const char *id);
 void std_close(StdLib *l);
 

@@ -128,11 +128,13 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
 {
     const char *p = pat;
     size_t i = from;
+    int kw = 0;                 /* the item before was a keyword written in the pattern (fn, def) */
 
     memset(m, 0, sizeof *m);
     while (*p) {
         const char *e;
         size_t il;
+        int was_kw = kw;
 
         while (*p == ' ')
             p++;
@@ -150,13 +152,19 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
                 return 0;
             while (i < len && is_idc((unsigned char)s[i]))
                 i++;
-            if (is_reject(s + st, i - st))
+            /* "new" never names a definition, except right after a keyword: fn new */
+            if (is_reject(s + st, i - st) && !(was_kw && !(i - st == 2 && memcmp(s + st, "if", 2) == 0)))
                 return 0;
             put(m->name, sizeof m->name, s + st, i - st);
         } else if (il == 1 && *p == '%') {
             size_t qs, ls, qe;
             int got = 0;
 
+            /* a pointer or a reference to a type: *Server, &Point, &mut Point */
+            while (i < len && (s[i] == '*' || s[i] == '&'))
+                i++;
+            if (i + 4 < len && memcmp(s + i, "mut ", 4) == 0 && s[i - 1] == '&')
+                i += 4;
             /* a type, or a union (A|B|null) of which the first real type is kept */
             for (;;) {
                 size_t from_bar = i;
@@ -168,7 +176,8 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
                     break;
                 }
                 qe = i;
-                if (!is_reject(s + ls, qe - ls)) {
+                /* a keyword is no type, but the last part of a qualified name is (Point::new) */
+                if (!is_reject(s + ls, qe - ls) || ls > qs) {
                     size_t n = qe - ls;
                     int nullish = (n == 4 && (memcmp(s + ls, "null", 4) == 0 ||
                                               memcmp(s + ls, "void", 4) == 0)) ||
@@ -296,6 +305,7 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
                 return 0;
             }
         }
+        kw = il >= 2 && isalpha((unsigned char)p[0]) && p[il - 1] != '?' && p[il - 1] != '*';
         p = e;
     }
     m->end = i;
@@ -543,7 +553,9 @@ static int try_decl(Build *B, size_t y, const char *s, size_t len, size_t i, siz
         long owner = top->kind == F_CLASS ? top->owner : -1;
         char ret[PM_NAME];
 
-        if (kind > RULE_NS)
+        if (kind > RULE_NS && kind != RULE_RECV)
+            continue;
+        if (kind == RULE_RECV && top->kind != F_GLOBAL)
             continue;
         if ((kind == RULE_METHOD || kind == RULE_PROP) && top->kind != F_CLASS)
             continue;
@@ -587,6 +599,16 @@ static int try_decl(Build *B, size_t y, const char *s, size_t len, size_t i, siz
             return kind;
         }
         B->ndoc = 0;
+        if (kind == RULE_RECV) {
+            /* func (s *Server) Start(...): a method of Server, which may come later in the
+             * file; the type is kept in ret until the end of the build (resolve_recv) */
+            char mark[PM_NAME + 1];
+
+            mark[0] = '\x01';
+            put(mark + 1, sizeof mark - 1, m.type, strlen(m.type));
+            ix_add(B->x, RULE_METHOD, m.name, m.params, mark, -1, y);
+            return RULE_METHOD;
+        }
         if (kind == RULE_FUNC && owner >= 0)
             kind = RULE_METHOD;
         if (m.type[0])
@@ -598,9 +620,15 @@ static int try_decl(Build *B, size_t y, const char *s, size_t len, size_t i, siz
         } else {
             const char *sg = m.params;
 
-            /* the receiver is not an argument the caller writes */
+            /* the receiver is not an argument the caller writes (self, &self, &mut self) */
+            if (*sg == '&')
+                sg++;
+            if (strncmp(sg, "mut self", 8) == 0 && (sg[8] == ',' || sg[8] == '\0'))
+                sg += 4;
             if (strncmp(sg, "self", 4) == 0 && (sg[4] == ',' || sg[4] == '\0'))
                 sg += sg[4] == ',' ? 5 : 4;
+            else if (sg != m.params && m.params[0] == '&')
+                sg = m.params;              /* & of something else: keep it */
             while (*sg == ' ')
                 sg++;
             {
@@ -812,6 +840,29 @@ static void scan_indent(Build *B, size_t y, const char *s, size_t len, const uin
     scan_rest(B, y, s, len, cls, kind >= 0 && end > first ? end : first);
 }
 
+/* The methods written outside their type (decl recv) get the class of that name as owner; one
+ * whose type is not in the file stays a function. */
+static void resolve_recv(SymIndex *x)
+{
+    size_t i, k;
+
+    for (i = 0; i < x->n; i++) {
+        Sym *s = &x->v[i];
+
+        if (s->ret[0] != '\x01')
+            continue;
+        for (k = 0; k < x->n; k++)
+            if (x->v[k].kind == RULE_CLASS && x->v[k].owner < 0 && strcmp(x->v[k].name, s->ret + 1) == 0)
+                break;
+        if (k < x->n) {
+            s->owner = (long)k;
+        } else {
+            s->kind = RULE_FUNC;
+        }
+        s->ret[0] = '\0';
+    }
+}
+
 SymIndex *sym_build(const Buffer *b, Syntax *syn)
 {
     SymIndex *x = xmalloc(sizeof *x);
@@ -852,6 +903,7 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
         }
     }
     free(cls);
+    resolve_recv(x);
     for (i = 0; i < x->n; i++)
         if (x->v[i].y1 == (size_t)-1)
             x->v[i].y1 = B.indent ? B.last_code : b->nlines;
@@ -861,8 +913,8 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
 
 /* ---- cache -------------------------------------------------------------- */
 
-enum { LIB_PHP, LIB_C, LIB_CPP, LIB_PY, LIB_JS, LIB_N };
-static const char *const lib_ids[LIB_N] = { "php", "c", "cpp", "py", "js" };
+enum { LIB_PHP, LIB_C, LIB_CPP, LIB_PY, LIB_JS, LIB_GO, LIB_RUST, LIB_N };
+static const char *const lib_ids[LIB_N] = { "php", "c", "cpp", "py", "js", "go", "rust" };
 
 #define CACHE_MAX 48
 #define SET_MAX 40
@@ -1635,6 +1687,10 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
         e->lib[e->nlib++] = lib_get(c, LIB_PY);
     } else if (strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0) {
         e->lib[e->nlib++] = lib_get(c, LIB_JS);
+    } else if (strcmp(lang, "Go") == 0) {
+        e->lib[e->nlib++] = lib_get(c, LIB_GO);
+    } else if (strcmp(lang, "Rust") == 0) {
+        e->lib[e->nlib++] = lib_get(c, LIB_RUST);
     } else if (strcmp(lang, "C") == 0) {
         if (sym_is_cxx(cur))
             e->lib[e->nlib++] = lib_get(c, LIB_CPP);

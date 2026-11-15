@@ -27,7 +27,8 @@ int syn_comment(const Syntax *s, const char **open, const char **close);
 /* Symbol rules of the language (directives decl/include/bind/attr, see langs.c and symbols.c).
  * pat is the pattern text; for RULE_CLASS..RULE_NS it describes a definition. */
 enum { RULE_CLASS, RULE_FUNC, RULE_METHOD, RULE_PROP, RULE_CONST, RULE_VAR, RULE_NS,
-       RULE_INCLUDE, RULE_BIND, RULE_ATTR, RULE_ALIAS, RULE_DOC };
+       RULE_INCLUDE, RULE_BIND, RULE_ATTR, RULE_ALIAS, RULE_DOC,
+       RULE_RECV };            /* decl recv: a method written outside its type (Go), % the type */
 typedef struct {
     int kind;
     const char *pat;

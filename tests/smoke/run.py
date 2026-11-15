@@ -224,6 +224,24 @@ def imports():
 
 
 @scenario
+def go_and_rust():
+    b = Box()
+    b.write("main.go", "package main\n\nimport \"os\"\n\nfunc main() {\n\t\n}\n")
+    r = b.run(["main.go"])
+    r.type(DOWN, DOWN, DOWN, DOWN, DOWN, END, "fmt.Printl", 0.3, ENTER, ctrl("s"))
+    check("Go: fmt.Println turns the import into a block with \"fmt\"",
+          b.read("main.go").startswith("package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n"), b.read("main.go"))
+    quit_(r, discard=True)
+    b.write("main.rs", "fn main() {\n    \n}\n")
+    r = b.run(["main.rs"])
+    r.type(DOWN, END, "HashMap::ne", 0.3, ENTER, ctrl("s"))
+    check("Rust: HashMap::new adds use std::collections::HashMap;",
+          b.read("main.rs").startswith("use std::collections::HashMap;\n\nfn main()"), b.read("main.rs"))
+    quit_(r, discard=True)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

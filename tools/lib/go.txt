@@ -1,0 +1,395 @@
+// Go standard library: builtins and the most used packages. Curated.
+// A package is a section named as it is written in the code ("http"); its first line "@net/http"
+// is the import path that accepting it, or one of its members, adds to the file.
+#
+append(slice, elems...)>[]T
+cap(v)>int
+clear(t)>
+close(c)>
+copy(dst, src)>int
+delete(m, key)>
+len(v)>int
+make(t, size...)>T
+max(x, y...)>T
+min(x, y...)>T
+new(T)>*T
+panic(v)>
+print(args...)>
+println(args...)>
+recover()>any
+#fmt
+@fmt
+Println(a ...any)>(n int, err error)
+Printf(format string, a ...any)>(n int, err error)
+Print(a ...any)>(n int, err error)
+Sprintf(format string, a ...any)>string
+Sprint(a ...any)>string
+Sprintln(a ...any)>string
+Errorf(format string, a ...any)>error
+Fprintf(w io.Writer, format string, a ...any)>(n int, err error)
+Fprintln(w io.Writer, a ...any)>(n int, err error)
+Fprint(w io.Writer, a ...any)>(n int, err error)
+Sscanf(str string, format string, a ...any)>(n int, err error)
+Scanln(a ...any)>(n int, err error)
+Stringer:
+#strings
+@strings
+Contains(s, substr string)>bool
+ContainsAny(s, chars string)>bool
+ContainsRune(s string, r rune)>bool
+Count(s, substr string)>int
+EqualFold(s, t string)>bool
+Fields(s string)>[]string
+HasPrefix(s, prefix string)>bool
+HasSuffix(s, suffix string)>bool
+Index(s, substr string)>int
+IndexByte(s string, c byte)>int
+Join(elems []string, sep string)>string
+LastIndex(s, substr string)>int
+Repeat(s string, count int)>string
+Replace(s, old, new string, n int)>string
+ReplaceAll(s, old, new string)>string
+Split(s, sep string)>[]string
+SplitN(s, sep string, n int)>[]string
+Title(s string)>string
+ToLower(s string)>string
+ToUpper(s string)>string
+TrimSpace(s string)>string
+Trim(s, cutset string)>string
+TrimLeft(s, cutset string)>string
+TrimRight(s, cutset string)>string
+TrimPrefix(s, prefix string)>string
+TrimSuffix(s, suffix string)>string
+Cut(s, sep string)>(before, after string, found bool)
+NewReader(s string)>*Reader
+NewReplacer(oldnew ...string)>*Replacer
+Builder:Builder
+#Builder
+@strings
+WriteString(s string)>(int, error)
+WriteByte(c byte)>error
+WriteRune(r rune)>(int, error)
+String()>string
+Len()>int
+Reset()>
+Grow(n int)>
+#strconv
+@strconv
+Atoi(s string)>(int, error)
+Itoa(i int)>string
+ParseInt(s string, base int, bitSize int)>(int64, error)
+ParseUint(s string, base int, bitSize int)>(uint64, error)
+ParseFloat(s string, bitSize int)>(float64, error)
+ParseBool(str string)>(bool, error)
+FormatInt(i int64, base int)>string
+FormatFloat(f float64, fmt byte, prec, bitSize int)>string
+FormatBool(b bool)>string
+Quote(s string)>string
+Unquote(s string)>(string, error)
+#os
+@os
+Args:[]string
+Stdin:*File
+Stdout:*File
+Stderr:*File
+Exit(code int)>
+Getenv(key string)>string
+Setenv(key, value string)>error
+LookupEnv(key string)>(string, bool)
+Open(name string)>(*File, error)
+Create(name string)>(*File, error)
+OpenFile(name string, flag int, perm FileMode)>(*File, error)
+ReadFile(name string)>([]byte, error)
+WriteFile(name string, data []byte, perm FileMode)>error
+Remove(name string)>error
+RemoveAll(path string)>error
+Rename(oldpath, newpath string)>error
+Mkdir(name string, perm FileMode)>error
+MkdirAll(path string, perm FileMode)>error
+ReadDir(name string)>([]DirEntry, error)
+Stat(name string)>(FileInfo, error)
+Getwd()>(dir string, err error)
+Chdir(dir string)>error
+Hostname()>(name string, err error)
+IsNotExist(err error)>bool
+TempDir()>string
+O_RDONLY:
+O_WRONLY:
+O_RDWR:
+O_CREATE:
+O_APPEND:
+O_TRUNC:
+File:File
+#File
+@os
+Close()>error
+Read(b []byte)>(n int, err error)
+Write(b []byte)>(n int, err error)
+WriteString(s string)>(n int, err error)
+Name()>string
+Stat()>(FileInfo, error)
+Sync()>error
+Seek(offset int64, whence int)>(ret int64, err error)
+#io
+@io
+ReadAll(r Reader)>([]byte, error)
+Copy(dst Writer, src Reader)>(written int64, err error)
+WriteString(w Writer, s string)>(n int, err error)
+EOF:error
+Discard:Writer
+Reader:
+Writer:
+ReadCloser:
+#bufio
+@bufio
+NewReader(rd io.Reader)>*Reader
+NewWriter(w io.Writer)>*Writer
+NewScanner(r io.Reader)>*Scanner
+ScanLines:
+ScanWords:
+#Scanner
+@bufio
+Scan()>bool
+Text()>string
+Bytes()>[]byte
+Err()>error
+Buffer(buf []byte, max int)>
+Split(split SplitFunc)>
+#Reader
+@bufio
+ReadString(delim byte)>(string, error)
+ReadLine()>(line []byte, isPrefix bool, err error)
+ReadRune()>(r rune, size int, err error)
+ReadByte()>(byte, error)
+#errors
+@errors
+New(text string)>error
+Is(err, target error)>bool
+As(err error, target any)>bool
+Unwrap(err error)>error
+Join(errs ...error)>error
+#time
+@time
+Now()>Time
+Since(t Time)>Duration
+Sleep(d Duration)>
+After(d Duration)><-chan Time
+Tick(d Duration)><-chan Time
+NewTimer(d Duration)>*Timer
+NewTicker(d Duration)>*Ticker
+Parse(layout, value string)>(Time, error)
+Unix(sec int64, nsec int64)>Time
+Date(year int, month Month, day, hour, min, sec, nsec int, loc *Location)>Time
+Nanosecond:Duration
+Microsecond:Duration
+Millisecond:Duration
+Second:Duration
+Minute:Duration
+Hour:Duration
+RFC3339:
+Time:Time
+Duration:Duration
+#Time
+@time
+Format(layout string)>string
+Unix()>int64
+UnixMilli()>int64
+Add(d Duration)>Time
+Sub(u Time)>Duration
+Before(u Time)>bool
+After(u Time)>bool
+Equal(u Time)>bool
+Year()>int
+Month()>Month
+Day()>int
+Hour()>int
+Minute()>int
+Second()>int
+IsZero()>bool
+UTC()>Time
+#Duration
+@time
+Seconds()>float64
+Milliseconds()>int64
+Minutes()>float64
+Hours()>float64
+String()>string
+#math
+@math
+Abs(x float64)>float64
+Ceil(x float64)>float64
+Floor(x float64)>float64
+Round(x float64)>float64
+Max(x, y float64)>float64
+Min(x, y float64)>float64
+Mod(x, y float64)>float64
+Pow(x, y float64)>float64
+Sqrt(x float64)>float64
+Log(x float64)>float64
+Exp(x float64)>float64
+Sin(x float64)>float64
+Cos(x float64)>float64
+Inf(sign int)>float64
+IsNaN(f float64)>bool
+Pi:
+MaxInt:
+MinInt:
+MaxInt64:
+#sort
+@sort
+Ints(x []int)>
+Strings(x []string)>
+Float64s(x []float64)>
+Slice(x any, less func(i, j int) bool)>
+SliceStable(x any, less func(i, j int) bool)>
+Sort(data Interface)>
+Search(n int, f func(int) bool)>int
+#sync
+@sync
+Mutex:Mutex
+RWMutex:Mutex
+WaitGroup:WaitGroup
+Once:Once
+#Mutex
+@sync
+Lock()>
+Unlock()>
+RLock()>
+RUnlock()>
+TryLock()>bool
+#WaitGroup
+@sync
+Add(delta int)>
+Done()>
+Wait()>
+#Once
+@sync
+Do(f func())>
+#context
+@context
+Background()>Context
+TODO()>Context
+WithCancel(parent Context)>(ctx Context, cancel CancelFunc)
+WithTimeout(parent Context, timeout time.Duration)>(Context, CancelFunc)
+WithDeadline(parent Context, d time.Time)>(Context, CancelFunc)
+WithValue(parent Context, key, val any)>Context
+Context:
+#bytes
+@bytes
+Contains(b, subslice []byte)>bool
+Equal(a, b []byte)>bool
+Split(s, sep []byte)>[][]byte
+Join(s [][]byte, sep []byte)>[]byte
+TrimSpace(s []byte)>[]byte
+NewBuffer(buf []byte)>*Buffer
+NewBufferString(s string)>*Buffer
+Buffer:
+#log
+@log
+Println(v ...any)>
+Printf(format string, v ...any)>
+Print(v ...any)>
+Fatal(v ...any)>
+Fatalf(format string, v ...any)>
+Fatalln(v ...any)>
+Panic(v ...any)>
+Panicf(format string, v ...any)>
+SetFlags(flag int)>
+SetPrefix(prefix string)>
+New(out io.Writer, prefix string, flag int)>*Logger
+#flag
+@flag
+String(name string, value string, usage string)>*string
+Int(name string, value int, usage string)>*int
+Bool(name string, value bool, usage string)>*bool
+StringVar(p *string, name string, value string, usage string)>
+IntVar(p *int, name string, value int, usage string)>
+BoolVar(p *bool, name string, value bool, usage string)>
+Parse()>
+Args()>[]string
+Arg(i int)>string
+NArg()>int
+Usage:
+#regexp
+@regexp
+MustCompile(str string)>*Regexp
+Compile(expr string)>(*Regexp, error)
+MatchString(pattern string, s string)>(matched bool, err error)
+QuoteMeta(s string)>string
+#Regexp
+@regexp
+MatchString(s string)>bool
+FindString(s string)>string
+FindStringSubmatch(s string)>[]string
+FindAllString(s string, n int)>[]string
+ReplaceAllString(src, repl string)>string
+Split(s string, n int)>[]string
+#http
+@net/http
+Get(url string)>(resp *Response, err error)
+Post(url, contentType string, body io.Reader)>(resp *Response, err error)
+NewRequest(method, url string, body io.Reader)>(*Request, error)
+NewRequestWithContext(ctx context.Context, method, url string, body io.Reader)>(*Request, error)
+HandleFunc(pattern string, handler func(ResponseWriter, *Request))>
+Handle(pattern string, handler Handler)>
+ListenAndServe(addr string, handler Handler)>error
+NewServeMux()>*ServeMux
+Error(w ResponseWriter, error string, code int)>
+Redirect(w ResponseWriter, r *Request, url string, code int)>
+StatusOK:
+StatusNotFound:
+StatusBadRequest:
+StatusInternalServerError:
+MethodGet:
+MethodPost:
+DefaultClient:*Client
+Client:Client
+Request:Request
+Response:Response
+ResponseWriter:ResponseWriter
+#Client
+@net/http
+Do(req *Request)>(*Response, error)
+Get(url string)>(resp *Response, err error)
+Post(url, contentType string, body io.Reader)>(resp *Response, err error)
+#Request
+@net/http
+Method:string
+URL:*url.URL
+Header:Header
+Body:io.ReadCloser
+Context()>context.Context
+FormValue(key string)>string
+ParseForm()>error
+#Response
+@net/http
+StatusCode:int
+Status:string
+Header:Header
+Body:io.ReadCloser
+#ResponseWriter
+@net/http
+Header()>Header
+Write([]byte)>(int, error)
+WriteHeader(statusCode int)>
+#json
+@encoding/json
+Marshal(v any)>([]byte, error)
+MarshalIndent(v any, prefix, indent string)>([]byte, error)
+Unmarshal(data []byte, v any)>error
+NewDecoder(r io.Reader)>*Decoder
+NewEncoder(w io.Writer)>*Encoder
+Valid(data []byte)>bool
+#filepath
+@path/filepath
+Join(elem ...string)>string
+Base(path string)>string
+Dir(path string)>string
+Ext(path string)>string
+Abs(path string)>(string, error)
+Clean(path string)>string
+Rel(basepath, targpath string)>(string, error)
+Glob(pattern string)>(matches []string, err error)
+Walk(root string, fn WalkFunc)>error
+WalkDir(root string, fn fs.WalkDirFunc)>error
+Separator:
