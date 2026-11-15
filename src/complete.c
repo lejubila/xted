@@ -172,11 +172,22 @@ static void hdr_cb(void *ctx, const char *name, int kind, const char *sig, const
                    const char *spec)
 {
     Gather *g = ctx;
-    size_t before = g->n;
+    size_t before = g->n, i, nl = strlen(name);
 
     sym_cb(ctx, name, kind, sig, ret, 3);
-    if (g->n > before)
+    if (g->n > before) {
         g->v[g->n - 1].inc = xstrdup(spec);
+        return;
+    }
+    /* the same name from a file the document already imports: give it the import too (a module
+     * imported for another name) */
+    for (i = 0; i < g->n; i++)
+        if (!g->v[i].inc && !g->v[i].std && g->v[i].dist >= 1 && g->v[i].kind != CAND_LOCAL &&
+            g->v[i].kind != CAND_KEYWORD && g->v[i].kind != CAND_SNIPPET &&
+            strlen(g->v[i].w) == nl && memcmp(g->v[i].w, name, nl) == 0) {
+            g->v[i].inc = xstrdup(spec);
+            return;
+        }
 }
 
 /* A class of the project for the suggestions: after `use` the qualified name itself, elsewhere
@@ -396,7 +407,7 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
             }
             sym_globals(c->sc, docs, ndocs, cur, sym_cb, &g);
             if (plen >= 2)
-                sym_project_headers(c->sc, docs, ndocs, cur, hdr_cb, &g);
+                sym_project_symbols(c->sc, docs, ndocs, cur, hdr_cb, &g);
             if (php && plen >= 3 && (start == 0 || b->lines[y].s[start - 1] != '$'))
                 sym_classes(c->sc, cur, g.prefix, plen, 0, class_cb, &g);
         }

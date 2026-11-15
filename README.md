@@ -181,6 +181,14 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     `require`; apici, punto e virgola e `import * as` come nelle righe esistenti. Un `import { a } from 'mod'`
     su una riga viene esteso (`{ a, b }`). La riga va tra gli import in ordine di modulo, oppure dopo i
     commenti e `'use strict'` se non ce ne sono. Niente se il nome è già importato o dichiarato nel file.
+  - Sempre in JavaScript e TypeScript si propone anche ciò che gli altri file del progetto esportano
+    (`export function`, `export class`, `export const`, `interface`, `type`, `enum`, `export { … }`,
+    `export default`, e in CommonJS `module.exports = { … }` ed `exports.x =`): scegliendolo si aggiunge
+    `import { formatDate } from './util'` (o `import Store from './util'` per l'export predefinito, o
+    `const { slugify } = require('./helpers')`), con il percorso relativo senza estensione né `/index`
+    (l'estensione resta se il file la usa già negli import relativi). Se il modulo è già importato per
+    un altro nome, l'import esistente viene esteso. Gli import dei pacchetti restano prima di quelli
+    dei file del progetto.
 - **Snippet** con segnaposti navigabili con Tab (`for` → ciclo completo, e così via).
 - **Esecuzione di comandi** (`Alt+R`, poi `F5` per ripeterlo, `Shift+F5` per interromperlo):
   l'output compare in un pannello `[Output]`. `F8` e `Shift+F8` saltano all'errore

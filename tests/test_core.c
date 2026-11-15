@@ -4601,6 +4601,88 @@ static void test_c_project_include(void)
     rm_rf(dir);
 }
 
+/* What another module of the project exports: suggested, and accepting it adds its import. */
+static void test_js_project_import(void)
+{
+    char dir[64], path[200], err[128], sub[200];
+    Editor e;
+    Doc *d;
+    size_t i;
+    struct { const char *file, *text, *typed, *head; size_t y, x; int changes; } t[] = {
+        { "src/app.ts", "import fs from 'fs';\n\nfunction f() {\n    \n}\n", "formatD",
+          "import fs from 'fs';\nimport { formatDate } from './util';\n\nfunction f() {\n", 3, 4, 1 },
+        { "src/app2.ts", "function f() {\n    \n}\n", "Datast",
+          "import Datastore from './util';\n\nfunction f() {\n", 1, 4, 1 },
+        { "src/deep/x.ts", "function f() {\n    \n}\n", "formatD",
+          "import { formatDate } from '../util';\n\nfunction f() {\n", 1, 4, 1 },
+        { "src/app3.ts", "import { MAX_ITEMS } from './util';\n\nfunction f() {\n    \n}\n", "formatD",
+          "import { MAX_ITEMS, formatDate } from './util';\n\nfunction f() {\n", 3, 4, 1 },
+        { "src/app4.ts", "function f() {\n    \n}\n", "libHel",
+          "import { libHelper } from './lib';\n\nfunction f() {\n", 1, 4, 1 },
+        { "src/app5.ts", "import { formatDate } from './util';\n\nfunction f() {\n    \n}\n", "formatD",
+          "import { formatDate } from './util';\n\nfunction f() {\n", 3, 4, 0 },
+        { "cjs/main.js", "const path = require('path');\n\nfunction f() {\n    \n}\n", "slugi",
+          "const path = require('path');\nconst { slugify } = require('./helpers');\n\nfunction f() {\n", 3, 4, 1 },
+        { "cjs/main2.js", "const path = require('path');\n\nfunction f() {\n    \n}\n", "camelC",
+          "const path = require('path');\nconst { camelCase } = require('./helpers');\n\nfunction f() {\n", 3, 4, 1 },
+    };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(sub, sizeof sub, "%s/.git", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/src", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/src/deep", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/src/lib", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/cjs", dir);
+    mkdir(sub, 0755);
+    put_file(dir, "src/util.ts", "export function formatDate(d: Date, fmt: string): string {\n  return '';\n}\n"
+                                 "export const MAX_ITEMS = 10;\nexport default class Datastore {\n}\n"
+                                 "export interface Item {\n}\nfunction hidden() {}\n");
+    put_file(dir, "src/lib/index.ts", "export function libHelper(x) {\n}\n");
+    put_file(dir, "cjs/helpers.js", "function slugify(s) {}\nfunction trimAll(s) {}\n"
+                                    "module.exports = { slugify, trimAll };\nexports.camelCase = (s) => s;\n");
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char *q;
+        size_t y, nl0, k;
+        SBuf all = SBUF_INIT;
+
+        put_file(dir, t[i].file, t[i].text);
+        snprintf(path, sizeof path, "%s/%s", dir, t[i].file);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        nl0 = e.buf->nlines;
+        e.cy = t[i].y;
+        e.cx = t[i].x;
+        for (q = t[i].typed; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        /* what a module does not export is not suggested from it */
+        for (k = 0; k < e.comp.n; k++)
+            CHECK(strcmp(e.comp.v[k].text, "hidden") != 0 || !e.comp.v[k].inc);
+        if (e.comp.on)
+            kkey(&e, KEY_ENTER, 0);
+        for (y = 0; y < e.buf->nlines; y++) {
+            sbuf_add(&all, e.buf->lines[y].s, e.buf->lines[y].len);
+            sbuf_adds(&all, "\n");
+        }
+        sbuf_add(&all, "", 1);
+        if (strncmp(all.p, t[i].head, strlen(t[i].head)) != 0)
+            fprintf(stderr, "case %zu (%s):\n%s---\n", i, t[i].file, all.p);
+        CHECK(strncmp(all.p, t[i].head, strlen(t[i].head)) == 0);
+        if (t[i].changes) {
+            edit_undo(&e);
+            CHECK(e.buf->nlines == nl0);
+        }
+        sbuf_free(&all);
+        editor_free(&e);
+    }
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5148,6 +5230,7 @@ int main(void)
     test_py_import();
     test_js_import();
     test_c_project_include();
+    test_js_project_import();
     test_config_merge();
     test_snippets();
     test_cursors();

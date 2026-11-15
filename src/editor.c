@@ -2138,6 +2138,15 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
         snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
         return;
     }
+    if (c->inc && (strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0)) {
+        /* what a module of the project exports; "=" first: its default export */
+        int def = c->inc[0] == '=';
+
+        nd->kind = def ? 4 : 5;
+        snprintf(nd->mod, sizeof nd->mod, "%s", c->inc + def);
+        snprintf(nd->name, sizeof nd->name, "%s", c->text);
+        return;
+    }
     if (!c->std)
         return;
     if (strcmp(lang, "Python") == 0) {

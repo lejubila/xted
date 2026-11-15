@@ -897,6 +897,7 @@ struct SymCache {
 typedef struct {
     char *name, *sig, *ret;
     int kind;
+    int def;                        /* JS/TS: the default export of the module */
 } HSym;
 
 struct Hdr {
@@ -2543,6 +2544,205 @@ static int is_header(const char *path)
            strcmp(x, "hxx") == 0;
 }
 
+static const char *strstr_len(const char *hay, size_t n, const char *needle)
+{
+    size_t nl = strlen(needle), i;
+
+    for (i = 0; i + nl <= n; i++)
+        if (memcmp(hay + i, needle, nl) == 0)
+            return hay + i;
+    return NULL;
+}
+
+static int is_js_module(const char *path)
+{
+    static const char *const ok[] = { "js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", NULL };
+    const char *x = ext_of(path);
+    size_t i, l = strlen(path);
+
+    if (l > 5 && strcmp(path + l - 5, ".d.ts") == 0)
+        return 0;
+    for (i = 0; ok[i]; i++)
+        if (strcmp(x, ok[i]) == 0)
+            return 1;
+    return 0;
+}
+
+static void hsym_add(struct Hdr *h, const char *name, size_t nl, int kind, const char *sig, size_t sl,
+                     int def)
+{
+    char *n;
+
+    if (nl == 0 || nl >= PM_NAME || h->n >= 400)
+        return;
+    h->v = xrealloc(h->v, (h->n + 1) * sizeof *h->v);
+    n = xmalloc(nl + 1);
+    memcpy(n, name, nl);
+    n[nl] = '\0';
+    h->v[h->n].name = n;
+    h->v[h->n].sig = xmalloc(sl + 1);
+    memcpy(h->v[h->n].sig, sig, sl);
+    h->v[h->n].sig[sl] = '\0';
+    h->v[h->n].ret = xstrdup("");
+    h->v[h->n].kind = kind;
+    h->v[h->n].def = def;
+    h->n++;
+}
+
+/* Skips the word w (and the blanks after it) at s[*i]; 1 if it was there. */
+static int js_word(const char *s, size_t len, size_t *i, const char *w)
+{
+    size_t n = strlen(w);
+
+    if (*i + n > len || memcmp(s + *i, w, n) != 0 || (*i + n < len && is_idc((unsigned char)s[*i + n])))
+        return 0;
+    *i += n;
+    while (*i < len && (s[*i] == ' ' || s[*i] == '\t'))
+        (*i)++;
+    return 1;
+}
+
+static size_t js_ident(const char *s, size_t len, size_t i)
+{
+    while (i < len && (is_idc((unsigned char)s[i]) || s[i] == '$'))
+        i++;
+    return i;
+}
+
+/* The names a JavaScript or TypeScript file exports, read from its lines: export function,
+ * class, const, interface, type, enum, export default function/class Name, export { a, b as c },
+ * and in CommonJS exports.x = and module.exports = { a, b }. */
+static void js_exports(const Buffer *b, struct Hdr *h)
+{
+    size_t y;
+
+    for (y = 0; y < b->nlines; y++) {
+        const char *s = b->lines[y].s;
+        size_t len = b->lines[y].len, i = 0, e, p0, p1;
+        int def = 0;
+
+        if (js_word(s, len, &i, "export")) {
+            if (js_word(s, len, &i, "default"))
+                def = 1;
+            js_word(s, len, &i, "declare");
+            js_word(s, len, &i, "abstract");
+            js_word(s, len, &i, "async");
+            if (js_word(s, len, &i, "function")) {
+                if (i < len && s[i] == '*')
+                    i++;
+                e = js_ident(s, len, i);
+                for (p0 = e; p0 < len && s[p0] != '('; p0++)
+                    ;
+                for (p1 = p0; p1 < len && s[p1] != ')'; p1++)
+                    ;
+                hsym_add(h, s + i, e - i, RULE_FUNC, s + p0 + (p0 < len), p1 > p0 ? p1 - p0 - 1 : 0, def);
+            } else if (js_word(s, len, &i, "class") || js_word(s, len, &i, "interface") ||
+                       js_word(s, len, &i, "type") || js_word(s, len, &i, "enum")) {
+                e = js_ident(s, len, i);
+                hsym_add(h, s + i, e - i, RULE_CLASS, "", 0, def);
+            } else if (!def && (js_word(s, len, &i, "const") || js_word(s, len, &i, "let") ||
+                                js_word(s, len, &i, "var"))) {
+                size_t k;
+                int fn = 0;
+
+                e = js_ident(s, len, i);
+                for (k = e; k < len && s[k] != '='; k++)
+                    ;
+                p0 = k + 1;
+                while (p0 < len && s[p0] == ' ')
+                    p0++;
+                if (p0 + 5 < len && memcmp(s + p0, "async", 5) == 0)
+                    p0 += 5;
+                while (p0 < len && s[p0] == ' ')
+                    p0++;
+                if (p0 + 8 <= len && memcmp(s + p0, "function", 8) == 0) {
+                    fn = 1;
+                    while (p0 < len && s[p0] != '(')
+                        p0++;
+                }
+                if (p0 < len && s[p0] == '(') {
+                    for (p1 = p0; p1 < len && s[p1] != ')'; p1++)
+                        ;
+                    if (fn || (p1 + 4 <= len && strstr_len(s + p1, len - p1, "=>")))
+                        fn = 1;
+                    if (fn) {
+                        hsym_add(h, s + i, e - i, RULE_FUNC, s + p0 + 1, p1 > p0 ? p1 - p0 - 1 : 0, 0);
+                        continue;
+                    }
+                }
+                hsym_add(h, s + i, e - i, RULE_VAR, "", 0, 0);
+            } else if (!def && i < len && s[i] == '{') {
+                /* export { a, b as c } (also re-exported from another module) */
+                i++;
+                while (i < len && s[i] != '}') {
+                    size_t a0, a1;
+
+                    while (i < len && (s[i] == ' ' || s[i] == ','))
+                        i++;
+                    a0 = i;
+                    a1 = js_ident(s, len, i);
+                    i = a1;
+                    while (i < len && s[i] == ' ')
+                        i++;
+                    if (js_word(s, len, &i, "as")) {
+                        a0 = i;
+                        a1 = js_ident(s, len, i);
+                        i = a1;
+                    }
+                    if (a1 > a0 && !(a1 - a0 == 7 && memcmp(s + a0, "default", 7) == 0))
+                        hsym_add(h, s + a0, a1 - a0, RULE_VAR, "", 0, 0);
+                    if (a1 == a0)
+                        i++;
+                }
+            } else if (def) {
+                /* export default Name; */
+                e = js_ident(s, len, i);
+                if (e > i)
+                    hsym_add(h, s + i, e - i, RULE_VAR, "", 0, 1);
+            }
+            continue;
+        }
+        /* CommonJS */
+        i = 0;
+        if (len > 8 && memcmp(s, "exports.", 8) == 0) {
+            i = 8;
+            e = js_ident(s, len, i);
+            hsym_add(h, s + i, e - i, RULE_VAR, "", 0, 0);
+        } else if (len > 15 && memcmp(s, "module.exports.", 15) == 0) {
+            i = 15;
+            e = js_ident(s, len, i);
+            hsym_add(h, s + i, e - i, RULE_VAR, "", 0, 0);
+        } else if (len > 14 && memcmp(s, "module.exports", 14) == 0) {
+            i = 14;
+            while (i < len && (s[i] == ' ' || s[i] == '='))
+                i++;
+            if (i < len && s[i] == '{') {
+                i++;
+                while (i < len && s[i] != '}') {
+                    size_t a0, a1;
+
+                    while (i < len && (s[i] == ' ' || s[i] == ','))
+                        i++;
+                    a0 = i;
+                    a1 = js_ident(s, len, i);
+                    if (a1 > a0)
+                        hsym_add(h, s + a0, a1 - a0, RULE_VAR, "", 0, 0);
+                    i = a1;
+                    /* a: value — skip to the next comma at this level */
+                    while (i < len && s[i] != ',' && s[i] != '}')
+                        i++;
+                    if (a1 == a0 && i < len && s[i] != '}')
+                        i++;
+                }
+            } else {
+                e = js_ident(s, len, i);
+                if (e > i)
+                    hsym_add(h, s + i, e - i, RULE_VAR, "", 0, 1);
+            }
+        }
+    }
+}
+
 /* A macro that only guards the header against a second inclusion (XTED_BUFFER_H). */
 static int guard_macro(const char *n)
 {
@@ -2563,7 +2763,8 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
     size_t i;
     Buffer b;
     char err[128];
-    SymIndex *x;
+    SymIndex *x = NULL;
+    int js;
 
     for (i = 0; i < c->nhdr; i++)
         if (strcmp(c->hdr[i].path, real) == 0) {
@@ -2574,6 +2775,7 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         return h;
     if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
         return h;
+    js = is_js_module(real);
     if (h && h->mtime == (long)st.st_mtime && h->size == (long)st.st_size) {
         h->checked = now;
         return h;
@@ -2587,13 +2789,12 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         buf_free(&b);
         return h;
     }
-    {
+    if (!js) {
         Syntax *syn = syn_detect(&b);
 
         x = sym_build(&b, syn);
         syn_free(syn);
     }
-    buf_free(&b);
     if (!h) {
         c->hdr = xrealloc(c->hdr, (c->nhdr + 1) * sizeof *c->hdr);
         h = &c->hdr[c->nhdr++];
@@ -2609,7 +2810,10 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         h->v = NULL;
         h->n = 0;
     }
-    for (i = 0; i < x->n && h->n < HDR_SYMS; i++) {
+    if (js)
+        js_exports(&b, h);
+    buf_free(&b);
+    for (i = 0; x && i < x->n && h->n < HDR_SYMS; i++) {
         const Sym *s = &x->v[i];
 
         if (s->owner >= 0 || !s->name[0] || s->hidden || (s->kind == RULE_CONST && guard_macro(s->name)))
@@ -2621,22 +2825,85 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         h->v[h->n].sig = xstrdup(s->sig ? s->sig : "");
         h->v[h->n].ret = xstrdup(s->ret ? s->ret : "");
         h->v[h->n].kind = s->kind;
+        h->v[h->n].def = 0;
         h->n++;
     }
-    sym_index_free(x);
+    if (x)
+        sym_index_free(x);
     h->mtime = (long)st.st_mtime;
     h->size = (long)st.st_size;
     h->checked = now;
     return h;
 }
 
+/* The path of file seen from the folder of from (a file too): "x.h", "../src/x.h". */
+static void rel_path(const char *from, const char *file, char *out, size_t n)
+{
+    char dir[PATH_MAX];
+    char *sl;
+    size_t last = 0, up = 0, k;
+    SBuf r = SBUF_INIT;
+
+    snprintf(dir, sizeof dir, "%s", from);
+    sl = strrchr(dir, '/');
+    if (sl)
+        *sl = '\0';
+    for (k = 0; dir[k] && file[k] && dir[k] == file[k]; k++)
+        if (dir[k] == '/')
+            last = k;
+    if (!dir[k] && file[k] == '/')
+        last = k;                           /* the file is below the folder */
+    for (k = last; dir[k]; k++)
+        if (dir[k] == '/')
+            up++;
+    for (k = 0; k < up; k++)
+        sbuf_adds(&r, "../");
+    sbuf_adds(&r, file + last + 1);
+    sbuf_add(&r, "", 1);
+    snprintf(out, n, "%s", r.p);
+    sbuf_free(&r);
+}
+
+/* How a JS/TS file cur would write the import of module file mod: relative ("./x", "../lib/x"),
+ * without the extension and without a final /index, unless its relative imports keep the
+ * extension (Node's ES modules need it). */
+static void js_spec(const SymIndex *cur, const char *mod, char *out, size_t n)
+{
+    char rel[PATH_MAX];
+    size_t i, l;
+    int keep = 0;
+    char *dot, *sl;
+
+    for (i = 0; i < cur->ninc; i++) {
+        const char *s = cur->inc[i];
+
+        if (s[0] == '.' && (s[1] == '/' || s[1] == '.') && strrchr(s, '.') > strrchr(s, '/'))
+            keep = 1;
+    }
+    rel_path(cur->key, mod, rel, sizeof rel);
+    if (!keep) {
+        dot = strrchr(rel, '.');
+        sl = strrchr(rel, '/');
+        if (dot && (!sl || dot > sl))
+            *dot = '\0';
+        l = strlen(rel);
+        if (l >= 6 && strcmp(rel + l - 6, "/index") == 0)
+            rel[l - 6] = '\0';
+        else if (strcmp(rel, "index") == 0)
+            snprintf(rel, sizeof rel, ".");
+    }
+    if (strncmp(rel, "../", 3) == 0 || strcmp(rel, ".") == 0)
+        snprintf(out, n, "%s", rel);
+    else
+        snprintf(out, n, "./%.4000s", rel);
+}
+
 /* How the file cur would write the include of hdr: like the includes it already has (the part of
  * hdr below the folder one of them is found from), else relative to the folder of cur. */
 static void hdr_spec(const SymIndex *cur, const char *hdr, char *out, size_t n)
 {
-    size_t i, k;
+    size_t i;
     const char *d = cur->key;
-    SBuf r = SBUF_INIT;
 
     for (i = 0; i < cur->ninc && cur->incp; i++) {
         const char *spec = cur->inc[i], *p = cur->incp[i];
@@ -2666,70 +2933,56 @@ static void hdr_spec(const SymIndex *cur, const char *hdr, char *out, size_t n)
             return;
         }
     }
-    /* relative to the folder of the file: the common folders, then ../ for the others */
-    {
-        char dir[PATH_MAX];
-        char *sl;
-        size_t last = 0, up = 0;
-
-        snprintf(dir, sizeof dir, "%s", d);
-        sl = strrchr(dir, '/');
-        if (sl)
-            *sl = '\0';
-        for (k = 0; dir[k] && hdr[k] && dir[k] == hdr[k]; k++)
-            if (dir[k] == '/')
-                last = k;
-        if (!dir[k] && hdr[k] == '/')
-            last = k;                       /* the header is below the folder of the file */
-        for (k = last; dir[k]; k++)
-            if (dir[k] == '/')
-                up++;
-        for (k = 0; k < up; k++)
-            sbuf_adds(&r, "../");
-        sbuf_adds(&r, hdr + last + 1);
-        sbuf_add(&r, "", 1);
-        snprintf(out, n, "%s", r.p);
-        sbuf_free(&r);
-    }
+    rel_path(d, hdr, out, n);
 }
 
-void sym_project_headers(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx)
+void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx)
 {
     Env e;
     size_t i, j, k, seen = 0;
+    const char *lang = syn_name(cur->syn);
+    int cl = strcmp(lang, "C") == 0, js = strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0;
 
-    if (!cur->buf.path || strcmp(syn_name(cur->syn), "C") != 0)
+    if (!cur->buf.path || (!cl && !js))
         return;
     env_build(c, docs, ndocs, cur, &e);
     if (!e.v[0]->key || !ensure_files(c))
         return;
     for (i = 0; i < c->nfiles && seen < HDR_MAX; i++) {
-        char path[PATH_MAX], *real, spec[PATH_MAX];
+        char path[PATH_MAX], *real, spec[PATH_MAX + 1];
         struct Hdr *h;
         int visible = 0;
 
-        if (!is_header(c->files[i]))
+        if (cl ? !is_header(c->files[i]) : !is_js_module(c->files[i]))
             continue;
         seen++;
         rooted(c, path, sizeof path, c->files[i]);
         real = realpath(path, NULL);
         if (!real)
             continue;
-        for (k = 0; k < e.n; k++)
+        /* C: a header the file reaches needs nothing; JS: a module it imports may still lack the
+         * name (import { a } from './m' and b is wanted), so only the file itself is left out */
+        for (k = 0; k < (cl ? e.n : 1); k++)
             if (e.v[k]->key && strcmp(e.v[k]->key, real) == 0)
                 visible = 1;
-        /* included under a name the editor cannot resolve ("buffer.h" with -Isrc): the same file */
-        for (k = 0; k < e.v[0]->ninc && !visible; k++) {
-            const char *spec = e.v[0]->inc[k], *sb = strrchr(spec, '/'), *rb = strrchr(real, '/');
+        /* C: included under a name the editor cannot resolve ("buffer.h" with -Isrc) */
+        for (k = 0; cl && k < e.v[0]->ninc && !visible; k++) {
+            const char *sp = e.v[0]->inc[k], *sb = strrchr(sp, '/'), *rb = strrchr(real, '/');
 
-            if (spec[0] != ':' && strcmp(sb ? sb + 1 : spec, rb ? rb + 1 : real) == 0)
+            if (sp[0] != ':' && strcmp(sb ? sb + 1 : sp, rb ? rb + 1 : real) == 0)
                 visible = 1;
         }
         h = visible ? NULL : hdr_get(c, real);
         if (h && h->n) {
-            hdr_spec(e.v[0], real, spec, sizeof spec);
+            if (cl)
+                hdr_spec(e.v[0], real, spec, sizeof spec);
+            else
+                js_spec(e.v[0], real, spec + 1, sizeof spec - 1);
+            if (!cl)
+                spec[0] = '=';              /* a default export is told by a leading "=" */
             for (j = 0; j < h->n; j++)
-                fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, spec);
+                fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret,
+                   cl || h->v[j].def ? spec : spec + 1);
         }
         free(real);
     }

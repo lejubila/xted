@@ -89,12 +89,14 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
 int sym_is_cxx(const Doc *d);
 void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn, void *ctx);
 
-/* C and C++: the functions, types, macros and variables of the headers of the project that cur
- * does not include (directly or through other headers), with how cur would write the include
- * ("buffer.h", "../src/buffer.h"). The headers are read a little at each call (sym_busy). */
+/* The symbols of the other files of the project that cur does not reach, with how cur would write
+ * the include or import of their file. C and C++: the functions, types, macros and variables of
+ * the headers ("buffer.h", "../src/buffer.h"). JavaScript and TypeScript: what the modules export
+ * ("./util", "../lib/api"; a default export comes as "=./util"). The files are read a little at
+ * each call (sym_busy). */
 typedef void (*HdrFn)(void *ctx, const char *name, int kind, const char *sig, const char *ret,
                       const char *spec);
-void sym_project_headers(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx);
+void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx);
 
 /* PHP: the classes of the project that can be imported with "use": config/app.php aliases, then
  * Composer's classmap, then the PSR-4 directories of the project. A class is reported with its

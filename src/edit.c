@@ -1640,6 +1640,15 @@ static int js_last_string(const Line *l, char *out, size_t n, char *quote)
     return 1;
 }
 
+/* The order of modules in a block of imports: packages ("fs", "react") before the files of the
+ * project ("./util"), each in alphabetical order. */
+static int js_mod_cmp(const char *a, const char *b)
+{
+    int ra = a[0] == '.', rb = b[0] == '.';
+
+    return ra != rb ? ra - rb : strcmp(a, b);
+}
+
 int edit_add_js_import(Editor *e, const char *mod, const char *name, int def, char *stmt, size_t sn)
 {
     const Buffer *b = e->buf;
@@ -1682,9 +1691,9 @@ int edit_add_js_import(Editor *e, const char *mod, const char *name, int def, ch
                 if (!quote)
                     quote = q;
                 if (blk_open) {
-                    if (prev[0] && strcmp(prev, cur) > 0)
+                    if (prev[0] && js_mod_cmp(prev, cur) > 0)
                         sorted = 0;
-                    if (ins == (size_t)-1 && strcmp(cur, mod) > 0)
+                    if (ins == (size_t)-1 && js_mod_cmp(cur, mod) > 0)
                         ins = y;
                     snprintf(prev, sizeof prev, "%s", cur);
                 }
