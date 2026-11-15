@@ -4929,6 +4929,62 @@ static void test_php_require_and_use_function(void)
     rm_rf(dir2);
 }
 
+/* Many classes reached from one file: the index cache must not drop one that is in use. */
+static void test_sym_cache_pressure(void)
+{
+    char dir[64], path[256], err[128], name[64], body[160];
+    Doc d;
+    SymCache *c = sym_cache_new();
+    Doc *docs[1];
+    static Got g;
+    SBuf main = SBUF_INIT;
+    int i, round;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(path, sizeof path, "%s/app", dir);
+    mkdir(path, 0700);
+    snprintf(path, sizeof path, "%s/vendor", dir);
+    mkdir(path, 0700);
+    snprintf(path, sizeof path, "%s/vendor/composer", dir);
+    mkdir(path, 0700);
+    put_file(dir, "composer.json", "{}\n");
+    put_file(dir, "vendor/composer/autoload_psr4.php",
+             "<?php\n$vendorDir = dirname(dirname(__FILE__));\n$baseDir = dirname($vendorDir);\n"
+             "return array(\n    'App\\\\' => array($baseDir . '/app'),\n);\n");
+    sbuf_adds(&main, "<?php\nnamespace App;\n");
+    for (i = 0; i < 70; i++) {
+        snprintf(name, sizeof name, "app/K%d.php", i);
+        snprintf(body, sizeof body, "<?php\nnamespace App;\nclass K%d\n{\n    public static function m%d() {}\n}\n", i, i);
+        put_file(dir, name, body);
+        snprintf(body, sizeof body, "use App\\K%d;\n", i);
+        sbuf_adds(&main, body);
+    }
+    for (i = 0; i < 70; i++) {
+        snprintf(body, sizeof body, "K%d::m%d();\n", i, i);
+        sbuf_adds(&main, body);
+    }
+    sbuf_add(&main, "", 1);
+    put_file(dir, "main.php", main.p);
+    sbuf_free(&main);
+    memset(&d, 0, sizeof d);
+    snprintf(path, sizeof path, "%s/main.php", dir);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    docs[0] = &d;
+    for (round = 0; round < 4; round++) {
+        memset(&g, 0, sizeof g);
+        sym_globals(c, docs, 1, &d, got_cb, &g);
+        /* a class whose file is not there any more is the case of an index read long ago */
+        if (round == 1) {
+            snprintf(path, sizeof path, "%s/app/K3.php", dir);
+            unlink(path);
+        }
+    }
+    CHECK(has_sym(&g, "K0"));
+    sym_cache_free(c);
+    doc_release(&d);
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5480,6 +5536,7 @@ int main(void)
     test_py_project_import();
     test_php_static_use();
     test_php_require_and_use_function();
+    test_sym_cache_pressure();
     test_config_merge();
     test_snippets();
     test_cursors();

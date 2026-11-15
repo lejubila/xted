@@ -875,6 +875,7 @@ struct SymCache {
     SymIndex **v;
     size_t n;
     unsigned long tick;
+    unsigned long pin;              /* indexes used since this tick belong to the Env being built */
     char **files;
     size_t nfiles;
     int files_done;
@@ -1087,21 +1088,26 @@ static long scan_left(const SymCache *c)
     return l > 0 ? l : -1;
 }
 
+/* Keeps x; when the cache is full, the index of a file read from disk that was used least
+ * recently goes. Never one of an open document, nor one the Env being built holds (used since
+ * c->pin): with none left to drop, the cache grows for this build. */
 static void cache_put(SymCache *c, SymIndex *x)
 {
-    size_t i, victim = 0;
+    size_t i, victim = (size_t)-1;
 
     if (c->n >= CACHE_MAX) {
         unsigned long best = (unsigned long)-1;
 
         for (i = 0; i < c->n; i++)
-            if (!c->v[i]->buf && c->v[i]->used < best) {
+            if (!c->v[i]->buf && c->v[i]->used < c->pin && c->v[i]->used < best) {
                 best = c->v[i]->used;
                 victim = i;
             }
-        sym_index_free(c->v[victim]);
-        c->v[victim] = x;
-        return;
+        if (victim != (size_t)-1) {
+            sym_index_free(c->v[victim]);
+            c->v[victim] = x;
+            return;
+        }
     }
     c->v = xrealloc(c->v, (c->n + 1) * sizeof *c->v);
     c->v[c->n++] = x;
@@ -1537,6 +1543,7 @@ typedef struct {
     StdLib *lib[2];
     size_t nlib;
     const Doc *cur;             /* for the aliases written in it */
+    SymCache *c;
 } Env;
 
 static void env_add(Env *e, SymIndex *x, int depth)
@@ -1545,6 +1552,8 @@ static void env_add(Env *e, SymIndex *x, int depth)
 
     if (!x || e->n >= SET_MAX)
         return;
+    if (e->c)
+        x->used = ++e->c->tick;         /* held by this Env: not to be dropped while it is built */
     for (i = 0; i < e->n; i++)
         if (e->v[i] == x || (x->key && e->v[i]->key && strcmp(x->key, e->v[i]->key) == 0))
             return;
@@ -1618,6 +1627,8 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
 
     memset(e, 0, sizeof *e);
     e->cur = cur;
+    e->c = c;
+    c->pin = c->tick + 1;
     if (strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0) {
         e->lib[e->nlib++] = lib_get(c, LIB_PHP);
     } else if (strcmp(lang, "Python") == 0) {
