@@ -2,7 +2,7 @@
 
 Editor di testo da terminale per Linux, scritto in **C99** con la sola libc POSIX.
 Un unico binario, senza ncurses né altre librerie: il terminale è controllato a mano con
-termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 460 KB.
+termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 480 KB.
 
 Il nome è `xted` (X = Unix/Linux, T = text/terminal, ED = editor); `make install` crea anche
 il collegamento breve `xt`.
