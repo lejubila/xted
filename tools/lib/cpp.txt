@@ -1,5 +1,14 @@
 // C++ standard library (namespace std): algorithms, containers, strings, streams, smart pointers. Curated.
+// A line "@header" starts the global symbols declared by that header, and the first line of a class
+// section names its header: accepting the symbol in the editor adds #include <header>.
 #std
+@utility
+swap(a, b)>void
+move(t)>T
+forward(t)>T
+make_pair(a, b)>pair
+exchange(obj, new_value)>T
+@algorithm
 sort(first, last, comp)>void
 stable_sort(first, last, comp)>void
 partial_sort(first, middle, last)>void
@@ -32,7 +41,6 @@ remove(first, last, value)>iterator
 remove_if(first, last, pred)>iterator
 replace(first, last, old_value, new_value)>void
 replace_if(first, last, pred, new_value)>void
-swap(a, b)>void
 iter_swap(a, b)>void
 min(a, b)>T
 max(a, b)>T
@@ -60,6 +68,8 @@ make_heap(first, last)>void
 push_heap(first, last)>void
 pop_heap(first, last)>void
 sort_heap(first, last)>void
+swap_ranges(first1, last1, first2)>iterator
+@numeric
 accumulate(first, last, init)>T
 reduce(first, last, init)>T
 inner_product(first1, last1, first2, init)>T
@@ -67,7 +77,7 @@ partial_sum(first, last, d_first)>iterator
 iota(first, last, value)>void
 gcd(m, n)>int
 lcm(m, n)>int
-abs(x)>int
+@cmath
 sqrt(x)>double
 pow(base, exp)>double
 floor(x)>double
@@ -84,15 +94,23 @@ atan2(y, x)>double
 fmod(x, y)>double
 isnan(x)>bool
 isinf(x)>bool
-move(t)>T
-forward(t)>T
-make_pair(a, b)>pair
+@cstdlib
+abs(x)>int
+exit(status)>void
+abort()>void
+getenv(name)>char
+@tuple
 make_tuple(...args)>tuple
-make_shared(...args)>shared_ptr
-make_unique(...args)>unique_ptr
-make_optional(value)>optional
 tie(...args)>tuple
 get(t)>T
+apply(f, t)>R
+@memory
+make_shared(...args)>shared_ptr
+make_unique(...args)>unique_ptr
+@optional
+make_optional(value)>optional
+nullopt:nullopt_t
+@string
 to_string(value)>string
 stoi(str, pos, base)>int
 stol(str, pos, base)>long
@@ -101,6 +119,8 @@ stoul(str, pos, base)>unsigned long
 stof(str, pos)>float
 stod(str, pos)>double
 getline(is, str, delim)>istream
+npos:size_t
+@iterator
 begin(c)>iterator
 end(c)>iterator
 size(c)>size_t
@@ -111,34 +131,36 @@ next(it, n)>iterator
 prev(it, n)>iterator
 back_inserter(c)>back_insert_iterator
 inserter(c, i)>insert_iterator
+@functional
 ref(t)>reference_wrapper
 cref(t)>reference_wrapper
 bind(f, ...args)>function
 invoke(f, ...args)>R
-apply(f, t)>R
-exchange(obj, new_value)>T
-swap_ranges(first1, last1, first2)>iterator
+@future
 async(policy, f, ...args)>future
+@thread
 this_thread:this_thread
+@chrono
 chrono:chrono
+@iostream
 cout:ostream
 cerr:ostream
 clog:ostream
 cin:istream
 endl:ostream
 flush:ostream
-npos:size_t
-nullopt:nullopt_t
+@cstddef
 nullptr:nullptr_t
+@exception
 terminate()>void
-exit(status)>void
-abort()>void
-getenv(name)>char
+@cstdio
 printf(format, ...)>int
 snprintf(buffer, size, format, ...)>int
+@cstring
 strlen(s)>size_t
 memcpy(dest, src, n)>void
 #string
+@string
 npos:size_t
 size()>size_t
 length()>size_t
@@ -177,6 +199,7 @@ copy(dest, count, pos)>size_t
 swap(other)>void
 assign(str)>string
 #string_view
+@string_view
 size()>size_t
 length()>size_t
 empty()>bool
@@ -193,6 +216,7 @@ at(pos)>char
 begin()>iterator
 end()>iterator
 #vector
+@vector
 size()>size_t
 empty()>bool
 capacity()>size_t
@@ -219,6 +243,7 @@ cend()>iterator
 assign(count, value)>void
 swap(other)>void
 #deque
+@deque
 size()>size_t
 empty()>bool
 clear()>void
@@ -237,6 +262,7 @@ begin()>iterator
 end()>iterator
 resize(n)>void
 #list
+@list
 size()>size_t
 empty()>bool
 clear()>void
@@ -260,6 +286,7 @@ remove_if(pred)>void
 merge(other)>void
 splice(pos, other)>void
 #forward_list
+@forward_list
 push_front(value)>void
 pop_front()>void
 front()>T
@@ -270,6 +297,7 @@ end()>iterator
 sort()>void
 reverse()>void
 #array
+@array
 size()>size_t
 empty()>bool
 fill(value)>void
@@ -281,6 +309,7 @@ begin()>iterator
 end()>iterator
 swap(other)>void
 #map
+@map
 size()>size_t
 empty()>bool
 clear()>void
@@ -302,6 +331,7 @@ rbegin()>iterator
 rend()>iterator
 swap(other)>void
 #unordered_map
+@unordered_map
 size()>size_t
 empty()>bool
 clear()>void
@@ -322,6 +352,7 @@ begin()>iterator
 end()>iterator
 swap(other)>void
 #set
+@set
 size()>size_t
 empty()>bool
 clear()>void
@@ -339,6 +370,7 @@ rbegin()>iterator
 rend()>iterator
 swap(other)>void
 #unordered_set
+@unordered_set
 size()>size_t
 empty()>bool
 clear()>void
@@ -352,9 +384,13 @@ reserve(n)>void
 begin()>iterator
 end()>iterator
 #multimap:map
+@map
 #multiset:set
+@set
 #unordered_multimap:unordered_map
+@unordered_map
 #stack
+@stack
 push(value)>void
 emplace(...args)>reference
 pop()>void
@@ -362,6 +398,7 @@ top()>T
 size()>size_t
 empty()>bool
 #queue
+@queue
 push(value)>void
 emplace(...args)>reference
 pop()>void
@@ -370,6 +407,7 @@ back()>T
 size()>size_t
 empty()>bool
 #priority_queue
+@queue
 push(value)>void
 emplace(...args)>void
 pop()>void
@@ -377,12 +415,15 @@ top()>T
 size()>size_t
 empty()>bool
 #pair
+@utility
 first:T
 second:T
 swap(other)>void
 #tuple
+@tuple
 swap(other)>void
 #optional
+@optional
 has_value()>bool
 value()>T
 value_or(default_value)>T
@@ -390,13 +431,16 @@ reset()>void
 emplace(...args)>T
 operator_bool()>bool
 #variant
+@variant
 index()>size_t
 valueless_by_exception()>bool
 #any
+@any
 has_value()>bool
 type()>type_info
 reset()>void
 #bitset
+@bitset
 set(pos, value)>bitset
 reset(pos)>bitset
 flip(pos)>bitset
@@ -409,6 +453,7 @@ all()>bool
 to_string()>string
 to_ulong()>unsigned long
 #span
+@span
 size()>size_t
 empty()>bool
 data()>T
@@ -420,12 +465,14 @@ subspan(offset, count)>span
 begin()>iterator
 end()>iterator
 #unique_ptr
+@memory
 get()>T
 release()>T
 reset(ptr)>void
 swap(other)>void
 operator_bool()>bool
 #shared_ptr
+@memory
 get()>T
 reset(ptr)>void
 use_count()>long
@@ -433,15 +480,18 @@ unique()>bool
 swap(other)>void
 operator_bool()>bool
 #weak_ptr
+@memory
 lock()>shared_ptr
 expired()>bool
 use_count()>long
 reset()>void
 #function
+@functional
 operator_bool()>bool
 swap(other)>void
 target()>T
 #thread
+@thread
 join()>void
 detach()>void
 joinable()>bool
@@ -449,31 +499,39 @@ get_id()>id
 hardware_concurrency()>unsigned
 swap(other)>void
 #this_thread
+@thread
 sleep_for(duration)>void
 sleep_until(time)>void
 yield()>void
 get_id()>id
 #mutex
+@mutex
 lock()>void
 unlock()>void
 try_lock()>bool
 #recursive_mutex:mutex
+@mutex
 #shared_mutex:mutex
+@shared_mutex
 lock_shared()>void
 unlock_shared()>void
 #lock_guard
+@mutex
 #unique_lock
+@mutex
 lock()>void
 unlock()>void
 try_lock()>bool
 owns_lock()>bool
 release()>mutex
 #condition_variable
+@condition_variable
 wait(lock, pred)>void
 wait_for(lock, rel_time, pred)>bool
 notify_one()>void
 notify_all()>void
 #atomic
+@atomic
 load(order)>T
 store(desired, order)>void
 exchange(desired, order)>T
@@ -482,15 +540,18 @@ compare_exchange_weak(expected, desired)>bool
 fetch_add(arg, order)>T
 fetch_sub(arg, order)>T
 #future
+@future
 get()>T
 wait()>void
 valid()>bool
 wait_for(rel_time)>future_status
 #promise
+@future
 get_future()>future
 set_value(value)>void
 set_exception(p)>void
 #chrono
+@chrono
 now()>time_point
 duration_cast(d)>duration
 milliseconds(count)>duration
@@ -503,22 +564,28 @@ steady_clock:steady_clock
 system_clock:system_clock
 high_resolution_clock:high_resolution_clock
 #steady_clock
+@chrono
 now()>time_point
 #system_clock
+@chrono
 now()>time_point
 to_time_t(t)>time_t
 from_time_t(t)>time_point
 #duration
+@chrono
 count()>long
 #time_point
+@chrono
 time_since_epoch()>duration
 #ios_base
+@ios
 precision(prec)>streamsize
 width(wide)>streamsize
 flags(fmtfl)>fmtflags
 setf(fmtfl)>fmtflags
 unsetf(mask)>void
 #ios:ios_base
+@ios
 good()>bool
 fail()>bool
 eof()>bool
@@ -530,6 +597,7 @@ operator_bool()>bool
 rdbuf()>streambuf
 tie(tiestr)>ostream
 #istream:ios
+@istream
 get()>int
 getline(s, count, delim)>istream
 read(s, count)>istream
@@ -541,31 +609,40 @@ gcount()>streamsize
 seekg(pos)>istream
 tellg()>streampos
 #ostream:ios
+@ostream
 put(c)>ostream
 write(s, count)>ostream
 flush()>ostream
 seekp(pos)>ostream
 tellp()>streampos
 #iostream:ostream
+@iostream
 #ifstream:istream
+@fstream
 open(filename, mode)>void
 close()>void
 is_open()>bool
 #ofstream:ostream
+@fstream
 open(filename, mode)>void
 close()>void
 is_open()>bool
 #fstream:iostream
+@fstream
 open(filename, mode)>void
 close()>void
 is_open()>bool
 #stringstream:iostream
+@sstream
 str()>string
 #istringstream:istream
+@sstream
 str()>string
 #ostringstream:ostream
+@sstream
 str()>string
 #filesystem
+@filesystem
 exists(p)>bool
 is_directory(p)>bool
 is_regular_file(p)>bool
@@ -583,6 +660,7 @@ canonical(p)>path
 directory_iterator:directory_iterator
 recursive_directory_iterator:recursive_directory_iterator
 #path
+@filesystem
 string()>string
 filename()>path
 stem()>path
@@ -599,22 +677,36 @@ replace_extension(replacement)>path
 append(p)>path
 c_str()>char
 #exception
+@exception
 what()>char
 #runtime_error:exception
+@stdexcept
 #logic_error:exception
+@stdexcept
 #invalid_argument:logic_error
+@stdexcept
 #out_of_range:logic_error
+@stdexcept
 #length_error:logic_error
+@stdexcept
 #domain_error:logic_error
+@stdexcept
 #range_error:runtime_error
+@stdexcept
 #overflow_error:runtime_error
+@stdexcept
 #underflow_error:runtime_error
+@stdexcept
 #bad_alloc:exception
+@new
 #bad_cast:exception
+@typeinfo
 #regex
+@regex
 mark_count()>unsigned
 flags()>flag_type
 #smatch
+@regex
 str(n)>string
 size()>size_t
 empty()>bool
@@ -624,21 +716,26 @@ position(n)>difference_type
 length(n)>difference_type
 ready()>bool
 #random_device
+@random
 entropy()>double
 #mt19937
+@random
 seed(value)>void
 min()>result_type
 max()>result_type
 discard(z)>void
 #uniform_int_distribution
+@random
 min()>T
 max()>T
 reset()>void
 #uniform_real_distribution
+@random
 min()>T
 max()>T
 reset()>void
 #numeric_limits
+@limits
 max()>T
 min()>T
 lowest()>T
@@ -646,6 +743,7 @@ epsilon()>T
 infinity()>T
 quiet_NaN()>T
 #initializer_list
+@initializer_list
 size()>size_t
 begin()>iterator
 end()>iterator

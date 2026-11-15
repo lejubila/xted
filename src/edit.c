@@ -1145,11 +1145,27 @@ static void add_use(Editor *e, const char *fq)
         e->cy += added;
 }
 
+/* 1 if two names are the same header: cstdio and stdio.h are. */
+static int same_header(const char *a, const char *b)
+{
+    size_t la = strlen(a), lb = strlen(b);
+
+    if (strcmp(a, b) == 0)
+        return 1;
+    if (la > 2 && a[0] == 'c' && lb > 2 && strcmp(b + lb - 2, ".h") == 0 && la - 1 == lb - 2 &&
+        memcmp(a + 1, b, lb - 2) == 0)
+        return 1;
+    if (lb > 2 && b[0] == 'c' && la > 2 && strcmp(a + la - 2, ".h") == 0 && lb - 1 == la - 2 &&
+        memcmp(b + 1, a, la - 2) == 0)
+        return 1;
+    return 0;
+}
+
 int edit_add_include(Editor *e, const char *hdr)
 {
     const Buffer *b = e->buf;
     size_t lim = b->nlines < 400 ? b->nlines : 400, y, first_sys = (size_t)-1, last_sys = 0;
-    size_t first_loc = (size_t)-1, ins = (size_t)-1, at, top = 0, hl = strlen(hdr), added = 0;
+    size_t first_loc = (size_t)-1, ins = (size_t)-1, at, top = 0, added = 0;
     int sorted = 1, in_comment = 0, top_done = 0;
     char prev[80] = "", pre[2] = "", post[2] = "";
     SBuf text = SBUF_INIT;
@@ -1177,7 +1193,7 @@ int edit_add_include(Editor *e, const char *hdr)
                 for (q++; q + nl < end && q[nl] != close && nl < sizeof name - 1; nl++)
                     name[nl] = q[nl];
                 name[nl] = '\0';
-                if (nl == hl && memcmp(name, hdr, hl) == 0)
+                if (same_header(name, hdr) || strcmp(name, "bits/stdc++.h") == 0)
                     return 0;                       /* already there (either way) */
                 if (sys) {
                     if (first_sys == (size_t)-1)

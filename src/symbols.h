@@ -85,6 +85,8 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
                 SymFn fn, void *ctx);
 /* Functions, classes, constants and variables visible from cur: the file, the open documents,
  * the files it includes, the standard library. */
+/* 1 if the document is C++ rather than C (by its extension, or by what it includes and uses). */
+int sym_is_cxx(const Doc *d);
 void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn, void *ctx);
 
 /* PHP: the classes of the project that can be imported with "use": config/app.php aliases, then

@@ -2096,24 +2096,28 @@ static void accept_cand(Editor *e)
  * file does not include: copied to out; returns 1 if there is one. */
 static int c_include_for(const Editor *e, const Cand *c, char *out, size_t n)
 {
-    StdLib *l;
-    const char *h;
-    size_t hl = 0;
+    static const char *const libs[] = { "cpp", "c" };
+    size_t hl = 0, k;
 
     if (!c->std || !e->doc->syn || strcmp(syn_name(e->doc->syn), "C") != 0 ||
         (c->kind != CAND_FUNC && c->kind != CAND_CONST && c->kind != CAND_CLASS && c->kind != CAND_PROP))
         return 0;
-    l = std_open("c");
-    if (!l)
-        return 0;
-    h = std_header(l, c->text, strlen(c->text), &hl);
-    if (h && hl > 0 && hl < n) {
-        memcpy(out, h, hl);
-        out[hl] = '\0';
-    } else {
-        hl = 0;
+    /* a C++ document: the C++ library first (<cstdio>, <vector>), then the C one */
+    for (k = sym_is_cxx(e->doc) ? 0 : 1; k < 2 && hl == 0; k++) {
+        StdLib *l = std_open(libs[k]);
+        const char *h;
+
+        if (!l)
+            continue;
+        h = std_header(l, c->text, strlen(c->text), &hl);
+        if (h && hl > 0 && hl < n) {
+            memcpy(out, h, hl);
+            out[hl] = '\0';
+        } else {
+            hl = 0;
+        }
+        std_close(l);
     }
-    std_close(l);
     return hl > 0;
 }
 

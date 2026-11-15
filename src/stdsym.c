@@ -279,8 +279,9 @@ const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl)
         const char *cur = NULL;
         size_t cl = 0;
 
-        if (s->nl != 0) {
-            /* a type: its header is the first line of the section */
+        if (s->nl != 0 && !(s->nl == 3 && memcmp(l->text + s->name, "std", 3) == 0)) {
+            /* a type: its header is the first line of the section (the section "std" of the C++
+             * list holds the functions of the namespace, in groups like the global one) */
             if (s->nl == nl && memcmp(l->text + s->name, name, nl) == 0 && s->from < s->to &&
                 l->text[s->from] == '@') {
                 size_t e = s->from;

@@ -4302,6 +4302,18 @@ static void test_c_include(void)
           "#include <string.h>", 3, "" },
         { "g.c", "#include <stdio.h>\n\nint main(void)\n{\n    \n}\n", "prin", 4, 4, NULL, 0, NULL },
         { "h.py", "def f():\n    \n", "strle", 1, 4, NULL, 0, NULL },
+        /* C++: its own library first, so <cstdio> and <vector>; a C file keeps <stdio.h> */
+        { "i.cpp", "#include <iostream>\n\nint main()\n{\n    \n}\n", "vecto", 4, 4,
+          "#include <vector>", 1, "#include <iostream>" },
+        { "j.cpp", "#include <vector>\n\nint main()\n{\n    \n}\n", "stable_so", 4, 4,
+          "#include <algorithm>", 0, "" },
+        { "k.cpp", "#include <memory>\n\nint main()\n{\n    \n}\n", "snprin", 4, 4,
+          "#include <cstdio>", 0, "" },
+        { "l.cpp", "#include <stdio.h>\n\nint main()\n{\n    \n}\n", "snprin", 4, 4, NULL, 0, NULL },
+        { "m.cpp", "#include <bits/stdc++.h>\n\nint main()\n{\n    \n}\n", "vecto", 4, 4, NULL, 0, NULL },
+        { "n.cpp", "#include <cstring>\n\nint main()\n{\n    \n}\n", "strle", 4, 4, NULL, 0, NULL },
+        { "o.c", "#include <stdlib.h>\n\nint main(void)\n{\n    \n}\n", "snprin", 4, 4,
+          "#include <stdio.h>", 0, "" },
     };
 
     CHECK(make_dir(dir, sizeof dir) != NULL);
@@ -4325,6 +4337,13 @@ static void test_c_include(void)
         if (e.comp.on)
             kkey(&e, KEY_ENTER, 0);
         if (t[i].line) {
+            if (!(e.buf->nlines >= nl0 + 1 && line_is(e.buf, t[i].at, t[i].line))) {
+                size_t q2;
+
+                fprintf(stderr, "%s:\n", t[i].file);
+                for (q2 = 0; q2 < e.buf->nlines; q2++)
+                    fprintf(stderr, "  | %.*s\n", (int)e.buf->lines[q2].len, e.buf->lines[q2].s);
+            }
             CHECK(e.buf->nlines >= nl0 + 1 && line_is(e.buf, t[i].at, t[i].line));
             CHECK(strcmp(t[i].after, "") == 0 || line_is(e.buf, t[i].at - 1, t[i].after));
             if (strcmp(t[i].file, "e.c") == 0)
@@ -4336,6 +4355,14 @@ static void test_c_include(void)
             edit_undo(&e);
             CHECK(e.buf->nlines == nl0 && line_is(e.buf, 0, strncmp(t[i].text, "#include <stdio", 14) == 0
                                                            ? "#include <stdio.h>"
+                                                           : strncmp(t[i].text, "#include <iostream>", 19) == 0
+                                                           ? "#include <iostream>"
+                                                           : strncmp(t[i].text, "#include <vector>", 17) == 0
+                                                           ? "#include <vector>"
+                                                           : strncmp(t[i].text, "#include <memory>", 17) == 0
+                                                           ? "#include <memory>"
+                                                           : strncmp(t[i].text, "#include <stdlib", 15) == 0
+                                                           ? "#include <stdlib.h>"
                                                            : strncmp(t[i].text, "/*", 2) == 0 ? "/* a program */"
                                                            : strncmp(t[i].text, "#ifndef", 7) == 0 ? "#ifndef X"
                                                            : "#include \"mine.h\""));

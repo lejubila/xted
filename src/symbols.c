@@ -1495,7 +1495,7 @@ static StdLib *lib_get(SymCache *c, int id)
     return c->lib[id];
 }
 
-static int looks_cxx(const Doc *d)
+int sym_is_cxx(const Doc *d)
 {
     static const char *const cxx[] = { "cc", "cpp", "cxx", "hpp", "hh", "hxx", "c++", NULL };
     const char *ext = ext_of(d->buf.path);
@@ -1559,7 +1559,7 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
     } else if (strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0) {
         e->lib[e->nlib++] = lib_get(c, LIB_JS);
     } else if (strcmp(lang, "C") == 0) {
-        if (looks_cxx(cur))
+        if (sym_is_cxx(cur))
             e->lib[e->nlib++] = lib_get(c, LIB_CPP);
         e->lib[e->nlib++] = lib_get(c, LIB_C);
     }
