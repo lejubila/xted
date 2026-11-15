@@ -21,7 +21,8 @@ typedef struct {
     unsigned set;               /* CFG_*: given by the user, not a default (config_lang) */
 } LangCfg;
 
-enum { CFG_TAB_WIDTH = 1, CFG_EXPAND_TAB = 2, CFG_INDENT_WIDTH = 4, CFG_TRIM = 8, CFG_FINAL_NL = 16 };
+enum { CFG_TAB_WIDTH = 1, CFG_EXPAND_TAB = 2, CFG_INDENT_WIDTH = 4, CFG_TRIM = 8, CFG_FINAL_NL = 16,
+       CFG_AUTOSUGGEST = 32, CFG_AUTOPAIR = 64, CFG_SUGGEST_MIN = 128 };
 
 typedef struct {
     char *name;                 /* language name, lower case */
@@ -58,8 +59,12 @@ void config_error(Config *c, int line, const char *msg);
 char *config_dir(void);
 /* Reads dir/config if it exists. Returns 1 if a file was read. */
 int config_load(Config *c, const char *dir);
+/* The same for any file (a project's .xted). */
+int config_load_file(Config *c, const char *path);
 /* The settings that apply to a language (any case; NULL = plain text): the defaults, then the
  * top-level values, then the language's own section. */
 LangCfg config_lang(const Config *c, const char *lang);
+/* Copies into d the values that s has set explicitly (s->set), over what d has. */
+void config_merge(LangCfg *d, const LangCfg *s);
 
 #endif

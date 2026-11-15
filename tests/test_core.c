@@ -3,6 +3,7 @@
 #include "commands.h"
 #include "config.h"
 #include "cursors.h"
+#include "cfgsave.h"
 #include "complete.h"
 #include "doc.h"
 #include "editorconfig.h"
@@ -3952,6 +3953,139 @@ static void test_app_dir(void)
     unsetenv("XDG_CONFIG_HOME");
 }
 
+/* The whole file as a string (static buffer), "" if it cannot be read. */
+static const char *slurp_file(const char *path)
+{
+    static char buf[4096];
+    FILE *f = fopen(path, "r");
+    size_t n = 0;
+
+    if (f) {
+        n = fread(buf, 1, sizeof buf - 1, f);
+        fclose(f);
+    }
+    buf[n] = '\0';
+    return buf;
+}
+
+static void test_cfgsave(void)
+{
+    char dir[64], file[200], err[200], used[200];
+    CfgPair p2[2] = { { "expand_tab", "true" }, { "indent_width", "4" } };
+    CfgPair p1[1] = { { "theme", "Chiaro" } };
+    char *pr;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    /* a new file, in a folder that does not exist yet */
+    snprintf(file, sizeof file, "%s/new/xted/config", dir);
+    CHECK(cfgsave_write(file, "Python", p2, 2, err, sizeof err) == 0);
+    CHECK(strcmp(slurp_file(file), "[Python]\nexpand_tab = true\nindent_width = 4\n") == 0);
+    CHECK(cfgsave_write(file, NULL, p1, 1, err, sizeof err) == 0);       /* top level goes first */
+    CHECK(strcmp(slurp_file(file), "theme = Chiaro\n[Python]\nexpand_tab = true\nindent_width = 4\n") == 0);
+
+    /* comments, order and unknown lines stay; a key that is there is replaced in place */
+    put_file(dir, "c1",
+             "# my settings\n"
+             "mouse = off\n"
+             "\n"
+             "[Python]\n"
+             "# four\n"
+             "indent_width = 8\n"
+             "weird line\n"
+             "\n"
+             "[keys]\n"
+             "ctrl+s = save\n");
+    snprintf(file, sizeof file, "%s/c1", dir);
+    CHECK(cfgsave_write(file, "python", p2, 2, err, sizeof err) == 0);
+    CHECK(strcmp(slurp_file(file),
+                 "# my settings\nmouse = off\n\n[Python]\n# four\nindent_width = 4\nweird line\n"
+                 "expand_tab = true\n\n[keys]\nctrl+s = save\n") == 0);
+    CHECK(cfgsave_write(file, NULL, p1, 1, err, sizeof err) == 0);
+    CHECK(strstr(slurp_file(file), "# my settings\nmouse = off\ntheme = Chiaro\n\n[Python]") != NULL);
+    CHECK(cfgsave_write(file, "PHP", p2, 1, err, sizeof err) == 0);       /* a new section at the end */
+    CHECK(strstr(slurp_file(file), "ctrl+s = save\n\n[PHP]\nexpand_tab = true\n") != NULL);
+
+    /* a folder that cannot be written is reported, and nothing is left behind */
+    CHECK(cfgsave_write("/proc/xted-no/config", NULL, p1, 1, err, sizeof err) == -1 && err[0]);
+
+    /* project files */
+    snprintf(file, sizeof file, "%s/proj", dir);
+    CHECK(mkdir(file, 0700) == 0);
+    snprintf(file, sizeof file, "%s/proj/.git", dir);
+    CHECK(mkdir(file, 0700) == 0);
+    snprintf(file, sizeof file, "%s/proj/src", dir);
+    CHECK(mkdir(file, 0700) == 0);
+    snprintf(file, sizeof file, "%s/proj/src/a.py", dir);
+    pr = cfgsave_find_project(file);
+    CHECK(pr == NULL);
+    pr = cfgsave_project_root(file);
+    snprintf(used, sizeof used, "%s/proj", dir);
+    CHECK(pr && strcmp(pr, used) == 0);
+    free(pr);
+    snprintf(file, sizeof file, "%s/proj/.xted", dir);
+    CHECK(cfgsave_write(file, NULL, p2, 1, err, sizeof err) == 0);
+    snprintf(file, sizeof file, "%s/proj/src/a.py", dir);
+    pr = cfgsave_find_project(file);
+    snprintf(used, sizeof used, "%s/proj/.xted", dir);
+    CHECK(pr && strcmp(pr, used) == 0);
+    free(pr);
+
+    /* .editorconfig: none yet, so one is created in the project folder with root = true */
+    snprintf(file, sizeof file, "%s/proj/src/a.py", dir);
+    CHECK(cfgsave_editorconfig(file, p2, 2, used, sizeof used, err, sizeof err) == 2);
+    snprintf(file, sizeof file, "%s/proj/.editorconfig", dir);
+    CHECK(strcmp(used, file) == 0);
+    CHECK(strcmp(slurp_file(file), "root = true\n\n[*.py]\nindent_style = space\nindent_size = 4\n") == 0);
+    /* a key unknown to .editorconfig is skipped */
+    snprintf(file, sizeof file, "%s/proj/src/a.py", dir);
+    CHECK(cfgsave_editorconfig(file, p1, 1, used, sizeof used, err, sizeof err) == 0);
+
+    /* an existing file: the last matching section that has the key is the one changed */
+    put_file(dir, "proj/.editorconfig",
+             "root = true\n\n[*]\nindent_style = tab\nindent_size = 8\n\n[*.py]\nindent_size = 2\n\n"
+             "[*.md]\nindent_size = 3\n");
+    snprintf(file, sizeof file, "%s/proj/src/a.py", dir);
+    CHECK(cfgsave_editorconfig(file, p2, 2, used, sizeof used, err, sizeof err) == 2);
+    snprintf(file, sizeof file, "%s/proj/.editorconfig", dir);
+    CHECK(strcmp(slurp_file(file),
+                 "root = true\n\n[*]\nindent_style = tab\nindent_size = 8\n\n"
+                 "[*.py]\nindent_size = 4\nindent_style = space\n\n[*.md]\nindent_size = 3\n") == 0);
+    /* the nearest .editorconfig is the one written (a deeper file wins over the root) */
+    put_file(dir, "proj/src/.editorconfig", "[*.js]\nindent_size = 2\n");
+    snprintf(file, sizeof file, "%s/proj/src/a.py", dir);
+    CHECK(cfgsave_editorconfig(file, p2, 1, used, sizeof used, err, sizeof err) == 1);
+    snprintf(file, sizeof file, "%s/proj/src/.editorconfig", dir);
+    CHECK(strcmp(used, file) == 0 &&
+          strcmp(slurp_file(file), "[*.js]\nindent_size = 2\n\n[*.py]\nindent_style = space\n") == 0);
+}
+
+/* A project's settings go over the user's: only what the project file says explicitly. */
+static void test_config_merge(void)
+{
+    Config user, proj;
+    LangCfg l, pl;
+
+    config_init(&user);
+    config_init(&proj);
+    {
+        const char *u = "expand_tab = off\ntab_width = 4\n[Python]\nindent_width = 2\n";
+        const char *p = "expand_tab = on\n[Python]\nautopair = off\n";
+
+        config_parse(&user, u, strlen(u));
+        config_parse(&proj, p, strlen(p));
+    }
+    l = config_lang(&user, "Python");
+    pl = config_lang(&proj, "Python");
+    CHECK((pl.set & CFG_EXPAND_TAB) && (pl.set & CFG_AUTOPAIR) && !(pl.set & CFG_TAB_WIDTH));
+    config_merge(&l, &pl);
+    CHECK(l.expand_tab == 1 && l.autopair == 0);                 /* the project's values */
+    CHECK(l.tab_width == 4 && l.indent_width == 2);              /* the user's, untouched */
+    CHECK((l.set & (CFG_EXPAND_TAB | CFG_AUTOPAIR | CFG_TAB_WIDTH | CFG_INDENT_WIDTH)) ==
+          (CFG_EXPAND_TAB | CFG_AUTOPAIR | CFG_TAB_WIDTH | CFG_INDENT_WIDTH));
+    config_free(&user);
+    config_free(&proj);
+}
+
 static void test_scan_steps(void)
 {
     char dir[64], path[256], err[128];
@@ -4465,6 +4599,8 @@ int main(void)
     test_laravel();
     test_scan_steps();
     test_app_dir();
+    test_cfgsave();
+    test_config_merge();
     test_snippets();
     test_cursors();
     test_folding();

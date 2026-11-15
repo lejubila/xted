@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "edit.h"
+#include "cfgsave.h"
 #include "commands.h"
 #include "config.h"
 #include "editorconfig.h"
@@ -14,6 +15,7 @@
 #include "utf8.h"
 #include "util.h"
 
+#include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -229,6 +231,7 @@ void editor_free(Editor *e)
         doc_free(e->docs[i]);
     free(e->docs);
     files_scan_free(e->fscan);
+    free(e->dests);
     picker_free(&e->picker);
     free(e->outline);
     find_free(e);
@@ -274,16 +277,39 @@ static int is_blank_doc(const Doc *d)
     return !d->buf.path && !d->buf.modified && d->buf.nlines == 1 && d->buf.lines[0].len == 0;
 }
 
+/* What the .xted of the document's project says for its language; 0 if there is none. */
+static int project_lang(const Doc *d, LangCfg *out)
+{
+    Config c;
+    char *f;
+
+    if (d->scratch || !d->buf.path || !(f = cfgsave_find_project(d->buf.path)))
+        return 0;
+    config_init(&c);
+    config_load_file(&c, f);
+    *out = config_lang(&c, d->syn ? syn_name(d->syn) : NULL);
+    config_free(&c);
+    free(f);
+    return 1;
+}
+
 /* The settings of the language the document turned out to be in. */
 static void apply_cfg(Editor *e, Doc *d)
 {
-    LangCfg l = config_lang(&e->cfg, d->syn ? syn_name(d->syn) : NULL);
+    LangCfg l = config_lang(&e->cfg, d->syn ? syn_name(d->syn) : NULL), pl;
     EcProps ec;
-    int tabw = l.tab_width, expand = l.expand_tab, iw = l.indent_width;
-    int trim = l.trim_trailing_space, final_nl = l.final_newline;
+    int tabw, expand, iw, trim, final_nl;
 
-    /* what the user asked for in the configuration wins, then .editorconfig, then the style
-     * the file has, then the defaults; a command given in this session wins over all */
+    /* what the project's .xted says wins over the user's configuration, which wins over
+     * .editorconfig, then the style the file has, then the defaults; a command given in this
+     * session wins over all */
+    if (project_lang(d, &pl))
+        config_merge(&l, &pl);
+    tabw = l.tab_width;
+    expand = l.expand_tab;
+    iw = l.indent_width;
+    trim = l.trim_trailing_space;
+    final_nl = l.final_newline;
     if (d->det.set && !(l.set & CFG_EXPAND_TAB)) {
         expand = d->det.expand;
         if (!(l.set & CFG_INDENT_WIDTH) && d->det.expand)
@@ -315,8 +341,8 @@ static void apply_cfg(Editor *e, Doc *d)
     d->indent_w = iw > 0 ? iw : tabw;
     d->trim_space = trim;
     d->final_nl = final_nl;
-    d->autosuggest = l.autosuggest;
-    d->autopair = l.autopair;
+    d->autosuggest = d->man_sug ? d->man_sug == 1 : l.autosuggest;
+    d->autopair = d->man_pair ? d->man_pair == 1 : l.autopair;
     d->suggest_min = l.suggest_min;
     if (d == e->doc)
         e->tabw = d->tabw;
@@ -1298,6 +1324,8 @@ static void cmd_quick_open(Editor *e)
     files_scan_pump(e);
 }
 
+static void save_settings_to(Editor *e, size_t idx);
+
 static void picker_accept(Editor *e)
 {
     long idx = picker_chosen(&e->picker);
@@ -1311,6 +1339,8 @@ static void picker_accept(Editor *e)
             switch_doc(e, e->docs[idx]);
     } else if (kind == PK_RESULTS) {
         find_open_result(e, (size_t)idx);
+    } else if (kind == PK_SAVECFG) {
+        save_settings_to(e, (size_t)idx);
     } else if (kind == PK_SYMBOLS) {
         if ((size_t)idx < e->noutline && e->outline[2 * idx] < e->buf->nlines) {
             buf_undo_close(e->buf);
@@ -2288,6 +2318,7 @@ void editor_cmd_theme(Editor *e)
 {
     e->theme_idx++;
     e->theme = theme_get(e->theme_idx);
+    e->pend |= PEND_THEME;
     render_invalidate(e->render);
     editor_set_msg(e, MSG_TTL_MS, "Tema: %s", e->theme->name);
 }
@@ -2343,8 +2374,296 @@ void editor_cmd_equalize(Editor *e)
 void editor_cmd_toggle_mouse(Editor *e)
 {
     e->mouse_on = !e->mouse_on;
+    e->pend |= PEND_MOUSE;
     term_mouse(e->mouse_on);
     editor_set_msg(e, MSG_TTL_MS, e->mouse_on ? "Mouse attivo" : "Mouse disattivato");
+}
+
+/* ---- switches and saving the settings ----------------------------------- */
+
+static void apply_all(Editor *e)
+{
+    size_t i;
+
+    for (i = 0; i < e->ndocs; i++)
+        apply_cfg(e, e->docs[i]);
+    render_invalidate(e->render);
+}
+
+void editor_cmd_toggle_autosuggest(Editor *e)
+{
+    e->doc->man_sug = e->doc->autosuggest ? 2 : 1;
+    apply_cfg(e, e->doc);
+    editor_set_msg(e, MSG_TTL_MS, "Autosuggest %s", e->doc->autosuggest ? "attivo" : "disattivato");
+}
+
+void editor_cmd_toggle_autopair(Editor *e)
+{
+    e->doc->man_pair = e->doc->autopair ? 2 : 1;
+    apply_cfg(e, e->doc);
+    editor_set_msg(e, MSG_TTL_MS, "Coppie automatiche %s", e->doc->autopair ? "attive" : "disattivate");
+}
+
+void editor_cmd_toggle_git(Editor *e)
+{
+    size_t i, k;
+
+    e->cfg.git = e->cfg.git == 0 ? 1 : 0;
+    e->pend |= PEND_GIT;
+    for (i = 0; i < e->ndocs; i++) {
+        Doc *d = e->docs[i];
+
+        if (e->cfg.git) {
+            e->git_off = 0;
+            git_refresh_doc(e, d);
+        } else {
+            for (k = 0; k < d->buf.nlines; k++)
+                d->buf.lines[k].git = GIT_NONE;
+            d->gutter = 0;
+        }
+    }
+    relayout(e);
+    editor_set_msg(e, MSG_TTL_MS, "Indicatori Git %s", e->cfg.git ? "attivi" : "disattivati");
+}
+
+void editor_cmd_toggle_clipboard(Editor *e)
+{
+    e->clipboard_osc52 = !e->clipboard_osc52;
+    e->pend |= PEND_CLIP;
+    editor_set_msg(e, MSG_TTL_MS, "Appunti di sistema %s", e->clipboard_osc52 ? "attivi" : "disattivati");
+}
+
+/* What was changed with commands and could be saved: the keys of the document's language (with the
+ * CFG_* bits they stand for) and the global ones. */
+typedef struct {
+    CfgPair lp[6], gp[4];
+    char val[6][16];
+    size_t nl, ng;
+    unsigned mask;
+} Pending;
+
+static void add_lang(Pending *p, const char *key, const char *val, unsigned bit)
+{
+    snprintf(p->val[p->nl], sizeof p->val[0], "%s", val);
+    p->lp[p->nl].key = key;
+    p->lp[p->nl].value = p->val[p->nl];
+    p->nl++;
+    p->mask |= bit;
+}
+
+static void pending_get(const Editor *e, Pending *p)
+{
+    const Doc *d = e->doc;
+    char num[16];
+
+    memset(p, 0, sizeof *p);
+    if (d->man.set) {
+        add_lang(p, "expand_tab", d->man.expand ? "true" : "false", CFG_EXPAND_TAB);
+        snprintf(num, sizeof num, "%d", d->man.expand ? d->man.width : d->man.tabw);
+        if (d->man.expand && d->man.width > 0)
+            add_lang(p, "indent_width", num, CFG_INDENT_WIDTH);
+        else if (!d->man.expand && d->man.tabw > 0)
+            add_lang(p, "tab_width", num, CFG_TAB_WIDTH);
+    }
+    if (d->man_sug)
+        add_lang(p, "autosuggest", d->man_sug == 1 ? "true" : "false", CFG_AUTOSUGGEST);
+    if (d->man_pair)
+        add_lang(p, "autopair", d->man_pair == 1 ? "true" : "false", CFG_AUTOPAIR);
+    if (e->pend & PEND_THEME) {
+        p->gp[p->ng].key = "theme";
+        p->gp[p->ng++].value = e->theme->name;
+    }
+    if (e->pend & PEND_MOUSE) {
+        p->gp[p->ng].key = "mouse";
+        p->gp[p->ng++].value = e->mouse_on ? "true" : "false";
+    }
+    if (e->pend & PEND_GIT) {
+        p->gp[p->ng].key = "git";
+        p->gp[p->ng++].value = e->cfg.git ? "true" : "false";
+    }
+    if (e->pend & PEND_CLIP) {
+        p->gp[p->ng].key = "clipboard";
+        p->gp[p->ng++].value = e->clipboard_osc52 ? "true" : "false";
+    }
+}
+
+static void add_dest(Editor *e, int kind, int lang, const char *path, const char *what, const char *note)
+{
+    char item[PATH_MAX + 160], shown[PATH_MAX + 2];
+    const char *home = getenv("HOME"), *label = kind == DEST_USER ? "Utente" :
+                       kind == DEST_PROJECT ? "Progetto" : ".editorconfig";
+    size_t hl = home ? strlen(home) : 0;
+
+    if (hl > 1 && strncmp(path, home, hl) == 0 && path[hl] == '/')
+        snprintf(shown, sizeof shown, "~%s", path + hl);
+    else
+        snprintf(shown, sizeof shown, "%s", path);
+    /* what and note first: a long path is the part that may be cut */
+    snprintf(item, sizeof item, "%s%s%s%s%s  %s", label, what[0] ? " [" : "", what,
+             what[0] ? "]" : "", note, shown);
+    picker_add(&e->picker, item);
+    e->dests = xrealloc(e->dests, (e->ndests + 1) * sizeof *e->dests);
+    e->dests[e->ndests].kind = kind;
+    e->dests[e->ndests].lang = lang;
+    e->ndests++;
+}
+
+/* The file a .xted of the document's project is (or would be) at. */
+static char *project_file(const Doc *d)
+{
+    char *f = cfgsave_find_project(d->buf.path), *root;
+    size_t n;
+
+    if (f)
+        return f;
+    root = cfgsave_project_root(d->buf.path);
+    n = strlen(root) + 8;
+    f = xmalloc(n);
+    snprintf(f, n, "%s/.xted", root);
+    free(root);
+    return f;
+}
+
+void editor_cmd_save_settings(Editor *e)
+{
+    Pending p;
+    const Doc *d = e->doc;
+    const char *lang = d->syn ? syn_name(d->syn) : NULL;
+    const unsigned ec_bits = CFG_TAB_WIDTH | CFG_EXPAND_TAB | CFG_INDENT_WIDTH;
+    unsigned u_set = config_lang(&e->cfg, lang).set, p_set = 0;
+    int has_path = !d->scratch && d->buf.path != NULL, scope, nscope;
+    char what[80], note[160], keys[200] = "", *f;
+    size_t i;
+
+    pending_get(e, &p);
+    if (p.nl == 0 && p.ng == 0) {
+        editor_set_msg(e, MSG_TTL_MS, "Niente da salvare: cambia prima qualcosa (indentazione, tema, interruttori)");
+        return;
+    }
+    if (has_path) {
+        LangCfg pl;
+
+        if (project_lang(d, &pl))
+            p_set = pl.set;
+    }
+    free(e->dests);
+    e->dests = NULL;
+    e->ndests = 0;
+    picker_open(&e->picker, "Salva dove");
+    e->picker_kind = PK_SAVECFG;
+    nscope = p.nl > 0 && lang ? 2 : 1;
+    if (e->cfgdir) {
+        size_t n = strlen(e->cfgdir) + 8;
+
+        f = xmalloc(n);
+        snprintf(f, n, "%s/config", e->cfgdir);
+        for (scope = 0; scope < nscope; scope++) {
+            what[0] = '\0';
+            if (p.nl > 0)
+                snprintf(what, sizeof what, scope ? "solo %s" : "tutti i linguaggi", lang);
+            snprintf(note, sizeof note, "%s", p.nl > 0 && (p_set & p.mask) ?
+                     " (nel progetto vince il suo .xted)" : "");
+            add_dest(e, DEST_USER, scope, f, what, note);
+        }
+        free(f);
+    }
+    if (has_path && p.nl > 0) {
+        f = project_file(d);
+        for (scope = 0; scope < nscope; scope++) {
+            snprintf(what, sizeof what, scope ? "solo %s" : "tutti i linguaggi", lang);
+            add_dest(e, DEST_PROJECT, scope, f, what, p.ng ? " (senza tema, mouse, ...)" : "");
+        }
+        free(f);
+    }
+    if (has_path && (p.mask & ec_bits)) {
+        f = cfgsave_editorconfig_path(d->buf.path);
+        if ((u_set | p_set) & p.mask & ec_bits)
+            snprintf(note, sizeof note, " (ignorato: vince %s)",
+                     p_set & p.mask & ec_bits ? ".xted del progetto" : "il file utente");
+        else
+            snprintf(note, sizeof note, "%s", (p.mask & ~ec_bits) ? " (solo l'indentazione)" : "");
+        add_dest(e, DEST_EDITORCONFIG, 0, f, "", note);
+        free(f);
+    }
+    for (i = 0; i < p.nl; i++)
+        snprintf(keys + strlen(keys), sizeof keys - strlen(keys), "%s%s", i ? ", " : "", p.lp[i].key);
+    for (i = 0; i < p.ng; i++)
+        snprintf(keys + strlen(keys), sizeof keys - strlen(keys), "%s%s", p.nl || i ? ", " : "",
+                 p.gp[i].key);
+    if (e->ndests == 0) {
+        picker_close(&e->picker);
+        editor_set_msg(e, MSG_TTL_MS, "Nessuna destinazione disponibile per queste impostazioni");
+        return;
+    }
+    picker_filter(&e->picker);
+    editor_set_msg(e, MSG_TTL_MS, "Da salvare: %s", keys);
+}
+
+static void save_settings_to(Editor *e, size_t idx)
+{
+    Pending p;
+    Doc *d = e->doc;
+    const SaveDest *dst;
+    const char *lang = d->syn ? syn_name(d->syn) : NULL;
+    char err[240], file[PATH_MAX + 32], *f = NULL, keys[200] = "";
+    int r = 0;
+    size_t i;
+
+    if (idx >= e->ndests)
+        return;
+    dst = &e->dests[idx];
+    pending_get(e, &p);
+    file[0] = '\0';
+    err[0] = '\0';
+    if (dst->kind == DEST_USER) {
+        if (!e->cfgdir) {
+            editor_set_msg(e, MSG_TTL_MS, "Nessuna cartella di configurazione (HOME non impostata)");
+            return;
+        }
+        snprintf(file, sizeof file, "%s/config", e->cfgdir);
+        if (p.nl)
+            r = cfgsave_write(file, dst->lang ? lang : NULL, p.lp, p.nl, err, sizeof err);
+        if (r == 0 && p.ng)
+            r = cfgsave_write(file, NULL, p.gp, p.ng, err, sizeof err);
+    } else if (dst->kind == DEST_PROJECT) {
+        f = project_file(d);
+        snprintf(file, sizeof file, "%s", f);
+        free(f);
+        r = cfgsave_write(file, dst->lang ? lang : NULL, p.lp, p.nl, err, sizeof err);
+    } else {
+        r = cfgsave_editorconfig(d->buf.path, p.lp, p.nl, file, sizeof file, err, sizeof err);
+        if (r == 0) {
+            editor_set_msg(e, MSG_TTL_MS, ".editorconfig non può contenere queste impostazioni");
+            return;
+        }
+    }
+    if (r < 0) {
+        editor_set_msg(e, MSG_TTL_MS, "%s", err);
+        return;
+    }
+    for (i = 0; i < p.nl; i++)
+        if (dst->kind != DEST_EDITORCONFIG || strcmp(p.lp[i].key, "autosuggest") != 0)
+            snprintf(keys + strlen(keys), sizeof keys - strlen(keys), "%s%s", keys[0] ? ", " : "",
+                     p.lp[i].key);
+    if (dst->kind == DEST_EDITORCONFIG) {
+        d->man.set = 0;
+    } else {
+        d->man.set = 0;
+        d->man_sug = d->man_pair = 0;
+    }
+    if (dst->kind == DEST_USER) {
+        for (i = 0; i < p.ng; i++)
+            snprintf(keys + strlen(keys), sizeof keys - strlen(keys), "%s%s", keys[0] ? ", " : "",
+                     p.gp[i].key);
+        e->pend = 0;
+        if (e->cfgdir) {
+            config_free(&e->cfg);
+            config_init(&e->cfg);
+            config_load(&e->cfg, e->cfgdir);
+        }
+    }
+    apply_all(e);
+    editor_set_msg(e, MSG_TTL_MS, "Salvato in %s: %s", file, keys);
 }
 
 void editor_run(Editor *e)

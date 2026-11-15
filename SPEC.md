@@ -125,6 +125,8 @@ L'interfaccia è minimale ma informativa; tutto è configurabile da un file di t
 ### Configurazione
 
 - File `~/.config/xted/config` in formato chiave = valore, con override per linguaggio.
+- File `.xted` di progetto (nella cartella del progetto o sopra il file, il più vicino), stesso formato: le chiavi per linguaggio hanno la precedenza sul file utente. Ordine: comando scelto nella palette > `.xted` > file utente > `.editorconfig` > stile rilevato nel file > predefiniti.
+- **Salva le impostazioni…** (palette): scrive ciò che è stato cambiato con comandi (indentazione, tema, interruttori di autosuggest, coppie automatiche, mouse, Git, appunti di sistema) nel file scelto dall'utente: utente (sezione globale o del linguaggio), `.xted` di progetto (creato nella radice del progetto se manca) o `.editorconfig` (solo indentazione). Ogni destinazione indica se verrebbe ignorata da un file più forte. I file si modificano riga per riga, senza perdere commenti e ordine.
 - Scorciatoie da tastiera rimappabili.
 - Cartella `~/.config/xted/syntax/` per aggiungere linguaggi senza ricompilare.
 - Temi in `~/.config/xted/themes/`.

@@ -41,6 +41,7 @@ typedef struct Doc {
     int autosuggest;
     int autopair;
     int suggest_min;
+    int man_sug, man_pair;  /* switched with a command: 0 not, 1 on, 2 off (wins over the files) */
     char *title;            /* name shown instead of a file name (scratch documents) */
     int scratch;            /* not a file: never saved, kept out of sessions and exit checks */
     int disk_known;         /* mtime/size/ino describe the file as we read or wrote it */

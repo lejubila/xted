@@ -25,7 +25,17 @@
 #define MSG_TTL_MS 5000
 #define SIDEBAR_W 28
 
-enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS, PK_COMMANDS, PK_TAGS, PK_SYMBOLS };
+enum { PK_BUFFERS = 1, PK_FILES, PK_RESULTS, PK_COMMANDS, PK_TAGS, PK_SYMBOLS, PK_SAVECFG };
+
+/* Where "Salva le impostazioni" can write: a file kind, and whether the language keys go to the
+ * top level (all languages) or to the section of the document's language. */
+enum { DEST_USER, DEST_PROJECT, DEST_EDITORCONFIG };
+typedef struct {
+    int kind, lang;
+} SaveDest;
+
+/* Settings changed with a command in this session that are not tied to a document. */
+enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8 };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -118,6 +128,9 @@ typedef struct Editor {
     size_t nxc, xc_cap;
     int undo_hold;          /* inside cur_each: one undo group for all cursors */
     int picker_kind;        /* PK_* */
+    unsigned pend;          /* PEND_*: changed since they were last saved */
+    SaveDest *dests;        /* PK_SAVECFG: what each item of the list means */
+    size_t ndests;
     FScan *fscan;           /* PK_FILES: the walk of the project, still going on (else NULL) */
     size_t *outline;        /* PK_SYMBOLS: line and byte of each item (pairs) */
     size_t noutline;
@@ -246,6 +259,11 @@ void editor_cmd_indent_detect(Editor *e);
 void editor_cmd_redraw(Editor *e);
 void editor_cmd_git(Editor *e);
 void editor_cmd_toggle_mouse(Editor *e);
+void editor_cmd_toggle_autosuggest(Editor *e);
+void editor_cmd_toggle_autopair(Editor *e);
+void editor_cmd_toggle_git(Editor *e);
+void editor_cmd_toggle_clipboard(Editor *e);
+void editor_cmd_save_settings(Editor *e);
 void editor_cmd_resize_mode(Editor *e);
 void editor_cmd_equalize(Editor *e);
 /* Alt+X: the list of all commands. */

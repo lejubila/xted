@@ -318,19 +318,13 @@ char *config_dir(void)
     return NULL;
 }
 
-int config_load(Config *c, const char *dir)
+int config_load_file(Config *c, const char *path)
 {
-    char *path;
-    FILE *f;
+    FILE *f = fopen(path, "r");
     SBuf text = SBUF_INIT;
     char buf[4096];
     size_t n;
 
-    n = strlen(dir) + 8;
-    path = xmalloc(n);
-    snprintf(path, n, "%s/config", dir);
-    f = fopen(path, "r");
-    free(path);
     if (!f)
         return 0;
     while ((n = fread(buf, 1, sizeof buf, f)) > 0 && text.len < (1u << 20))
@@ -339,6 +333,18 @@ int config_load(Config *c, const char *dir)
     config_parse(c, text.p ? text.p : "", text.len);
     sbuf_free(&text);
     return 1;
+}
+
+int config_load(Config *c, const char *dir)
+{
+    size_t n = strlen(dir) + 8;
+    char *path = xmalloc(n);
+    int r;
+
+    snprintf(path, n, "%s/config", dir);
+    r = config_load_file(c, path);
+    free(path);
+    return r;
 }
 
 static void overlay(LangCfg *dst, const LangCfg *src)
@@ -363,12 +369,18 @@ static void overlay(LangCfg *dst, const LangCfg *src)
         dst->final_newline = src->final_newline;
         dst->set |= CFG_FINAL_NL;
     }
-    if (src->autosuggest >= 0)
+    if (src->autosuggest >= 0) {
         dst->autosuggest = src->autosuggest;
-    if (src->autopair >= 0)
+        dst->set |= CFG_AUTOSUGGEST;
+    }
+    if (src->autopair >= 0) {
         dst->autopair = src->autopair;
-    if (src->suggest_min >= 0)
+        dst->set |= CFG_AUTOPAIR;
+    }
+    if (src->suggest_min >= 0) {
         dst->suggest_min = src->suggest_min;
+        dst->set |= CFG_SUGGEST_MIN;
+    }
 }
 
 LangCfg config_lang(const Config *c, const char *lang)
@@ -395,4 +407,25 @@ LangCfg config_lang(const Config *c, const char *lang)
                 overlay(&out, &c->lang[i].c);
     }
     return out;
+}
+
+void config_merge(LangCfg *d, const LangCfg *s)
+{
+    if (s->set & CFG_TAB_WIDTH)
+        d->tab_width = s->tab_width;
+    if (s->set & CFG_EXPAND_TAB)
+        d->expand_tab = s->expand_tab;
+    if (s->set & CFG_INDENT_WIDTH)
+        d->indent_width = s->indent_width;
+    if (s->set & CFG_TRIM)
+        d->trim_trailing_space = s->trim_trailing_space;
+    if (s->set & CFG_FINAL_NL)
+        d->final_newline = s->final_newline;
+    if (s->set & CFG_AUTOSUGGEST)
+        d->autosuggest = s->autosuggest;
+    if (s->set & CFG_AUTOPAIR)
+        d->autopair = s->autopair;
+    if (s->set & CFG_SUGGEST_MIN)
+        d->suggest_min = s->suggest_min;
+    d->set |= s->set;
 }
