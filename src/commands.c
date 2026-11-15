@@ -147,6 +147,6 @@ int command_state(const Editor *e, int idx, char *val, size_t n)
     if (commands[idx].state >= ST_TABS)
         snprintf(val, n, "%s", on ? "attiva" : "");
     else
-        snprintf(val, n, "%s", on ? "attivo" : "non attivo");
+        snprintf(val, n, "%s", on ? "attivo" : "spento");
     return on;
 }

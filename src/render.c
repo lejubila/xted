@@ -20,6 +20,8 @@ struct Render {
     int ncols;
     int cur_r, cur_c;
     int need_clear;
+    const Theme *cur_theme;     /* the theme the cursor colour was set for */
+    int cur_depth;
     SBuf frame, row;
 };
 
@@ -121,6 +123,68 @@ static size_t fit_tail(SBuf *o, const char *s, size_t len, size_t maxcols)
     }
     emit_cp(o, 0x2026);
     return 1 + fit_cols(o, s + start, len - start, maxcols - 1);
+}
+
+/* The chrome (bars, lists) in the theme's own colours, so that it does not depend on the
+ * terminal's defaults: reverse video on a terminal whose colours do not match the theme gives
+ * bars that vanish into the text area. Without a theme background it stays reverse video. */
+static int themed(const Editor *e)
+{
+    return e->color_depth != COLOR_NONE && e->theme->has_bg;
+}
+
+static Rgb mix_rgb(Rgb a, Rgb b, int pct)
+{
+    Rgb r;
+
+    r.r = (unsigned char)((a.r * pct + b.r * (100 - pct)) / 100);
+    r.g = (unsigned char)((a.g * pct + b.g * (100 - pct)) / 100);
+    r.b = (unsigned char)((a.b * pct + b.b * (100 - pct)) / 100);
+    return r;
+}
+
+enum { BAR_ON, BAR_DIM, BAR_LIFT };
+
+/* A bar: the text colour as background with the background colour as text (the look of reverse
+ * video), dimmer for an inactive one, and BAR_LIFT for the active tab: the text area's colours. */
+static void bar(SBuf *o, const Editor *e, int mode)
+{
+    const Theme *t = e->theme;
+
+    if (!themed(e)) {
+        sbuf_adds(o, mode == BAR_ON ? "\x1b[7m" : mode == BAR_DIM ? "\x1b[7;2m" : "\x1b[27;1m");
+        return;
+    }
+    sbuf_adds(o, "\x1b[22m");
+    if (mode == BAR_LIFT) {
+        theme_bg(o, e->color_depth, t->bg);
+        theme_fg(o, e->color_depth, t->fg);
+        sbuf_adds(o, "\x1b[1m");
+    } else {
+        theme_bg(o, e->color_depth, mode == BAR_ON ? t->fg : mix_rgb(t->fg, t->bg, 55));
+        theme_fg(o, e->color_depth, t->bg);
+    }
+}
+
+/* Back to the text colour after a coloured word. */
+static void fg_back(SBuf *o, const Editor *e)
+{
+    if (themed(e))
+        theme_fg(o, e->color_depth, e->theme->fg);
+    else
+        sbuf_adds(o, "\x1b[39m");
+}
+
+/* The background of a list row: the popup colours (the highlighted one for the chosen row);
+ * without a theme background the chosen row is reverse video. */
+static void row_on(SBuf *o, const Editor *e, int sel)
+{
+    if (themed(e)) {
+        theme_bg(o, e->color_depth, sel ? e->theme->popup_sel : e->theme->popup);
+        theme_fg(o, e->color_depth, e->theme->fg);
+    } else if (sel) {
+        sbuf_adds(o, "\x1b[7m");
+    }
 }
 
 /* Turns reverse video on or off, only emitting it on a change. */
@@ -591,12 +655,15 @@ static void tab_row(SBuf *o, const Editor *e)
     char label[300];
 
     start = tab_widths(e, wd);
-    sbuf_adds(o, "\x1b[7m");
+    bar(o, e, BAR_ON);
     for (i = start; i < e->ndocs && used < cols; i++) {
         int on = e->docs[i] == e->doc;
 
         tab_label(e, i, label, sizeof label);
-        sbuf_adds(o, on ? "\x1b[27;1m" : "\x1b[22;7m");
+        if (on)
+            bar(o, e, BAR_LIFT);
+        else
+            bar(o, e, BAR_ON);
         used += 1;
         sbuf_adds(o, " ");
         used += fit_cols(o, label, strlen(label), wd[i] - 2 < cols - used ? wd[i] - 2 : cols - used);
@@ -605,7 +672,7 @@ static void tab_row(SBuf *o, const Editor *e)
             used++;
         }
     }
-    sbuf_adds(o, "\x1b[22;7m");
+    bar(o, e, BAR_ON);
     spaces(o, cols - used);
     sbuf_adds(o, "\x1b[0m");
     free(wd);
@@ -643,7 +710,7 @@ static void status_row(SBuf *o, const Win *w, int active, int scan, const Editor
 
     /* left part is " name [+]"; the modified mark wins over the name when space is tight */
     lmax = cols > right.len ? cols - right.len : cols;
-    sbuf_adds(o, active ? "\x1b[7m" : "\x1b[7;2m");
+    bar(o, e, active ? BAR_ON : BAR_DIM);
     if (lmax >= 1 + marklen) {
         size_t room = lmax - 1 - marklen, nmax = room;
         int hint = hint_on && room >= 30;
@@ -695,7 +762,7 @@ static void sidebar_row(SBuf *o, const Editor *e, int y)
         size_t ind = (size_t)en->depth * 2;
 
         if (sel)
-            sbuf_adds(o, e->sidebar_focus ? "\x1b[7m" : "\x1b[2;7m");
+            bar(o, e, e->sidebar_focus ? BAR_ON : BAR_DIM);
         else if (en->is_dir)
             sbuf_adds(o, "\x1b[1m");
         if (ind > w / 2)
@@ -771,6 +838,7 @@ static const Win *win_at(Win *const *wins, size_t n, int x, int y)
 static void palette_row(SBuf *o, const Editor *e, const char *it, int sel, size_t *used)
 {
     size_t cols = (size_t)e->cols, w1 = (size_t)e->pal_w1, w2 = (size_t)e->pal_w2;
+    size_t w3 = (size_t)e->pal_w3, base;
     const char *name = it + 1, *v = strchr(name, '\x1f'), *key, *vend;
     int color = e->color_depth != COLOR_NONE && !sel;
     size_t u;
@@ -793,13 +861,17 @@ static void palette_row(SBuf *o, const Editor *e, const char *it, int sel, size_
         sbuf_adds(o, "  ");
     }
     if (color)
-        sbuf_adds(o, "\x1b[39m");
+        fg_back(o, e);
     *used += 2;
+    base = *used;
+    /* the shortcuts are kept whole: a long name gives way */
+    if (*used + w1 + 2 + w2 + 2 + w3 > cols && cols > *used + 2 + w2 + 2 + w3 + 12)
+        w1 = cols - (*used + 2 + w2 + 2 + w3);
     sbuf_adds(o, "\x1b[1m");
-    u = fit_cols(o, name, (size_t)(v - 1 - name), cols > *used ? cols - *used : 0);
+    u = fit_cols(o, name, (size_t)(v - 1 - name), *used + w1 + 2 + w2 > cols ? cols - *used : w1);
     sbuf_adds(o, "\x1b[22m");
     *used += u;
-    if (2 + w1 + 2 + w2 > cols)
+    if (base + w1 + 2 + w2 > cols)
         return;                 /* too narrow for the columns: the name alone */
     spaces(o, w1 - u + 2);
     *used += w1 - u + 2;
@@ -809,14 +881,156 @@ static void palette_row(SBuf *o, const Editor *e, const char *it, int sel, size_
             theme_fg(o, e->color_depth, e->theme->cls[SC_KEYWORD]);
     }
     u = fit_cols(o, v, (size_t)(vend - v), w2);
-    sbuf_adds(o, color ? "\x1b[39m\x1b[22m" : "\x1b[22m");
+    if (color)
+        fg_back(o, e);
+    sbuf_adds(o, "\x1b[22m");
     spaces(o, w2 - u + 2);
     *used += w2 + 2;
     sbuf_adds(o, sel || e->color_depth == COLOR_NONE ? "\x1b[2m" : "");
     if (color)
         theme_fg(o, e->color_depth, e->theme->cls[SC_COMMENT]);
     *used += fit_cols(o, key, strlen(key), cols - *used);
-    sbuf_adds(o, color ? "\x1b[39m" : "\x1b[22m");
+    if (color)
+        fg_back(o, e);
+    else
+        sbuf_adds(o, "\x1b[22m");
+}
+
+/* A row of the symbol list: a letter for the kind in the colour of its class, the name in bold,
+ * the parameters in the colour of strings and the line number in that of comments, each in a
+ * column as wide as the widest of all rows (the parameters give way on a narrow screen). */
+static void symbol_row(SBuf *o, const Editor *e, const char *it, int sel, size_t *used)
+{
+    static const char kinds[] = "cfmpk";
+    static const int cls[] = { SC_TYPE, SC_KEYWORD, SC_KEYWORD, SC_NUMBER, SC_CONSTANT };
+    size_t cols = (size_t)e->cols, w1 = (size_t)e->pal_w1, w2 = (size_t)e->pal_w2;
+    size_t w3 = (size_t)e->pal_w3, u;
+    const char *name = it + 1, *a = strchr(name, '\x1f'), *l = a ? strchr(a + 1, '\x1f') : NULL;
+    const char *k = strchr(kinds, it[0]);
+    int color = e->color_depth != COLOR_NONE && !sel;
+
+    if (!l) {
+        *used += fit_cols(o, it, strlen(it), cols - *used);
+        return;
+    }
+    if (color && k && it[0])
+        theme_fg(o, e->color_depth, e->theme->cls[cls[k - kinds]]);
+    sbuf_add(o, it, 1);
+    if (color)
+        fg_back(o, e);
+    sbuf_adds(o, " ");
+    *used += 2;
+    if (*used + w1 + 2 + w3 + 2 > cols)
+        w1 = cols > *used + 2 + w3 + 2 + 8 ? cols - *used - 2 - w3 - 2 : 8;
+    if (*used + w1 + 2 + w2 + 2 + w3 > cols)
+        w2 = cols > *used + w1 + 2 + 2 + w3 ? cols - *used - w1 - 2 - 2 - w3 : 0;
+    sbuf_adds(o, "\x1b[1m");
+    u = fit_cols(o, name, (size_t)(a - name), w1);
+    sbuf_adds(o, "\x1b[22m");
+    spaces(o, w1 - u + 2);
+    *used += w1 + 2;
+    if (color)
+        theme_fg(o, e->color_depth, e->theme->cls[SC_STRING]);
+    u = fit_cols(o, a + 1, (size_t)(l - a - 1), w2);
+    if (color)
+        fg_back(o, e);
+    spaces(o, w2 - u + 2);
+    *used += w2 + 2;
+    sbuf_adds(o, sel || e->color_depth == COLOR_NONE ? "\x1b[2m" : "");
+    if (color)
+        theme_fg(o, e->color_depth, e->theme->cls[SC_COMMENT]);
+    spaces(o, w3 > strlen(l + 1) ? w3 - strlen(l + 1) : 0);
+    *used += (w3 > strlen(l + 1) ? w3 - strlen(l + 1) : 0);
+    *used += fit_cols(o, l + 1, strlen(l + 1), cols > *used ? cols - *used : 0);
+    if (color)
+        fg_back(o, e);
+    else
+        sbuf_adds(o, "\x1b[22m");
+}
+
+/* A row of the "save where" list: the kind of file in bold, the scope in the keyword colour, the
+ * note in that of strings and the path in that of comments, in columns shared by all rows. */
+static void savecfg_row(SBuf *o, const Editor *e, const char *it, int sel, size_t *used)
+{
+    size_t cols = (size_t)e->cols, w[3], i, u;
+    const char *f[4], *c = it;
+    static const int cls[3] = { SC_KEYWORD, SC_STRING, SC_COMMENT };
+    int color = e->color_depth != COLOR_NONE && !sel;
+
+    w[0] = (size_t)e->pal_w1;
+    w[1] = (size_t)e->pal_w2;
+    w[2] = (size_t)e->pal_w3;
+    for (i = 0; i < 4; i++) {
+        f[i] = c;
+        c = i < 3 ? strchr(c, '\x1f') : NULL;
+        if (i < 3 && !c) {
+            *used += fit_cols(o, it, strlen(it), cols - *used);
+            return;
+        }
+        if (c)
+            c++;
+    }
+    /* on a narrow screen the note, then the scope, give way to the path */
+    while (*used + w[0] + 2 + w[1] + 2 + w[2] + 2 + 6 > cols && (w[1] || w[2])) {
+        if (w[2])
+            w[2] = w[2] > 8 ? w[2] - 8 : 0;
+        else
+            w[1] = w[1] > 8 ? w[1] - 8 : 0;
+    }
+    for (i = 0; i < 3; i++) {
+        const char *end = strchr(f[i], '\x1f');
+
+        if (i == 0)
+            sbuf_adds(o, "\x1b[1m");
+        else if (color)
+            theme_fg(o, e->color_depth, e->theme->cls[cls[i - 1]]);
+        u = fit_cols(o, f[i], (size_t)(end - f[i]), w[i]);
+        if (i == 0)
+            sbuf_adds(o, "\x1b[22m");
+        else if (color)
+            fg_back(o, e);
+        if (w[i]) {
+            spaces(o, w[i] - u + 2);
+            *used += w[i] + 2;
+        }
+    }
+    sbuf_adds(o, sel || e->color_depth == COLOR_NONE ? "\x1b[2m" : "");
+    if (color)
+        theme_fg(o, e->color_depth, e->theme->cls[cls[2]]);
+    *used += fit_cols(o, f[3], strlen(f[3]), cols > *used ? cols - *used : 0);
+    if (color)
+        fg_back(o, e);
+    else
+        sbuf_adds(o, "\x1b[22m");
+}
+
+/* A row of the buffer list: the name in bold, the path in the colour of comments, in a column as
+ * wide as the longest name. */
+static void buffer_row(SBuf *o, const Editor *e, const char *it, int rev, size_t *used)
+{
+    size_t cols = (size_t)e->cols, w1 = (size_t)e->pal_w1, u;
+    const char *sep = strchr(it, '\x1f');
+    int color = e->color_depth != COLOR_NONE && !rev;
+
+    if (!sep) {
+        *used += fit_cols(o, it, strlen(it), cols - *used);
+        return;
+    }
+    if (*used + w1 + 2 + 10 > cols)
+        w1 = cols > *used + 2 + 10 ? cols - *used - 2 - 10 : 0;
+    sbuf_adds(o, "\x1b[1m");
+    u = fit_cols(o, it, (size_t)(sep - it), w1);
+    sbuf_adds(o, "\x1b[22m");
+    spaces(o, w1 - u + 2);
+    *used += w1 + 2;
+    sbuf_adds(o, rev || e->color_depth == COLOR_NONE ? "\x1b[2m" : "");
+    if (color)
+        theme_fg(o, e->color_depth, e->theme->cls[SC_COMMENT]);
+    *used += fit_cols(o, sep + 1, strlen(sep + 1), cols > *used ? cols - *used : 0);
+    if (color)
+        fg_back(o, e);
+    else
+        sbuf_adds(o, "\x1b[22m");
 }
 
 static void picker_row(SBuf *o, const Editor *e, int k)
@@ -825,7 +1039,8 @@ static void picker_row(SBuf *o, const Editor *e, int k)
     size_t cols = (size_t)e->cols, used = 0;
 
     if (k == 0) {
-        sbuf_adds(o, "\x1b[7m ");
+        bar(o, e, BAR_ON);
+        sbuf_adds(o, " ");
         used = 1;
         used += fit_cols(o, p->title, strlen(p->title), cols - used);
         sbuf_adds(o, " \xe2\x80\xba ");
@@ -846,12 +1061,14 @@ static void picker_row(SBuf *o, const Editor *e, int k)
         sbuf_adds(o, "\x1b[0m");
     } else {
         size_t pos = p->top + (size_t)k - 1;
+        int sel = pos == p->sel && pos < p->nshown;
+        int rev = sel && !themed(e);    /* the chosen row is reverse video: no extra colours */
 
+        row_on(o, e, sel);
+        sbuf_adds(o, " ");
+        used = 1;
         if (pos < p->nshown) {
-            sbuf_adds(o, pos == p->sel ? "\x1b[7m " : " ");
-            used = 1;
             const char *it = p->items[p->shown[pos]];
-            const char *sep = e->picker_kind == PK_BUFFERS ? strstr(it, "   ") : NULL;
 
             if (it[0] == PICKER_HEAD) {
                 /* a section of the palette */
@@ -859,27 +1076,19 @@ static void picker_row(SBuf *o, const Editor *e, int k)
                 used += fit_cols(o, it + 1, strlen(it + 1), cols - used);
                 sbuf_adds(o, "\x1b[22m");
             } else if (e->picker_kind == PK_COMMANDS) {
-                palette_row(o, e, it, pos == p->sel, &used);
-            } else if (sep) {
-                /* a buffer: its name stands out, the path is in the colour of comments */
-                sbuf_adds(o, "\x1b[1m");
-                used += fit_cols(o, it, (size_t)(sep - it), cols - used);
-                sbuf_adds(o, "\x1b[22m");
-                if (pos == p->sel)
-                    sbuf_adds(o, "\x1b[2m");
-                else if (e->color_depth != COLOR_NONE)
-                    theme_fg(o, e->color_depth, e->theme->cls[SC_COMMENT]);
-                else
-                    sbuf_adds(o, "\x1b[2m");
-                used += fit_cols(o, sep, strlen(sep), cols - used);
-                sbuf_adds(o, pos != p->sel && e->color_depth != COLOR_NONE ? "\x1b[39m" : "\x1b[22m");
+                palette_row(o, e, it, rev, &used);
+            } else if (e->picker_kind == PK_SAVECFG) {
+                savecfg_row(o, e, it, rev, &used);
+            } else if (e->picker_kind == PK_SYMBOLS) {
+                symbol_row(o, e, it, rev, &used);
+            } else if (e->picker_kind == PK_BUFFERS) {
+                buffer_row(o, e, it, rev, &used);
             } else {
                 used += fit_cols(o, it, strlen(it), cols - used);
             }
         }
         spaces(o, cols - used);
-        if (pos == p->sel && pos < p->nshown)
-            sbuf_adds(o, "\x1b[0m");
+        sbuf_adds(o, "\x1b[0m");
     }
 }
 
@@ -967,6 +1176,17 @@ void render_frame(Render *r, const Editor *e)
         nwins = 64;
 
     r->frame.len = 0;
+    /* the cursor is drawn by the terminal in its own colour, which may be the colour of a light
+     * theme's background: set it to the text colour of the theme (OSC 12), reset on exit */
+    if (r->cur_theme != e->theme || r->cur_depth != e->color_depth) {
+        if (themed(e))
+            sbuf_addf(&r->frame, "\x1b]12;#%02x%02x%02x\x07", e->theme->fg.r, e->theme->fg.g,
+                      e->theme->fg.b);
+        else
+            sbuf_adds(&r->frame, "\x1b]112\x07");
+        r->cur_theme = e->theme;
+        r->cur_depth = e->color_depth;
+    }
     if (r->need_clear) {
         sbuf_adds(&r->frame, "\x1b[?25l\x1b[2J");
         changed = 1;

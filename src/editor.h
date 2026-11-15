@@ -133,7 +133,8 @@ typedef struct Editor {
     size_t ndests;
     FScan *fscan;           /* PK_FILES: the walk of the project, still going on (else NULL) */
     size_t *pal;            /* PK_COMMANDS: the command (table index) of each item, headings aside */
-    int pal_w1, pal_w2;     /* PK_COMMANDS: widths of the name and value columns */
+    size_t pal_last;        /* PK_COMMANDS: the command the palette was left on */
+    int pal_w1, pal_w2, pal_w3;     /* PK_COMMANDS, PK_SYMBOLS: widths of the three columns */
     size_t *outline;        /* PK_SYMBOLS: line and byte of each item (pairs) */
     size_t noutline;
 

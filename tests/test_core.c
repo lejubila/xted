@@ -3038,6 +3038,11 @@ static void test_keymap(void)
     CHECK(strcmp(out, "Alt+J") == 0);
     keymap_label(&m, command_by_id("fold_all"), out, sizeof out);
     CHECK(out[0] == '\0');
+    /* a command with several keys lists them all */
+    keymap_label(&m, command_by_id("next_win"), out, sizeof out);
+    CHECK(strstr(out, "Alt+O") && strstr(out, "Alt+Right") && strstr(out, ", "));
+    keymap_label(&m, command_by_id("next_win"), out, 8);
+    CHECK(strlen(out) < 8);
     keymap_free(&m);
 }
 

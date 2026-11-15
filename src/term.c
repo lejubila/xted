@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 #define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H\x1b[?2004h\x1b[?1004h"
-#define SEQ_LEAVE "\x1b[0m\x1b[?25h\x1b[?1006l\x1b[?1002l\x1b[?1000l" \
+#define SEQ_LEAVE "\x1b]112\x07\x1b[0m\x1b[?25h\x1b[?1006l\x1b[?1002l\x1b[?1000l" \
                   "\x1b[?1004l\x1b[?2004l\x1b[?1049l"
 #define PASTE_END "\x1b[201~"
 

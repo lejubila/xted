@@ -1208,17 +1208,23 @@ static void cmd_buffers(Editor *e)
 
     picker_open(&e->picker, "Buffer");
     e->picker_kind = PK_BUFFERS;
+    e->pal_w1 = 0;
     for (i = 0; i < e->ndocs; i++) {
         const Doc *d = e->docs[i];
         SBuf b = SBUF_INIT;
+        size_t n;
+        int w;
 
+        /* name, then the path after a unit separator: the renderer puts them in columns */
         sbuf_adds(&b, doc_base_name(d));
         if (d->buf.modified)
             sbuf_adds(&b, " *");
-        if (d->buf.path) {
-            sbuf_adds(&b, "   ");
+        n = b.len;
+        w = (int)utf8_cols(b.p, n, n, 0);
+        e->pal_w1 = w > e->pal_w1 ? w : e->pal_w1;
+        sbuf_adds(&b, "\x1f");
+        if (d->buf.path)
             sbuf_adds(&b, d->buf.path);
-        }
         sbuf_add(&b, "", 1);
         picker_add(&e->picker, b.p);
         sbuf_free(&b);
@@ -1239,14 +1245,15 @@ static void outline_cb(void *ctx, int kind, const char *name, const char *sig, s
     SBuf b = SBUF_INIT;
     static const char tag[] = { 'c', 'f', 'm', 'p', 'k' };
 
-    /* RULE_CLASS, RULE_FUNC, RULE_METHOD, RULE_PROP, RULE_CONST in this order */
-    sbuf_addf(&b, "%c  %s", kind >= RULE_CLASS && kind <= RULE_CONST ? tag[kind - RULE_CLASS] : '?',
+    /* RULE_CLASS, RULE_FUNC, RULE_METHOD, RULE_PROP, RULE_CONST in this order. The item is kind,
+     * name, parameters and line, cut at the unit separator by the renderer into columns. */
+    sbuf_addf(&b, "%c%s\x1f", kind >= RULE_CLASS && kind <= RULE_CONST ? tag[kind - RULE_CLASS] : '?',
               name);
     if ((kind == RULE_FUNC || kind == RULE_METHOD) && strlen(sig) < 48)
         sbuf_addf(&b, "(%s)", sig);
     else if (kind == RULE_FUNC || kind == RULE_METHOD)
         sbuf_adds(&b, "(...)");
-    sbuf_addf(&b, "   :%zu", y + 1);
+    sbuf_addf(&b, "\x1f%zu", y + 1);
     sbuf_add(&b, "", 1);
     picker_add(&e->picker, b.p);
     sbuf_free(&b);
@@ -1277,6 +1284,25 @@ static void cmd_symbols(Editor *e)
         picker_close(&e->picker);
         editor_set_msg(e, MSG_TTL_MS, "Nessun simbolo in questo file");
         return;
+    }
+    /* column widths: name, parameters, line number */
+    e->pal_w1 = e->pal_w2 = e->pal_w3 = 0;
+    {
+        size_t k;
+
+        for (k = 0; k < e->picker.nitems; k++) {
+            const char *n = e->picker.items[k] + 1, *a = strchr(n, '\x1f'), *l = a ? strchr(a + 1, '\x1f') : NULL;
+            int w;
+
+            if (!l)
+                continue;
+            w = (int)utf8_cols(n, (size_t)(a - n), (size_t)(a - n), 0);
+            e->pal_w1 = w > e->pal_w1 ? w : e->pal_w1;
+            w = (int)utf8_cols(a + 1, (size_t)(l - a - 1), (size_t)(l - a - 1), 0);
+            e->pal_w2 = w > e->pal_w2 ? w : e->pal_w2;
+            w = (int)strlen(l + 1);
+            e->pal_w3 = w > e->pal_w3 ? w : e->pal_w3;
+        }
     }
     picker_filter(&e->picker);
     /* start on the last definition at or above the cursor */
@@ -1327,11 +1353,33 @@ static void cmd_quick_open(Editor *e)
 
 static void save_settings_to(Editor *e, size_t idx);
 
+static void palette_open(Editor *e, const char *query);
+
 static void picker_accept(Editor *e)
 {
     long idx = picker_chosen(&e->picker);
     int kind = e->picker_kind;
 
+    if (kind == PK_COMMANDS && idx >= 0) {
+        int c = (int)e->pal[idx];
+
+        e->pal_last = (size_t)c;
+        if (commands[c].state != ST_NONE) {
+            /* a setting: it changes, the palette stays open and shows the new value */
+            char query[PICKER_QMAX];
+            size_t top = e->picker.top, sel = e->picker.sel;
+
+            snprintf(query, sizeof query, "%s", e->picker.query);
+            command_run(e, c);
+            palette_open(e, query);
+            /* same items in the same order: the list looks as it did, only the values change */
+            if (sel < e->picker.nshown) {
+                e->picker.sel = sel;
+                e->picker.top = top;
+            }
+            return;
+        }
+    }
     picker_close(&e->picker);
     if (idx < 0)
         return;
@@ -1372,6 +1420,8 @@ static void handle_picker(Editor *e, Key k)
 
     if (k.code == KEY_ESC || k.code == CTRL('p') || k.code == CTRL('e') ||
         k.code == CTRL('q')) {
+        if (e->picker_kind == PK_COMMANDS && picker_chosen(p) >= 0)
+            e->pal_last = e->pal[picker_chosen(p)];     /* the next palette opens here */
         picker_close(p);
     } else if (k.code == KEY_ENTER) {
         picker_accept(e);
@@ -2329,7 +2379,8 @@ void editor_cmd_redraw(Editor *e)
     render_invalidate(e->render);
 }
 
-void editor_cmd_palette(Editor *e)
+/* Opens the palette with the query typed so far, on the command used last. */
+static void palette_open(Editor *e, const char *query)
 {
     size_t i, k = 0;
     int g, last = -1;
@@ -2340,11 +2391,16 @@ void editor_cmd_palette(Editor *e)
     e->picker_kind = PK_COMMANDS;
     free(e->pal);
     e->pal = xmalloc((ncommands + G_COUNT) * sizeof *e->pal);
-    e->pal_w1 = e->pal_w2 = 0;
+    e->pal_w1 = e->pal_w2 = e->pal_w3 = 0;
     for (i = 0; i < ncommands; i++) {
         int w = (int)utf8_cols(commands[i].name, strlen(commands[i].name), strlen(commands[i].name), 0);
 
+        char label[100];
+
         on[i] = command_state(e, (int)i, val[i], sizeof val[i]);
+        keymap_label(&e->km, (int)i, label, sizeof label);
+        if ((int)strlen(label) > e->pal_w3)
+            e->pal_w3 = (int)strlen(label);
         if (w > e->pal_w1)
             e->pal_w1 = w;
         w = (int)utf8_cols(val[i], strlen(val[i]), strlen(val[i]), 0);
@@ -2354,7 +2410,7 @@ void editor_cmd_palette(Editor *e)
     /* Item: marker (1 on, 0 off, space none), name, value, shortcut; the last three are cut at
      * the unit separator by the renderer, so they line up in columns. */
     for (i = 0; i < ncommands; i++) {
-        char item[200], label[40];
+        char item[260], label[100];
 
         g = commands[i].group;
         if (g != last) {
@@ -2372,7 +2428,27 @@ void editor_cmd_palette(Editor *e)
     }
     free(val);
     free(on);
+    snprintf(e->picker.query, sizeof e->picker.query, "%s", query);
+    e->picker.qlen = strlen(e->picker.query);
     picker_filter(&e->picker);
+    for (i = 0; i < k; i++)
+        if (e->pal[i] == e->pal_last && e->picker.items[i][0] != PICKER_HEAD) {
+            picker_select_item(&e->picker, i);
+            /* in the middle of the window, not on its last row */
+            if (e->picker.sel > PICKER_ROWS / 2) {
+                size_t top = e->picker.sel - PICKER_ROWS / 2;
+
+                if (top + PICKER_ROWS > e->picker.nshown)
+                    top = e->picker.nshown > PICKER_ROWS ? e->picker.nshown - PICKER_ROWS : 0;
+                e->picker.top = top;
+            }
+            break;
+        }
+}
+
+void editor_cmd_palette(Editor *e)
+{
+    palette_open(e, "");
 }
 
 void editor_relayout(Editor *e)
@@ -2528,9 +2604,18 @@ static void add_dest(Editor *e, int kind, int lang, const char *path, const char
         snprintf(shown, sizeof shown, "~%s", path + hl);
     else
         snprintf(shown, sizeof shown, "%s", path);
-    /* what and note first: a long path is the part that may be cut */
-    snprintf(item, sizeof item, "%s%s%s%s%s  %s", label, what[0] ? " [" : "", what,
-             what[0] ? "]" : "", note, shown);
+    /* label, scope, note and path, cut at the unit separator by the renderer into columns (the
+     * path last: it is the part that may be cut) */
+    if (note[0] == ' ')
+        note++;
+    snprintf(item, sizeof item, "%s\x1f%s\x1f%s\x1f%s", label, what, note, shown);
+    {
+        int w1 = (int)strlen(label), w2 = (int)strlen(what), w3 = (int)strlen(note);
+
+        e->pal_w1 = w1 > e->pal_w1 ? w1 : e->pal_w1;
+        e->pal_w2 = w2 > e->pal_w2 ? w2 : e->pal_w2;
+        e->pal_w3 = w3 > e->pal_w3 ? w3 : e->pal_w3;
+    }
     picker_add(&e->picker, item);
     e->dests = xrealloc(e->dests, (e->ndests + 1) * sizeof *e->dests);
     e->dests[e->ndests].kind = kind;
@@ -2581,6 +2666,7 @@ void editor_cmd_save_settings(Editor *e)
     e->ndests = 0;
     picker_open(&e->picker, "Salva dove");
     e->picker_kind = PK_SAVECFG;
+    e->pal_w1 = e->pal_w2 = e->pal_w3 = 0;
     nscope = p.nl > 0 && lang ? 2 : 1;
     if (e->cfgdir) {
         size_t n = strlen(e->cfgdir) + 8;

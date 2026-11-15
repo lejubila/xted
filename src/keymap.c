@@ -235,12 +235,17 @@ int keymap_find(const Keymap *m, Key k)
 
 void keymap_label(const Keymap *m, int cmd, char *out, size_t n)
 {
-    size_t i;
+    size_t i, len = 0;
 
     out[0] = '\0';
-    for (i = 0; i < m->n; i++)
-        if (m->b[i].cmd == cmd) {
-            key_format(m->b[i].key, 1, out, n);
-            return;
-        }
+    for (i = 0; i < m->n; i++) {
+        char one[32];
+
+        if (m->b[i].cmd != cmd)
+            continue;
+        key_format(m->b[i].key, 1, one, sizeof one);
+        if (len + strlen(one) + 3 > n)
+            break;
+        len += (size_t)snprintf(out + len, n - len, "%s%s", len ? ", " : "", one);
+    }
 }
