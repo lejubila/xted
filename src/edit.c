@@ -1161,13 +1161,13 @@ static int same_header(const char *a, const char *b)
     return 0;
 }
 
-int edit_add_include(Editor *e, const char *hdr)
+int edit_add_include(Editor *e, const char *hdr, int local)
 {
     const Buffer *b = e->buf;
     size_t lim = b->nlines < 400 ? b->nlines : 400, y, first_sys = (size_t)-1, last_sys = 0;
-    size_t first_loc = (size_t)-1, ins = (size_t)-1, at, top = 0, added = 0;
-    int sorted = 1, in_comment = 0, top_done = 0;
-    char prev[80] = "", pre[2] = "", post[2] = "";
+    size_t first_loc = (size_t)-1, last_loc = 0, ins = (size_t)-1, lins = (size_t)-1, at, top = 0, added = 0;
+    int sorted = 1, lsorted = 1, in_comment = 0, top_done = 0;
+    char prev[256] = "", lprev[256] = "", pre[2] = "", post[2] = "";
     SBuf text = SBUF_INIT;
 
     for (y = 0; y < lim; y++) {
@@ -1195,6 +1195,13 @@ int edit_add_include(Editor *e, const char *hdr)
                 name[nl] = '\0';
                 if (same_header(name, hdr) || strcmp(name, "bits/stdc++.h") == 0)
                     return 0;                       /* already there (either way) */
+                if (local && !sys) {
+                    /* "buffer.h" and "../src/buffer.h": the same header by another path */
+                    const char *a = strrchr(name, '/'), *h2 = strrchr(hdr, '/');
+
+                    if (strcmp(a ? a + 1 : name, h2 ? h2 + 1 : hdr) == 0)
+                        return 0;
+                }
                 if (sys) {
                     if (first_sys == (size_t)-1)
                         first_sys = y;
@@ -1204,8 +1211,15 @@ int edit_add_include(Editor *e, const char *hdr)
                     snprintf(prev, sizeof prev, "%s", name);
                     if (ins == (size_t)-1 && strcmp(name, hdr) > 0)
                         ins = y;
-                } else if (first_loc == (size_t)-1) {
-                    first_loc = y;
+                } else {
+                    if (first_loc == (size_t)-1)
+                        first_loc = y;
+                    last_loc = y;
+                    if (strcmp(lprev, name) > 0)
+                        lsorted = 0;
+                    snprintf(lprev, sizeof lprev, "%s", name);
+                    if (lins == (size_t)-1 && strcmp(name, hdr) > 0)
+                        lins = y;
                 }
             }
             top_done = 1;
@@ -1238,7 +1252,22 @@ int edit_add_include(Editor *e, const char *hdr)
             top_done = 1;
         }
     }
-    if (first_sys != (size_t)-1) {
+    if (local && first_loc != (size_t)-1) {
+        at = lsorted && lins != (size_t)-1 ? lins : last_loc + 1;
+    } else if (local && first_sys != (size_t)-1) {
+        /* the local includes go after the system ones, past a blank line */
+        at = last_sys + 1;
+        if (at < b->nlines && b->lines[at].len == 0)
+            at++;
+        else
+            pre[0] = '\n';
+        if (at < b->nlines && b->lines[at].len > 0)
+            post[0] = '\n';
+    } else if (local) {
+        at = top;
+        if (at < b->nlines && b->lines[at].len > 0)
+            post[0] = '\n';
+    } else if (first_sys != (size_t)-1) {
         at = sorted && ins != (size_t)-1 ? ins : last_sys + 1;
     } else if (first_loc != (size_t)-1) {
         at = first_loc;
@@ -1249,9 +1278,9 @@ int edit_add_include(Editor *e, const char *hdr)
             post[0] = '\n';
     }
     sbuf_adds(&text, pre);
-    sbuf_adds(&text, "#include <");
+    sbuf_adds(&text, local ? "#include \"" : "#include <");
     sbuf_adds(&text, hdr);
-    sbuf_adds(&text, ">\n");
+    sbuf_adds(&text, local ? "\"\n" : ">\n");
     sbuf_adds(&text, post);
     {
         size_t yy = at, xx = 0, k;
@@ -1264,9 +1293,9 @@ int edit_add_include(Editor *e, const char *hdr)
                 pre[0] = '\n';
             sbuf_free(&text);
             sbuf_adds(&text, pre);
-            sbuf_adds(&text, "#include <");
+            sbuf_adds(&text, local ? "#include \"" : "#include <");
             sbuf_adds(&text, hdr);
-            sbuf_adds(&text, ">\n");
+            sbuf_adds(&text, local ? "\"\n" : ">\n");
             sbuf_adds(&text, post);
             at = b->nlines;
         }

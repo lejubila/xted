@@ -161,6 +161,11 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     l'header equivalente (`<cstdio>` o `<stdio.h>`) né `<bits/stdc++.h>`: tra gli
     `#include <…>` esistenti in ordine, prima di quelli locali `"…"`, oppure in cima al file dopo i
     commenti e l'include guard. Un solo Annulla toglie sia l'include sia il testo inserito.
+  - In C e C++ si propongono anche le funzioni, i tipi, le macro e le variabili degli header del
+    progetto che il file non include ancora (la cartella del progetto è quella con `.git`); scegliendone
+    uno si aggiunge `#include "buffer.h"`, scritto come gli include che il file ha già o relativo alla sua
+    cartella (`"../src/buffer.h"`), tra gli include locali in ordine o dopo quelli di sistema. Gli header
+    si leggono a poco a poco (al massimo 400) e si rileggono quando cambiano.
   - In Python, scegliendo un modulo della libreria standard (`os`, `json`, `pathlib`, …), una sua
     classe (`Path`, `OrderedDict`, `deque`, …) o un membro dopo il nome del modulo (`os.getcwd`)
     l'editor aggiunge `import os` o `from pathlib import Path` se manca. L'import va nel primo blocco di

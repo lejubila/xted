@@ -888,6 +888,22 @@ struct SymCache {
     char root[PATH_MAX];            /* the project (where vendor/ or composer.json is); "" = cwd */
     StdLib *lib[LIB_N];
     int lib_tried[LIB_N];
+    struct Hdr *hdr;                /* C: the headers of the project and their top-level names */
+    size_t nhdr;
+};
+
+/* A header of the project, kept while its modification time is the same: only what a file that
+ * includes it can use (functions, types, macros, variables at the top level). */
+typedef struct {
+    char *name, *sig, *ret;
+    int kind;
+} HSym;
+
+struct Hdr {
+    char *path;                     /* real path */
+    long mtime, size, checked;
+    HSym *v;
+    size_t n;
 };
 
 SymCache *sym_cache_new(void)
@@ -915,6 +931,20 @@ static void free_project(SymCache *c)
     }
     for (i = 0; i < c->ncls; i++)
         free(c->cls[i]);
+    for (i = 0; i < c->nhdr; i++) {
+        size_t k;
+
+        for (k = 0; k < c->hdr[i].n; k++) {
+            free(c->hdr[i].v[k].name);
+            free(c->hdr[i].v[k].sig);
+            free(c->hdr[i].v[k].ret);
+        }
+        free(c->hdr[i].v);
+        free(c->hdr[i].path);
+    }
+    free(c->hdr);
+    c->hdr = NULL;
+    c->nhdr = 0;
     files_scan_free(c->files_fs);
     files_scan_free(c->cl_fs);
     if (c->cl_file)
@@ -936,7 +966,8 @@ static void free_project(SymCache *c)
 }
 
 /* The project of the file at key: the nearest directory above it with Composer's vendor/ or a
- * composer.json, so that the lookups work whatever directory the editor was started in. */
+ * composer.json, else the one with .git, so that the lookups work whatever directory the editor
+ * was started in. */
 static void set_root(SymCache *c, const char *key)
 {
     char dir[PATH_MAX], probe_path[PATH_MAX + 40];
@@ -961,6 +992,20 @@ static void set_root(SymCache *c, const char *key)
             }
             if (dir[0] == '\0')
                 break;
+        }
+        /* no Composer: the folder of the Git repository (a C project, for its headers) */
+        if (!found[0]) {
+            snprintf(dir, sizeof dir, "%s", key);
+            while ((sl = strrchr(dir, '/')) != NULL) {
+                *sl = '\0';
+                snprintf(probe_path, sizeof probe_path, "%s/.git", dir);
+                if (stat(probe_path, &st) == 0) {
+                    snprintf(found, sizeof found, "%s", dir);
+                    break;
+                }
+                if (dir[0] == '\0')
+                    break;
+            }
         }
     }
     if (strcmp(found, c->root) == 0)
@@ -1184,6 +1229,37 @@ static void collect_file(const char *rel, void *ctx)
     c->files[c->nfiles++] = xstrdup(rel);
 }
 
+/* The files of the project (without vendor/). The walk goes on a little at each call: 0 while it
+ * is not over (c->busy is set), 1 when c->files is complete. */
+static int ensure_files(SymCache *c)
+{
+    static const char *const prune[] = { "vendor", NULL };
+    long left;
+
+    if (c->files_done)
+        return 1;
+    /* vendor is Composer's business (its map); walking it can take seconds */
+    left = scan_left(c);
+    if (left < 0) {
+        c->busy = 1;
+        return 0;
+    }
+    if (!c->files_fs) {
+        char top[PATH_MAX];
+
+        rooted(c, top, sizeof top, ".");
+        c->files_fs = files_scan_begin(top, prune);
+    }
+    if (!files_scan_step(c->files_fs, collect_file, c, left)) {
+        c->busy = 1;
+        return 0;
+    }
+    files_scan_free(c->files_fs);
+    c->files_fs = NULL;
+    c->files_done = 1;
+    return 1;
+}
+
 /* The last segment of a qualified name (A\\B\\Foo, A::Foo). */
 static const char *last_segment(const char *q)
 {
@@ -1343,30 +1419,8 @@ static char *find_class_file(SymCache *c, const char *qual, const char *ext)
         if (f)
             return f;
     }
-    if (!c->files_done) {
-        /* vendor is Composer's business (the map above); walking it can take seconds, so the
-         * walk goes on a little at each call and the class is not found until it ends */
-        static const char *const prune[] = { "vendor", NULL };
-        long left = scan_left(c);
-
-        if (left < 0) {
-            c->busy = 1;
-            return NULL;
-        }
-        if (!c->files_fs) {
-            char top[PATH_MAX];
-
-            rooted(c, top, sizeof top, ".");
-            c->files_fs = files_scan_begin(top, prune);
-        }
-        if (!files_scan_step(c->files_fs, collect_file, c, left)) {
-            c->busy = 1;
-            return NULL;
-        }
-        files_scan_free(c->files_fs);
-        c->files_fs = NULL;
-        c->files_done = 1;
-    }
+    if (!ensure_files(c))
+        return NULL;
     for (i = 0; i < c->nfiles; i++) {
         const char *f = c->files[i], *base = strrchr(f, '/');
         size_t bl;
@@ -2473,6 +2527,212 @@ void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn
             if (e.lib[i] == c->lib[LIB_CPP])
                 std_members(e.lib[i], "std", 3, std_cb, &sc);
         }
+}
+
+/* ---- the headers of a C project ---------------------------------------- */
+
+#define HDR_MAX 400                 /* headers of the project looked at */
+#define HDR_SYMS 400                /* names kept from one header */
+#define HDR_BYTES (256L * 1024)
+
+static int is_header(const char *path)
+{
+    const char *x = ext_of(path);
+
+    return strcmp(x, "h") == 0 || strcmp(x, "hpp") == 0 || strcmp(x, "hh") == 0 ||
+           strcmp(x, "hxx") == 0;
+}
+
+/* A macro that only guards the header against a second inclusion (XTED_BUFFER_H). */
+static int guard_macro(const char *n)
+{
+    size_t l = strlen(n);
+
+    if (l > 2 && strcmp(n + l - 2, "_H") == 0)
+        return 1;
+    return l > 3 && strcmp(n + l - 3, "_H_") == 0;
+}
+
+/* The names of a header, read again when it changed; NULL if it cannot be read, or if there is
+ * no time left to read it now (c->busy is set and the next call goes on). */
+static struct Hdr *hdr_get(SymCache *c, const char *real)
+{
+    struct Hdr *h = NULL;
+    struct stat st;
+    long now = (long)time(NULL);
+    size_t i;
+    Buffer b;
+    char err[128];
+    SymIndex *x;
+
+    for (i = 0; i < c->nhdr; i++)
+        if (strcmp(c->hdr[i].path, real) == 0) {
+            h = &c->hdr[i];
+            break;
+        }
+    if (h && now - h->checked < 2)
+        return h;
+    if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
+        return h;
+    if (h && h->mtime == (long)st.st_mtime && h->size == (long)st.st_size) {
+        h->checked = now;
+        return h;
+    }
+    if (c->deadline_us && scan_left(c) < 0) {
+        c->busy = 1;
+        return h;
+    }
+    buf_init(&b);
+    if (buf_load(&b, real, err, sizeof err) != 0) {
+        buf_free(&b);
+        return h;
+    }
+    {
+        Syntax *syn = syn_detect(&b);
+
+        x = sym_build(&b, syn);
+        syn_free(syn);
+    }
+    buf_free(&b);
+    if (!h) {
+        c->hdr = xrealloc(c->hdr, (c->nhdr + 1) * sizeof *c->hdr);
+        h = &c->hdr[c->nhdr++];
+        memset(h, 0, sizeof *h);
+        h->path = xstrdup(real);
+    } else {
+        for (i = 0; i < h->n; i++) {
+            free(h->v[i].name);
+            free(h->v[i].sig);
+            free(h->v[i].ret);
+        }
+        free(h->v);
+        h->v = NULL;
+        h->n = 0;
+    }
+    for (i = 0; i < x->n && h->n < HDR_SYMS; i++) {
+        const Sym *s = &x->v[i];
+
+        if (s->owner >= 0 || !s->name[0] || s->hidden || (s->kind == RULE_CONST && guard_macro(s->name)))
+            continue;
+        if (s->kind != RULE_FUNC && s->kind != RULE_CLASS && s->kind != RULE_CONST && s->kind != RULE_VAR)
+            continue;
+        h->v = xrealloc(h->v, (h->n + 1) * sizeof *h->v);
+        h->v[h->n].name = xstrdup(s->name);
+        h->v[h->n].sig = xstrdup(s->sig ? s->sig : "");
+        h->v[h->n].ret = xstrdup(s->ret ? s->ret : "");
+        h->v[h->n].kind = s->kind;
+        h->n++;
+    }
+    sym_index_free(x);
+    h->mtime = (long)st.st_mtime;
+    h->size = (long)st.st_size;
+    h->checked = now;
+    return h;
+}
+
+/* How the file cur would write the include of hdr: like the includes it already has (the part of
+ * hdr below the folder one of them is found from), else relative to the folder of cur. */
+static void hdr_spec(const SymIndex *cur, const char *hdr, char *out, size_t n)
+{
+    size_t i, k;
+    const char *d = cur->key;
+    SBuf r = SBUF_INIT;
+
+    for (i = 0; i < cur->ninc && cur->incp; i++) {
+        const char *spec = cur->inc[i], *p = cur->incp[i];
+        size_t sl, pl;
+
+        if (!p || !p[0] || spec[0] == ':' || strstr(spec, ".."))
+            continue;
+        sl = strlen(spec);
+        pl = strlen(p);
+        if (pl > sl + 1 && strcmp(p + pl - sl, spec) == 0 && p[pl - sl - 1] == '/' &&
+            strncmp(hdr, p, pl - sl) == 0 && strchr(hdr + (pl - sl), '/') == NULL) {
+            snprintf(out, n, "%s", hdr + (pl - sl));
+            return;
+        }
+    }
+    for (i = 0; i < cur->ninc && cur->incp; i++) {
+        const char *spec = cur->inc[i], *p = cur->incp[i];
+        size_t sl, pl;
+
+        if (!p || !p[0] || spec[0] == ':' || strstr(spec, ".."))
+            continue;
+        sl = strlen(spec);
+        pl = strlen(p);
+        if (pl > sl + 1 && strcmp(p + pl - sl, spec) == 0 && p[pl - sl - 1] == '/' &&
+            strncmp(hdr, p, pl - sl) == 0) {
+            snprintf(out, n, "%s", hdr + (pl - sl));
+            return;
+        }
+    }
+    /* relative to the folder of the file: the common folders, then ../ for the others */
+    {
+        char dir[PATH_MAX];
+        char *sl;
+        size_t last = 0, up = 0;
+
+        snprintf(dir, sizeof dir, "%s", d);
+        sl = strrchr(dir, '/');
+        if (sl)
+            *sl = '\0';
+        for (k = 0; dir[k] && hdr[k] && dir[k] == hdr[k]; k++)
+            if (dir[k] == '/')
+                last = k;
+        if (!dir[k] && hdr[k] == '/')
+            last = k;                       /* the header is below the folder of the file */
+        for (k = last; dir[k]; k++)
+            if (dir[k] == '/')
+                up++;
+        for (k = 0; k < up; k++)
+            sbuf_adds(&r, "../");
+        sbuf_adds(&r, hdr + last + 1);
+        sbuf_add(&r, "", 1);
+        snprintf(out, n, "%s", r.p);
+        sbuf_free(&r);
+    }
+}
+
+void sym_project_headers(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx)
+{
+    Env e;
+    size_t i, j, k, seen = 0;
+
+    if (!cur->buf.path || strcmp(syn_name(cur->syn), "C") != 0)
+        return;
+    env_build(c, docs, ndocs, cur, &e);
+    if (!e.v[0]->key || !ensure_files(c))
+        return;
+    for (i = 0; i < c->nfiles && seen < HDR_MAX; i++) {
+        char path[PATH_MAX], *real, spec[PATH_MAX];
+        struct Hdr *h;
+        int visible = 0;
+
+        if (!is_header(c->files[i]))
+            continue;
+        seen++;
+        rooted(c, path, sizeof path, c->files[i]);
+        real = realpath(path, NULL);
+        if (!real)
+            continue;
+        for (k = 0; k < e.n; k++)
+            if (e.v[k]->key && strcmp(e.v[k]->key, real) == 0)
+                visible = 1;
+        /* included under a name the editor cannot resolve ("buffer.h" with -Isrc): the same file */
+        for (k = 0; k < e.v[0]->ninc && !visible; k++) {
+            const char *spec = e.v[0]->inc[k], *sb = strrchr(spec, '/'), *rb = strrchr(real, '/');
+
+            if (spec[0] != ':' && strcmp(sb ? sb + 1 : spec, rb ? rb + 1 : real) == 0)
+                visible = 1;
+        }
+        h = visible ? NULL : hdr_get(c, real);
+        if (h && h->n) {
+            hdr_spec(e.v[0], real, spec, sizeof spec);
+            for (j = 0; j < h->n; j++)
+                fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, spec);
+        }
+        free(real);
+    }
 }
 
 /* ---- calls, parameters and local variables ------------------------------ */

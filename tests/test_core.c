@@ -4532,6 +4532,75 @@ static void test_js_import(void)
     rm_rf(dir);
 }
 
+/* A function of a header of the project that the file does not include yet: suggested, and
+ * accepting it adds #include "header.h" written from where the file is. */
+static void test_c_project_include(void)
+{
+    char dir[64], path[200], err[128], sub[200];
+    Editor e;
+    Doc *d;
+    size_t i, k;
+    struct { const char *file, *text, *typed, *head; size_t y, x; int changes; } t[] = {
+        { "src/a.c", "#include <stdio.h>\n\nint main(void)\n{\n    \n}\n", "buf_ins",
+          "#include <stdio.h>\n\n#include \"buf.h\"\n\nint main(void)\n", 4, 4, 1 },
+        { "tests/t.c", "int main(void)\n{\n    \n}\n", "buf_ins",
+          "#include \"../src/buf.h\"\n\nint main(void)\n", 2, 4, 1 },
+        { "src/b.c", "#include \"buf.h\"\n\nint main(void)\n{\n    \n}\n", "buf_ins",
+          "#include \"buf.h\"\n\nint main(void)\n", 4, 4, 0 },
+        { "src/c.c", "#include \"aaa.h\"\n#include \"zzz.h\"\n\nint main(void)\n{\n    \n}\n", "buf_ins",
+          "#include \"aaa.h\"\n#include \"buf.h\"\n#include \"zzz.h\"\n", 5, 4, 1 },
+        { "src/d.c", "/* d */\n\nint main(void)\n{\n    \n}\n", "Buf_t",
+          "/* d */\n\n#include \"buf.h\"\n\nint main(void)\n", 4, 4, 1 },
+    };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(sub, sizeof sub, "%s/.git", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/src", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/tests", dir);
+    mkdir(sub, 0755);
+    put_file(dir, "src/buf.h", "#ifndef BUF_H\n#define BUF_H\n\ntypedef struct { int n; } Buf_t;\n"
+                               "int buf_insert(int where, const char *text);\n#define BUF_MAX 64\n#endif\n");
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char *q;
+        size_t y, nl0;
+        SBuf all = SBUF_INIT;
+
+        put_file(dir, t[i].file, t[i].text);
+        snprintf(path, sizeof path, "%s/%s", dir, t[i].file);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        nl0 = e.buf->nlines;
+        e.cy = t[i].y;
+        e.cx = t[i].x;
+        for (q = t[i].typed; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        /* the guard of the header is not a symbol to suggest */
+        for (k = 0; k < e.comp.n; k++)
+            CHECK(strcmp(e.comp.v[k].text, "BUF_H") != 0 || !e.comp.v[k].inc);
+        if (e.comp.on)
+            kkey(&e, KEY_ENTER, 0);
+        for (y = 0; y < e.buf->nlines; y++) {
+            sbuf_add(&all, e.buf->lines[y].s, e.buf->lines[y].len);
+            sbuf_adds(&all, "\n");
+        }
+        sbuf_add(&all, "", 1);
+        if (strncmp(all.p, t[i].head, strlen(t[i].head)) != 0)
+            fprintf(stderr, "case %zu (%s):\n%s---\n", i, t[i].file, all.p);
+        CHECK(strncmp(all.p, t[i].head, strlen(t[i].head)) == 0);
+        if (t[i].changes) {
+            edit_undo(&e);
+            CHECK(e.buf->nlines == nl0);
+        }
+        sbuf_free(&all);
+        editor_free(&e);
+    }
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5078,6 +5147,7 @@ int main(void)
     test_c_include();
     test_py_import();
     test_js_import();
+    test_c_project_include();
     test_config_merge();
     test_snippets();
     test_cursors();

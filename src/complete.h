@@ -21,6 +21,7 @@ typedef struct {
     char *sig;              /* signature shown for the highlighted candidate (may be NULL) */
     int kind;               /* CAND_* */
     int std;                /* comes from the standard library (accepting it may add an include) */
+    char *inc;              /* C: the project header that declares it, not included yet (or NULL) */
 } Cand;
 
 /* The suggestion popup: candidates for the word before the cursor, best first. */

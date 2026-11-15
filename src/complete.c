@@ -12,7 +12,7 @@
 #define MAX_RAW 2048
 
 typedef struct {
-    char *w, *sig;
+    char *w, *sig, *inc;
     int kind, score, std;
     size_t dist;            /* lines from the cursor; documents other than the current one: far */
 } Raw;
@@ -116,6 +116,7 @@ static void consider_sig(Gather *g, const char *w, size_t n, int kind, size_t di
     g->v[g->n].score = score + g->bonus;
     g->v[g->n].dist = dist;
     g->v[g->n].std = 0;
+    g->v[g->n].inc = NULL;
     g->n++;
 }
 
@@ -165,6 +166,19 @@ static void sym_cb(void *ctx, const char *name, int kind, const char *sig, const
         g->v[g->n - 1].std = rank >= 2;
 }
 
+/* A symbol of a header of the project that the file does not include: like the others, with the
+ * include it needs (and a little lower than what the file already reaches). */
+static void hdr_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret,
+                   const char *spec)
+{
+    Gather *g = ctx;
+    size_t before = g->n;
+
+    sym_cb(ctx, name, kind, sig, ret, 3);
+    if (g->n > before)
+        g->v[g->n - 1].inc = xstrdup(spec);
+}
+
 /* A class of the project for the suggestions: after `use` the qualified name itself, elsewhere
  * the short name with the qualified one as its signature (so accepting it can add the use). */
 static void class_cb(void *ctx, const char *fq, int rank)
@@ -177,6 +191,7 @@ static void class_cb(void *ctx, const char *fq, int rank)
             g->v[g->n].sig = NULL;
             g->v[g->n].kind = CAND_CLASS;
             g->v[g->n].std = 0;
+            g->v[g->n].inc = NULL;
             /* the closer the last segment is to what was typed, the better; the project first */
             {
                 const char *last = strrchr(fq, '\\');
@@ -292,6 +307,7 @@ void complete_close(Complete *c)
     for (i = 0; i < c->n; i++) {
         free(c->v[i].text);
         free(c->v[i].sig);
+        free(c->v[i].inc);
     }
     c->n = 0;
     c->on = 0;
@@ -379,6 +395,8 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
                 g.bonus = 0;
             }
             sym_globals(c->sc, docs, ndocs, cur, sym_cb, &g);
+            if (plen >= 2)
+                sym_project_headers(c->sc, docs, ndocs, cur, hdr_cb, &g);
             if (php && plen >= 3 && (start == 0 || b->lines[y].s[start - 1] != '$'))
                 sym_classes(c->sc, cur, g.prefix, plen, 0, class_cb, &g);
         }
@@ -424,10 +442,12 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
         c->v[c->n].sig = g.v[i].sig;
         c->v[c->n].kind = g.v[i].kind;
         c->v[c->n].std = g.v[i].std;
+        c->v[c->n].inc = g.v[i].inc;
         c->n++;
     }
     for (i = take; i < g.n; i++) {
         free(g.v[i].w);
+        free(g.v[i].inc);
         free(g.v[i].sig);
     }
     for (i = 0; i < g.setsize; i++)

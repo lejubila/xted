@@ -2097,8 +2097,8 @@ static void accept_cand(Editor *e)
  * library the file does not have yet. */
 typedef struct {
     int kind;               /* 0 nothing, 1 C include, 2 Python import, 3 Python from-import,
-                               4 JS/TS default import, 5 JS/TS named import */
-    char mod[64];           /* the header, or the module */
+                               4 JS/TS default import, 5 JS/TS named import, 6 C local include */
+    char mod[256];          /* the header, or the module */
     char name[64];          /* the imported name (from-import) */
 } Needs;
 
@@ -2132,6 +2132,12 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
     int qualified = e->comp.x > 0 && e->comp.x <= ln->len && ln->s[e->comp.x - 1] == '.';
 
     memset(nd, 0, sizeof *nd);
+    if (c->inc && strcmp(lang, "C") == 0) {
+        /* a symbol of a header of the project */
+        nd->kind = 6;
+        snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
+        return;
+    }
     if (!c->std)
         return;
     if (strcmp(lang, "Python") == 0) {
@@ -2236,16 +2242,16 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
 static void complete_accept(Editor *e)
 {
     Needs nd;
-    char what[160];
+    char what[400];
     int added = 0;
 
     needs_for(e, &e->comp.v[e->comp.sel], &nd);
     if (nd.kind) {
         buf_undo_begin(e->buf, e->cy, e->cx);
         e->undo_hold++;
-        if (nd.kind == 1) {
-            added = edit_add_include(e, nd.mod);
-            snprintf(what, sizeof what, "#include <%s>", nd.mod);
+        if (nd.kind == 1 || nd.kind == 6) {
+            added = edit_add_include(e, nd.mod, nd.kind == 6);
+            snprintf(what, sizeof what, nd.kind == 6 ? "#include \"%s\"" : "#include <%s>", nd.mod);
         } else if (nd.kind == 2) {
             added = edit_add_py_import(e, nd.mod, NULL);
             snprintf(what, sizeof what, "import %s", nd.mod);
