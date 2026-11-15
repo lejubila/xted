@@ -72,6 +72,10 @@ void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n);
 
 /* Like edit_replace_word for a class chosen in the suggestions; in a PHP file also adds the
  * "use fq;" statement when the class is not yet imported (fq NULL: just the word). One undo step. */
+/* Adds "#include <hdr>" to a C file unless the file already has it: among the system includes
+ * (in order if they are in order), else before the first local one, else at the top after the
+ * comments and the include guard. Returns 1 if a line was added. It does not open an undo group. */
+int edit_add_include(Editor *e, const char *hdr);
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq);
 
 /* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */

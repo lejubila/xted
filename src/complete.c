@@ -13,7 +13,7 @@
 
 typedef struct {
     char *w, *sig;
-    int kind, score;
+    int kind, score, std;
     size_t dist;            /* lines from the cursor; documents other than the current one: far */
 } Raw;
 
@@ -115,6 +115,7 @@ static void consider_sig(Gather *g, const char *w, size_t n, int kind, size_t di
     g->v[g->n].kind = kind;
     g->v[g->n].score = score + g->bonus;
     g->v[g->n].dist = dist;
+    g->v[g->n].std = 0;
     g->n++;
 }
 
@@ -129,8 +130,8 @@ static void sym_cb(void *ctx, const char *name, int kind, const char *sig, const
 {
     char buf[PM_PARAMS + PM_NAME + 96];
     int ck;
-    size_t n;
-    const Gather *g = ctx;
+    size_t n, before;
+    Gather *g = ctx;
 
     /* most of the library is rejected by the first letter: do not format it */
     if (g->plen > 0 && (strlen(name) < g->plen || !first_char_ok(g, name)))
@@ -158,7 +159,10 @@ static void sym_cb(void *ctx, const char *name, int kind, const char *sig, const
         n += (size_t)snprintf(buf + n, sizeof buf - n, "(%s)", sig);
     if (ck != CAND_CLASS && ret[0] && n < sizeof buf)
         snprintf(buf + n, sizeof buf - n, ": %s", ret);
+    before = g->n;
     consider_sig(ctx, name, strlen(name), ck, (size_t)rank, ck == CAND_CLASS && rank < 2 ? NULL : buf);
+    if (g->n > before)
+        g->v[g->n - 1].std = rank >= 2;
 }
 
 /* A class of the project for the suggestions: after `use` the qualified name itself, elsewhere
@@ -172,6 +176,7 @@ static void class_cb(void *ctx, const char *fq, int rank)
             g->v[g->n].w = xstrdup(fq);
             g->v[g->n].sig = NULL;
             g->v[g->n].kind = CAND_CLASS;
+            g->v[g->n].std = 0;
             /* the closer the last segment is to what was typed, the better; the project first */
             {
                 const char *last = strrchr(fq, '\\');
@@ -418,6 +423,7 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
         c->v[c->n].text = g.v[i].w;
         c->v[c->n].sig = g.v[i].sig;
         c->v[c->n].kind = g.v[i].kind;
+        c->v[c->n].std = g.v[i].std;
         c->n++;
     }
     for (i = take; i < g.n; i++) {

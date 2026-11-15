@@ -1,85 +1,94 @@
 #
-a64l(const char *s)>long int
-abort()>void
-abs(int x)>int
-accept(int fd, SOCKADDR_ARG addr, socklen_t *addr_len)>int
-accept4(int fd, SOCKADDR_ARG addr, socklen_t *addr_len, int flags)>int
-access(const char *name, int type)>int
-acct(const char *name)>int
-adjtime(const struct timeval *delta, struct timeval *olddelta)>int
-alarm(unsigned int seconds)>unsigned int
-aligned_alloc(size_t alignment, size_t size)>void *
-alphasort(const struct dirent **e1, const struct dirent **e2)>int
-arc4random()>__uint32_t
-arc4random_buf(void *buf, size_t size)>void
-arc4random_uniform(uint32_t upper_bound)>__uint32_t
-asctime(const struct tm *tp)>char *
-asctime_r(const struct tm *tp, char *buf)>char *
-asprintf(char **ptr, const char *fmt, ...)>int
+@arpa/inet.h
+inet_addr(const char *cp)>in_addr_t
+inet_aton(const char *cp, struct in_addr *inp)>int
+inet_lnaof(struct in_addr in)>in_addr_t
+inet_makeaddr(in_addr_t net, in_addr_t host)>:in_addr
+inet_net_ntop(int af, const void *cp, int bits, char *buf, size_t len)>char *
+inet_net_pton(int af, const char *cp, void *buf, size_t len)>int
+inet_neta(in_addr_t net, char *buf, size_t len)>char *
+inet_netof(struct in_addr in)>in_addr_t
+inet_network(const char *cp)>in_addr_t
+inet_nsap_addr(const char *cp, unsigned char *buf, int len)>unsigned int
+inet_nsap_ntoa(int len, const unsigned char *cp, char *buf)>char *
+inet_ntoa(struct in_addr in)>char *
+inet_ntop(int af, const void *cp, char *buf, socklen_t len)>char *
+inet_pton(int af, const char *cp, void *buf)>int
+@assert.h
 assert(expr)>
 assert_perror(errnum)>
-at_quick_exit(void (*func)(void))>int
-atexit(void (*func)(void))>int
-atof(const char *nptr)>double
-atoi(const char *nptr)>int
-atol(const char *nptr)>long int
-atoll(const char *nptr)>long long int
-basename(char *filename)>char *
-bcmp(const void *s1, const void *s2, size_t n)>int
-bcopy(const void *src, void *dest, size_t n)>void
-bind(int fd, CONST_SOCKADDR_ARG addr, socklen_t len)>int
-bindresvport(int sockfd, struct sockaddr_in *sock_in)>int
-bindresvport6(int sockfd, struct sockaddr_in6 *sock_in)>int
-brk(void *addr)>int
-bsd_signal(int sig, sighandler_t handler)>__sighandler_t
-bsearch(KEY, BASE, NMEMB, SIZE, COMPAR)>
-btowc(int c)>wint_t
-bzero(void *s, size_t n)>void
-call_once(once_flag *flag, void (*func)(void))>void
-calloc(size_t nmemb, size_t size)>void *
-canonicalize_file_name(const char *name)>char *
-cfgetibaud(const struct termios *termios_p)>baud_t
-cfgetispeed(const struct termios *termios_p)>speed_t
-cfgetobaud(const struct termios *termios_p)>baud_t
-cfgetospeed(const struct termios *termios_p)>speed_t
-cfmakeraw(struct termios *termios_p)>void
-cfsetbaud(struct termios *termios_p, baud_t baud)>int
-cfsetibaud(struct termios *termios_p, baud_t baud)>int
-cfsetispeed(struct termios *termios_p, speed_t speed)>int
-cfsetobaud(struct termios *termios_p, baud_t baud)>int
-cfsetospeed(struct termios *termios_p, speed_t speed)>int
-cfsetspeed(struct termios *termios_p, speed_t speed)>int
-chdir(const char *path)>int
-chmod(const char *file, mode_t mode)>int
-chown(const char *file, uid_t owner, gid_t group)>int
-chroot(const char *path)>int
-clearenv()>int
-clearerr(FILE *stream)>void
-clearerr_unlocked(FILE *stream)>void
-clock()>clock_t
-clock_getcpuclockid(pid_t pid, clockid_t *clock_id)>int
-clock_getres(clockid_t clock_id, struct timespec *res)>int
-clock_gettime(clockid_t clock_id, struct timespec *tp)>int
-clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *req, struct timespec *rem)>int
-clock_settime(clockid_t clock_id, const struct timespec *tp)>int
-close(int fd)>int
-close_range(unsigned int fd, unsigned int max_fd, int flags)>int
+@complex.h
+CMPLX:
+CMPLXF:
+CMPLXF128:
+CMPLXF128X:
+CMPLXF16:
+CMPLXF32:
+CMPLXF32X:
+CMPLXF64X:
+CMPLXL:
+@ctype.h
+isalnum(int c)>int
+isalnum_l(c, l)>
+isalpha(int c)>int
+isalpha_l(c, l)>
+isascii(c)>
+isascii_l(c, l)>
+isblank_l(c, l)>
+iscntrl(int c)>int
+iscntrl_l(c, l)>
+isctype(int c, int mask)>int
+isdigit(int c)>int
+isdigit_l(c, l)>
+isgraph(int c)>int
+isgraph_l(c, l)>
+islower(int c)>int
+islower_l(c, l)>
+isprint(int c)>int
+isprint_l(c, l)>
+ispunct(int c)>int
+ispunct_l(c, l)>
+isspace(int c)>int
+isspace_l(c, l)>
+isupper(int c)>int
+isupper_l(c, l)>
+isxdigit(int c)>int
+isxdigit_l(c, l)>
+toascii(c)>
+toascii_l(c, l)>
+tolower(c)>
+tolower_l(c, locale)>
+toupper(c)>
+toupper_l(c, locale)>
+@dirent.h
+alphasort(const struct dirent **e1, const struct dirent **e2)>int
 closedir(DIR *dirp)>int
-closefrom(int lowfd)>void
-confstr(int name, char *buf, size_t len)>size_t
-connect(int fd, CONST_SOCKADDR_ARG addr, socklen_t len)>int
-copy_file_range(int infd, off64_t *pinoff, int outfd, off64_t *poutoff, size_t length, unsigned int flags)>ssize_t
-creat(const char *file, mode_t mode)>int
-crypt(const char *key, const char *salt)>char *
-ctermid(char *s)>char *
-ctime(const time_t *timer)>char *
-ctime_r(const time_t *timer, char *buf)>char *
-cuserid(char *s)>char *
-daemon(int nochdir, int noclose)>int
-difftime(time_t time1, time_t time0)>double
 dirfd(dirp)>
-dirname(char *path)>char *
-div(int numer, int denom)>div_t
+fdopendir(int fd)>DIR *
+getdirentries(int fd, char *buf, size_t nbytes, off_t *basep)>__ssize_t
+opendir(const char *name)>DIR *
+readdir(DIR *dirp)>:dirent *
+readdir64_r(DIR *dirp, struct dirent64 *entry, struct dirent64 **result)>int
+readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result)>int
+rewinddir(DIR *dirp)>void
+scandir(const char *dir, struct dirent ***namelist, int (*selector)(const struct dirent *), int (*)>int
+scandirat(int dfd, const char *dir, struct dirent ***namelist, int (*selector)(const struct dirent *)>int
+seekdir(DIR *dirp, long int pos)>void
+telldir(DIR *dirp)>long int
+versionsort(const struct dirent **e1, const struct dirent **e2)>int
+DTTOIF:
+DT_BLK:
+DT_CHR:
+DT_DIR:
+DT_FIFO:
+DT_LNK:
+DT_REG:
+DT_SOCK:
+DT_UNKNOWN:
+DT_WHT:
+IFTODT:
+MAXNAMLEN:
+@dlfcn.h
 dladdr(const void *address, Dl_info *info)>int
 dladdr1(const void *address, Dl_info *info, void **extra_info, int flags)>int
 dlclose(void *handle)>int
@@ -89,58 +98,100 @@ dlmopen(Lmid_t nsid, const char *file, int mode)>void *
 dlopen(const char *file, int mode)>void *
 dlsym(void *handle, const char *name)>void *
 dlvsym(void *handle, const char *name, const char *version)>void *
-dprintf(int fd, const char *fmt, ...)>int
-drand48()>double
-drand48_r(struct drand48_data *buffer, double *result)>int
-dup(int fd)>int
-dup2(int fd, int fd2)>int
-dup3(int fd, int fd2, int flags)>int
-duplocale(locale_t dataset)>locale_t
-dysize(int year)>int
-eaccess(const char *name, int type)>int
-ecvt(double value, int ndigit, int *decpt, int *sign)>char *
-ecvt_r(double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
-endgrent()>void
-endhostent()>void
-endnetent()>void
-endnetgrent()>void
-endprotoent()>void
-endpwent()>void
-endservent()>void
-endusershell()>void
-epoll_create(int size)>int
-epoll_create1(int flags)>int
-epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)>int
-epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *ss)>int
-epoll_pwait2(int epfd, struct epoll_event *events, int maxevents, const struct timespec *timeout, const)>int
-epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)>int
-erand48(unsigned short int xsubi[3])>double
-erand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, double *result)>int
-euidaccess(const char *name, int type)>int
-execl(const char *path, const char *arg, ...)>int
-execle(const char *path, const char *arg, ...)>int
-execlp(const char *file, const char *arg, ...)>int
-execv(const char *path, char *const argv[])>int
-execve(const char *path, char *const argv[], char *const envp[])>int
-execveat(int fd, const char *path, char *const argv[], char *const envp[], int flags)>int
-execvp(const char *file, char *const argv[])>int
-execvpe(const char *file, char *const argv[], char *const envp[])>int
-exit(int status)>void
-explicit_bzero(void *s, size_t n)>void
-faccessat(int fd, const char *file, int type, int flag)>int
-fchdir(int fd)>int
-fchmod(int fd, mode_t mode)>int
-fchmodat(int fd, const char *file, mode_t mode, int flag)>int
-fchown(int fd, uid_t owner, gid_t group)>int
-fchownat(int fd, const char *file, uid_t owner, gid_t group, int flag)>int
-fclose(FILE *stream)>int
-fcloseall()>int
+DLFO_FLAG_SFRAME:
+LM_ID_BASE:
+LM_ID_NEWLM:
+RTLD_DEFAULT:
+RTLD_DI_CONFIGADDR:
+RTLD_DI_LINKMAP:
+RTLD_DI_LMID:
+RTLD_DI_MAX:
+RTLD_DI_ORIGIN:
+RTLD_DI_PHDR:
+RTLD_DI_PROFILENAME:
+RTLD_DI_PROFILEOUT:
+RTLD_DI_SERINFO:
+RTLD_DI_SERINFOSIZE:
+RTLD_DI_TLS_DATA:
+RTLD_DI_TLS_MODID:
+RTLD_DL_LINKMAP:
+RTLD_DL_SYMENT:
+RTLD_NEXT:
+@errno.h
+EACCES:
+EAGAIN:
+EBADF:
+EEXIST:
+EINTR:
+EINVAL:
+EIO:
+EISDIR:
+ENOENT:
+ENOMEM:
+ENOSPC:
+ENOTDIR:
+EPERM:
+EPIPE:
+ERANGE:
+ETIMEDOUT:
+errno:int
+@fcntl.h
+creat(const char *file, mode_t mode)>int
 fcntl(int fd, int cmd, ...)>int
-fcvt(double value, int ndigit, int *decpt, int *sign)>char *
-fcvt_r(double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
-fdatasync(int fildes)>int
-fdopen(int fd, const char *modes)>FILE *
-fdopendir(int fd)>DIR *
+open(const char *file, int oflag, ...)>int
+openat(int fd, const char *file, int oflag, ...)>int
+posix_fadvise(int fd, off_t offset, off_t len, int advise)>int
+posix_fallocate(int fd, off_t offset, off_t len)>int
+AT_EACCESS:
+AT_EMPTY_PATH:
+AT_FDCWD:
+AT_NO_AUTOMOUNT:
+AT_RECURSIVE:
+AT_REMOVEDIR:
+AT_STATX_DONT_SYNC:
+AT_STATX_FORCE_SYNC:
+AT_STATX_SYNC_AS_STAT:
+AT_STATX_SYNC_TYPE:
+AT_SYMLINK_FOLLOW:
+AT_SYMLINK_NOFOLLOW:
+FD_CLOEXEC:
+F_GETFD:
+F_GETFL:
+F_SETFD:
+F_SETFL:
+O_APPEND:
+O_CLOEXEC:
+O_CREAT:
+O_EXCL:
+O_NONBLOCK:
+O_RDONLY:
+O_RDWR:
+O_TRUNC:
+O_WRONLY:
+S_IFBLK:
+S_IFCHR:
+S_IFDIR:
+S_IFIFO:
+S_IFLNK:
+S_IFMT:
+S_IFREG:
+S_IFSOCK:
+S_IRGRP:
+S_IROTH:
+S_IRUSR:
+S_IRWXG:
+S_IRWXO:
+S_IRWXU:
+S_ISGID:
+S_ISUID:
+S_ISVTX:
+S_IWGRP:
+S_IWOTH:
+S_IWUSR:
+S_IXGRP:
+S_IXOTH:
+S_IXUSR:
+@fenv.h
 feclearexcept(int excepts)>int
 fedisableexcept(int excepts)>int
 feenableexcept(int excepts)>int
@@ -150,11 +201,7 @@ fegetexceptflag(fexcept_t *flagp, int excepts)>int
 fegetmode(femode_t *modep)>int
 fegetround()>int
 feholdexcept(fenv_t *envp)>int
-feof(FILE *stream)>int
-feof_unlocked(FILE *stream)>int
 feraiseexcept(int excepts)>int
-ferror(FILE *stream)>int
-ferror_unlocked(FILE *stream)>int
 fesetenv(const fenv_t *envp)>int
 fesetexcept(int excepts)>int
 fesetexceptflag(const fexcept_t *flagp, int excepts)>int
@@ -163,97 +210,46 @@ fesetround(int rounding_direction)>int
 fetestexcept(int excepts)>int
 fetestexceptflag(const fexcept_t *flagp, int excepts)>int
 feupdateenv(const fenv_t *envp)>int
-fexecve(int fd, char *const argv[], char *const envp[])>int
-fflush(FILE *stream)>int
-fflush_unlocked(FILE *stream)>int
-ffs(int i)>int
-ffsl(long int l)>int
-ffsll(long long int ll)>int
-fgetc(FILE *stream)>int
-fgetc_unlocked(FILE *stream)>int
+FE_SNANS_ALWAYS_SIGNAL:
+@fnmatch.h
+fnmatch(const char *pattern, const char *name, int flags)>int
+FNM_CASEFOLD:
+FNM_EXTMATCH:
+FNM_FILE_NAME:
+FNM_LEADING_DIR:
+FNM_NOESCAPE:
+FNM_NOMATCH:
+FNM_NOSYS:
+FNM_PATHNAME:
+FNM_PERIOD:
+@glob.h
+glob(const char *pattern, int flags, int (*errfunc)(const char *, int), glob_t *pglob)>int
+glob_pattern_p(const char *pattern, int quote)>int
+globfree(glob_t *pglob)>void
+GLOB_ABEND:
+GLOB_ABORTED:
+GLOB_ALTDIRFUNC:
+GLOB_APPEND:
+GLOB_BRACE:
+GLOB_DOOFFS:
+GLOB_ERR:
+GLOB_MAGCHAR:
+GLOB_MARK:
+GLOB_NOCHECK:
+GLOB_NOESCAPE:
+GLOB_NOMAGIC:
+GLOB_NOMATCH:
+GLOB_NOSORT:
+GLOB_NOSPACE:
+GLOB_NOSYS:
+GLOB_ONLYDIR:
+GLOB_PERIOD:
+GLOB_TILDE:
+GLOB_TILDE_CHECK:
+@grp.h
+endgrent()>void
 fgetgrent(FILE *stream)>:group *
 fgetgrent_r(FILE *stream, struct group *resultbuf, char *buffer, size_t buflen, struct group **result)>int
-fgetpos(FILE *stream, fpos_t *pos)>int
-fgetpwent(FILE *stream)>:passwd *
-fgetpwent_r(FILE *stream, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **resul)>int
-fgets(char *s, int n, FILE *stream)>char *
-fgets_unlocked(char *s, int n, FILE *stream)>char *
-fgetwc(FILE *stream)>wint_t
-fgetwc_unlocked(FILE *stream)>wint_t
-fgetws(wchar_t *ws, int n, FILE *stream)>wchar_t *
-fgetws_unlocked(wchar_t *ws, int n, FILE *stream)>wchar_t *
-fileno(FILE *stream)>int
-fileno_unlocked(FILE *stream)>int
-flockfile(FILE *stream)>void
-fmemopen(void *s, size_t len, const char *modes)>FILE *
-fnmatch(const char *pattern, const char *name, int flags)>int
-fopen(const char *filename, const char *modes)>FILE *
-fopencookie(void *magic_cookie, const char *modes, cookie_io_functions_t io_funcs)>FILE *
-fork()>__pid_t
-fpathconf(int fd, int name)>long int
-fpclassify(x)>
-fprintf(FILE *stream, const char *format, ...)>int
-fputc(int c, FILE *stream)>int
-fputc_unlocked(int c, FILE *stream)>int
-fputs(const char *s, FILE *stream)>int
-fputs_unlocked(const char *s, FILE *stream)>int
-fputwc(wchar_t wc, FILE *stream)>wint_t
-fputwc_unlocked(wchar_t wc, FILE *stream)>wint_t
-fputws(const wchar_t *ws, FILE *stream)>int
-fputws_unlocked(const wchar_t *ws, FILE *stream)>int
-fread(void *ptr, size_t size, size_t n, FILE *stream)>size_t
-fread_unlocked(void *ptr, size_t size, size_t n, FILE *stream)>size_t
-free(void *ptr)>void
-free_aligned_sized(void *ptr, size_t alignment, size_t size)>void
-free_sized(void *ptr, size_t size)>void
-freeaddrinfo(struct addrinfo *ai)>void
-freeifaddrs(struct ifaddrs *ifa)>void
-freelocale(locale_t dataset)>void
-freopen(const char *filename, const char *modes, FILE *stream)>FILE *
-fscanf(FILE *stream, const char *format, ...)>int
-fseek(FILE *stream, long int off, int whence)>int
-fseeko(FILE *stream, off_t off, int whence)>int
-fsetpos(FILE *stream, const fpos_t *pos)>int
-fstat(int fd, struct stat *buf)>int
-fstatat(int fd, const char *file, struct stat *buf, int flag)>int
-fsync(int fd)>int
-ftell(FILE *stream)>long int
-ftello(FILE *stream)>__off_t
-ftruncate(int fd, off_t length)>int
-ftrylockfile(FILE *stream)>int
-funlockfile(FILE *stream)>void
-futimens(int fd, const struct timespec times[2])>int
-futimes(int fd, const struct timeval tvp[2])>int
-futimesat(int fd, const char *file, const struct timeval tvp[2])>int
-fwide(FILE *fp, int mode)>int
-fwprintf(FILE *stream, const wchar_t *format, ...)>int
-fwrite(const void *ptr, size_t size, size_t n, FILE *s)>size_t
-fwrite_unlocked(const void *ptr, size_t size, size_t n, FILE *stream)>size_t
-fwscanf(FILE *stream, const wchar_t *format, ...)>int
-gai_cancel(struct gaicb *gaicbp)>int
-gai_error(struct gaicb *req)>int
-gai_strerror(int ecode)>char *
-gai_suspend(const struct gaicb *const list[], int ent, const struct timespec *timeout)>int
-gcvt(double value, int ndigit, char *buf)>char *
-get_current_dir_name()>char *
-getaddrinfo(const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai)>int
-getaddrinfo_a(int mode, struct gaicb *list[], int ent, struct sigevent *sig)>int
-getc(FILE *stream)>int
-getc_unlocked(FILE *stream)>int
-getchar()>int
-getchar_unlocked()>int
-getcwd(char *buf, size_t size)>char *
-getdate(const char *string)>:tm *
-getdate_r(const char *string, struct tm *resbufp)>int
-getdelim(char **lineptr, size_t *n, int delimiter, FILE *stream)>__ssize_t
-getdirentries(int fd, char *buf, size_t nbytes, off_t *basep)>__ssize_t
-getdomainname(char *name, size_t len)>int
-getdtablesize()>int
-getegid()>__gid_t
-getentropy(void *buffer, size_t length)>int
-getenv(const char *name)>char *
-geteuid()>__uid_t
-getgid()>__gid_t
 getgrent()>:group *
 getgrent_r(struct group *resultbuf, char *buffer, size_t buflen, struct group **result)>int
 getgrgid(gid_t gid)>:group *
@@ -261,7 +257,244 @@ getgrgid_r(gid_t gid, struct group *resultbuf, char *buffer, size_t buflen, stru
 getgrnam(const char *name)>:group *
 getgrnam_r(const char *name, struct group *resultbuf, char *buffer, size_t buflen, struct group **res)>int
 getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups)>int
-getgroups(int size, gid_t list[])>int
+initgroups(const char *user, gid_t group)>int
+putgrent(const struct group *p, FILE *f)>int
+setgrent()>void
+setgroups(size_t n, const gid_t *groups)>int
+NSS_BUFLEN_GROUP:
+@ifaddrs.h
+freeifaddrs(struct ifaddrs *ifa)>void
+getifaddrs(struct ifaddrs **ifap)>int
+@inttypes.h
+imaxabs(intmax_t n)>intmax_t
+imaxdiv(intmax_t numer, intmax_t denom)>imaxdiv_t
+strtoimax(const char *nptr, char **endptr, int base)>intmax_t
+strtoumax(const char *nptr, char **endptr, int base)>uintmax_t
+umaxabs(intmax_t n)>uintmax_t
+wcstoimax(const gwchar_t *nptr, gwchar_t **endptr, int base)>intmax_t
+wcstoumax(const gwchar_t *nptr, gwchar_t **endptr, int base)>uintmax_t
+PRIB16:
+PRIB32:
+PRIB8:
+PRIBFAST16:
+PRIBFAST32:
+PRIBFAST8:
+PRIBLEAST16:
+PRIBLEAST32:
+PRIBLEAST8:
+PRIBMAX:
+PRIBPTR:
+PRIX16:
+PRIX32:
+PRIX8:
+PRIXFAST16:
+PRIXFAST32:
+PRIXFAST8:
+PRIXLEAST16:
+PRIXLEAST32:
+PRIXLEAST8:
+PRIXMAX:
+PRIXPTR:
+@libgen.h
+dirname(char *path)>char *
+@limits.h
+BOOL_MAX:
+BOOL_WIDTH:
+CHAR_BIT:
+CHAR_MAX:
+CHAR_MIN:
+CHAR_WIDTH:
+INT_MAX:
+INT_MIN:
+INT_WIDTH:
+LLONG_MAX:
+LLONG_MIN:
+LLONG_WIDTH:
+LONG_MAX:
+LONG_MIN:
+LONG_WIDTH:
+MB_LEN_MAX:
+SCHAR_MAX:
+SCHAR_MIN:
+SCHAR_WIDTH:
+SHRT_MAX:
+SHRT_MIN:
+SHRT_WIDTH:
+UCHAR_MAX:
+UCHAR_WIDTH:
+UINT_MAX:
+UINT_WIDTH:
+ULLONG_MAX:
+ULLONG_WIDTH:
+ULONG_MAX:
+ULONG_WIDTH:
+USHRT_MAX:
+USHRT_WIDTH:
+@locale.h
+duplocale(locale_t dataset)>locale_t
+freelocale(locale_t dataset)>void
+localeconv()>:lconv *
+newlocale(int category_mask, const char *locale, locale_t base)>locale_t
+setlocale(int category, const char *locale)>char *
+uselocale(locale_t dataset)>locale_t
+LC_ADDRESS:
+LC_ADDRESS_MASK:
+LC_ALL:
+LC_ALL_MASK:
+LC_COLLATE:
+LC_COLLATE_MASK:
+LC_CTYPE:
+LC_CTYPE_MASK:
+LC_GLOBAL_LOCALE:
+LC_IDENTIFICATION:
+LC_IDENTIFICATION_MASK:
+LC_MEASUREMENT:
+LC_MEASUREMENT_MASK:
+LC_MESSAGES:
+LC_MESSAGES_MASK:
+LC_MONETARY:
+LC_MONETARY_MASK:
+LC_NAME:
+LC_NAME_MASK:
+LC_NUMERIC:
+LC_NUMERIC_MASK:
+LC_PAPER:
+LC_PAPER_MASK:
+LC_TELEPHONE:
+LC_TELEPHONE_MASK:
+LC_TIME:
+LC_TIME_MASK:
+@math.h
+acos(double x)>double
+asin(double x)>double
+atan(double x)>double
+atan2(double y, double x)>double
+cbrt(double x)>double
+ceil(double x)>double
+cos(double x)>double
+cosh(double x)>double
+exp(double x)>double
+fabs(double x)>double
+floor(double x)>double
+fmax(double x, double y)>double
+fmin(double x, double y)>double
+fmod(double x, double y)>double
+fpclassify(x)>
+hypot(double x, double y)>double
+iseqsig(x, y)>
+isfinite(x)>
+isgreater(x, y)>
+isgreaterequal(x, y)>
+isinf(x)>
+isless(x, y)>
+islessequal(x, y)>
+islessgreater(x, y)>
+isnan(x)>
+isnormal(x)>
+issignaling(x)>
+issubnormal(x)>
+isunordered(x, y)>
+iszero(x)>
+log(double x)>double
+log10(double x)>double
+log2(double x)>double
+lround(double x)>long
+pow(double x, double y)>double
+round(double x)>double
+signbit(x)>
+sin(double x)>double
+sinh(double x)>double
+sqrt(double x)>double
+tan(double x)>double
+tanh(double x)>double
+trunc(double x)>double
+FP_ILOGB0:
+FP_ILOGBNAN:
+FP_INFINITE:
+FP_INT_DOWNWARD:
+FP_INT_TONEAREST:
+FP_INT_TONEARESTFROMZERO:
+FP_INT_TOWARDZERO:
+FP_INT_UPWARD:
+FP_LLOGB0:
+FP_LLOGBNAN:
+FP_NAN:
+FP_NORMAL:
+FP_SUBNORMAL:
+FP_ZERO:
+HUGE_VAL:
+HUGE_VALF:
+HUGE_VALL:
+HUGE_VAL_F128:
+HUGE_VAL_F128X:
+HUGE_VAL_F16:
+HUGE_VAL_F32:
+HUGE_VAL_F32X:
+HUGE_VAL_F64X:
+INFINITY:
+MATH_ERREXCEPT:
+MATH_ERRNO:
+MAXFLOAT:
+M_1_PI:
+M_2_PI:
+M_2_SQRTPI:
+M_E:
+M_LN10:
+M_LN2:
+M_LOG10E:
+M_LOG2E:
+M_PI:
+M_PI_2:
+M_PI_4:
+M_SQRT1_2:
+M_SQRT2:
+NAN:
+SNAN:
+SNANF:
+SNANF128:
+SNANF128X:
+SNANF16:
+SNANF32:
+SNANF32X:
+SNANF64X:
+SNANL:
+@net/if.h
+if_freenameindex(struct if_nameindex *ptr)>void
+if_indextoname(unsigned int ifindex, char ifname[IF_NAMESIZE])>char *
+if_nameindex()>:if_nameindex *
+if_nametoindex(const char *ifname)>unsigned int
+IFF_ALLMULTI:
+IFF_AUTOMEDIA:
+IFF_BROADCAST:
+IFF_DEBUG:
+IFF_DYNAMIC:
+IFF_LOOPBACK:
+IFF_MASTER:
+IFF_MULTICAST:
+IFF_NOARP:
+IFF_NOTRAILERS:
+IFF_POINTOPOINT:
+IFF_PORTSEL:
+IFF_PROMISC:
+IFF_RUNNING:
+IFF_SLAVE:
+IFF_UP:
+IFHWADDRLEN:
+IFNAMSIZ:
+IF_NAMESIZE:
+@netdb.h
+endhostent()>void
+endnetent()>void
+endnetgrent()>void
+endprotoent()>void
+endservent()>void
+freeaddrinfo(struct addrinfo *ai)>void
+gai_cancel(struct gaicb *gaicbp)>int
+gai_error(struct gaicb *req)>int
+gai_strerror(int ecode)>char *
+gai_suspend(const struct gaicb *const list[], int ent, const struct timespec *timeout)>int
+getaddrinfo(const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai)>int
+getaddrinfo_a(int mode, struct gaicb *list[], int ent, struct sigevent *sig)>int
 gethostbyaddr(const void *addr, socklen_t len, int type)>:hostent *
 gethostbyaddr_r(const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t b)>int
 gethostbyname(const char *name)>:hostent *
@@ -270,15 +503,6 @@ gethostbyname2_r(const char *name, int af, struct hostent *result_buf, char *buf
 gethostbyname_r(const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **r)>int
 gethostent()>:hostent *
 gethostent_r(struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errn)>int
-gethostid()>long int
-gethostname(char *name, size_t len)>int
-getifaddrs(struct ifaddrs **ifap)>int
-getipv4sourcefilter(int s, struct in_addr interface_addr, struct in_addr group, uint32_t *fmode, uint32_t *num)>int
-getitimer(itimer_which_t which, struct itimerval *value)>int
-getline(char **lineptr, size_t *n, FILE *stream)>__ssize_t
-getloadavg(double loadavg[], int nelem)>int
-getlogin()>char *
-getlogin_r(char *name, size_t name_len)>int
 getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, soc)>int
 getnetbyaddr(uint32_t net, int type)>:netent *
 getnetbyaddr_r(uint32_t net, int type, struct netent *result_buf, char *buf, size_t buflen, struct netent)>int
@@ -288,73 +512,92 @@ getnetent()>:netent *
 getnetent_r(struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop)>int
 getnetgrent(char **hostp, char **userp, char **domainp)>int
 getnetgrent_r(char **hostp, char **userp, char **domainp, char *buffer, size_t buflen)>int
-getpagesize()>int
-getpass(const char *prompt)>char *
-getpeername(int fd, SOCKADDR_ARG addr, socklen_t *len)>int
-getpgid(pid_t pid)>__pid_t
-getpgrp()>__pid_t
-getpid()>__pid_t
-getppid()>__pid_t
-getpriority(priority_which_t which, id_t who)>int
 getprotobyname(const char *name)>:protoent *
 getprotobyname_r(const char *name, struct protoent *result_buf, char *buf, size_t buflen, struct protoent *)>int
 getprotobynumber(int proto)>:protoent *
 getprotobynumber_r(int proto, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result)>int
 getprotoent()>:protoent *
 getprotoent_r(struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result)>int
-getpt()>int
-getpw(uid_t uid, char *buffer)>int
-getpwent()>:passwd *
-getpwent_r(struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **result)>int
-getpwnam(const char *name)>:passwd *
-getpwnam_r(const char *name, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **r)>int
-getpwuid(uid_t uid)>:passwd *
-getpwuid_r(uid_t uid, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **result)>int
-getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)>int
-getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)>int
-getrlimit(rlimit_resource_t resource, struct rlimit *rlimits)>int
-getrusage(rusage_who_t who, struct rusage *usage)>int
-gets(char *s)>char *
 getservbyname(const char *name, const char *proto)>:servent *
 getservbyname_r(const char *name, const char *proto, struct servent *result_buf, char *buf, size_t buflen,)>int
 getservbyport(int port, const char *proto)>:servent *
 getservbyport_r(int port, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct )>int
 getservent()>:servent *
 getservent_r(struct servent *result_buf, char *buf, size_t buflen, struct servent **result)>int
-getsid(pid_t pid)>__pid_t
-getsockname(int fd, SOCKADDR_ARG addr, socklen_t *len)>int
-getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)>int
-getsourcefilter(int s, uint32_t interface_addr, const struct sockaddr *group, socklen_t grouplen, uint32_t)>int
-getsubopt(char **optionp, char *const *tokens, char **valuep)>int
-gettimeofday(struct timeval *tv, void *tz)>int
-getuid()>__uid_t
-getumask()>__mode_t
-getusershell()>char *
-getw(FILE *stream)>int
-getwc(FILE *stream)>wint_t
-getwc_unlocked(FILE *stream)>wint_t
-getwchar()>wint_t
-getwchar_unlocked()>wint_t
-getwd(char *buf)>char *
-glob(const char *pattern, int flags, int (*errfunc)(const char *, int), glob_t *pglob)>int
-glob_pattern_p(const char *pattern, int quote)>int
-globfree(glob_t *pglob)>void
-gmtime(const time_t *timer)>:tm *
-gmtime_r(const time_t *timer, struct tm *tp)>:tm *
-grantpt(int fd)>int
-group_member(gid_t gid)>int
-gsignal(int sig)>int
 herror(const char *str)>void
 hstrerror(int err_num)>char *
+innetgr(const char *netgroup, const char *host, const char *user, const char *domain)>int
+iruserok(uint32_t raddr, int suser, const char *remuser, const char *locuser)>int
+iruserok_af(const void *raddr, int suser, const char *remuser, const char *locuser, sa_family_t af)>int
+rcmd(char **ahost, unsigned short int rport, const char *locuser, const char *remuser, const ch)>int
+rcmd_af(char **ahost, unsigned short int rport, const char *locuser, const char *remuser, const ch)>int
+rexec(char **ahost, int rport, const char *name, const char *pass, const char *cmd, int *fd2p)>int
+rexec_af(char **ahost, int rport, const char *name, const char *pass, const char *cmd, int *fd2p, s)>int
+rresvport(int *alport)>int
+rresvport_af(int *alport, sa_family_t af)>int
+ruserok(const char *rhost, int suser, const char *remuser, const char *locuser)>int
+ruserok_af(const char *rhost, int suser, const char *remuser, const char *locuser, sa_family_t af)>int
+sethostent(int stay_open)>void
+setnetent(int stay_open)>void
+setnetgrent(const char *netgroup)>int
+setprotoent(int stay_open)>void
+setservent(int stay_open)>void
+AI_ADDRCONFIG:
+AI_ALL:
+AI_CANONIDN:
+AI_CANONNAME:
+AI_IDN:
+AI_IDN_ALLOW_UNASSIGNED:
+AI_IDN_USE_STD3_ASCII_RULES:
+AI_NUMERICHOST:
+AI_NUMERICSERV:
+AI_PASSIVE:
+AI_V4MAPPED:
+EAI_ADDRFAMILY:
+EAI_AGAIN:
+EAI_ALLDONE:
+EAI_BADFLAGS:
+EAI_CANCELED:
+EAI_FAIL:
+EAI_FAMILY:
+EAI_IDN_ENCODE:
+EAI_INPROGRESS:
+EAI_INTR:
+EAI_MEMORY:
+EAI_NODATA:
+EAI_NONAME:
+EAI_NOTCANCELED:
+EAI_OVERFLOW:
+EAI_SERVICE:
+EAI_SOCKTYPE:
+EAI_SYSTEM:
+GAI_NOWAIT:
+GAI_WAIT:
+HOST_NOT_FOUND:
+NETDB_INTERNAL:
+NETDB_SUCCESS:
+NI_DGRAM:
+NI_IDN:
+NI_IDN_ALLOW_UNASSIGNED:
+NI_IDN_USE_STD3_ASCII_RULES:
+NI_MAXHOST:
+NI_MAXSERV:
+NI_NAMEREQD:
+NI_NOFQDN:
+NI_NUMERICHOST:
+NI_NUMERICSERV:
+NO_ADDRESS:
+NO_DATA:
+NO_RECOVERY:
+SCOPE_DELIMITER:
+TRY_AGAIN:
+@netinet/in.h
+bindresvport(int sockfd, struct sockaddr_in *sock_in)>int
+bindresvport6(int sockfd, struct sockaddr_in6 *sock_in)>int
+getipv4sourcefilter(int s, struct in_addr interface_addr, struct in_addr group, uint32_t *fmode, uint32_t *num)>int
+getsourcefilter(int s, uint32_t interface_addr, const struct sockaddr *group, socklen_t grouplen, uint32_t)>int
 htonl(x)>
 htons(x)>
-if_freenameindex(struct if_nameindex *ptr)>void
-if_indextoname(unsigned int ifindex, char ifname[IF_NAMESIZE])>char *
-if_nameindex()>:if_nameindex *
-if_nametoindex(const char *ifname)>unsigned int
-imaxabs(intmax_t n)>intmax_t
-imaxdiv(intmax_t numer, intmax_t denom)>imaxdiv_t
-index(char *s, int c)>char *
 inet6_opt_append(void *extbuf, socklen_t extlen, int offset, uint8_t type, socklen_t len, uint8_t align, vo)>int
 inet6_opt_find(void *extbuf, socklen_t extlen, int offset, uint8_t type, socklen_t *lenp, void **databufp)>int
 inet6_opt_finish(void *extbuf, socklen_t extlen, int offset)>int
@@ -374,181 +617,122 @@ inet6_rth_init(void *bp, socklen_t bp_len, int type, int segments)>void *
 inet6_rth_reverse(const void *in, void *out)>int
 inet6_rth_segments(const void *bp)>int
 inet6_rth_space(int type, int segments)>socklen_t
-inet_addr(const char *cp)>in_addr_t
-inet_aton(const char *cp, struct in_addr *inp)>int
-inet_lnaof(struct in_addr in)>in_addr_t
-inet_makeaddr(in_addr_t net, in_addr_t host)>:in_addr
-inet_net_ntop(int af, const void *cp, int bits, char *buf, size_t len)>char *
-inet_net_pton(int af, const char *cp, void *buf, size_t len)>int
-inet_neta(in_addr_t net, char *buf, size_t len)>char *
-inet_netof(struct in_addr in)>in_addr_t
-inet_network(const char *cp)>in_addr_t
-inet_nsap_addr(const char *cp, unsigned char *buf, int len)>unsigned int
-inet_nsap_ntoa(int len, const unsigned char *cp, char *buf)>char *
-inet_ntoa(struct in_addr in)>char *
-inet_ntop(int af, const void *cp, char *buf, socklen_t len)>char *
-inet_pton(int af, const char *cp, void *buf)>int
-initgroups(const char *user, gid_t group)>int
-initstate(unsigned int seed, char *statebuf, size_t statelen)>char *
-initstate_r(unsigned int seed, char *statebuf, size_t statelen, struct random_data *buf)>int
-innetgr(const char *netgroup, const char *host, const char *user, const char *domain)>int
-ioctl(int fd, unsigned long int request, ...)>int
-iruserok(uint32_t raddr, int suser, const char *remuser, const char *locuser)>int
-iruserok_af(const void *raddr, int suser, const char *remuser, const char *locuser, sa_family_t af)>int
-isalnum_l(c, l)>
-isalpha_l(c, l)>
-isascii(c)>
-isascii_l(c, l)>
-isatty(int fd)>int
-isblank_l(c, l)>
-iscntrl_l(c, l)>
-isctype(int c, int mask)>int
-isdigit_l(c, l)>
-iseqsig(x, y)>
-isfdtype(int fd, int fdtype)>int
-isfinite(x)>
-isgraph_l(c, l)>
-isgreater(x, y)>
-isgreaterequal(x, y)>
-isinf(x)>
-isless(x, y)>
-islessequal(x, y)>
-islessgreater(x, y)>
-islower_l(c, l)>
-isnan(x)>
-isnormal(x)>
-isprint_l(c, l)>
-ispunct_l(c, l)>
-issignaling(x)>
-isspace_l(c, l)>
-issubnormal(x)>
-isunordered(x, y)>
-isupper_l(c, l)>
-iswalnum_l(wint_t wc, locale_t locale)>int
-iswalpha_l(wint_t wc, locale_t locale)>int
-iswblank_l(wint_t wc, locale_t locale)>int
-iswcntrl_l(wint_t wc, locale_t locale)>int
-iswctype_l(wint_t wc, wctype_t desc, locale_t locale)>int
-iswdigit_l(wint_t wc, locale_t locale)>int
-iswgraph_l(wint_t wc, locale_t locale)>int
-iswlower_l(wint_t wc, locale_t locale)>int
-iswprint_l(wint_t wc, locale_t locale)>int
-iswpunct_l(wint_t wc, locale_t locale)>int
-iswspace_l(wint_t wc, locale_t locale)>int
-iswupper_l(wint_t wc, locale_t locale)>int
-iswxdigit_l(wint_t wc, locale_t locale)>int
-isxdigit_l(c, l)>
-iszero(x)>
-jrand48(unsigned short int xsubi[3])>long int
-jrand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, long int *result)>int
-kill(pid_t pid, int sig)>int
-killpg(pid_t pgrp, int sig)>int
-l64a(long int n)>char *
-labs(long int x)>long int
-lchmod(const char *file, mode_t mode)>int
-lchown(const char *file, uid_t owner, gid_t group)>int
-lcong48(unsigned short int param[7])>void
-lcong48_r(unsigned short int param[7], struct drand48_data *buffer)>int
-ldiv(long int numer, long int denom)>ldiv_t
-link(const char *from, const char *to)>int
-linkat(int fromfd, const char *from, int tofd, const char *to, int flags)>int
-listen(int fd, int n)>int
-llabs(long long int x)>long long int
-lldiv(long long int numer, long long int denom)>lldiv_t
-localeconv()>:lconv *
-localtime(const time_t *timer)>:tm *
-localtime_r(const time_t *timer, struct tm *tp)>:tm *
-lockf(int fd, int cmd, off_t len)>int
-longjmp(struct jmp_buf_tag env[1], int val)>void
-lrand48()>long int
-lrand48_r(struct drand48_data *buffer, long int *result)>int
-lseek(int fd, off_t offset, int whence)>__off_t
-lstat(const char *file, struct stat *buf)>int
-lutimes(const char *file, const struct timeval tvp[2])>int
-madvise(void *addr, size_t len, int advice)>int
-malloc(size_t size)>void *
-mblen(const char *s, size_t n)>int
-mbrlen(const char *s, size_t n, mbstate_t *ps)>size_t
-mbrtowc(wchar_t *pwc, const char *s, size_t n, mbstate_t *p)>size_t
-mbsinit(const mbstate_t *ps)>int
-mbsnrtowcs(wchar_t *dst, const char **src, size_t nmc, size_t len, mbstate_t *ps)>size_t
-mbsrtowcs(wchar_t *dst, const char **src, size_t len, mbstate_t *ps)>size_t
-mbstowcs(wchar_t *pwcs, const char *s, size_t n)>size_t
-mbtowc(wchar_t *pwc, const char *s, size_t n)>int
-memalignment(const void *p)>size_t
-memccpy(void *dest, const void *src, int c, size_t n)>void *
-memchr(S, C, N)>
-memcmp(const void *s1, const void *s2, size_t n)>int
-memcpy(void *dest, const void *src, size_t n)>void *
-memfrob(void *s, size_t n)>void *
-memmem(const void *haystack, size_t haystacklen, const void *needle, size_t needlelen)>void *
-memmove(void *dest, const void *src, size_t n)>void *
-mempcpy(void *dest, const void *src, size_t n)>void *
-memrchr(const void *s, int c, size_t n)>void *
-memset(void *s, int c, size_t n)>void *
-memset_explicit(void *s, int c, size_t n)>void *
-mincore(void *start, size_t len, unsigned char *vec)>int
-mkdir(const char *path, mode_t mode)>int
-mkdirat(int fd, const char *path, mode_t mode)>int
-mkdtemp(char *template)>char *
-mkfifo(const char *path, mode_t mode)>int
-mkfifoat(int fd, const char *path, mode_t mode)>int
-mknod(const char *path, mode_t mode, dev_t dev)>int
-mknodat(int fd, const char *path, mode_t mode, dev_t dev)>int
-mkostemp(char *template, int flags)>int
-mkostemps(char *template, int suffixlen, int flags)>int
-mkstemp(char *template)>int
-mkstemps(char *template, int suffixlen)>int
-mktemp(char *template)>char *
-mktime(struct tm *tp)>time_t
-mlock(const void *addr, size_t len)>int
-mlockall(int flags)>int
-mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)>void *
-mprotect(void *addr, size_t len, int prot)>int
-mrand48()>long int
-mrand48_r(struct drand48_data *buffer, long int *result)>int
-mremap(void *addr, size_t old_len, size_t new_len, int flags, ...)>void *
-msync(void *addr, size_t len, int flags)>int
-munlock(const void *addr, size_t len)>int
-munlockall()>int
-munmap(void *addr, size_t len)>int
-nanosleep(const struct timespec *requested_time, struct timespec *remaining)>int
-newlocale(int category_mask, const char *locale, locale_t base)>locale_t
-nice(int inc)>int
-nrand48(unsigned short int xsubi[3])>long int
-nrand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, long int *result)>int
 ntohl(x)>
 ntohs(x)>
-obstack_printf(struct obstack *obstack, const char *format, ...)>int
-obstack_vprintf(struct obstack *obstack, const char *format, gnuc_va_list args)>int
-on_exit(void (*func)(int status, void *arg), void *arg)>int
-open(const char *file, int oflag, ...)>int
-open_memstream(char **bufloc, size_t *sizeloc)>FILE *
-open_wmemstream(wchar_t **bufloc, size_t *sizeloc)>__FILE *
-openat(int fd, const char *file, int oflag, ...)>int
-opendir(const char *name)>DIR *
-pathconf(const char *path, int name)>long int
-pause()>int
-pclose(FILE *stream)>int
-perror(const char *s)>void
-pipe(int pipedes[2])>int
-pipe2(int pipedes[2], int flags)>int
-popen(const char *command, const char *modes)>FILE *
-posix_fadvise(int fd, off_t offset, off_t len, int advise)>int
-posix_fallocate(int fd, off_t offset, off_t len)>int
-posix_madvise(void *addr, size_t len, int advice)>int
-posix_memalign(void **memptr, size_t alignment, size_t size)>int
-posix_openpt(int oflag)>int
-pread(int fd, void *buf, size_t nbytes, off_t offset)>ssize_t
-preadv(int fd, const struct iovec *iovec, int count, off_t offset)>ssize_t
-preadv2(int fp, const struct iovec *iovec, int count, off_t offset, int _flags)>ssize_t
-preadv64v2(int fp, const struct iovec *iovec, int count, off64_t offset, int _flags)>ssize_t
-printf(const char *format, ...)>int
-profil(unsigned short int *sample_buffer, size_t size, size_t offset, unsigned int scale)>int
-pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *tim)>int
-psiginfo(const siginfo_t *pinfo, const char *s)>void
-psignal(int sig, const char *s)>void
-pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void))>int
+setipv4sourcefilter(int s, struct in_addr interface_addr, struct in_addr group, uint32_t fmode, uint32_t numsr)>int
+setsourcefilter(int s, uint32_t interface_addr, const struct sockaddr *group, socklen_t grouplen, uint32_t)>int
+GROUP_FILTER_SIZE:
+IN6ADDR_ANY_INIT:
+IN6ADDR_LOOPBACK_INIT:
+IN6_ARE_ADDR_EQUAL:
+IN6_IS_ADDR_LINKLOCAL:
+IN6_IS_ADDR_LOOPBACK:
+IN6_IS_ADDR_MC_GLOBAL:
+IN6_IS_ADDR_MC_LINKLOCAL:
+IN6_IS_ADDR_MC_NODELOCAL:
+IN6_IS_ADDR_MC_ORGLOCAL:
+IN6_IS_ADDR_MC_SITELOCAL:
+IN6_IS_ADDR_MULTICAST:
+IN6_IS_ADDR_SITELOCAL:
+IN6_IS_ADDR_UNSPECIFIED:
+IN6_IS_ADDR_V4COMPAT:
+IN6_IS_ADDR_V4MAPPED:
+INADDR_ALLHOSTS_GROUP:
+INADDR_ALLRTRS_GROUP:
+INADDR_ALLSNOOPERS_GROUP:
+INADDR_ANY:
+INADDR_BROADCAST:
+INADDR_DUMMY:
+INADDR_LOOPBACK:
+INADDR_MAX_LOCAL_GROUP:
+INADDR_NONE:
+INADDR_UNSPEC_GROUP:
+INET6_ADDRSTRLEN:
+INET_ADDRSTRLEN:
+IN_BADCLASS:
+IN_CLASSA:
+IN_CLASSA_HOST:
+IN_CLASSA_MAX:
+IN_CLASSA_NET:
+IN_CLASSA_NSHIFT:
+IN_CLASSB:
+IN_CLASSB_HOST:
+IN_CLASSB_MAX:
+IN_CLASSB_NET:
+IN_CLASSB_NSHIFT:
+IN_CLASSC:
+IN_CLASSC_HOST:
+IN_CLASSC_NET:
+IN_CLASSC_NSHIFT:
+IN_CLASSD:
+IN_EXPERIMENTAL:
+IN_LOOPBACKNET:
+IN_MULTICAST:
+IPPORT_BIFFUDP:
+IPPORT_CMDSERVER:
+IPPORT_DAYTIME:
+IPPORT_DISCARD:
+IPPORT_ECHO:
+IPPORT_EFSSERVER:
+IPPORT_EXECSERVER:
+IPPORT_FINGER:
+IPPORT_FTP:
+IPPORT_LOGINSERVER:
+IPPORT_MTP:
+IPPORT_NAMESERVER:
+IPPORT_NETSTAT:
+IPPORT_RESERVED:
+IPPORT_RJE:
+IPPORT_ROUTESERVER:
+IPPORT_SMTP:
+IPPORT_SUPDUP:
+IPPORT_SYSTAT:
+IPPORT_TELNET:
+IPPORT_TFTP:
+IPPORT_TIMESERVER:
+IPPORT_TTYLINK:
+IPPORT_USERRESERVED:
+IPPORT_WHOIS:
+IPPORT_WHOSERVER:
+IPPROTO_AH:
+IPPROTO_BEETPH:
+IPPROTO_COMP:
+IPPROTO_DCCP:
+IPPROTO_DSTOPTS:
+IPPROTO_EGP:
+IPPROTO_ENCAP:
+IPPROTO_ESP:
+IPPROTO_ETHERNET:
+IPPROTO_FRAGMENT:
+IPPROTO_GRE:
+IPPROTO_HOPOPTS:
+IPPROTO_ICMP:
+IPPROTO_ICMPV6:
+IPPROTO_IDP:
+IPPROTO_IGMP:
+IPPROTO_IP:
+IPPROTO_IPIP:
+IPPROTO_IPV6:
+IPPROTO_L2TP:
+IPPROTO_MAX:
+IPPROTO_MH:
+IPPROTO_MPLS:
+IPPROTO_MPTCP:
+IPPROTO_MTP:
+IPPROTO_NONE:
+IPPROTO_PIM:
+IPPROTO_PUP:
+IPPROTO_RAW:
+IPPROTO_ROUTING:
+IPPROTO_RSVP:
+IPPROTO_SCTP:
+IPPROTO_SMC:
+IPPROTO_TCP:
+IPPROTO_TP:
+IPPROTO_UDP:
+IPPROTO_UDPLITE:
+IP_MSFILTER_SIZE:
+@pthread.h
 pthread_attr_destroy(pthread_attr_t *attr)>int
 pthread_attr_getaffinity_np(const pthread_attr_t *attr, size_t cpusetsize, cpu_set_t *cpuset)>int
 pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)>int
@@ -674,41 +858,65 @@ pthread_testcancel()>void
 pthread_timedjoin_np(pthread_t th, void **thread_return, const struct timespec *abstime)>int
 pthread_tryjoin_np(pthread_t th, void **thread_return)>int
 pthread_yield()>int
-ptsname(int fd)>char *
-ptsname_r(int fd, char *buf, size_t buflen)>int
-putc(int c, FILE *stream)>int
-putc_unlocked(int c, FILE *stream)>int
-putchar(int c)>int
-putchar_unlocked(int c)>int
-putenv(char *string)>int
-putgrent(const struct group *p, FILE *f)>int
+~__pthread_cleanup_class()>
+PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP:
+PTHREAD_ATTR_NO_SIGMASK_NP:
+PTHREAD_BARRIER_SERIAL_THREAD:
+PTHREAD_CANCELED:
+PTHREAD_CANCEL_ASYNCHRONOUS:
+PTHREAD_CANCEL_DEFERRED:
+PTHREAD_CANCEL_DISABLE:
+PTHREAD_CANCEL_ENABLE:
+PTHREAD_COND_INITIALIZER:
+PTHREAD_CREATE_DETACHED:
+PTHREAD_CREATE_JOINABLE:
+PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP:
+PTHREAD_EXPLICIT_SCHED:
+PTHREAD_INHERIT_SCHED:
+PTHREAD_MUTEX_ADAPTIVE_NP:
+PTHREAD_MUTEX_DEFAULT:
+PTHREAD_MUTEX_ERRORCHECK:
+PTHREAD_MUTEX_ERRORCHECK_NP:
+PTHREAD_MUTEX_FAST_NP:
+PTHREAD_MUTEX_INITIALIZER:
+PTHREAD_MUTEX_NORMAL:
+PTHREAD_MUTEX_RECURSIVE:
+PTHREAD_MUTEX_RECURSIVE_NP:
+PTHREAD_MUTEX_ROBUST:
+PTHREAD_MUTEX_ROBUST_NP:
+PTHREAD_MUTEX_STALLED:
+PTHREAD_MUTEX_STALLED_NP:
+PTHREAD_MUTEX_TIMED_NP:
+PTHREAD_ONCE_INIT:
+PTHREAD_PRIO_INHERIT:
+PTHREAD_PRIO_NONE:
+PTHREAD_PRIO_PROTECT:
+PTHREAD_PROCESS_PRIVATE:
+PTHREAD_PROCESS_SHARED:
+PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP:
+PTHREAD_RWLOCK_DEFAULT_NP:
+PTHREAD_RWLOCK_INITIALIZER:
+PTHREAD_RWLOCK_PREFER_READER_NP:
+PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP:
+PTHREAD_RWLOCK_PREFER_WRITER_NP:
+PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP:
+PTHREAD_SCOPE_PROCESS:
+PTHREAD_SCOPE_SYSTEM:
+@pwd.h
+endpwent()>void
+fgetpwent(FILE *stream)>:passwd *
+fgetpwent_r(FILE *stream, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **resul)>int
+getpw(uid_t uid, char *buffer)>int
+getpwent()>:passwd *
+getpwent_r(struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **result)>int
+getpwnam(const char *name)>:passwd *
+getpwnam_r(const char *name, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **r)>int
+getpwuid(uid_t uid)>:passwd *
+getpwuid_r(uid_t uid, struct passwd *resultbuf, char *buffer, size_t buflen, struct passwd **result)>int
 putpwent(const struct passwd *p, FILE *f)>int
-puts(const char *s)>int
-putw(int w, FILE *stream)>int
-putwc(wchar_t wc, FILE *stream)>wint_t
-putwc_unlocked(wchar_t wc, FILE *stream)>wint_t
-putwchar(wchar_t wc)>wint_t
-putwchar_unlocked(wchar_t wc)>wint_t
-pwrite(int fd, const void *buf, size_t n, off_t offset)>ssize_t
-pwritev(int fd, const struct iovec *iovec, int count, off_t offset)>ssize_t
-pwritev2(int fd, const struct iovec *iodev, int count, off_t offset, int flags)>ssize_t
-pwritev64v2(int fd, const struct iovec *iodev, int count, off64_t offset, int flags)>ssize_t
-qecvt(long double value, int ndigit, int *decpt, int *sign)>char *
-qecvt_r(long double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
-qfcvt(long double value, int ndigit, int *decpt, int *sign)>char *
-qfcvt_r(long double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
-qgcvt(long double value, int ndigit, char *buf)>char *
-qsort(void *base, size_t nmemb, size_t size, compar_fn_t compar)>void
-qsort_r(void *base, size_t nmemb, size_t size, compar_d_fn_t compar, void *arg)>void
-quick_exit(int status)>void
-raise(int sig)>int
-rand()>int
-rand_r(unsigned int *seed)>int
-random()>long int
-random_r(struct random_data *buf, int32_t *result)>int
-rawmemchr(const void *s, int c)>void *
-rcmd(char **ahost, unsigned short int rport, const char *locuser, const char *remuser, const ch)>int
-rcmd_af(char **ahost, unsigned short int rport, const char *locuser, const char *remuser, const ch)>int
+setpwent()>void
+NSS_BUFLEN_PASSWD:
+@regex.h
 re_comp(const char *)>char *
 re_compile_fastmap(struct re_pattern_buffer *buffer)>int
 re_compile_pattern(const char *pattern, size_t length, struct re_pattern_buffer *buffer)>char *
@@ -719,45 +927,81 @@ re_search(struct re_pattern_buffer *buffer, const char *String, regoff_t length,
 re_search_2(struct re_pattern_buffer *buffer, const char *string1, regoff_t length1, const char *strin)>regoff_t
 re_set_registers(struct re_pattern_buffer *buffer, struct re_registers *regs, re_size_t num_regs, regoff_t )>void
 re_set_syntax(reg_syntax_t syntax)>reg_syntax_t
-read(int fd, void *buf, size_t nbytes)>ssize_t
-readdir(DIR *dirp)>:dirent *
-readdir64_r(DIR *dirp, struct dirent64 *entry, struct dirent64 **result)>int
-readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result)>int
-readlink(const char *path, char *buf, size_t len)>ssize_t
-readlinkat(int fd, const char *path, char *buf, size_t len)>ssize_t
-readv(int fd, const struct iovec *iovec, int count)>ssize_t
-realloc(void *ptr, size_t size)>void *
-reallocarray(void *ptr, size_t nmemb, size_t size)>void *
-realpath(const char *name, char *resolved)>char *
-recv(int fd, void *buf, size_t n, int flags)>ssize_t
-recvfrom(int fd, void *buf, size_t n, int flags, SOCKADDR_ARG addr, socklen_t *addr_len)>ssize_t
-recvmmsg(int fd, struct mmsghdr *vmessages, unsigned int vlen, int flags, struct timespec *tmo)>int
-recvmsg(int fd, struct msghdr *message, int flags)>ssize_t
 regcomp(regex_t *_Restrict_ preg, const char *_Restrict_ pattern, int cflags)>int
 regerror(int errcode, const regex_t *_Restrict_ preg, char *_Restrict_ errbuf, size_t errbuf_size)>size_t
 regexec(const regex_t *_Restrict_ preg, const char *_Restrict_ String, size_t nmatch, regmatch_t p)>int
 regfree(regex_t *preg)>void
-remap_file_pages(void *start, size_t size, int prot, size_t pgoff, int flags)>int
-remove(const char *filename)>int
-rename(const char *old, const char *new)>int
-renameat(int oldfd, const char *old, int newfd, const char *new)>int
-renameat2(int oldfd, const char *old, int newfd, const char *new, unsigned int flags)>int
-revoke(const char *file)>int
-rewind(FILE *stream)>void
-rewinddir(DIR *dirp)>void
-rexec(char **ahost, int rport, const char *name, const char *pass, const char *cmd, int *fd2p)>int
-rexec_af(char **ahost, int rport, const char *name, const char *pass, const char *cmd, int *fd2p, s)>int
-rindex(char *s, int c)>char *
-rmdir(const char *path)>int
-rpmatch(const char *response)>int
-rresvport(int *alport)>int
-rresvport_af(int *alport, sa_family_t af)>int
-ruserok(const char *rhost, int suser, const char *remuser, const char *locuser)>int
-ruserok_af(const char *rhost, int suser, const char *remuser, const char *locuser, sa_family_t af)>int
-sbrk(intptr_t delta)>void *
-scandir(const char *dir, struct dirent ***namelist, int (*selector)(const struct dirent *), int (*)>int
-scandirat(int dfd, const char *dir, struct dirent ***namelist, int (*selector)(const struct dirent *)>int
-scanf(const char *format, ...)>int
+REGS_FIXED:
+REGS_REALLOCATE:
+REGS_UNALLOCATED:
+REG_BADBR:
+REG_BADPAT:
+REG_BADRPT:
+REG_EBRACE:
+REG_EBRACK:
+REG_ECOLLATE:
+REG_ECTYPE:
+REG_EEND:
+REG_EESCAPE:
+REG_ENOSYS:
+REG_EPAREN:
+REG_ERANGE:
+REG_ERPAREN:
+REG_ESIZE:
+REG_ESPACE:
+REG_ESUBREG:
+REG_EXTENDED:
+REG_ICASE:
+REG_NEWLINE:
+REG_NOERROR:
+REG_NOMATCH:
+REG_NOSUB:
+REG_NOTBOL:
+REG_NOTEOL:
+REG_STARTEND:
+RE_BACKSLASH_ESCAPE_IN_LISTS:
+RE_BK_PLUS_QM:
+RE_CARET_ANCHORS_HERE:
+RE_CHAR_CLASSES:
+RE_CONTEXT_INDEP_ANCHORS:
+RE_CONTEXT_INDEP_OPS:
+RE_CONTEXT_INVALID_DUP:
+RE_CONTEXT_INVALID_OPS:
+RE_DEBUG:
+RE_DOT_NEWLINE:
+RE_DOT_NOT_NULL:
+RE_DUP_MAX:
+RE_HAT_LISTS_NOT_NEWLINE:
+RE_ICASE:
+RE_INTERVALS:
+RE_INVALID_INTERVAL_ORD:
+RE_LIMITED_OPS:
+RE_NEWLINE_ALT:
+RE_NO_BK_BRACES:
+RE_NO_BK_PARENS:
+RE_NO_BK_REFS:
+RE_NO_BK_VBAR:
+RE_NO_EMPTY_RANGES:
+RE_NO_GNU_OPS:
+RE_NO_POSIX_BACKTRACKING:
+RE_NO_SUB:
+RE_NREGS:
+RE_SYNTAX_AWK:
+RE_SYNTAX_ED:
+RE_SYNTAX_EGREP:
+RE_SYNTAX_EMACS:
+RE_SYNTAX_GNU_AWK:
+RE_SYNTAX_GREP:
+RE_SYNTAX_POSIX_AWK:
+RE_SYNTAX_POSIX_BASIC:
+RE_SYNTAX_POSIX_EGREP:
+RE_SYNTAX_POSIX_EXTENDED:
+RE_SYNTAX_POSIX_MINIMAL_BASIC:
+RE_SYNTAX_POSIX_MINIMAL_EXTENDED:
+RE_SYNTAX_SED:
+RE_TRANSLATE_TYPE:
+RE_UNMATCHED_RIGHT_PAREN_ORD:
+@sched.h
 sched_get_priority_max(int algorithm)>int
 sched_get_priority_min(int algorithm)>int
 sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset)>int
@@ -768,11 +1012,29 @@ sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset)>int
 sched_setparam(pid_t pid, const struct sched_param *param)>int
 sched_setscheduler(pid_t pid, int policy, const struct sched_param *param)>int
 sched_yield()>int
-secure_getenv(const char *name)>char *
-seed48(unsigned short int seed16v[3])>unsigned short int *
-seed48_r(unsigned short int seed16v[3], struct drand48_data *buffer)>int
-seekdir(DIR *dirp, long int pos)>void
-select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)>int
+CPU_ALLOC:
+CPU_ALLOC_SIZE:
+CPU_AND:
+CPU_AND_S:
+CPU_CLR:
+CPU_CLR_S:
+CPU_COUNT:
+CPU_COUNT_S:
+CPU_EQUAL:
+CPU_EQUAL_S:
+CPU_FREE:
+CPU_ISSET:
+CPU_ISSET_S:
+CPU_OR:
+CPU_OR_S:
+CPU_SET:
+CPU_SETSIZE:
+CPU_SET_S:
+CPU_XOR:
+CPU_XOR_S:
+CPU_ZERO:
+CPU_ZERO_S:
+@semaphore.h
 sem_clockwait(sem_t *sem, clockid_t clock, const struct timespec *abstime)>int
 sem_close(sem_t *sem)>int
 sem_destroy(sem_t *sem)>int
@@ -784,61 +1046,25 @@ sem_timedwait(sem_t *sem, const struct timespec *abstime)>int
 sem_trywait(sem_t *sem)>int
 sem_unlink(const char *name)>int
 sem_wait(sem_t *sem)>int
-send(int fd, const void *buf, size_t n, int flags)>ssize_t
-sendmmsg(int fd, struct mmsghdr *vmessages, unsigned int vlen, int flags)>int
-sendmsg(int fd, const struct msghdr *message, int flags)>ssize_t
-sendto(int fd, const void *buf, size_t n, int flags, CONST_SOCKADDR_ARG addr, socklen_t addr_len)>ssize_t
-setbuf(FILE *stream, char *buf)>void
-setbuffer(FILE *stream, char *buf, size_t size)>void
-setdomainname(const char *name, size_t len)>int
-setegid(gid_t gid)>int
-setenv(const char *name, const char *value, int replace)>int
-seteuid(uid_t uid)>int
-setgid(gid_t gid)>int
-setgrent()>void
-setgroups(size_t n, const gid_t *groups)>int
-sethostent(int stay_open)>void
-sethostid(long int id)>int
-sethostname(const char *name, size_t len)>int
-setipv4sourcefilter(int s, struct in_addr interface_addr, struct in_addr group, uint32_t fmode, uint32_t numsr)>int
-setitimer(itimer_which_t which, const struct itimerval *new, struct itimerval *old)>int
+@setjmp.h
+longjmp(struct jmp_buf_tag env[1], int val)>void
 setjmp(env)>
-setlinebuf(FILE *stream)>void
-setlocale(int category, const char *locale)>char *
-setlogin(const char *name)>int
-setnetent(int stay_open)>void
-setnetgrent(const char *netgroup)>int
-setpgid(pid_t pid, pid_t pgid)>int
-setpgrp()>int
-setpriority(priority_which_t which, id_t who, int prio)>int
-setprotoent(int stay_open)>void
-setpwent()>void
-setregid(gid_t rgid, gid_t egid)>int
-setresgid(gid_t rgid, gid_t egid, gid_t sgid)>int
-setresuid(uid_t ruid, uid_t euid, uid_t suid)>int
-setreuid(uid_t ruid, uid_t euid)>int
-setrlimit(rlimit_resource_t resource, const struct rlimit *rlimits)>int
-setservent(int stay_open)>void
-setsid()>__pid_t
-setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen)>int
-setsourcefilter(int s, uint32_t interface_addr, const struct sockaddr *group, socklen_t grouplen, uint32_t)>int
-setstate(char *statebuf)>char *
-setstate_r(char *statebuf, struct random_data *buf)>int
-settimeofday(const struct timeval *tv, const struct timezone *tz)>int
-setuid(uid_t uid)>int
-setusershell()>void
-setvbuf(FILE *stream, char *buf, int modes, size_t n)>int
-shm_open(const char *name, int oflag, mode_t mode)>int
-shm_unlink(const char *name)>int
-shutdown(int fd, int how)>int
-sigabbrev_np(int sig)>char *
+siglongjmp(sigjmp_buf env, int val)>void
+sigsetjmp(env, savemask)>
+@signal.h
+bsd_signal(int sig, sighandler_t handler)>__sighandler_t
+gsignal(int sig)>int
+kill(pid_t pid, int sig)>int
+killpg(pid_t pgrp, int sig)>int
+psiginfo(const siginfo_t *pinfo, const char *s)>void
+psignal(int sig, const char *s)>void
+raise(int sig)>int
 sigaction(int sig, const struct sigaction *act, struct sigaction *oact)>int
 sigaddset(sigset_t *set, int signo)>int
 sigaltstack(const stack_t *ss, stack_t *oss)>int
 sigandset(sigset_t *set, const sigset_t *left, const sigset_t *right)>int
 sigblock(int mask)>int
 sigdelset(sigset_t *set, int signo)>int
-sigdescr_np(int sig)>char *
 sigemptyset(sigset_t *set)>int
 sigfillset(sigset_t *set)>int
 siggetmask()>int
@@ -847,10 +1073,8 @@ sigignore(int sig)>int
 siginterrupt(int sig, int interrupt)>int
 sigisemptyset(const sigset_t *set)>int
 sigismember(const sigset_t *set, int signo)>int
-siglongjmp(sigjmp_buf env, int val)>void
 sigmask(sig)>
 signal(int sig, sighandler_t handler)>__sighandler_t
-signbit(x)>
 sigorset(sigset_t *set, const sigset_t *left, const sigset_t *right)>int
 sigpause(sig)>
 sigpending(sigset_t *set)>int
@@ -859,47 +1083,348 @@ sigqueue(pid_t pid, int sig, const union sigval val)>int
 sigrelse(int sig)>int
 sigreturn(struct sigcontext *scp)>int
 sigset(int sig, sighandler_t disp)>__sighandler_t
-sigsetjmp(env, savemask)>
 sigsetmask(int mask)>int
 sigstack(struct sigstack *ss, struct sigstack *oss)>int
 sigsuspend(const sigset_t *set)>int
 sigtimedwait(const sigset_t *set, siginfo_t *info, const struct timespec *timeout)>int
 sigwait(const sigset_t *set, int *sig)>int
 sigwaitinfo(const sigset_t *set, siginfo_t *info)>int
-sleep(unsigned int seconds)>unsigned int
+ssignal(int sig, sighandler_t handler)>__sighandler_t
+sysv_signal(int sig, sighandler_t handler)>__sighandler_t
+NSIG:
+SIGABRT:
+SIGALRM:
+SIGCHLD:
+SIGHUP:
+SIGINT:
+SIGKILL:
+SIGPIPE:
+SIGQUIT:
+SIGRTMAX:
+SIGRTMIN:
+SIGSEGV:
+SIGTERM:
+SIGUSR1:
+SIGUSR2:
+SIG_DFL:
+SIG_IGN:
+@stdarg.h
+va_arg(ap, type)>type
+va_copy(dest, src)>void
+va_end(ap)>void
+va_start(ap, last)>void
+@stdbool.h
+false:
+true:
+@stddef.h
+offsetof(type, member)>size_t
+NULL:
+@stdint.h
+INT16_C:
+INT16_MAX:
+INT16_MIN:
+INT16_WIDTH:
+INT32_C:
+INT32_MAX:
+INT32_MIN:
+INT32_WIDTH:
+INT64_C:
+INT64_MAX:
+INT64_MIN:
+INT64_WIDTH:
+INT8_C:
+INT8_MAX:
+INT8_MIN:
+INT8_WIDTH:
+INTMAX_C:
+INTMAX_MAX:
+INTMAX_MIN:
+INTMAX_WIDTH:
+INTPTR_MAX:
+INTPTR_MIN:
+INTPTR_WIDTH:
+INT_FAST16_MAX:
+INT_FAST16_MIN:
+INT_FAST16_WIDTH:
+INT_FAST32_MAX:
+INT_FAST32_MIN:
+INT_FAST32_WIDTH:
+INT_FAST64_MAX:
+INT_FAST64_MIN:
+INT_FAST64_WIDTH:
+INT_FAST8_MAX:
+INT_FAST8_MIN:
+INT_FAST8_WIDTH:
+INT_LEAST16_MAX:
+INT_LEAST16_MIN:
+INT_LEAST16_WIDTH:
+INT_LEAST32_MAX:
+INT_LEAST32_MIN:
+INT_LEAST32_WIDTH:
+INT_LEAST64_MAX:
+INT_LEAST64_MIN:
+INT_LEAST64_WIDTH:
+INT_LEAST8_MAX:
+INT_LEAST8_MIN:
+INT_LEAST8_WIDTH:
+PTRDIFF_MAX:
+PTRDIFF_MIN:
+PTRDIFF_WIDTH:
+SIG_ATOMIC_MAX:
+SIG_ATOMIC_MIN:
+SIG_ATOMIC_WIDTH:
+SIZE_MAX:
+SIZE_WIDTH:
+UINT16_C:
+UINT16_MAX:
+UINT16_WIDTH:
+UINT32_C:
+UINT32_MAX:
+UINT32_WIDTH:
+UINT64_C:
+UINT64_MAX:
+UINT64_WIDTH:
+UINT8_C:
+UINT8_MAX:
+UINT8_WIDTH:
+UINTMAX_C:
+UINTMAX_MAX:
+UINTMAX_WIDTH:
+UINTPTR_MAX:
+UINTPTR_WIDTH:
+UINT_FAST16_MAX:
+UINT_FAST16_WIDTH:
+UINT_FAST32_MAX:
+UINT_FAST32_WIDTH:
+UINT_FAST64_MAX:
+UINT_FAST64_WIDTH:
+UINT_FAST8_MAX:
+UINT_FAST8_WIDTH:
+UINT_LEAST16_MAX:
+UINT_LEAST16_WIDTH:
+UINT_LEAST32_MAX:
+UINT_LEAST32_WIDTH:
+UINT_LEAST64_MAX:
+UINT_LEAST64_WIDTH:
+UINT_LEAST8_MAX:
+UINT_LEAST8_WIDTH:
+WCHAR_MAX:
+WCHAR_MIN:
+WCHAR_WIDTH:
+WINT_MAX:
+WINT_MIN:
+WINT_WIDTH:
+@stdio.h
+asprintf(char **ptr, const char *fmt, ...)>int
+clearerr(FILE *stream)>void
+clearerr_unlocked(FILE *stream)>void
+ctermid(char *s)>char *
+cuserid(char *s)>char *
+dprintf(int fd, const char *fmt, ...)>int
+fclose(FILE *stream)>int
+fcloseall()>int
+fdopen(int fd, const char *modes)>FILE *
+feof(FILE *stream)>int
+feof_unlocked(FILE *stream)>int
+ferror(FILE *stream)>int
+ferror_unlocked(FILE *stream)>int
+fflush(FILE *stream)>int
+fflush_unlocked(FILE *stream)>int
+fgetc(FILE *stream)>int
+fgetc_unlocked(FILE *stream)>int
+fgetpos(FILE *stream, fpos_t *pos)>int
+fgets(char *s, int n, FILE *stream)>char *
+fgets_unlocked(char *s, int n, FILE *stream)>char *
+fileno(FILE *stream)>int
+fileno_unlocked(FILE *stream)>int
+flockfile(FILE *stream)>void
+fmemopen(void *s, size_t len, const char *modes)>FILE *
+fopen(const char *filename, const char *modes)>FILE *
+fopencookie(void *magic_cookie, const char *modes, cookie_io_functions_t io_funcs)>FILE *
+fprintf(FILE *stream, const char *format, ...)>int
+fputc(int c, FILE *stream)>int
+fputc_unlocked(int c, FILE *stream)>int
+fputs(const char *s, FILE *stream)>int
+fputs_unlocked(const char *s, FILE *stream)>int
+fread(void *ptr, size_t size, size_t n, FILE *stream)>size_t
+fread_unlocked(void *ptr, size_t size, size_t n, FILE *stream)>size_t
+freopen(const char *filename, const char *modes, FILE *stream)>FILE *
+fscanf(FILE *stream, const char *format, ...)>int
+fseek(FILE *stream, long int off, int whence)>int
+fseeko(FILE *stream, off_t off, int whence)>int
+fsetpos(FILE *stream, const fpos_t *pos)>int
+ftell(FILE *stream)>long int
+ftello(FILE *stream)>__off_t
+ftrylockfile(FILE *stream)>int
+funlockfile(FILE *stream)>void
+fwrite(const void *ptr, size_t size, size_t n, FILE *s)>size_t
+fwrite_unlocked(const void *ptr, size_t size, size_t n, FILE *stream)>size_t
+getc(FILE *stream)>int
+getc_unlocked(FILE *stream)>int
+getchar()>int
+getchar_unlocked()>int
+getdelim(char **lineptr, size_t *n, int delimiter, FILE *stream)>__ssize_t
+getline(char **lineptr, size_t *n, FILE *stream)>__ssize_t
+gets(char *s)>char *
+getw(FILE *stream)>int
+obstack_printf(struct obstack *obstack, const char *format, ...)>int
+obstack_vprintf(struct obstack *obstack, const char *format, gnuc_va_list args)>int
+open_memstream(char **bufloc, size_t *sizeloc)>FILE *
+open_wmemstream(wchar_t **bufloc, size_t *sizeloc)>__FILE *
+pclose(FILE *stream)>int
+perror(const char *s)>void
+popen(const char *command, const char *modes)>FILE *
+printf(const char *format, ...)>int
+putc(int c, FILE *stream)>int
+putc_unlocked(int c, FILE *stream)>int
+putchar(int c)>int
+putchar_unlocked(int c)>int
+puts(const char *s)>int
+putw(int w, FILE *stream)>int
+remove(const char *filename)>int
+rename(const char *old, const char *new)>int
+renameat(int oldfd, const char *old, int newfd, const char *new)>int
+renameat2(int oldfd, const char *old, int newfd, const char *new, unsigned int flags)>int
+rewind(FILE *stream)>void
+scanf(const char *format, ...)>int
+setbuf(FILE *stream, char *buf)>void
+setbuffer(FILE *stream, char *buf, size_t size)>void
+setlinebuf(FILE *stream)>void
+setvbuf(FILE *stream, char *buf, int modes, size_t n)>int
 snprintf(char *s, size_t maxlen, const char *format, ...)>int
-sockatmark(int fd)>int
-socket(int domain, int type, int protocol)>int
-socketpair(int domain, int type, int protocol, int fds[2])>int
 sprintf(char *s, const char *format, ...)>int
+sscanf(const char *s, const char *format, ...)>int
+tempnam(const char *dir, const char *pfx)>char *
+tmpfile()>FILE *
+tmpnam(char[L_tmpnam])>char *
+tmpnam_r(char s[L_tmpnam])>char *
+ungetc(int c, FILE *stream)>int
+vasprintf(char **ptr, const char *f, gnuc_va_list arg)>int
+vdprintf(int fd, const char *fmt, gnuc_va_list arg)>int
+vfprintf(FILE *s, const char *format, gnuc_va_list arg)>int
+vfscanf(FILE *s, const char *format, gnuc_va_list arg)>int
+vprintf(const char *format, gnuc_va_list arg)>int
+vscanf(const char *format, gnuc_va_list arg)>int
+vsnprintf(char *s, size_t maxlen, const char *format, gnuc_va_list arg)>int
+vsprintf(char *s, const char *format, gnuc_va_list arg)>int
+vsscanf(const char *s, const char *format, gnuc_va_list arg)>int
+AT_RENAME_EXCHANGE:
+AT_RENAME_NOREPLACE:
+AT_RENAME_WHITEOUT:
+BUFSIZ:
+EOF:
+FOPEN_MAX:
+RENAME_EXCHANGE:
+RENAME_NOREPLACE:
+RENAME_WHITEOUT:
+SEEK_CUR:
+SEEK_DATA:
+SEEK_END:
+SEEK_HOLE:
+SEEK_SET:
+TMP_MAX:
+stderr:FILE *
+stdin:FILE *
+stdout:FILE *
+@stdlib.h
+a64l(const char *s)>long int
+abort()>void
+abs(int x)>int
+aligned_alloc(size_t alignment, size_t size)>void *
+arc4random()>__uint32_t
+arc4random_buf(void *buf, size_t size)>void
+arc4random_uniform(uint32_t upper_bound)>__uint32_t
+at_quick_exit(void (*func)(void))>int
+atexit(void (*func)(void))>int
+atof(const char *nptr)>double
+atoi(const char *nptr)>int
+atol(const char *nptr)>long int
+atoll(const char *nptr)>long long int
+bsearch(KEY, BASE, NMEMB, SIZE, COMPAR)>
+call_once(once_flag *flag, void (*func)(void))>void
+calloc(size_t nmemb, size_t size)>void *
+canonicalize_file_name(const char *name)>char *
+clearenv()>int
+div(int numer, int denom)>div_t
+drand48()>double
+drand48_r(struct drand48_data *buffer, double *result)>int
+ecvt(double value, int ndigit, int *decpt, int *sign)>char *
+ecvt_r(double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+erand48(unsigned short int xsubi[3])>double
+erand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, double *result)>int
+exit(int status)>void
+fcvt(double value, int ndigit, int *decpt, int *sign)>char *
+fcvt_r(double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+free(void *ptr)>void
+free_aligned_sized(void *ptr, size_t alignment, size_t size)>void
+free_sized(void *ptr, size_t size)>void
+gcvt(double value, int ndigit, char *buf)>char *
+getenv(const char *name)>char *
+getloadavg(double loadavg[], int nelem)>int
+getpt()>int
+getsubopt(char **optionp, char *const *tokens, char **valuep)>int
+grantpt(int fd)>int
+initstate(unsigned int seed, char *statebuf, size_t statelen)>char *
+initstate_r(unsigned int seed, char *statebuf, size_t statelen, struct random_data *buf)>int
+jrand48(unsigned short int xsubi[3])>long int
+jrand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, long int *result)>int
+l64a(long int n)>char *
+labs(long int x)>long int
+lcong48(unsigned short int param[7])>void
+lcong48_r(unsigned short int param[7], struct drand48_data *buffer)>int
+ldiv(long int numer, long int denom)>ldiv_t
+llabs(long long int x)>long long int
+lldiv(long long int numer, long long int denom)>lldiv_t
+lrand48()>long int
+lrand48_r(struct drand48_data *buffer, long int *result)>int
+malloc(size_t size)>void *
+mblen(const char *s, size_t n)>int
+mbstowcs(wchar_t *pwcs, const char *s, size_t n)>size_t
+mbtowc(wchar_t *pwc, const char *s, size_t n)>int
+memalignment(const void *p)>size_t
+mkdtemp(char *template)>char *
+mkostemp(char *template, int flags)>int
+mkostemps(char *template, int suffixlen, int flags)>int
+mkstemp(char *template)>int
+mkstemps(char *template, int suffixlen)>int
+mktemp(char *template)>char *
+mrand48()>long int
+mrand48_r(struct drand48_data *buffer, long int *result)>int
+nrand48(unsigned short int xsubi[3])>long int
+nrand48_r(unsigned short int xsubi[3], struct drand48_data *buffer, long int *result)>int
+on_exit(void (*func)(int status, void *arg), void *arg)>int
+posix_memalign(void **memptr, size_t alignment, size_t size)>int
+posix_openpt(int oflag)>int
+ptsname(int fd)>char *
+ptsname_r(int fd, char *buf, size_t buflen)>int
+putenv(char *string)>int
+qecvt(long double value, int ndigit, int *decpt, int *sign)>char *
+qecvt_r(long double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+qfcvt(long double value, int ndigit, int *decpt, int *sign)>char *
+qfcvt_r(long double value, int ndigit, int *decpt, int *sign, char *buf, size_t len)>int
+qgcvt(long double value, int ndigit, char *buf)>char *
+qsort(void *base, size_t nmemb, size_t size, compar_fn_t compar)>void
+qsort_r(void *base, size_t nmemb, size_t size, compar_d_fn_t compar, void *arg)>void
+quick_exit(int status)>void
+rand()>int
+rand_r(unsigned int *seed)>int
+random()>long int
+random_r(struct random_data *buf, int32_t *result)>int
+realloc(void *ptr, size_t size)>void *
+reallocarray(void *ptr, size_t nmemb, size_t size)>void *
+realpath(const char *name, char *resolved)>char *
+rpmatch(const char *response)>int
+secure_getenv(const char *name)>char *
+seed48(unsigned short int seed16v[3])>unsigned short int *
+seed48_r(unsigned short int seed16v[3], struct drand48_data *buffer)>int
+setenv(const char *name, const char *value, int replace)>int
+setstate(char *statebuf)>char *
+setstate_r(char *statebuf, struct random_data *buf)>int
 srand(unsigned int seed)>void
 srand48(long int seedval)>void
 srand48_r(long int seedval, struct drand48_data *buffer)>int
 srandom(unsigned int seed)>void
 srandom_r(unsigned int seed, struct random_data *buf)>int
-sscanf(const char *s, const char *format, ...)>int
-ssignal(int sig, sighandler_t handler)>__sighandler_t
-stat(const char *file, struct stat *buf)>int
-stpcpy(char *dest, const char *src)>char *
-stpncpy(char *dest, const char *src, size_t n)>char *
-strcasecmp(const char *s1, const char *s2)>int
-strcasecmp_l(const char *s1, const char *s2, locale_t loc)>int
-strcasestr(char *haystack, const char *needle)>char *
-strcat(char *dest, const char *src)>char *
-strchr(S, C)>
-strchrnul(char *s, int c)>char *
-strcmp(const char *s1, const char *s2)>int
-strcoll(const char *s1, const char *s2)>int
-strcoll_l(const char *s1, const char *s2, locale_t l)>int
-strcpy(char *dest, const char *src)>char *
-strcspn(const char *s, const char *reject)>size_t
-strdup(const char *s)>char *
-strdupa(s)>
-strerror(int errnum)>char *
-strerror_l(int errnum, locale_t l)>char *
-strerror_r(int errnum, char *buf, size_t buflen)>char *
-strerrordesc_np(int err)>char *
-strerrorname_np(int err)>char *
 strfromd(char *dest, size_t size, const char *format, double f)>int
 strfromf(char *dest, size_t size, const char *format, float f)>int
 strfromf128(char *dest, size_t size, const char *format, _Float128 f)>int
@@ -909,28 +1434,6 @@ strfromf32(char *dest, size_t size, const char *format, _Float32 f)>int
 strfromf32x(char *dest, size_t size, const char *format, _Float32x f)>int
 strfromf64x(char *dest, size_t size, const char *format, _Float64x f)>int
 strfroml(char *dest, size_t size, const char *format, long double f)>int
-strfry(char *string)>char *
-strftime(char *s, size_t maxsize, const char *format, const struct tm *tp)>size_t
-strftime_l(char *s, size_t maxsize, const char *format, const struct tm *tp, locale_t loc)>size_t
-strlcat(char *dest, const char *src, size_t n)>size_t
-strlcpy(char *dest, const char *src, size_t n)>size_t
-strlen(const char *s)>size_t
-strncasecmp(const char *s1, const char *s2, size_t n)>int
-strncasecmp_l(const char *s1, const char *s2, size_t n, locale_t loc)>int
-strncat(char *dest, const char *src, size_t n)>char *
-strncmp(const char *s1, const char *s2, size_t n)>int
-strncpy(char *dest, const char *src, size_t n)>char *
-strndup(const char *string, size_t n)>char *
-strndupa(s, n)>
-strnlen(const char *string, size_t maxlen)>size_t
-strpbrk(S, ACCEPT)>
-strptime(const char *s, const char *fmt, struct tm *tp)>char *
-strptime_l(const char *s, const char *fmt, struct tm *tp, locale_t loc)>char *
-strrchr(S, C)>
-strsep(char **stringp, const char *delim)>char *
-strsignal(int sig)>char *
-strspn(const char *s, const char *accept)>size_t
-strstr(HAYSTACK, NEEDLE)>
 strtod(const char *nptr, char **endptr)>double
 strtod_l(const char *nptr, char **endptr, locale_t loc)>double
 strtof(const char *nptr, char **endptr)>float
@@ -948,9 +1451,6 @@ strtof64_l(const char *nptr, char **endptr, locale_t loc)>_Float64
 strtof64x(const char *nptr, char **endptr)>_Float64x
 strtof64x_l(const char *nptr, char **endptr, locale_t loc)>_Float64x
 strtof_l(const char *nptr, char **endptr, locale_t loc)>float
-strtoimax(const char *nptr, char **endptr, int base)>intmax_t
-strtok(char *s, const char *delim)>char *
-strtok_r(char *s, const char *delim, char **save_ptr)>char *
 strtol(const char *nptr, char **endptr, int base)>long int
 strtol_l(const char *nptr, char **endptr, int base, locale_t loc)>long int
 strtold(const char *nptr, char **endptr)>long double
@@ -962,194 +1462,182 @@ strtoul(const char *nptr, char **endptr, int base)>unsigned long int
 strtoul_l(const char *nptr, char **endptr, int base, locale_t loc)>unsigned long int
 strtoull(const char *nptr, char **endptr, int base)>unsigned long long int
 strtoull_l(const char *nptr, char **endptr, int base, locale_t loc)>unsigned long long int
-strtoumax(const char *nptr, char **endptr, int base)>uintmax_t
 strtouq(const char *nptr, char **endptr, int base)>unsigned long long int
+system(const char *command)>int
+ttyslot()>int
+uabs(int x)>unsigned int
+ulabs(long int x)>unsigned long int
+ullabs(long long int x)>unsigned long long int
+unlockpt(int fd)>int
+unsetenv(const char *name)>int
+valloc(size_t size)>void *
+wcstombs(char *s, const wchar_t *pwcs, size_t n)>size_t
+wctomb(char *s, wchar_t wchar)>int
+EXIT_FAILURE:
+EXIT_SUCCESS:
+MB_CUR_MAX:
+RAND_MAX:
+WEXITSTATUS:
+WIFCONTINUED:
+WIFEXITED:
+WIFSIGNALED:
+WIFSTOPPED:
+WSTOPSIG:
+WTERMSIG:
+@string.h
+basename(char *filename)>char *
+explicit_bzero(void *s, size_t n)>void
+memccpy(void *dest, const void *src, int c, size_t n)>void *
+memchr(S, C, N)>
+memcmp(const void *s1, const void *s2, size_t n)>int
+memcpy(void *dest, const void *src, size_t n)>void *
+memfrob(void *s, size_t n)>void *
+memmem(const void *haystack, size_t haystacklen, const void *needle, size_t needlelen)>void *
+memmove(void *dest, const void *src, size_t n)>void *
+mempcpy(void *dest, const void *src, size_t n)>void *
+memrchr(const void *s, int c, size_t n)>void *
+memset(void *s, int c, size_t n)>void *
+memset_explicit(void *s, int c, size_t n)>void *
+rawmemchr(const void *s, int c)>void *
+sigabbrev_np(int sig)>char *
+sigdescr_np(int sig)>char *
+stpcpy(char *dest, const char *src)>char *
+stpncpy(char *dest, const char *src, size_t n)>char *
+strcasestr(char *haystack, const char *needle)>char *
+strcat(char *dest, const char *src)>char *
+strchr(S, C)>
+strchrnul(char *s, int c)>char *
+strcmp(const char *s1, const char *s2)>int
+strcoll(const char *s1, const char *s2)>int
+strcoll_l(const char *s1, const char *s2, locale_t l)>int
+strcpy(char *dest, const char *src)>char *
+strcspn(const char *s, const char *reject)>size_t
+strdup(const char *s)>char *
+strdupa(s)>
+strerror(int errnum)>char *
+strerror_l(int errnum, locale_t l)>char *
+strerror_r(int errnum, char *buf, size_t buflen)>char *
+strerrordesc_np(int err)>char *
+strerrorname_np(int err)>char *
+strfry(char *string)>char *
+strlcat(char *dest, const char *src, size_t n)>size_t
+strlcpy(char *dest, const char *src, size_t n)>size_t
+strlen(const char *s)>size_t
+strncat(char *dest, const char *src, size_t n)>char *
+strncmp(const char *s1, const char *s2, size_t n)>int
+strncpy(char *dest, const char *src, size_t n)>char *
+strndup(const char *string, size_t n)>char *
+strndupa(s, n)>
+strnlen(const char *string, size_t maxlen)>size_t
+strpbrk(S, ACCEPT)>
+strrchr(S, C)>
+strsep(char **stringp, const char *delim)>char *
+strsignal(int sig)>char *
+strspn(const char *s, const char *accept)>size_t
+strstr(HAYSTACK, NEEDLE)>
+strtok(char *s, const char *delim)>char *
+strtok_r(char *s, const char *delim, char **save_ptr)>char *
 strverscmp(const char *s1, const char *s2)>int
 strxfrm(char *dest, const char *src, size_t n)>size_t
 strxfrm_l(char *dest, const char *src, size_t n, locale_t l)>size_t
-swab(const void *from, void *to, ssize_t n)>void
-swprintf(wchar_t *s, size_t n, const wchar_t *format, ...)>int
-swscanf(const wchar_t *s, const wchar_t *format, ...)>int
-symlink(const char *from, const char *to)>int
-symlinkat(const char *from, int tofd, const char *to)>int
-sync()>void
-syncfs(int fd)>int
-syscall(long int sysno, ...)>long int
-sysconf(int name)>long int
-system(const char *command)>int
-sysv_signal(int sig, sighandler_t handler)>__sighandler_t
-tcdrain(int fd)>int
-tcflow(int fd, int action)>int
-tcflush(int fd, int queue_selector)>int
-tcgetattr(int fd, struct termios *termios_p)>int
-tcgetpgrp(int fd)>__pid_t
-tcgetsid(int fd)>__pid_t
-tcsendbreak(int fd, int duration)>int
-tcsetattr(int fd, int optional_actions, const struct termios *termios_p)>int
-tcsetpgrp(int fd, pid_t pgrp_id)>int
-telldir(DIR *dirp)>long int
-tempnam(const char *dir, const char *pfx)>char *
-time(time_t *timer)>time_t
-timegm(struct tm *tp)>time_t
-timelocal(struct tm *tp)>time_t
-timer_create(clockid_t clock_id, struct sigevent *evp, timer_t *timerid)>int
-timer_delete(timer_t timerid)>int
-timer_getoverrun(timer_t timerid)>int
-timer_gettime(timer_t timerid, struct itimerspec *value)>int
-timer_settime(timer_t timerid, int flags, const struct itimerspec *value, struct itimerspec *ovalue)>int
-timeradd(a, b, result)>
-timerclear(tvp)>
-timercmp(a, b, CMP)>
-timerisset(tvp)>
-timersub(a, b, result)>
-timespec_get(struct timespec *ts, int base)>int
-timespec_getres(struct timespec *ts, int base)>int
-tmpfile()>FILE *
-tmpnam(char[L_tmpnam])>char *
-tmpnam_r(char s[L_tmpnam])>char *
-toascii(c)>
-toascii_l(c, l)>
-tolower(c)>
-tolower_l(c, locale)>
-toupper(c)>
-toupper_l(c, locale)>
-towctrans(wint_t wc, wctrans_t desc)>wint_t
-towctrans_l(wint_t wc, wctrans_t desc, locale_t locale)>wint_t
-towlower_l(wint_t wc, locale_t locale)>wint_t
-towupper_l(wint_t wc, locale_t locale)>wint_t
-truncate(const char *file, off_t length)>int
-ttyname(int fd)>char *
-ttyname_r(int fd, char *buf, size_t buflen)>int
-ttyslot()>int
-tzset()>void
-uabs(int x)>unsigned int
-ualarm(useconds_t value, useconds_t interval)>__useconds_t
-ulabs(long int x)>unsigned long int
-ullabs(long long int x)>unsigned long long int
-umask(mode_t mask)>__mode_t
-umaxabs(intmax_t n)>uintmax_t
-uname(struct utsname *name)>int
-ungetc(int c, FILE *stream)>int
-ungetwc(wint_t wc, FILE *stream)>wint_t
-unlink(const char *name)>int
-unlinkat(int fd, const char *name, int flag)>int
-unlockpt(int fd)>int
-unsetenv(const char *name)>int
-uselocale(locale_t dataset)>locale_t
-usleep(useconds_t useconds)>int
-utime(const char *file, const struct utimbuf *file_times)>int
-utimensat(int fd, const char *path, const struct timespec times[2], int flags)>int
-utimes(const char *file, const struct timeval tvp[2])>int
-valloc(size_t size)>void *
-vasprintf(char **ptr, const char *f, gnuc_va_list arg)>int
-vdprintf(int fd, const char *fmt, gnuc_va_list arg)>int
-versionsort(const struct dirent **e1, const struct dirent **e2)>int
-vfork()>__pid_t
-vfprintf(FILE *s, const char *format, gnuc_va_list arg)>int
-vfscanf(FILE *s, const char *format, gnuc_va_list arg)>int
-vfwprintf(FILE *s, const wchar_t *format, gnuc_va_list arg)>int
-vfwscanf(FILE *s, const wchar_t *format, gnuc_va_list arg)>int
-vhangup()>int
-vprintf(const char *format, gnuc_va_list arg)>int
-vscanf(const char *format, gnuc_va_list arg)>int
-vsnprintf(char *s, size_t maxlen, const char *format, gnuc_va_list arg)>int
-vsprintf(char *s, const char *format, gnuc_va_list arg)>int
-vsscanf(const char *s, const char *format, gnuc_va_list arg)>int
-vswprintf(wchar_t *s, size_t n, const wchar_t *format, gnuc_va_list arg)>int
-vswscanf(const wchar_t *s, const wchar_t *format, gnuc_va_list arg)>int
-vwprintf(const wchar_t *format, gnuc_va_list arg)>int
-vwscanf(const wchar_t *format, gnuc_va_list arg)>int
-wait(int *stat_loc)>__pid_t
-wait3(int *stat_loc, int options, struct rusage *usage)>__pid_t
-wait4(pid_t pid, int *stat_loc, int options, struct rusage *usage)>__pid_t
-waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)>int
-waitpid(pid_t pid, int *stat_loc, int options)>__pid_t
-wcpcpy(wchar_t *dest, const wchar_t *src)>wchar_t *
-wcpncpy(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
-wcrtomb(char *s, wchar_t wc, mbstate_t *ps)>size_t
-wcscasecmp(const wchar_t *s1, const wchar_t *s2)>int
-wcscasecmp_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)>int
-wcscat(wchar_t *dest, const wchar_t *src)>wchar_t *
-wcschr(WCS, WC)>
-wcschrnul(const wchar_t *s, wchar_t wc)>wchar_t *
-wcscmp(const wchar_t *s1, const wchar_t *s2)>int
-wcscoll(const wchar_t *s1, const wchar_t *s2)>int
-wcscoll_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)>int
-wcscpy(wchar_t *dest, const wchar_t *src)>wchar_t *
-wcscspn(const wchar_t *wcs, const wchar_t *reject)>size_t
-wcsdup(const wchar_t *s)>wchar_t *
-wcsftime(wchar_t *s, size_t maxsize, const wchar_t *format, const struct tm *tp)>size_t
-wcsftime_l(wchar_t *s, size_t maxsize, const wchar_t *format, const struct tm *tp, locale_t loc)>size_t
-wcslcat(wchar_t *dest, const wchar_t *src, size_t n)>size_t
-wcslcpy(wchar_t *dest, const wchar_t *src, size_t n)>size_t
-wcslen(const wchar_t *s)>size_t
-wcsncasecmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
-wcsncasecmp_l(const wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)>int
-wcsncat(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
-wcsncmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
-wcsncpy(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
-wcsnlen(const wchar_t *s, size_t maxlen)>size_t
-wcsnrtombs(char *dst, const wchar_t **src, size_t nwc, size_t len, mbstate_t *ps)>size_t
-wcspbrk(WCS, ACCEPT)>
-wcsrchr(WCS, WC)>
-wcsrtombs(char *dst, const wchar_t **src, size_t len, mbstate_t *ps)>size_t
-wcsspn(const wchar_t *wcs, const wchar_t *accept)>size_t
-wcsstr(HAYSTACK, NEEDLE)>
-wcstod(const wchar_t *nptr, wchar_t **endptr)>double
-wcstod_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>double
-wcstof(const wchar_t *nptr, wchar_t **endptr)>float
-wcstof128(const wchar_t *nptr, wchar_t **endptr)>_Float128
-wcstof128_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float128
-wcstof128x(const wchar_t *nptr, wchar_t **endptr)>_Float128x
-wcstof128x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float128x
-wcstof16(const wchar_t *nptr, wchar_t **endptr)>_Float16
-wcstof16_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float16
-wcstof32(const wchar_t *nptr, wchar_t **endptr)>_Float32
-wcstof32_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float32
-wcstof32x(const wchar_t *nptr, wchar_t **endptr)>_Float32x
-wcstof32x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float32x
-wcstof64_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float64
-wcstof64x(const wchar_t *nptr, wchar_t **endptr)>_Float64x
-wcstof64x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float64x
-wcstof_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>float
-wcstoimax(const gwchar_t *nptr, gwchar_t **endptr, int base)>intmax_t
-wcstok(wchar_t *s, const wchar_t *delim, wchar_t **ptr)>wchar_t *
-wcstol(const wchar_t *nptr, wchar_t **endptr, int base)>long int
-wcstol_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>long int
-wcstold(const wchar_t *nptr, wchar_t **endptr)>long double
-wcstold_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>long double
-wcstoll(const wchar_t *nptr, wchar_t **endptr, int base)>long long int
-wcstoll_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>long long int
-wcstombs(char *s, const wchar_t *pwcs, size_t n)>size_t
-wcstoq(const wchar_t *nptr, wchar_t **endptr, int base)>long long int
-wcstoul(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long int
-wcstoul_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>unsigned long int
-wcstoull(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long long int
-wcstoull_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>unsigned long long int
-wcstoumax(const gwchar_t *nptr, gwchar_t **endptr, int base)>uintmax_t
-wcstouq(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long long int
-wcswcs(const wchar_t *haystack, const wchar_t *needle)>wchar_t *
-wcswidth(const wchar_t *s, size_t n)>int
-wcsxfrm(wchar_t *s1, const wchar_t *s2, size_t n)>size_t
-wcsxfrm_l(wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)>size_t
-wctob(wint_t c)>int
-wctomb(char *s, wchar_t wchar)>int
-wctrans(const char *property)>wctrans_t
-wctrans_l(const char *property, locale_t locale)>wctrans_t
-wctype_l(const char *property, locale_t locale)>wctype_t
-wcwidth(wchar_t c)>int
-wmemchr(S, C, N)>
-wmemcmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
-wmemcpy(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
-wmemmove(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
-wmempcpy(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
-wmemset(wchar_t *s, wchar_t c, size_t n)>wchar_t *
-wprintf(const wchar_t *format, ...)>int
-write(int fd, const void *buf, size_t n)>ssize_t
-writev(int fd, const struct iovec *iovec, int count)>ssize_t
-wscanf(const wchar_t *format, ...)>int
-~__pthread_cleanup_class()>
-ACCESSPERMS:
+@strings.h
+bcmp(const void *s1, const void *s2, size_t n)>int
+bcopy(const void *src, void *dest, size_t n)>void
+bzero(void *s, size_t n)>void
+ffs(int i)>int
+ffsl(long int l)>int
+ffsll(long long int ll)>int
+index(char *s, int c)>char *
+rindex(char *s, int c)>char *
+strcasecmp(const char *s1, const char *s2)>int
+strcasecmp_l(const char *s1, const char *s2, locale_t loc)>int
+strncasecmp(const char *s1, const char *s2, size_t n)>int
+strncasecmp_l(const char *s1, const char *s2, size_t n, locale_t loc)>int
+@sys/epoll.h
+epoll_create(int size)>int
+epoll_create1(int flags)>int
+epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)>int
+epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *ss)>int
+epoll_pwait2(int epfd, struct epoll_event *events, int maxevents, const struct timespec *timeout, const)>int
+epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)>int
+EPIOCGPARAMS:
+EPIOCSPARAMS:
+EPOLLERR:
+EPOLLET:
+EPOLLEXCLUSIVE:
+EPOLLHUP:
+EPOLLIN:
+EPOLLMSG:
+EPOLLONESHOT:
+EPOLLOUT:
+EPOLLPRI:
+EPOLLRDBAND:
+EPOLLRDHUP:
+EPOLLRDNORM:
+EPOLLWAKEUP:
+EPOLLWRBAND:
+EPOLLWRNORM:
+EPOLL_CTL_ADD:
+EPOLL_CTL_DEL:
+EPOLL_CTL_MOD:
+EPOLL_IOC_TYPE:
+@sys/ioctl.h
+ioctl(int fd, unsigned long int request, ...)>int
+@sys/mman.h
+madvise(void *addr, size_t len, int advice)>int
+mincore(void *start, size_t len, unsigned char *vec)>int
+mlock(const void *addr, size_t len)>int
+mlockall(int flags)>int
+mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)>void *
+mprotect(void *addr, size_t len, int prot)>int
+mremap(void *addr, size_t old_len, size_t new_len, int flags, ...)>void *
+msync(void *addr, size_t len, int flags)>int
+munlock(const void *addr, size_t len)>int
+munlockall()>int
+munmap(void *addr, size_t len)>int
+posix_madvise(void *addr, size_t len, int advice)>int
+remap_file_pages(void *start, size_t size, int prot, size_t pgoff, int flags)>int
+shm_open(const char *name, int oflag, mode_t mode)>int
+shm_unlink(const char *name)>int
+MAP_FAILED:
+@sys/resource.h
+getpriority(priority_which_t which, id_t who)>int
+getrlimit(rlimit_resource_t resource, struct rlimit *rlimits)>int
+getrusage(rusage_who_t who, struct rusage *usage)>int
+setpriority(priority_which_t which, id_t who, int prio)>int
+setrlimit(rlimit_resource_t resource, const struct rlimit *rlimits)>int
+@sys/select.h
+pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *tim)>int
+select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)>int
+FD_CLR:
+FD_ISSET:
+FD_SET:
+FD_SETSIZE:
+FD_ZERO:
+NFDBITS:
+@sys/socket.h
+accept(int fd, SOCKADDR_ARG addr, socklen_t *addr_len)>int
+accept4(int fd, SOCKADDR_ARG addr, socklen_t *addr_len, int flags)>int
+bind(int fd, CONST_SOCKADDR_ARG addr, socklen_t len)>int
+connect(int fd, CONST_SOCKADDR_ARG addr, socklen_t len)>int
+getpeername(int fd, SOCKADDR_ARG addr, socklen_t *len)>int
+getsockname(int fd, SOCKADDR_ARG addr, socklen_t *len)>int
+getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)>int
+isfdtype(int fd, int fdtype)>int
+listen(int fd, int n)>int
+recv(int fd, void *buf, size_t n, int flags)>ssize_t
+recvfrom(int fd, void *buf, size_t n, int flags, SOCKADDR_ARG addr, socklen_t *addr_len)>ssize_t
+recvmmsg(int fd, struct mmsghdr *vmessages, unsigned int vlen, int flags, struct timespec *tmo)>int
+recvmsg(int fd, struct msghdr *message, int flags)>ssize_t
+send(int fd, const void *buf, size_t n, int flags)>ssize_t
+sendmmsg(int fd, struct mmsghdr *vmessages, unsigned int vlen, int flags)>int
+sendmsg(int fd, const struct msghdr *message, int flags)>ssize_t
+sendto(int fd, const void *buf, size_t n, int flags, CONST_SOCKADDR_ARG addr, socklen_t addr_len)>ssize_t
+setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen)>int
+shutdown(int fd, int how)>int
+sockatmark(int fd)>int
+socket(int domain, int type, int protocol)>int
+socketpair(int domain, int type, int protocol, int fds[2])>int
 AF_ALG:
 AF_APPLETALK:
 AF_ASH:
@@ -1199,430 +1687,12 @@ AF_VSOCK:
 AF_WANPIPE:
 AF_X25:
 AF_XDP:
-AI_ADDRCONFIG:
-AI_ALL:
-AI_CANONIDN:
-AI_CANONNAME:
-AI_IDN:
-AI_IDN_ALLOW_UNASSIGNED:
-AI_IDN_USE_STD3_ASCII_RULES:
-AI_NUMERICHOST:
-AI_NUMERICSERV:
-AI_PASSIVE:
-AI_V4MAPPED:
-ALLPERMS:
-AT_EACCESS:
-AT_EMPTY_PATH:
-AT_FDCWD:
-AT_NO_AUTOMOUNT:
-AT_RECURSIVE:
-AT_REMOVEDIR:
-AT_RENAME_EXCHANGE:
-AT_RENAME_NOREPLACE:
-AT_RENAME_WHITEOUT:
-AT_STATX_DONT_SYNC:
-AT_STATX_FORCE_SYNC:
-AT_STATX_SYNC_AS_STAT:
-AT_STATX_SYNC_TYPE:
-AT_SYMLINK_FOLLOW:
-AT_SYMLINK_NOFOLLOW:
-BAUD_MAX:
-BOOL_MAX:
-BOOL_WIDTH:
-BUFSIZ:
-CCEQ:
-CHAR_BIT:
-CHAR_MAX:
-CHAR_MIN:
-CHAR_WIDTH:
-CMPLX:
-CMPLXF:
-CMPLXF128:
-CMPLXF128X:
-CMPLXF16:
-CMPLXF32:
-CMPLXF32X:
-CMPLXF64X:
-CMPLXL:
 CMSG_ALIGN:
 CMSG_DATA:
 CMSG_FIRSTHDR:
 CMSG_LEN:
 CMSG_NXTHDR:
 CMSG_SPACE:
-CPU_ALLOC:
-CPU_ALLOC_SIZE:
-CPU_AND:
-CPU_AND_S:
-CPU_CLR:
-CPU_CLR_S:
-CPU_COUNT:
-CPU_COUNT_S:
-CPU_EQUAL:
-CPU_EQUAL_S:
-CPU_FREE:
-CPU_ISSET:
-CPU_ISSET_S:
-CPU_OR:
-CPU_OR_S:
-CPU_SET:
-CPU_SETSIZE:
-CPU_SET_S:
-CPU_XOR:
-CPU_XOR_S:
-CPU_ZERO:
-CPU_ZERO_S:
-DEFFILEMODE:
-DLFO_FLAG_SFRAME:
-DTTOIF:
-DT_BLK:
-DT_CHR:
-DT_DIR:
-DT_FIFO:
-DT_LNK:
-DT_REG:
-DT_SOCK:
-DT_UNKNOWN:
-DT_WHT:
-EAI_ADDRFAMILY:
-EAI_AGAIN:
-EAI_ALLDONE:
-EAI_BADFLAGS:
-EAI_CANCELED:
-EAI_FAIL:
-EAI_FAMILY:
-EAI_IDN_ENCODE:
-EAI_INPROGRESS:
-EAI_INTR:
-EAI_MEMORY:
-EAI_NODATA:
-EAI_NONAME:
-EAI_NOTCANCELED:
-EAI_OVERFLOW:
-EAI_SERVICE:
-EAI_SOCKTYPE:
-EAI_SYSTEM:
-EOF:
-EPIOCGPARAMS:
-EPIOCSPARAMS:
-EPOLLERR:
-EPOLLET:
-EPOLLEXCLUSIVE:
-EPOLLHUP:
-EPOLLIN:
-EPOLLMSG:
-EPOLLONESHOT:
-EPOLLOUT:
-EPOLLPRI:
-EPOLLRDBAND:
-EPOLLRDHUP:
-EPOLLRDNORM:
-EPOLLWAKEUP:
-EPOLLWRBAND:
-EPOLLWRNORM:
-EPOLL_CTL_ADD:
-EPOLL_CTL_DEL:
-EPOLL_CTL_MOD:
-EPOLL_IOC_TYPE:
-EXIT_FAILURE:
-EXIT_SUCCESS:
-FD_CLR:
-FD_ISSET:
-FD_SET:
-FD_SETSIZE:
-FD_ZERO:
-FE_SNANS_ALWAYS_SIGNAL:
-FNM_CASEFOLD:
-FNM_EXTMATCH:
-FNM_FILE_NAME:
-FNM_LEADING_DIR:
-FNM_NOESCAPE:
-FNM_NOMATCH:
-FNM_NOSYS:
-FNM_PATHNAME:
-FNM_PERIOD:
-FOPEN_MAX:
-FP_ILOGB0:
-FP_ILOGBNAN:
-FP_INFINITE:
-FP_INT_DOWNWARD:
-FP_INT_TONEAREST:
-FP_INT_TONEARESTFROMZERO:
-FP_INT_TOWARDZERO:
-FP_INT_UPWARD:
-FP_LLOGB0:
-FP_LLOGBNAN:
-FP_NAN:
-FP_NORMAL:
-FP_SUBNORMAL:
-FP_ZERO:
-F_LOCK:
-F_OK:
-F_TEST:
-F_TLOCK:
-F_ULOCK:
-GAI_NOWAIT:
-GAI_WAIT:
-GLOB_ABEND:
-GLOB_ABORTED:
-GLOB_ALTDIRFUNC:
-GLOB_APPEND:
-GLOB_BRACE:
-GLOB_DOOFFS:
-GLOB_ERR:
-GLOB_MAGCHAR:
-GLOB_MARK:
-GLOB_NOCHECK:
-GLOB_NOESCAPE:
-GLOB_NOMAGIC:
-GLOB_NOMATCH:
-GLOB_NOSORT:
-GLOB_NOSPACE:
-GLOB_NOSYS:
-GLOB_ONLYDIR:
-GLOB_PERIOD:
-GLOB_TILDE:
-GLOB_TILDE_CHECK:
-GROUP_FILTER_SIZE:
-HOST_NOT_FOUND:
-HUGE_VAL:
-HUGE_VALF:
-HUGE_VALL:
-HUGE_VAL_F128:
-HUGE_VAL_F128X:
-HUGE_VAL_F16:
-HUGE_VAL_F32:
-HUGE_VAL_F32X:
-HUGE_VAL_F64X:
-IFF_ALLMULTI:
-IFF_AUTOMEDIA:
-IFF_BROADCAST:
-IFF_DEBUG:
-IFF_DYNAMIC:
-IFF_LOOPBACK:
-IFF_MASTER:
-IFF_MULTICAST:
-IFF_NOARP:
-IFF_NOTRAILERS:
-IFF_POINTOPOINT:
-IFF_PORTSEL:
-IFF_PROMISC:
-IFF_RUNNING:
-IFF_SLAVE:
-IFF_UP:
-IFHWADDRLEN:
-IFNAMSIZ:
-IFTODT:
-IF_NAMESIZE:
-IN6ADDR_ANY_INIT:
-IN6ADDR_LOOPBACK_INIT:
-IN6_ARE_ADDR_EQUAL:
-IN6_IS_ADDR_LINKLOCAL:
-IN6_IS_ADDR_LOOPBACK:
-IN6_IS_ADDR_MC_GLOBAL:
-IN6_IS_ADDR_MC_LINKLOCAL:
-IN6_IS_ADDR_MC_NODELOCAL:
-IN6_IS_ADDR_MC_ORGLOCAL:
-IN6_IS_ADDR_MC_SITELOCAL:
-IN6_IS_ADDR_MULTICAST:
-IN6_IS_ADDR_SITELOCAL:
-IN6_IS_ADDR_UNSPECIFIED:
-IN6_IS_ADDR_V4COMPAT:
-IN6_IS_ADDR_V4MAPPED:
-INADDR_ALLHOSTS_GROUP:
-INADDR_ALLRTRS_GROUP:
-INADDR_ALLSNOOPERS_GROUP:
-INADDR_ANY:
-INADDR_BROADCAST:
-INADDR_DUMMY:
-INADDR_LOOPBACK:
-INADDR_MAX_LOCAL_GROUP:
-INADDR_NONE:
-INADDR_UNSPEC_GROUP:
-INET6_ADDRSTRLEN:
-INET_ADDRSTRLEN:
-INFINITY:
-INT16_C:
-INT16_MAX:
-INT16_MIN:
-INT16_WIDTH:
-INT32_C:
-INT32_MAX:
-INT32_MIN:
-INT32_WIDTH:
-INT64_C:
-INT64_MAX:
-INT64_MIN:
-INT64_WIDTH:
-INT8_C:
-INT8_MAX:
-INT8_MIN:
-INT8_WIDTH:
-INTMAX_C:
-INTMAX_MAX:
-INTMAX_MIN:
-INTMAX_WIDTH:
-INTPTR_MAX:
-INTPTR_MIN:
-INTPTR_WIDTH:
-INT_FAST16_MAX:
-INT_FAST16_MIN:
-INT_FAST16_WIDTH:
-INT_FAST32_MAX:
-INT_FAST32_MIN:
-INT_FAST32_WIDTH:
-INT_FAST64_MAX:
-INT_FAST64_MIN:
-INT_FAST64_WIDTH:
-INT_FAST8_MAX:
-INT_FAST8_MIN:
-INT_FAST8_WIDTH:
-INT_LEAST16_MAX:
-INT_LEAST16_MIN:
-INT_LEAST16_WIDTH:
-INT_LEAST32_MAX:
-INT_LEAST32_MIN:
-INT_LEAST32_WIDTH:
-INT_LEAST64_MAX:
-INT_LEAST64_MIN:
-INT_LEAST64_WIDTH:
-INT_LEAST8_MAX:
-INT_LEAST8_MIN:
-INT_LEAST8_WIDTH:
-INT_MAX:
-INT_MIN:
-INT_WIDTH:
-IN_BADCLASS:
-IN_CLASSA:
-IN_CLASSA_HOST:
-IN_CLASSA_MAX:
-IN_CLASSA_NET:
-IN_CLASSA_NSHIFT:
-IN_CLASSB:
-IN_CLASSB_HOST:
-IN_CLASSB_MAX:
-IN_CLASSB_NET:
-IN_CLASSB_NSHIFT:
-IN_CLASSC:
-IN_CLASSC_HOST:
-IN_CLASSC_NET:
-IN_CLASSC_NSHIFT:
-IN_CLASSD:
-IN_EXPERIMENTAL:
-IN_LOOPBACKNET:
-IN_MULTICAST:
-IPPORT_BIFFUDP:
-IPPORT_CMDSERVER:
-IPPORT_DAYTIME:
-IPPORT_DISCARD:
-IPPORT_ECHO:
-IPPORT_EFSSERVER:
-IPPORT_EXECSERVER:
-IPPORT_FINGER:
-IPPORT_FTP:
-IPPORT_LOGINSERVER:
-IPPORT_MTP:
-IPPORT_NAMESERVER:
-IPPORT_NETSTAT:
-IPPORT_RESERVED:
-IPPORT_RJE:
-IPPORT_ROUTESERVER:
-IPPORT_SMTP:
-IPPORT_SUPDUP:
-IPPORT_SYSTAT:
-IPPORT_TELNET:
-IPPORT_TFTP:
-IPPORT_TIMESERVER:
-IPPORT_TTYLINK:
-IPPORT_USERRESERVED:
-IPPORT_WHOIS:
-IPPORT_WHOSERVER:
-IPPROTO_AH:
-IPPROTO_BEETPH:
-IPPROTO_COMP:
-IPPROTO_DCCP:
-IPPROTO_DSTOPTS:
-IPPROTO_EGP:
-IPPROTO_ENCAP:
-IPPROTO_ESP:
-IPPROTO_ETHERNET:
-IPPROTO_FRAGMENT:
-IPPROTO_GRE:
-IPPROTO_HOPOPTS:
-IPPROTO_ICMP:
-IPPROTO_ICMPV6:
-IPPROTO_IDP:
-IPPROTO_IGMP:
-IPPROTO_IP:
-IPPROTO_IPIP:
-IPPROTO_IPV6:
-IPPROTO_L2TP:
-IPPROTO_MAX:
-IPPROTO_MH:
-IPPROTO_MPLS:
-IPPROTO_MPTCP:
-IPPROTO_MTP:
-IPPROTO_NONE:
-IPPROTO_PIM:
-IPPROTO_PUP:
-IPPROTO_RAW:
-IPPROTO_ROUTING:
-IPPROTO_RSVP:
-IPPROTO_SCTP:
-IPPROTO_SMC:
-IPPROTO_TCP:
-IPPROTO_TP:
-IPPROTO_UDP:
-IPPROTO_UDPLITE:
-IP_MSFILTER_SIZE:
-ITIMER_PROF:
-ITIMER_REAL:
-ITIMER_VIRTUAL:
-LC_ADDRESS:
-LC_ADDRESS_MASK:
-LC_ALL:
-LC_ALL_MASK:
-LC_COLLATE:
-LC_COLLATE_MASK:
-LC_CTYPE:
-LC_CTYPE_MASK:
-LC_GLOBAL_LOCALE:
-LC_IDENTIFICATION:
-LC_IDENTIFICATION_MASK:
-LC_MEASUREMENT:
-LC_MEASUREMENT_MASK:
-LC_MESSAGES:
-LC_MESSAGES_MASK:
-LC_MONETARY:
-LC_MONETARY_MASK:
-LC_NAME:
-LC_NAME_MASK:
-LC_NUMERIC:
-LC_NUMERIC_MASK:
-LC_PAPER:
-LC_PAPER_MASK:
-LC_TELEPHONE:
-LC_TELEPHONE_MASK:
-LC_TIME:
-LC_TIME_MASK:
-LLONG_MAX:
-LLONG_MIN:
-LLONG_WIDTH:
-LM_ID_BASE:
-LM_ID_NEWLM:
-LONG_MAX:
-LONG_MIN:
-LONG_WIDTH:
-L_INCR:
-L_SET:
-L_XTND:
-MAP_FAILED:
-MATH_ERREXCEPT:
-MATH_ERRNO:
-MAXFLOAT:
-MAXNAMLEN:
-MB_CUR_MAX:
-MB_LEN_MAX:
 MSG_BATCH:
 MSG_CMSG_CLOEXEC:
 MSG_CONFIRM:
@@ -1646,40 +1716,6 @@ MSG_TRYHARD:
 MSG_WAITALL:
 MSG_WAITFORONE:
 MSG_ZEROCOPY:
-M_1_PI:
-M_2_PI:
-M_2_SQRTPI:
-M_E:
-M_LN10:
-M_LN2:
-M_LOG10E:
-M_LOG2E:
-M_PI:
-M_PI_2:
-M_PI_4:
-M_SQRT1_2:
-M_SQRT2:
-NAN:
-NCCS:
-NETDB_INTERNAL:
-NETDB_SUCCESS:
-NFDBITS:
-NI_DGRAM:
-NI_IDN:
-NI_IDN_ALLOW_UNASSIGNED:
-NI_IDN_USE_STD3_ASCII_RULES:
-NI_MAXHOST:
-NI_MAXSERV:
-NI_NAMEREQD:
-NI_NOFQDN:
-NI_NUMERICHOST:
-NI_NUMERICSERV:
-NO_ADDRESS:
-NO_DATA:
-NO_RECOVERY:
-NSIG:
-NSS_BUFLEN_GROUP:
-NSS_BUFLEN_PASSWD:
 PF_ALG:
 PF_APPLETALK:
 PF_ASH:
@@ -1729,200 +1765,13 @@ PF_VSOCK:
 PF_WANPIPE:
 PF_X25:
 PF_XDP:
-PRIB16:
-PRIB32:
-PRIB8:
-PRIBFAST16:
-PRIBFAST32:
-PRIBFAST8:
-PRIBLEAST16:
-PRIBLEAST32:
-PRIBLEAST8:
-PRIBMAX:
-PRIBPTR:
-PRIX16:
-PRIX32:
-PRIX8:
-PRIXFAST16:
-PRIXFAST32:
-PRIXFAST8:
-PRIXLEAST16:
-PRIXLEAST32:
-PRIXLEAST8:
-PRIXMAX:
-PRIXPTR:
-PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP:
-PTHREAD_ATTR_NO_SIGMASK_NP:
-PTHREAD_BARRIER_SERIAL_THREAD:
-PTHREAD_CANCELED:
-PTHREAD_CANCEL_ASYNCHRONOUS:
-PTHREAD_CANCEL_DEFERRED:
-PTHREAD_CANCEL_DISABLE:
-PTHREAD_CANCEL_ENABLE:
-PTHREAD_COND_INITIALIZER:
-PTHREAD_CREATE_DETACHED:
-PTHREAD_CREATE_JOINABLE:
-PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP:
-PTHREAD_EXPLICIT_SCHED:
-PTHREAD_INHERIT_SCHED:
-PTHREAD_MUTEX_ADAPTIVE_NP:
-PTHREAD_MUTEX_DEFAULT:
-PTHREAD_MUTEX_ERRORCHECK:
-PTHREAD_MUTEX_ERRORCHECK_NP:
-PTHREAD_MUTEX_FAST_NP:
-PTHREAD_MUTEX_INITIALIZER:
-PTHREAD_MUTEX_NORMAL:
-PTHREAD_MUTEX_RECURSIVE:
-PTHREAD_MUTEX_RECURSIVE_NP:
-PTHREAD_MUTEX_ROBUST:
-PTHREAD_MUTEX_ROBUST_NP:
-PTHREAD_MUTEX_STALLED:
-PTHREAD_MUTEX_STALLED_NP:
-PTHREAD_MUTEX_TIMED_NP:
-PTHREAD_ONCE_INIT:
-PTHREAD_PRIO_INHERIT:
-PTHREAD_PRIO_NONE:
-PTHREAD_PRIO_PROTECT:
-PTHREAD_PROCESS_PRIVATE:
-PTHREAD_PROCESS_SHARED:
-PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP:
-PTHREAD_RWLOCK_DEFAULT_NP:
-PTHREAD_RWLOCK_INITIALIZER:
-PTHREAD_RWLOCK_PREFER_READER_NP:
-PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP:
-PTHREAD_RWLOCK_PREFER_WRITER_NP:
-PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP:
-PTHREAD_SCOPE_PROCESS:
-PTHREAD_SCOPE_SYSTEM:
-PTRDIFF_MAX:
-PTRDIFF_MIN:
-PTRDIFF_WIDTH:
-RAND_MAX:
-REGS_FIXED:
-REGS_REALLOCATE:
-REGS_UNALLOCATED:
-REG_BADBR:
-REG_BADPAT:
-REG_BADRPT:
-REG_EBRACE:
-REG_EBRACK:
-REG_ECOLLATE:
-REG_ECTYPE:
-REG_EEND:
-REG_EESCAPE:
-REG_ENOSYS:
-REG_EPAREN:
-REG_ERANGE:
-REG_ERPAREN:
-REG_ESIZE:
-REG_ESPACE:
-REG_ESUBREG:
-REG_EXTENDED:
-REG_ICASE:
-REG_NEWLINE:
-REG_NOERROR:
-REG_NOMATCH:
-REG_NOSUB:
-REG_NOTBOL:
-REG_NOTEOL:
-REG_STARTEND:
-RENAME_EXCHANGE:
-RENAME_NOREPLACE:
-RENAME_WHITEOUT:
-RE_BACKSLASH_ESCAPE_IN_LISTS:
-RE_BK_PLUS_QM:
-RE_CARET_ANCHORS_HERE:
-RE_CHAR_CLASSES:
-RE_CONTEXT_INDEP_ANCHORS:
-RE_CONTEXT_INDEP_OPS:
-RE_CONTEXT_INVALID_DUP:
-RE_CONTEXT_INVALID_OPS:
-RE_DEBUG:
-RE_DOT_NEWLINE:
-RE_DOT_NOT_NULL:
-RE_DUP_MAX:
-RE_HAT_LISTS_NOT_NEWLINE:
-RE_ICASE:
-RE_INTERVALS:
-RE_INVALID_INTERVAL_ORD:
-RE_LIMITED_OPS:
-RE_NEWLINE_ALT:
-RE_NO_BK_BRACES:
-RE_NO_BK_PARENS:
-RE_NO_BK_REFS:
-RE_NO_BK_VBAR:
-RE_NO_EMPTY_RANGES:
-RE_NO_GNU_OPS:
-RE_NO_POSIX_BACKTRACKING:
-RE_NO_SUB:
-RE_NREGS:
-RE_SYNTAX_AWK:
-RE_SYNTAX_ED:
-RE_SYNTAX_EGREP:
-RE_SYNTAX_EMACS:
-RE_SYNTAX_GNU_AWK:
-RE_SYNTAX_GREP:
-RE_SYNTAX_POSIX_AWK:
-RE_SYNTAX_POSIX_BASIC:
-RE_SYNTAX_POSIX_EGREP:
-RE_SYNTAX_POSIX_EXTENDED:
-RE_SYNTAX_POSIX_MINIMAL_BASIC:
-RE_SYNTAX_POSIX_MINIMAL_EXTENDED:
-RE_SYNTAX_SED:
-RE_TRANSLATE_TYPE:
-RE_UNMATCHED_RIGHT_PAREN_ORD:
-RTLD_DEFAULT:
-RTLD_DI_CONFIGADDR:
-RTLD_DI_LINKMAP:
-RTLD_DI_LMID:
-RTLD_DI_MAX:
-RTLD_DI_ORIGIN:
-RTLD_DI_PHDR:
-RTLD_DI_PROFILENAME:
-RTLD_DI_PROFILEOUT:
-RTLD_DI_SERINFO:
-RTLD_DI_SERINFOSIZE:
-RTLD_DI_TLS_DATA:
-RTLD_DI_TLS_MODID:
-RTLD_DL_LINKMAP:
-RTLD_DL_SYMENT:
-RTLD_NEXT:
-R_OK:
-SCHAR_MAX:
-SCHAR_MIN:
-SCHAR_WIDTH:
 SCM_CREDENTIALS:
 SCM_PIDFD:
 SCM_RIGHTS:
 SCM_SECURITY:
-SCOPE_DELIMITER:
-SEEK_CUR:
-SEEK_DATA:
-SEEK_END:
-SEEK_HOLE:
-SEEK_SET:
-SHRT_MAX:
-SHRT_MIN:
-SHRT_WIDTH:
 SHUT_RD:
 SHUT_RDWR:
 SHUT_WR:
-SIGRTMAX:
-SIGRTMIN:
-SIG_ATOMIC_MAX:
-SIG_ATOMIC_MIN:
-SIG_ATOMIC_WIDTH:
-SIZE_MAX:
-SIZE_WIDTH:
-SNAN:
-SNANF:
-SNANF128:
-SNANF128X:
-SNANF16:
-SNANF32:
-SNANF32X:
-SNANF64X:
-SNANL:
 SOL_AAL:
 SOL_ALG:
 SOL_ATM:
@@ -1953,124 +1802,427 @@ SOL_X25:
 SOL_XDP:
 SOMAXCONN:
 SO_DEBUG:
-STDERR_FILENO:
-STDIN_FILENO:
-STDOUT_FILENO:
-SUN_LEN:
-SYS_NMLN:
+@sys/stat.h
+chmod(const char *file, mode_t mode)>int
+fchmod(int fd, mode_t mode)>int
+fchmodat(int fd, const char *file, mode_t mode, int flag)>int
+fstat(int fd, struct stat *buf)>int
+fstatat(int fd, const char *file, struct stat *buf, int flag)>int
+futimens(int fd, const struct timespec times[2])>int
+getumask()>__mode_t
+lchmod(const char *file, mode_t mode)>int
+lstat(const char *file, struct stat *buf)>int
+mkdir(const char *path, mode_t mode)>int
+mkdirat(int fd, const char *path, mode_t mode)>int
+mkfifo(const char *path, mode_t mode)>int
+mkfifoat(int fd, const char *path, mode_t mode)>int
+mknod(const char *path, mode_t mode, dev_t dev)>int
+mknodat(int fd, const char *path, mode_t mode, dev_t dev)>int
+stat(const char *file, struct stat *buf)>int
+umask(mode_t mask)>__mode_t
+utimensat(int fd, const char *path, const struct timespec times[2], int flags)>int
+ACCESSPERMS:
+ALLPERMS:
+DEFFILEMODE:
 S_BLKSIZE:
 S_IEXEC:
-S_IFBLK:
-S_IFCHR:
-S_IFDIR:
-S_IFIFO:
-S_IFLNK:
-S_IFMT:
-S_IFREG:
-S_IFSOCK:
 S_IREAD:
-S_IRGRP:
-S_IROTH:
-S_IRUSR:
-S_IRWXG:
-S_IRWXO:
-S_IRWXU:
 S_ISBLK:
 S_ISCHR:
 S_ISDIR:
 S_ISFIFO:
-S_ISGID:
 S_ISLNK:
 S_ISREG:
 S_ISSOCK:
-S_ISUID:
-S_ISVTX:
-S_IWGRP:
-S_IWOTH:
 S_IWRITE:
-S_IWUSR:
-S_IXGRP:
-S_IXOTH:
-S_IXUSR:
 S_TYPEISMQ:
 S_TYPEISSEM:
 S_TYPEISSHM:
-TEMP_FAILURE_RETRY:
+@sys/time.h
+adjtime(const struct timeval *delta, struct timeval *olddelta)>int
+futimes(int fd, const struct timeval tvp[2])>int
+futimesat(int fd, const char *file, const struct timeval tvp[2])>int
+getitimer(itimer_which_t which, struct itimerval *value)>int
+gettimeofday(struct timeval *tv, void *tz)>int
+lutimes(const char *file, const struct timeval tvp[2])>int
+setitimer(itimer_which_t which, const struct itimerval *new, struct itimerval *old)>int
+settimeofday(const struct timeval *tv, const struct timezone *tz)>int
+timeradd(a, b, result)>
+timerclear(tvp)>
+timercmp(a, b, CMP)>
+timerisset(tvp)>
+timersub(a, b, result)>
+utimes(const char *file, const struct timeval tvp[2])>int
+ITIMER_PROF:
+ITIMER_REAL:
+ITIMER_VIRTUAL:
 TIMESPEC_TO_TIMEVAL:
 TIMEVAL_TO_TIMESPEC:
+@sys/uio.h
+preadv(int fd, const struct iovec *iovec, int count, off_t offset)>ssize_t
+preadv2(int fp, const struct iovec *iovec, int count, off_t offset, int _flags)>ssize_t
+preadv64v2(int fp, const struct iovec *iovec, int count, off64_t offset, int _flags)>ssize_t
+pwritev(int fd, const struct iovec *iovec, int count, off_t offset)>ssize_t
+pwritev2(int fd, const struct iovec *iodev, int count, off_t offset, int flags)>ssize_t
+pwritev64v2(int fd, const struct iovec *iodev, int count, off64_t offset, int flags)>ssize_t
+readv(int fd, const struct iovec *iovec, int count)>ssize_t
+writev(int fd, const struct iovec *iovec, int count)>ssize_t
+UIO_MAXIOV:
+@sys/un.h
+SUN_LEN:
+@sys/utsname.h
+uname(struct utsname *name)>int
+SYS_NMLN:
+@sys/wait.h
+wait(int *stat_loc)>__pid_t
+wait3(int *stat_loc, int options, struct rusage *usage)>__pid_t
+wait4(pid_t pid, int *stat_loc, int options, struct rusage *usage)>__pid_t
+waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)>int
+waitpid(pid_t pid, int *stat_loc, int options)>__pid_t
+WAIT_ANY:
+WAIT_MYPGRP:
+WCOREDUMP:
+WCOREFLAG:
+W_EXITCODE:
+W_STOPCODE:
+@termios.h
+cfgetibaud(const struct termios *termios_p)>baud_t
+cfgetispeed(const struct termios *termios_p)>speed_t
+cfgetobaud(const struct termios *termios_p)>baud_t
+cfgetospeed(const struct termios *termios_p)>speed_t
+cfmakeraw(struct termios *termios_p)>void
+cfsetbaud(struct termios *termios_p, baud_t baud)>int
+cfsetibaud(struct termios *termios_p, baud_t baud)>int
+cfsetispeed(struct termios *termios_p, speed_t speed)>int
+cfsetobaud(struct termios *termios_p, baud_t baud)>int
+cfsetospeed(struct termios *termios_p, speed_t speed)>int
+cfsetspeed(struct termios *termios_p, speed_t speed)>int
+tcdrain(int fd)>int
+tcflow(int fd, int action)>int
+tcflush(int fd, int queue_selector)>int
+tcgetattr(int fd, struct termios *termios_p)>int
+tcgetsid(int fd)>__pid_t
+tcsendbreak(int fd, int duration)>int
+tcsetattr(int fd, int optional_actions, const struct termios *termios_p)>int
+BAUD_MAX:
+CCEQ:
+NCCS:
+@time.h
+asctime(const struct tm *tp)>char *
+asctime_r(const struct tm *tp, char *buf)>char *
+clock()>clock_t
+clock_getcpuclockid(pid_t pid, clockid_t *clock_id)>int
+clock_getres(clockid_t clock_id, struct timespec *res)>int
+clock_gettime(clockid_t clock_id, struct timespec *tp)>int
+clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *req, struct timespec *rem)>int
+clock_settime(clockid_t clock_id, const struct timespec *tp)>int
+ctime(const time_t *timer)>char *
+ctime_r(const time_t *timer, char *buf)>char *
+difftime(time_t time1, time_t time0)>double
+dysize(int year)>int
+getdate(const char *string)>:tm *
+getdate_r(const char *string, struct tm *resbufp)>int
+gmtime(const time_t *timer)>:tm *
+gmtime_r(const time_t *timer, struct tm *tp)>:tm *
+localtime(const time_t *timer)>:tm *
+localtime_r(const time_t *timer, struct tm *tp)>:tm *
+mktime(struct tm *tp)>time_t
+nanosleep(const struct timespec *requested_time, struct timespec *remaining)>int
+strftime(char *s, size_t maxsize, const char *format, const struct tm *tp)>size_t
+strftime_l(char *s, size_t maxsize, const char *format, const struct tm *tp, locale_t loc)>size_t
+strptime(const char *s, const char *fmt, struct tm *tp)>char *
+strptime_l(const char *s, const char *fmt, struct tm *tp, locale_t loc)>char *
+time(time_t *timer)>time_t
+timegm(struct tm *tp)>time_t
+timelocal(struct tm *tp)>time_t
+timer_create(clockid_t clock_id, struct sigevent *evp, timer_t *timerid)>int
+timer_delete(timer_t timerid)>int
+timer_getoverrun(timer_t timerid)>int
+timer_gettime(timer_t timerid, struct itimerspec *value)>int
+timer_settime(timer_t timerid, int flags, const struct itimerspec *value, struct itimerspec *ovalue)>int
+timespec_get(struct timespec *ts, int base)>int
+timespec_getres(struct timespec *ts, int base)>int
+tzset()>void
+CLOCKS_PER_SEC:
+CLOCK_MONOTONIC:
+CLOCK_REALTIME:
 TIME_ACTIVE:
 TIME_MONOTONIC:
 TIME_THREAD_ACTIVE:
 TIME_UTC:
-TMP_MAX:
-TRY_AGAIN:
-UCHAR_MAX:
-UCHAR_WIDTH:
-UINT16_C:
-UINT16_MAX:
-UINT16_WIDTH:
-UINT32_C:
-UINT32_MAX:
-UINT32_WIDTH:
-UINT64_C:
-UINT64_MAX:
-UINT64_WIDTH:
-UINT8_C:
-UINT8_MAX:
-UINT8_WIDTH:
-UINTMAX_C:
-UINTMAX_MAX:
-UINTMAX_WIDTH:
-UINTPTR_MAX:
-UINTPTR_WIDTH:
-UINT_FAST16_MAX:
-UINT_FAST16_WIDTH:
-UINT_FAST32_MAX:
-UINT_FAST32_WIDTH:
-UINT_FAST64_MAX:
-UINT_FAST64_WIDTH:
-UINT_FAST8_MAX:
-UINT_FAST8_WIDTH:
-UINT_LEAST16_MAX:
-UINT_LEAST16_WIDTH:
-UINT_LEAST32_MAX:
-UINT_LEAST32_WIDTH:
-UINT_LEAST64_MAX:
-UINT_LEAST64_WIDTH:
-UINT_LEAST8_MAX:
-UINT_LEAST8_WIDTH:
-UINT_MAX:
-UINT_WIDTH:
-UIO_MAXIOV:
-ULLONG_MAX:
-ULLONG_WIDTH:
-ULONG_MAX:
-ULONG_WIDTH:
-USHRT_MAX:
-USHRT_WIDTH:
-WAIT_ANY:
-WAIT_MYPGRP:
-WCHAR_MAX:
-WCHAR_MIN:
-WCHAR_WIDTH:
-WCOREDUMP:
-WCOREFLAG:
-WEOF:
-WEXITSTATUS:
-WIFCONTINUED:
-WIFEXITED:
-WIFSIGNALED:
-WIFSTOPPED:
-WINT_MAX:
-WINT_MIN:
-WINT_WIDTH:
-WSTOPSIG:
-WTERMSIG:
-W_EXITCODE:
+@unistd.h
+access(const char *name, int type)>int
+acct(const char *name)>int
+alarm(unsigned int seconds)>unsigned int
+brk(void *addr)>int
+chdir(const char *path)>int
+chown(const char *file, uid_t owner, gid_t group)>int
+chroot(const char *path)>int
+close(int fd)>int
+close_range(unsigned int fd, unsigned int max_fd, int flags)>int
+closefrom(int lowfd)>void
+confstr(int name, char *buf, size_t len)>size_t
+copy_file_range(int infd, off64_t *pinoff, int outfd, off64_t *poutoff, size_t length, unsigned int flags)>ssize_t
+crypt(const char *key, const char *salt)>char *
+daemon(int nochdir, int noclose)>int
+dup(int fd)>int
+dup2(int fd, int fd2)>int
+dup3(int fd, int fd2, int flags)>int
+eaccess(const char *name, int type)>int
+endusershell()>void
+euidaccess(const char *name, int type)>int
+execl(const char *path, const char *arg, ...)>int
+execle(const char *path, const char *arg, ...)>int
+execlp(const char *file, const char *arg, ...)>int
+execv(const char *path, char *const argv[])>int
+execve(const char *path, char *const argv[], char *const envp[])>int
+execveat(int fd, const char *path, char *const argv[], char *const envp[], int flags)>int
+execvp(const char *file, char *const argv[])>int
+execvpe(const char *file, char *const argv[], char *const envp[])>int
+faccessat(int fd, const char *file, int type, int flag)>int
+fchdir(int fd)>int
+fchown(int fd, uid_t owner, gid_t group)>int
+fchownat(int fd, const char *file, uid_t owner, gid_t group, int flag)>int
+fdatasync(int fildes)>int
+fexecve(int fd, char *const argv[], char *const envp[])>int
+fork()>__pid_t
+fpathconf(int fd, int name)>long int
+fsync(int fd)>int
+ftruncate(int fd, off_t length)>int
+get_current_dir_name()>char *
+getcwd(char *buf, size_t size)>char *
+getdomainname(char *name, size_t len)>int
+getdtablesize()>int
+getegid()>__gid_t
+getentropy(void *buffer, size_t length)>int
+geteuid()>__uid_t
+getgid()>__gid_t
+getgroups(int size, gid_t list[])>int
+gethostid()>long int
+gethostname(char *name, size_t len)>int
+getlogin()>char *
+getlogin_r(char *name, size_t name_len)>int
+getpagesize()>int
+getpass(const char *prompt)>char *
+getpgid(pid_t pid)>__pid_t
+getpgrp()>__pid_t
+getpid()>__pid_t
+getppid()>__pid_t
+getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)>int
+getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)>int
+getsid(pid_t pid)>__pid_t
+getuid()>__uid_t
+getusershell()>char *
+getwd(char *buf)>char *
+group_member(gid_t gid)>int
+isatty(int fd)>int
+lchown(const char *file, uid_t owner, gid_t group)>int
+link(const char *from, const char *to)>int
+linkat(int fromfd, const char *from, int tofd, const char *to, int flags)>int
+lockf(int fd, int cmd, off_t len)>int
+lseek(int fd, off_t offset, int whence)>__off_t
+nice(int inc)>int
+pathconf(const char *path, int name)>long int
+pause()>int
+pipe(int pipedes[2])>int
+pipe2(int pipedes[2], int flags)>int
+pread(int fd, void *buf, size_t nbytes, off_t offset)>ssize_t
+profil(unsigned short int *sample_buffer, size_t size, size_t offset, unsigned int scale)>int
+pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void))>int
+pwrite(int fd, const void *buf, size_t n, off_t offset)>ssize_t
+read(int fd, void *buf, size_t nbytes)>ssize_t
+readlink(const char *path, char *buf, size_t len)>ssize_t
+readlinkat(int fd, const char *path, char *buf, size_t len)>ssize_t
+revoke(const char *file)>int
+rmdir(const char *path)>int
+sbrk(intptr_t delta)>void *
+setdomainname(const char *name, size_t len)>int
+setegid(gid_t gid)>int
+seteuid(uid_t uid)>int
+setgid(gid_t gid)>int
+sethostid(long int id)>int
+sethostname(const char *name, size_t len)>int
+setlogin(const char *name)>int
+setpgid(pid_t pid, pid_t pgid)>int
+setpgrp()>int
+setregid(gid_t rgid, gid_t egid)>int
+setresgid(gid_t rgid, gid_t egid, gid_t sgid)>int
+setresuid(uid_t ruid, uid_t euid, uid_t suid)>int
+setreuid(uid_t ruid, uid_t euid)>int
+setsid()>__pid_t
+setuid(uid_t uid)>int
+setusershell()>void
+sleep(unsigned int seconds)>unsigned int
+swab(const void *from, void *to, ssize_t n)>void
+symlink(const char *from, const char *to)>int
+symlinkat(const char *from, int tofd, const char *to)>int
+sync()>void
+syncfs(int fd)>int
+syscall(long int sysno, ...)>long int
+sysconf(int name)>long int
+tcgetpgrp(int fd)>__pid_t
+tcsetpgrp(int fd, pid_t pgrp_id)>int
+truncate(const char *file, off_t length)>int
+ttyname(int fd)>char *
+ttyname_r(int fd, char *buf, size_t buflen)>int
+ualarm(useconds_t value, useconds_t interval)>__useconds_t
+unlink(const char *name)>int
+unlinkat(int fd, const char *name, int flag)>int
+usleep(useconds_t useconds)>int
+vfork()>__pid_t
+vhangup()>int
+write(int fd, const void *buf, size_t n)>ssize_t
+F_LOCK:
+F_OK:
+F_TEST:
+F_TLOCK:
+F_ULOCK:
+L_INCR:
+L_SET:
+L_XTND:
+R_OK:
+STDERR_FILENO:
+STDIN_FILENO:
+STDOUT_FILENO:
+TEMP_FAILURE_RETRY:
 W_OK:
-W_STOPCODE:
 X_OK:
+@utime.h
+utime(const char *file, const struct utimbuf *file_times)>int
+@wchar.h
+btowc(int c)>wint_t
+fgetwc(FILE *stream)>wint_t
+fgetwc_unlocked(FILE *stream)>wint_t
+fgetws(wchar_t *ws, int n, FILE *stream)>wchar_t *
+fgetws_unlocked(wchar_t *ws, int n, FILE *stream)>wchar_t *
+fputwc(wchar_t wc, FILE *stream)>wint_t
+fputwc_unlocked(wchar_t wc, FILE *stream)>wint_t
+fputws(const wchar_t *ws, FILE *stream)>int
+fputws_unlocked(const wchar_t *ws, FILE *stream)>int
+fwide(FILE *fp, int mode)>int
+fwprintf(FILE *stream, const wchar_t *format, ...)>int
+fwscanf(FILE *stream, const wchar_t *format, ...)>int
+getwc(FILE *stream)>wint_t
+getwc_unlocked(FILE *stream)>wint_t
+getwchar()>wint_t
+getwchar_unlocked()>wint_t
+mbrlen(const char *s, size_t n, mbstate_t *ps)>size_t
+mbrtowc(wchar_t *pwc, const char *s, size_t n, mbstate_t *p)>size_t
+mbsinit(const mbstate_t *ps)>int
+mbsnrtowcs(wchar_t *dst, const char **src, size_t nmc, size_t len, mbstate_t *ps)>size_t
+mbsrtowcs(wchar_t *dst, const char **src, size_t len, mbstate_t *ps)>size_t
+putwc(wchar_t wc, FILE *stream)>wint_t
+putwc_unlocked(wchar_t wc, FILE *stream)>wint_t
+putwchar(wchar_t wc)>wint_t
+putwchar_unlocked(wchar_t wc)>wint_t
+swprintf(wchar_t *s, size_t n, const wchar_t *format, ...)>int
+swscanf(const wchar_t *s, const wchar_t *format, ...)>int
+ungetwc(wint_t wc, FILE *stream)>wint_t
+vfwprintf(FILE *s, const wchar_t *format, gnuc_va_list arg)>int
+vfwscanf(FILE *s, const wchar_t *format, gnuc_va_list arg)>int
+vswprintf(wchar_t *s, size_t n, const wchar_t *format, gnuc_va_list arg)>int
+vswscanf(const wchar_t *s, const wchar_t *format, gnuc_va_list arg)>int
+vwprintf(const wchar_t *format, gnuc_va_list arg)>int
+vwscanf(const wchar_t *format, gnuc_va_list arg)>int
+wcpcpy(wchar_t *dest, const wchar_t *src)>wchar_t *
+wcpncpy(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
+wcrtomb(char *s, wchar_t wc, mbstate_t *ps)>size_t
+wcscasecmp(const wchar_t *s1, const wchar_t *s2)>int
+wcscasecmp_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)>int
+wcscat(wchar_t *dest, const wchar_t *src)>wchar_t *
+wcschr(WCS, WC)>
+wcschrnul(const wchar_t *s, wchar_t wc)>wchar_t *
+wcscmp(const wchar_t *s1, const wchar_t *s2)>int
+wcscoll(const wchar_t *s1, const wchar_t *s2)>int
+wcscoll_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)>int
+wcscpy(wchar_t *dest, const wchar_t *src)>wchar_t *
+wcscspn(const wchar_t *wcs, const wchar_t *reject)>size_t
+wcsdup(const wchar_t *s)>wchar_t *
+wcsftime(wchar_t *s, size_t maxsize, const wchar_t *format, const struct tm *tp)>size_t
+wcsftime_l(wchar_t *s, size_t maxsize, const wchar_t *format, const struct tm *tp, locale_t loc)>size_t
+wcslcat(wchar_t *dest, const wchar_t *src, size_t n)>size_t
+wcslcpy(wchar_t *dest, const wchar_t *src, size_t n)>size_t
+wcslen(const wchar_t *s)>size_t
+wcsncasecmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
+wcsncasecmp_l(const wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)>int
+wcsncat(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
+wcsncmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
+wcsncpy(wchar_t *dest, const wchar_t *src, size_t n)>wchar_t *
+wcsnlen(const wchar_t *s, size_t maxlen)>size_t
+wcsnrtombs(char *dst, const wchar_t **src, size_t nwc, size_t len, mbstate_t *ps)>size_t
+wcspbrk(WCS, ACCEPT)>
+wcsrchr(WCS, WC)>
+wcsrtombs(char *dst, const wchar_t **src, size_t len, mbstate_t *ps)>size_t
+wcsspn(const wchar_t *wcs, const wchar_t *accept)>size_t
+wcsstr(HAYSTACK, NEEDLE)>
+wcstod(const wchar_t *nptr, wchar_t **endptr)>double
+wcstod_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>double
+wcstof(const wchar_t *nptr, wchar_t **endptr)>float
+wcstof128(const wchar_t *nptr, wchar_t **endptr)>_Float128
+wcstof128_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float128
+wcstof128x(const wchar_t *nptr, wchar_t **endptr)>_Float128x
+wcstof128x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float128x
+wcstof16(const wchar_t *nptr, wchar_t **endptr)>_Float16
+wcstof16_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float16
+wcstof32(const wchar_t *nptr, wchar_t **endptr)>_Float32
+wcstof32_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float32
+wcstof32x(const wchar_t *nptr, wchar_t **endptr)>_Float32x
+wcstof32x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float32x
+wcstof64_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float64
+wcstof64x(const wchar_t *nptr, wchar_t **endptr)>_Float64x
+wcstof64x_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>_Float64x
+wcstof_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>float
+wcstok(wchar_t *s, const wchar_t *delim, wchar_t **ptr)>wchar_t *
+wcstol(const wchar_t *nptr, wchar_t **endptr, int base)>long int
+wcstol_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>long int
+wcstold(const wchar_t *nptr, wchar_t **endptr)>long double
+wcstold_l(const wchar_t *nptr, wchar_t **endptr, locale_t loc)>long double
+wcstoll(const wchar_t *nptr, wchar_t **endptr, int base)>long long int
+wcstoll_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>long long int
+wcstoq(const wchar_t *nptr, wchar_t **endptr, int base)>long long int
+wcstoul(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long int
+wcstoul_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>unsigned long int
+wcstoull(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long long int
+wcstoull_l(const wchar_t *nptr, wchar_t **endptr, int base, locale_t loc)>unsigned long long int
+wcstouq(const wchar_t *nptr, wchar_t **endptr, int base)>unsigned long long int
+wcswcs(const wchar_t *haystack, const wchar_t *needle)>wchar_t *
+wcswidth(const wchar_t *s, size_t n)>int
+wcsxfrm(wchar_t *s1, const wchar_t *s2, size_t n)>size_t
+wcsxfrm_l(wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)>size_t
+wctob(wint_t c)>int
+wcwidth(wchar_t c)>int
+wmemchr(S, C, N)>
+wmemcmp(const wchar_t *s1, const wchar_t *s2, size_t n)>int
+wmemcpy(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
+wmemmove(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
+wmempcpy(wchar_t *s1, const wchar_t *s2, size_t n)>wchar_t *
+wmemset(wchar_t *s, wchar_t c, size_t n)>wchar_t *
+wprintf(const wchar_t *format, ...)>int
+wscanf(const wchar_t *format, ...)>int
+WEOF:
+@wctype.h
+iswalnum_l(wint_t wc, locale_t locale)>int
+iswalpha_l(wint_t wc, locale_t locale)>int
+iswblank_l(wint_t wc, locale_t locale)>int
+iswcntrl_l(wint_t wc, locale_t locale)>int
+iswctype_l(wint_t wc, wctype_t desc, locale_t locale)>int
+iswdigit_l(wint_t wc, locale_t locale)>int
+iswgraph_l(wint_t wc, locale_t locale)>int
+iswlower_l(wint_t wc, locale_t locale)>int
+iswprint_l(wint_t wc, locale_t locale)>int
+iswpunct_l(wint_t wc, locale_t locale)>int
+iswspace_l(wint_t wc, locale_t locale)>int
+iswupper_l(wint_t wc, locale_t locale)>int
+iswxdigit_l(wint_t wc, locale_t locale)>int
+towctrans(wint_t wc, wctrans_t desc)>wint_t
+towctrans_l(wint_t wc, wctrans_t desc, locale_t locale)>wint_t
+towlower_l(wint_t wc, locale_t locale)>wint_t
+towupper_l(wint_t wc, locale_t locale)>wint_t
+wctrans(const char *property)>wctrans_t
+wctrans_l(const char *property, locale_t locale)>wctrans_t
+wctype_l(const char *property, locale_t locale)>wctype_t
 #glob_t
+@glob.h
 gl_closedir:void (*)(void *)
 gl_flags:int
 gl_lstat:int (*)( char *, stat *)
@@ -2084,6 +2236,7 @@ gl_readdir:void *(*)(void *)
 gl_stat:int (*)( char *, stat *)
 gl_stat:int (*)( char *,void *)
 #glob64_t
+@glob.h
 gl_closedir:void (*)(void *)
 gl_flags:int
 gl_lstat:int (*)( char *, stat64 *)
@@ -2097,35 +2250,45 @@ gl_readdir:void *(*)(void *)
 gl_stat:int (*)( char *, stat64 *)
 gl_stat:int (*)( char *,void *)
 #imaxdiv_t
+@inttypes.h
 quot:long int
 rem:long int
 #Dl_info
+@dlfcn.h
 dli_fbase:void *
 dli_fname:char *
 dli_saddr:void *
 dli_sname:char *
 #Dl_serpath
+@dlfcn.h
 dls_flags:unsigned int
 dls_name:char *
 #Dl_serinfo
+@dlfcn.h
 dls_cnt:unsigned int
 dls_serpath:Dl_serpath[1]
 dls_size:size_t
 #regmatch_t
+@regex.h
 rm_eo:regoff_t
 rm_so:regoff_t
 #fd_set
+@sys/select.h
 fds_bits:__fd_mask[]
 #div_t
+@stdlib.h
 quot:int
 rem:int
 #ldiv_t
+@stdlib.h
 quot:long int
 rem:long int
 #lldiv_t
+@stdlib.h
 quot:long long int
 rem:long long int
 #addrinfo
+@netdb.h
 ai_addr::sockaddr *
 ai_addrlen:socklen_t
 ai_canonname:char *
@@ -2135,10 +2298,12 @@ ai_next::addrinfo *
 ai_protocol:int
 ai_socktype:int
 #cmsghdr
+@sys/socket.h
 cmsg_len:size_t
 cmsg_level:int
 cmsg_type:int
 #dirent
+@dirent.h
 d_ino:__ino_t
 d_name:char[256]
 d_off:__off_t
@@ -2151,6 +2316,7 @@ d_off:__off64_t
 d_reclen:unsigned short int
 d_type:unsigned char
 #dl_find_object
+@dlfcn.h
 dlfo_eh_count:int
 dlfo_eh_dbase:void *
 dlfo_eh_frame:void *
@@ -2160,49 +2326,60 @@ dlfo_map_end:void *
 dlfo_map_start:void *
 dlfo_sframe:void *
 #epoll_data_t
+@sys/epoll.h
 fd:int
 ptr:void *
 u32:uint32_t
 #epoll_event
+@sys/epoll.h
 data:epoll_data_t
 events:uint32_t
 #epoll_params
+@sys/epoll.h
 busy_poll_budget:uint16_t
 busy_poll_usecs:uint32_t
 prefer_busy_poll:uint8_t
 #gaicb
+@netdb.h
 ar_name:char *
 ar_request:addrinfo *
 ar_result::addrinfo *
 ar_service:char *
 #group
+@grp.h
 gr_gid:__gid_t
 gr_mem:char **
 gr_name:char *
 gr_passwd:char *
 #group_filter
+@netinet/in.h
 gf_fmode:uint32_t
 gf_group::sockaddr_storage
 gf_interface:uint32_t
 gf_numsrc:uint32_t
 gf_slist::sockaddr_storage[1]
 #group_req
+@netinet/in.h
 gr_group::sockaddr_storage
 gr_interface:uint32_t
 #group_source_req
+@netinet/in.h
 gsr_group::sockaddr_storage
 gsr_interface:uint32_t
 gsr_source::sockaddr_storage
 #hostent
+@netdb.h
 h_addr_list:char **
 h_addrtype:int
 h_aliases:char **
 h_length:int
 h_name:char *
 #if_nameindex
+@net/if.h
 if_index:unsigned int
 if_name:char *
 #ifaddr
+@net/if.h
 ifa_addr::sockaddr
 ifa_ifp::iface *
 ifa_ifu::ifaddr::__anonf4c6998b020a
@@ -2211,6 +2388,7 @@ ifa_next::ifaddr *
 ifu_broadaddr::sockaddr
 ifu_dstaddr::sockaddr
 #ifaddrs
+@ifaddrs.h
 ifa_addr::sockaddr *
 ifa_data:void *
 ifa_flags:unsigned int
@@ -2222,12 +2400,14 @@ ifa_next::ifaddrs *
 ifu_broadaddr::sockaddr *
 ifu_dstaddr::sockaddr *
 #ifconf
+@net/if.h
 ifc_ifcu::ifconf::__anonf4c6998b050a
 ifc_len:int
 #ifconf::__anonf4c6998b050a
 ifcu_buf:__caddr_t
 ifcu_req::ifreq *
 #ifmap
+@net/if.h
 base_addr:unsigned short int
 dma:unsigned char
 irq:unsigned char
@@ -2235,6 +2415,7 @@ mem_end:unsigned long int
 mem_start:unsigned long int
 port:unsigned char
 #ifreq
+@net/if.h
 ifr_ifrn::ifreq::__anonf4c6998b030a
 ifr_ifru::ifreq::__anonf4c6998b040a
 #ifreq::__anonf4c6998b030a
@@ -2253,43 +2434,55 @@ ifru_netmask::sockaddr
 ifru_newname:char[]
 ifru_slave:char[]
 #in6_pktinfo
+@netinet/in.h
 ipi6_addr::in6_addr
 ipi6_ifindex:unsigned int
 #in_addr
+@netinet/in.h
 s_addr:in_addr_t
 #iovec
+@sys/uio.h
 iov_base:void *
 iov_len:size_t
 #ip6_mtuinfo
+@netinet/in.h
 ip6m_addr::sockaddr_in6
 ip6m_mtu:uint32_t
 #ip_mreq
+@netinet/in.h
 imr_interface::in_addr
 imr_multiaddr::in_addr
 #ip_mreq_source
+@netinet/in.h
 imr_interface::in_addr
 imr_multiaddr::in_addr
 imr_sourceaddr::in_addr
 #ip_mreqn
+@netinet/in.h
 imr_address::in_addr
 imr_ifindex:int
 imr_multiaddr::in_addr
 #ip_msfilter
+@netinet/in.h
 imsf_fmode:uint32_t
 imsf_interface::in_addr
 imsf_multiaddr::in_addr
 imsf_numsrc:uint32_t
 imsf_slist::in_addr[1]
 #ipv6_mreq
+@netinet/in.h
 ipv6mr_interface:unsigned int
 ipv6mr_multiaddr::in6_addr
 #itimerspec
+@time.h
 it_interval::timespec
 it_value::timespec
 #itimerval
+@sys/time.h
 it_interval::timeval
 it_value::timeval
 #lconv
+@locale.h
 currency_symbol:char *
 decimal_point:char *
 frac_digits:char
@@ -2315,12 +2508,15 @@ p_sign_posn:char
 positive_sign:char *
 thousands_sep:char *
 #linger
+@sys/socket.h
 l_linger:int
 l_onoff:int
 #mmsghdr
+@sys/socket.h
 msg_hdr::msghdr
 msg_len:unsigned int
 #msghdr
+@sys/socket.h
 msg_control:void *
 msg_controllen:size_t
 msg_flags:int
@@ -2329,6 +2525,7 @@ msg_iovlen:size_t
 msg_name:void *
 msg_namelen:socklen_t
 #passwd
+@pwd.h
 pw_dir:char *
 pw_gecos:char *
 pw_gid:__gid_t
@@ -2337,10 +2534,12 @@ pw_passwd:char *
 pw_shell:char *
 pw_uid:__uid_t
 #protoent
+@netdb.h
 p_aliases:char **
 p_name:char *
 p_proto:int
 #random_data
+@stdlib.h
 end_ptr:int32_t *
 fptr:int32_t *
 rand_deg:int
@@ -2349,12 +2548,15 @@ rand_type:int
 rptr:int32_t *
 state:int32_t *
 #regex_t
+@regex.h
 re_nsub:size_t
 #re_registers
+@regex.h
 end:regoff_t *
 num_regs:__re_size_t
 start:regoff_t *
 #rusage
+@sys/resource.h
 ru_stime::timeval
 ru_utime::timeval
 #rusage::__anon7f2d80e8010a
@@ -2386,24 +2588,30 @@ ru_nvcsw:long int
 #rusage::__anon7f2d80e80e0a
 ru_nivcsw:long int
 #servent
+@netdb.h
 s_aliases:char **
 s_name:char *
 s_port:int
 s_proto:char *
 #sockaddr
+@sys/socket.h
 sa_data:char[14]
 #sockaddr_in
+@netinet/in.h
 sin_addr::in_addr
 sin_port:in_port_t
 sin_zero:unsigned char[]
 #sockaddr_in6
+@netinet/in.h
 sin6_addr::in6_addr
 sin6_flowinfo:uint32_t
 sin6_port:in_port_t
 sin6_scope_id:uint32_t
 #sockaddr_un
+@sys/un.h
 sun_path:char[108]
 #termios
+@termios.h
 c_cc:cc_t[]
 c_cflag:tcflag_t
 c_iflag:tcflag_t
@@ -2415,17 +2623,21 @@ c_ispeed:speed_t
 #termios::__anon889dd42e020a
 c_ospeed:speed_t
 #timespec
+@time.h
 tv_nsec:__syscall_slong_t
 tv_nsec:long int
 tv_nsec:long int
 tv_sec:__time64_t
 #timeval
+@sys/time.h
 tv_sec:__time64_t
 tv_usec:__suseconds64_t
 #timezone
+@sys/time.h
 tz_dsttime:int
 tz_minuteswest:int
 #tm
+@time.h
 tm_gmtoff:long int
 tm_hour:int
 tm_isdst:int
@@ -2438,13 +2650,16 @@ tm_yday:int
 tm_year:int
 tm_zone:char *
 #ucred
+@sys/socket.h
 gid:gid_t
 pid:pid_t
 uid:uid_t
 #utimbuf
+@utime.h
 actime:__time64_t
 modtime:__time64_t
 #utsname
+@sys/utsname.h
 domainname:char[]
 machine:char[]
 nodename:char[]
@@ -2452,86 +2667,194 @@ release:char[]
 sysname:char[]
 version:char[]
 #DIR
+@dirent.h
+#FILE
+@stdio.h
 #Lmid_t
+@dlfcn.h
 #active_reg_t
+@regex.h
 #baud_t
+@termios.h
 #blkcnt64_t
+@sys/types.h
 #blkcnt_t
+@sys/types.h
 #blksize_t
+@sys/types.h
+#bool
+@stdbool.h
 #caddr_t
+@sys/types.h
 #comparison_fn_t
+@stdlib.h
 #daddr_t
+@sys/types.h
 #dev_t
+@sys/types.h
 #double_t
+@math.h
 #drand48_data
+@stdlib.h
 #epoll_data
+@sys/epoll.h
 #fd_mask
+@sys/select.h
 #float_t
+@math.h
 #fpos64_t
+@stdio.h
 #fpos_t
+@stdio.h
 #fsblkcnt64_t
+@sys/types.h
 #fsblkcnt_t
+@sys/types.h
 #fsfilcnt64_t
+@sys/types.h
 #fsfilcnt_t
+@sys/types.h
 #fsid_t
+@sys/types.h
 #gid_t
+@sys/types.h
 #id_t
+@sys/types.h
 #in6_addr
+@netinet/in.h
 #in_addr_t
+@netinet/in.h
 #in_port_t
+@netinet/in.h
 #ino64_t
+@dirent.h
 #ino_t
+@sys/types.h
+#int16_t
+@stdint.h
+#int32_t
+@stdint.h
+#int64_t
+@stdint.h
+#int8_t
+@stdint.h
 #int_fast16_t
+@stdint.h
 #int_fast32_t
+@stdint.h
 #int_fast64_t
+@stdint.h
 #int_fast8_t
+@stdint.h
 #intmax_t
+@stdint.h
 #intptr_t
+@stdint.h
 #jmp_buf
+@setjmp.h
 #key_t
+@sys/types.h
 #loff_t
+@sys/types.h
 #long_double_t
+@math.h
 #mode_t
+@sys/types.h
 #nlink_t
+@sys/types.h
 #off64_t
+@stdio.h
 #off_t
+@sys/types.h
 #pid_t
+@sys/types.h
+#ptrdiff_t
+@stddef.h
 #quad_t
+@sys/types.h
 #re_pattern_buffer
+@regex.h
 #reg_errcode_t
+@regex.h
 #reg_syntax_t
+@regex.h
 #register_t
+@sys/types.h
 #regoff_t
+@regex.h
 #s_reg_t
+@regex.h
 #sa_family_t
+@sys/socket.h
 #sig_t
+@signal.h
 #sighandler_t
+@signal.h
 #sigjmp_buf
+@setjmp.h
 #size_t
+@stddef.h
 #sockaddr_storage
+@sys/socket.h
 #socklen_t
+@sys/socket.h
 #ssize_t
+@sys/types.h
 #stat
+@sys/stat.h
 #suseconds_t
+@sys/types.h
 #u_char
+@sys/types.h
 #u_int
+@sys/types.h
 #u_int16_t
+@sys/types.h
 #u_int32_t
+@sys/types.h
 #u_int64_t
+@sys/types.h
 #u_int8_t
+@sys/types.h
 #u_long
+@sys/types.h
 #u_quad_t
+@sys/types.h
 #u_short
+@sys/types.h
 #uid_t
+@sys/types.h
 #uint
+@sys/types.h
+#uint16_t
+@stdint.h
+#uint32_t
+@stdint.h
+#uint64_t
+@stdint.h
+#uint8_t
+@stdint.h
 #uint_fast16_t
+@stdint.h
 #uint_fast32_t
+@stdint.h
 #uint_fast64_t
+@stdint.h
 #uint_fast8_t
+@stdint.h
 #uintmax_t
+@stdint.h
 #uintptr_t
+@stdint.h
 #ulong
+@sys/types.h
 #useconds_t
+@sys/types.h
 #ushort
+@sys/types.h
 #va_list
+@stdarg.h
+#wchar_t
+@stddef.h
 #wctrans_t
+@wctype.h

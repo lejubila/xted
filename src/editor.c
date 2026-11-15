@@ -13,6 +13,7 @@
 #include "mouse.h"
 #include "run.h"
 #include "session.h"
+#include "stdsym.h"
 #include "utf8.h"
 #include "util.h"
 
@@ -2034,7 +2035,7 @@ collapse:
 
 /* ---- suggestion popup --------------------------------------------------- */
 
-static void complete_accept(Editor *e)
+static void accept_cand(Editor *e)
 {
     const Cand *c = &e->comp.v[e->comp.sel];
     char *text = xstrdup(c->text);
@@ -2091,6 +2092,53 @@ static void complete_accept(Editor *e)
 
 /* Accepting inside a snippet session: keep the current stop's length right (a new snippet
  * from the choice replaces the session; a changed line count ends it). */
+/* The header to include for the highlighted candidate, if it is a symbol of the C library the
+ * file does not include: copied to out; returns 1 if there is one. */
+static int c_include_for(const Editor *e, const Cand *c, char *out, size_t n)
+{
+    StdLib *l;
+    const char *h;
+    size_t hl = 0;
+
+    if (!c->std || !e->doc->syn || strcmp(syn_name(e->doc->syn), "C") != 0 ||
+        (c->kind != CAND_FUNC && c->kind != CAND_CONST && c->kind != CAND_CLASS && c->kind != CAND_PROP))
+        return 0;
+    l = std_open("c");
+    if (!l)
+        return 0;
+    h = std_header(l, c->text, strlen(c->text), &hl);
+    if (h && hl > 0 && hl < n) {
+        memcpy(out, h, hl);
+        out[hl] = '\0';
+    } else {
+        hl = 0;
+    }
+    std_close(l);
+    return hl > 0;
+}
+
+/* Accepts the highlighted candidate; a symbol of the C library also gets its #include, in the
+ * same undo step. */
+static void complete_accept(Editor *e)
+{
+    char hdr[64];
+    int inc = c_include_for(e, &e->comp.v[e->comp.sel], hdr, sizeof hdr), added = 0;
+
+    if (inc) {
+        buf_undo_begin(e->buf, e->cy, e->cx);
+        e->undo_hold++;
+        added = edit_add_include(e, hdr);
+    }
+    accept_cand(e);
+    if (inc) {
+        e->undo_hold--;
+        buf_undo_cursor(e->buf, e->cy, e->cx);
+        buf_undo_close(e->buf);
+        if (added)
+            editor_set_msg(e, MSG_TTL_MS, tr("Added #include <%s>"), hdr);
+    }
+}
+
 static void accept_in_snippet(Editor *e)
 {
     SnipSession old = e->snip;

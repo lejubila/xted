@@ -20,6 +20,7 @@ typedef struct {
     char *text;             /* what is inserted (for a snippet: its name) */
     char *sig;              /* signature shown for the highlighted candidate (may be NULL) */
     int kind;               /* CAND_* */
+    int std;                /* comes from the standard library (accepting it may add an include) */
 } Cand;
 
 /* The suggestion popup: candidates for the word before the cursor, best first. */

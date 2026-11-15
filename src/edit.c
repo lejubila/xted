@@ -1145,6 +1145,126 @@ static void add_use(Editor *e, const char *fq)
         e->cy += added;
 }
 
+int edit_add_include(Editor *e, const char *hdr)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 400 ? b->nlines : 400, y, first_sys = (size_t)-1, last_sys = 0;
+    size_t first_loc = (size_t)-1, ins = (size_t)-1, at, top = 0, hl = strlen(hdr), added = 0;
+    int sorted = 1, in_comment = 0, top_done = 0;
+    char prev[80] = "", pre[2] = "", post[2] = "";
+    SBuf text = SBUF_INIT;
+
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        size_t i = 0;
+        const char *s;
+
+        while (i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'))
+            i++;
+        s = l->s + i;
+        if (l->len - i >= 8 && memcmp(s, "#include", 8) == 0) {
+            const char *q = s + 8, *end = l->s + l->len;
+            char name[80];
+            size_t nl = 0;
+            int sys;
+
+            while (q < end && (*q == ' ' || *q == '\t'))
+                q++;
+            sys = q < end && *q == '<';
+            if (q < end && (*q == '<' || *q == '"')) {
+                char close = *q == '<' ? '>' : '"';
+
+                for (q++; q + nl < end && q[nl] != close && nl < sizeof name - 1; nl++)
+                    name[nl] = q[nl];
+                name[nl] = '\0';
+                if (nl == hl && memcmp(name, hdr, hl) == 0)
+                    return 0;                       /* already there (either way) */
+                if (sys) {
+                    if (first_sys == (size_t)-1)
+                        first_sys = y;
+                    last_sys = y;
+                    if (strcmp(prev, name) > 0)
+                        sorted = 0;
+                    snprintf(prev, sizeof prev, "%s", name);
+                    if (ins == (size_t)-1 && strcmp(name, hdr) > 0)
+                        ins = y;
+                } else if (first_loc == (size_t)-1) {
+                    first_loc = y;
+                }
+            }
+            top_done = 1;
+            continue;
+        }
+        if (top_done)
+            continue;
+        /* where the includes go in a file that has none: after the comments and the guard */
+        if (in_comment) {
+            top = y + 1;
+            for (i = 0; i + 1 < l->len; i++)
+                if (l->s[i] == '*' && l->s[i + 1] == '/')
+                    in_comment = 0;
+        } else if (l->len - i >= 2 && s[0] == '/' && s[1] == '*') {
+            in_comment = 1;
+            top = y + 1;
+            for (i += 2; i + 1 < l->len; i++)
+                if (l->s[i] == '*' && l->s[i + 1] == '/')
+                    in_comment = 0;
+        } else if (l->len - i >= 2 && s[0] == '/' && s[1] == '/') {
+            top = y + 1;
+        } else if (l->len == i) {
+            if (top == y)
+                top = y + 1;
+        } else if ((l->len - i >= 7 && memcmp(s, "#ifndef", 7) == 0) ||
+                   (l->len - i >= 7 && memcmp(s, "#define", 7) == 0 && top > 0) ||
+                   (l->len - i >= 12 && memcmp(s, "#pragma once", 12) == 0)) {
+            top = y + 1;
+        } else {
+            top_done = 1;
+        }
+    }
+    if (first_sys != (size_t)-1) {
+        at = sorted && ins != (size_t)-1 ? ins : last_sys + 1;
+    } else if (first_loc != (size_t)-1) {
+        at = first_loc;
+        post[0] = '\n';                             /* system includes before the local ones */
+    } else {
+        at = top;
+        if (at < b->nlines && b->lines[at].len > 0)
+            post[0] = '\n';
+    }
+    sbuf_adds(&text, pre);
+    sbuf_adds(&text, "#include <");
+    sbuf_adds(&text, hdr);
+    sbuf_adds(&text, ">\n");
+    sbuf_adds(&text, post);
+    {
+        size_t yy = at, xx = 0, k;
+
+        if (at >= b->nlines) {
+            /* the file ends before the place: append after its last line */
+            yy = b->nlines - 1;
+            xx = b->lines[yy].len;
+            if (xx > 0)
+                pre[0] = '\n';
+            sbuf_free(&text);
+            sbuf_adds(&text, pre);
+            sbuf_adds(&text, "#include <");
+            sbuf_adds(&text, hdr);
+            sbuf_adds(&text, ">\n");
+            sbuf_adds(&text, post);
+            at = b->nlines;
+        }
+        for (k = 0; k < text.len; k++)
+            if (text.p[k] == '\n')
+                added++;
+        buf_insert_text(e->buf, &yy, &xx, text.p, text.len);
+    }
+    sbuf_free(&text);
+    if (at <= e->cy)
+        e->cy += added;
+    return 1;
+}
+
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq)
 {
     if (from_x > e->cx)

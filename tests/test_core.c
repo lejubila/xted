@@ -4207,7 +4207,14 @@ static void test_i18n(void)
           i18n_same_formats("100%% %-5s", "100%% %-5s") && !i18n_same_formats("%zu", "%d") &&
           i18n_same_formats("none", "nulla") && !i18n_same_formats("%s", "none"));
     n = i18n_available(codes, 16);
-    CHECK(n == 2 && strcmp(codes[0], "en") == 0 && strcmp(codes[1], "xx") == 0);
+    {
+        size_t k;
+        int has_xx = 0;
+
+        for (k = 1; k < n; k++)     /* others may be installed in the system folder */
+            has_xx |= strcmp(codes[k], "xx") == 0;
+        CHECK(n >= 2 && strcmp(codes[0], "en") == 0 && has_xx);
+    }
     /* a language without a catalog: English, and the caller is told */
     CHECK(i18n_set("zz") == -1 && strcmp(i18n_code(), "en") == 0 && strcmp(tr("Save"), "Save") == 0);
     CHECK(i18n_set("../x") == -1);
@@ -4271,6 +4278,72 @@ static void test_i18n(void)
         setenv("LC_ALL", saved, 1);
     else
         setenv("LC_ALL", "C", 1);
+    rm_rf(dir);
+}
+
+/* Accepting a symbol of the C library adds the #include it needs, in the same undo step. */
+static void test_c_include(void)
+{
+    char dir[64], path[128], err[128];
+    Editor e;
+    Doc *d;
+    size_t i;
+    struct { const char *file, *text, *typed; size_t y, x; const char *line; size_t at; const char *after; } t[] = {
+        { "a.c", "#include <stdio.h>\n\nint main(void)\n{\n    \n}\n", "strle", 4, 4,
+          "#include <string.h>", 1, "#include <stdio.h>" },
+        { "b.c", "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void)\n{\n    \n}\n", "strle", 5, 4,
+          "#include <string.h>", 2, "#include <stdlib.h>" },
+        { "c.c", "#include <string.h>\n\nint main(void)\n{\n    \n}\n", "strle", 4, 4, NULL, 0, NULL },
+        { "d.c", "/* a program */\n\nint main(void)\n{\n    \n}\n", "strle", 4, 4,
+          "#include <string.h>", 2, "" },
+        { "e.c", "#include \"mine.h\"\n\nint main(void)\n{\n    \n}\n", "strle", 4, 4,
+          "#include <string.h>", 0, "" },
+        { "f.c", "#ifndef X\n#define X\n\nint main(void)\n{\n    \n}\n#endif\n", "strle", 5, 4,
+          "#include <string.h>", 3, "" },
+        { "g.c", "#include <stdio.h>\n\nint main(void)\n{\n    \n}\n", "prin", 4, 4, NULL, 0, NULL },
+        { "h.py", "def f():\n    \n", "strle", 1, 4, NULL, 0, NULL },
+    };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char *q;
+        size_t nl0;
+
+        put_file(dir, t[i].file, t[i].text);
+        snprintf(path, sizeof path, "%s/%s", dir, t[i].file);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        nl0 = e.buf->nlines;
+        e.cy = t[i].y;
+        e.cx = t[i].x;
+        for (q = t[i].typed; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        if (strstr(t[i].file, ".c"))
+            CHECK(e.comp.on);
+        if (e.comp.on)
+            kkey(&e, KEY_ENTER, 0);
+        if (t[i].line) {
+            CHECK(e.buf->nlines >= nl0 + 1 && line_is(e.buf, t[i].at, t[i].line));
+            CHECK(strcmp(t[i].after, "") == 0 || line_is(e.buf, t[i].at - 1, t[i].after));
+            if (strcmp(t[i].file, "e.c") == 0)
+                CHECK(line_is(e.buf, 1, "") && line_is(e.buf, 2, "#include \"mine.h\""));
+            if (strcmp(t[i].file, "d.c") == 0)
+                CHECK(line_is(e.buf, 1, "") && line_is(e.buf, 3, ""));
+            /* the cursor stays on its line, which moved down, and one Undo takes back all */
+            CHECK(e.cy == t[i].y + (e.buf->nlines - nl0));
+            edit_undo(&e);
+            CHECK(e.buf->nlines == nl0 && line_is(e.buf, 0, strncmp(t[i].text, "#include <stdio", 14) == 0
+                                                           ? "#include <stdio.h>"
+                                                           : strncmp(t[i].text, "/*", 2) == 0 ? "/* a program */"
+                                                           : strncmp(t[i].text, "#ifndef", 7) == 0 ? "#ifndef X"
+                                                           : "#include \"mine.h\""));
+        } else {
+            CHECK(e.buf->nlines == nl0);        /* nothing was added */
+        }
+        editor_free(&e);
+    }
     rm_rf(dir);
 }
 
@@ -4817,6 +4890,7 @@ int main(void)
     test_cfgsave();
     test_save_project();
     test_i18n();
+    test_c_include();
     test_config_merge();
     test_snippets();
     test_cursors();

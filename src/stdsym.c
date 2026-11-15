@@ -209,7 +209,7 @@ static void each_entry(const StdLib *l, const Sect *s, StdFn fn, void *ctx)
 
         while (e < s->to && l->text[e] != '\n')
             e++;
-        if (e > i && l->text[i] != '#')
+        if (e > i && l->text[i] != '#' && l->text[i] != '@')
             entry(l, l->text + i, e - i, fn, ctx);
         i = e + 1;
     }
@@ -267,4 +267,49 @@ void std_members(const StdLib *l, const char *cls, size_t cl, StdFn fn, void *ct
         cls = l->text + s->base;
         cl = s->bl;
     }
+}
+
+const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl)
+{
+    size_t i;
+
+    for (i = 0; i < l->nsec; i++) {
+        const Sect *s = &l->sec[i];
+        size_t p = s->from;
+        const char *cur = NULL;
+        size_t cl = 0;
+
+        if (s->nl != 0) {
+            /* a type: its header is the first line of the section */
+            if (s->nl == nl && memcmp(l->text + s->name, name, nl) == 0 && s->from < s->to &&
+                l->text[s->from] == '@') {
+                size_t e = s->from;
+
+                while (e < s->to && l->text[e] != '\n')
+                    e++;
+                *hl = e - s->from - 1;
+                return l->text + s->from + 1;
+            }
+            continue;
+        }
+        while (p < s->to) {
+            size_t e = p, k;
+
+            while (e < s->to && l->text[e] != '\n')
+                e++;
+            if (e > p && l->text[p] == '@') {
+                cur = l->text + p + 1;
+                cl = e - p - 1;
+            } else if (e > p && cur) {
+                for (k = p; k < e && l->text[k] != '(' && l->text[k] != ':'; k++)
+                    ;
+                if (k - p == nl && memcmp(l->text + p, name, nl) == 0) {
+                    *hl = cl;
+                    return cur;
+                }
+            }
+            p = e + 1;
+        }
+    }
+    return NULL;
 }

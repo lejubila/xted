@@ -155,6 +155,10 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   - In PHP, dopo `use`, propone le classi del progetto (classmap e PSR-4 di Composer, alias
     di `config/app.php`) e aggiunge l'istruzione `use` in ordine; i metodi dichiarati in
     `@method` (facade di Laravel) sono riconosciuti.
+  - In C, scegliendo un simbolo della libreria standard (`strlen`, `malloc`, `FILE`, `INT_MAX`, `uint32_t`,
+    `O_RDONLY`, …) l'editor aggiunge anche `#include <string.h>` (o l'header giusto) se manca: tra gli
+    `#include <…>` esistenti in ordine, prima di quelli locali `"…"`, oppure in cima al file dopo i
+    commenti e l'include guard. Un solo Annulla toglie sia l'include sia il testo inserito.
 - **Snippet** con segnaposti navigabili con Tab (`for` → ciclo completo, e così via).
 - **Esecuzione di comandi** (`Alt+R`, poi `F5` per ripeterlo, `Shift+F5` per interromperlo):
   l'output compare in un pannello `[Output]`. `F8` e `Shift+F8` saltano all'errore
