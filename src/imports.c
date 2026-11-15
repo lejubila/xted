@@ -1241,52 +1241,134 @@ int imp_rust(Editor *e, const char *path)
         insert_block(e, at, line);
         return 1;
     }
-    /* use crate::x::{A, C}; on one line: the name joins the braces, in order */
-    for (k = 0; k < n; k++) {
-        const Line *l = &b->lines[v[k].y1];
-        const char *u = l->s + (v[k].y0 == v[k].y1 ? v[k].u : 0);
-        size_t ul = v[k].ul, x, end;
+    /* the braces of a use of the module (use crate::net::{A, B};) or of one above it (use bat::{
+     * config::Config, ... };): the rest of the path joins them, in rustfmt's order */
+    {
+        size_t best = (size_t)-1, bbp = 0, uy = 0, ux = 0;
 
-        if (v[k].y1 != v[k].y0 && b->lines[v[k].y0].s[0] != '#')
-            continue;
-        if (v[k].y0 != v[k].y1) {
-            /* an attribute above: the use is the last line */
-            size_t i = 0;
+        for (k = 0; k < n; k++) {
+            size_t yy = v[k].y0, i = 0, ulen, c2;
+            const Line *l;
+            const char *u;
 
-            u = l->s;
-            while (i + 4 < l->len && memcmp(l->s + i, "use ", 4) != 0)
+            while (yy < v[k].y1 && b->lines[yy].len > 0 && b->lines[yy].s[0] == '#')
+                yy++;                       /* past #[cfg(...)] */
+            l = &b->lines[yy];
+            while (i + 4 <= l->len && memcmp(l->s + i, "use ", 4) != 0)
                 i++;
-            if (i + 4 >= l->len)
+            if (i + 4 > l->len)
                 continue;
             u = l->s + i + 4;
-            for (ul = l->len - i - 4; ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '); ul--)
-                ;
-        }
-        if (ul <= pre + 1 || memcmp(u, path, pre) != 0 || u[pre] != '{' || u[ul - 1] != '}' ||
-            memchr(u + pre + 1, '{', ul - pre - 1) != NULL)
-            continue;
-        for (x = pre + 1, end = ul - 1; x < end;) {
-            size_t ie = x;
+            ulen = l->len - i - 4;
+            for (c2 = 0; c2 + 2 <= pre; c2++) {
+                size_t bp = c2 + 2;
 
-            while (ie < end && u[ie] != ',')
-                ie++;
-            if (strcmp(name, "self") != 0 && !(ie - x == 4 && memcmp(u + x, "self", 4) == 0) &&
-                rust_cmp(u + x, ie - x, name, strlen(name)) > 0)
-                break;
-            x = ie;
-            while (x < end && (u[x] == ',' || u[x] == ' '))
-                x++;
+                if (path[c2] == ':' && path[c2 + 1] == ':' && ulen > bp && memcmp(u, path, bp) == 0 &&
+                    u[bp] == '{' && bp > bbp) {
+                    best = k;
+                    bbp = bp;
+                    uy = yy;
+                    ux = (size_t)(u - l->s) + bp;
+                }
+            }
         }
-        {
-            size_t col = (size_t)(u - l->s) + x;
+        if (best != (size_t)-1) {
+            const char *item = path + bbp;
+            size_t il = strlen(item), y = uy, x = ux + 1, ins_y = (size_t)-1, ins_x = 0;
+            size_t close_y = (size_t)-1, close_x = 0, indent = 4;
+            int depth = 0, ins_bol = 0, got_indent = 0;
 
-            snprintf(line, sizeof line, x < end ? "%s, " : ", %s", name);
-            buf_insert(e->buf, v[k].y1, x < end ? col : (size_t)(u - l->s) + end, line, strlen(line));
-            if (e->cy == v[k].y1 && e->cx >= col)
-                e->cx += strlen(line);
+            while (y <= v[best].y1 && close_y == (size_t)-1) {
+                const Line *l = &b->lines[y];
+
+                while (x < l->len) {
+                    char ch = l->s[x];
+
+                    if (depth == 0 && ch != ' ' && ch != '\t' && ch != ',' && ch != '}') {
+                        size_t ie = x, bol = x;
+                        int d2 = 0;
+
+                        while (bol > 0 && (l->s[bol - 1] == ' ' || l->s[bol - 1] == '\t'))
+                            bol--;
+                        if (y != uy && !got_indent && bol == 0) {
+                            indent = x;
+                            got_indent = 1;
+                        }
+                        /* the item: up to a comma or the closing brace at its level */
+                        while (ie < l->len && !(d2 == 0 && (l->s[ie] == ',' || l->s[ie] == '}'))) {
+                            if (l->s[ie] == '{')
+                                d2++;
+                            else if (l->s[ie] == '}')
+                                d2--;
+                            ie++;
+                        }
+                        if (ins_y == (size_t)-1 && !(ie - x == 4 && memcmp(l->s + x, "self", 4) == 0) &&
+                            rust_cmp(l->s + x, ie - x, item, il) > 0) {
+                            ins_y = y;
+                            ins_x = x;
+                            ins_bol = bol == 0 && y != uy;
+                        }
+                        if (d2 > 0)
+                            depth = d2;     /* a nested list that goes on below */
+                        x = ie;
+                        continue;
+                    }
+                    if (ch == '{')
+                        depth++;
+                    else if (ch == '}') {
+                        if (depth == 0) {
+                            close_y = y;
+                            close_x = x;
+                            break;
+                        }
+                        depth--;
+                    }
+                    x++;
+                }
+                y++;
+                x = 0;
+            }
+            if (close_y != (size_t)-1) {
+                int multi = close_y != uy;
+                char ln[400];
+
+                if (ins_y != (size_t)-1 && multi && ins_bol) {
+                    /* one item a line: a line of its own */
+                    snprintf(ln, sizeof ln, "%*s%s,\n", (int)indent, "", item);
+                    insert_lines(e, ins_y, ln, 0, 0);
+                } else if (ins_y != (size_t)-1) {
+                    snprintf(ln, sizeof ln, "%s, ", item);
+                    buf_insert(e->buf, ins_y, ins_x, ln, strlen(ln));
+                    if (e->cy == ins_y && e->cx >= ins_x)
+                        e->cx += strlen(ln);
+                } else if (multi) {
+                    const Line *cl = &b->lines[close_y];
+                    size_t q = 0;
+
+                    while (q < close_x && (cl->s[q] == ' ' || cl->s[q] == '\t'))
+                        q++;
+                    if (q == close_x) {
+                        snprintf(ln, sizeof ln, "%*s%s,\n", (int)indent, "", item);
+                        insert_lines(e, close_y, ln, 0, 0);
+                    } else {
+                        snprintf(ln, sizeof ln, "%s%s", cl->s[close_x - 1] == ',' ? " " : ", ", item);
+                        buf_insert(e->buf, close_y, close_x, ln, strlen(ln));
+                    }
+                } else {
+                    const Line *cl = &b->lines[close_y];
+                    size_t q = close_x;
+
+                    while (q > 0 && cl->s[q - 1] == ' ')
+                        q--;
+                    snprintf(ln, sizeof ln, "%s%s", q > 0 && cl->s[q - 1] == ',' ? " " : ", ", item);
+                    buf_insert(e->buf, close_y, q, ln, strlen(ln));
+                    if (e->cy == close_y && e->cx >= q)
+                        e->cx += strlen(ln);
+                }
+                free(v);
+                return 1;
+            }
         }
-        free(v);
-        return 1;
     }
     snprintf(line, sizeof line, "use %s;\n", path);
     {

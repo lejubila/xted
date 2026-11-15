@@ -162,6 +162,8 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     c'è un `go.mod` sopra il file) si propongono i suoi nomi esportati e si aggiunge
     `import "example.com/app/store"` (il `module` di `go.mod` più la cartella). Come fa goimports, nel
     blocco la libreria standard sta nel primo gruppo e i moduli esterni in un gruppo dopo una riga vuota.
+    Un pacchetto importato con un altro nome (`m "example.com/app/store"`, `f "fmt"`) dà i suoi membri
+    dopo `m.` e `f.`.
   - In Rust, scegliendo un tipo o un modulo fuori dal prelude (`HashMap`, `HashMap::new`, `fs::read`)
     si aggiunge `use std::collections::HashMap;` (o `use std::fs;`) tra gli `use` in ordine, oppure
     dopo i commenti `//!` e gli attributi `#![…]`; un `use std::collections::{HashMap, …}` conta già.
@@ -171,10 +173,14 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     aggiunge `use crate::net::http::fetch;`. Da un programma (`src/bin/…`, o `src/main.rs` accanto a
     `lib.rs`) i suoi moduli sono `crate::…` e la libreria si raggiunge col nome del pacchetto
     (`use bat::output::OutputType;`), solo attraverso i `pub mod` e i `pub use` di `lib.rs`.
+    Un file che nessun `mod` dichiara (in `lib.rs`/`main.rs` o nel modulo padre) non fa parte del crate
+    e non si propone; `pub(crate)`, `pub(super)` contano come `pub`.
     Gli `use` seguono rustfmt: gruppi `std`/`core`, altri crate, `crate`/`self`/`super`, in ordine
-    (i moduli prima dei tipi); un `use crate::net::{A, B};` su una riga accoglie il nome tra le graffe,
-    gli attributi `#[cfg(…)]` restano col loro `use`, e un nome già presente in graffe annidate
-    (`use crate::{app::App, …}`) non si aggiunge di nuovo. Senza `use`, si scrive dopo le `mod …;`.
+    (i moduli prima dei tipi); le graffe di un `use` del modulo o di uno sopra accolgono il resto del
+    percorso in ordine, su una riga (`use crate::net::{A, B};`) o una voce per riga
+    (`use bat::{`↵`config::Config,`↵`line_range::LineRange,`↵…`};`); gli attributi `#[cfg(…)]` restano col
+    loro `use`, e un nome già presente in graffe annidate (`use crate::{app::App, …}`) non si aggiunge di
+    nuovo. Senza `use`, si scrive dopo le `mod …;`.
   - In PHP, scegliendo un metodo o una costante dopo `Nome::` (`Route::get`, `User::find`) si aggiunge
     `use` della classe se manca (alias di `config/app.php`, poi le classi del progetto e di `vendor`).
     Con Composer, le funzioni e costanti dei file di `"autoload": {"files"}` vengono proposte, e per
@@ -184,6 +190,12 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   - In PHP, dopo `use`, propone le classi del progetto (classmap e PSR-4 di Composer, alias
     di `config/app.php`) e aggiunge l'istruzione `use` in ordine; i metodi dichiarati in
     `@method` (facade di Laravel) sono riconosciuti.
+  - Dopo una facade (`Auth::`, `Flash::`, `File::`) si propongono i metodi della classe a cui rimanda:
+    quella dei suoi `@see`, o, senza `@see` (le facade di October), quella del commento
+    `Resolves to: - Ns\Classe` o quella restituita da `getFacadeAccessor()` (`Classe::class`). Gli alias
+    si leggono da `config/app.php` e dai file che include con `base_path()` (`modules/system/aliases.php`
+    di October), anche nella forma `'Nome' => 'Ns\Classe'`; una classe base scritta con un alias
+    (`use Illuminate\Filesystem\Filesystem as FilesystemBase;`) porta i suoi metodi.
   - In C e C++, scegliendo un simbolo della libreria standard (`strlen`, `malloc`, `FILE`, `INT_MAX`, `uint32_t`,
     `O_RDONLY`, …, e in C++ `vector`, `sort`, `make_unique`, …) l'editor aggiunge anche `#include <string.h>`
     (o `<vector>`, `<algorithm>`, `<memory>`, `<cstdio>`, l'header giusto) se manca, e se non c'è già

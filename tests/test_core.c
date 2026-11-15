@@ -4933,6 +4933,60 @@ static void test_php_require_and_use_function(void)
     rm_rf(dir2);
 }
 
+/* Facades with no @see (October): the class comes from "Resolves to:" (even with the wrong
+ * namespace) or from getFacadeAccessor; the aliases are in a file config/app.php includes; a
+ * module with its own composer.json is still in the project; a base class named with "as". */
+static void test_php_facades(void)
+{
+    char dir[64], sub[200];
+    static const char *const dirs[] = {
+        "config", "modules", "modules/backend", "vendor", "vendor/composer", "vendor/lib",
+        "vendor/lib/src", "vendor/lib/src/Facades", "vendor/lib/src/Flash", "vendor/lib/src/Support",
+        "vendor/base", "vendor/base/src"
+    };
+    size_t i;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof dirs / sizeof dirs[0]; i++) {
+        snprintf(sub, sizeof sub, "%s/%s", dir, dirs[i]);
+        mkdir(sub, 0755);
+    }
+    put_file(dir, "vendor/composer/autoload_psr4.php",
+             "<?php\n$vendorDir = dirname(dirname(__FILE__));\n$baseDir = dirname($vendorDir);\n"
+             "return array(\n    'Lib\\\\' => array($vendorDir . '/lib/src'),\n"
+             "    'Base\\\\' => array($vendorDir . '/base/src'),\n);\n");
+    put_file(dir, "config/app.php", "<?php\nreturn [\n    'aliases' => array_merge(include(base_path('modules/aliases.php')), [\n"
+                                    "        'Old' => 'Lib\\Facades\\Old',\n    ]),\n];\n");
+    put_file(dir, "modules/aliases.php", "<?php\nreturn [\n    'Flash' => Lib\\Facades\\Flash::class,\n"
+                                         "    'Str' => Lib\\Facades\\Str::class,\n];\n");
+    put_file(dir, "modules/backend/composer.json", "{}\n");
+    put_file(dir, "vendor/lib/src/Facades/Flash.php",
+             "<?php namespace Lib\\Facades;\n\nclass Flash extends Facade\n{\n    /**\n     * Resolves to:\n"
+             "     * - Lib\\Support\\FlashBag\n     */\n    protected static function getFacadeAccessor() { return 'flash'; }\n}\n");
+    put_file(dir, "vendor/lib/src/Flash/FlashBag.php",
+             "<?php namespace Lib\\Flash;\n\nclass FlashBag\n{\n    public function success($m) {}\n}\n");
+    put_file(dir, "vendor/lib/src/Facades/Str.php",
+             "<?php namespace Lib\\Facades;\n\nclass Str extends Facade\n{\n    /**\n     * Resolves to:\n"
+             "     * - Lib\\Support\\Str\n     */\n    protected static function getFacadeAccessor() { return 'string'; }\n}\n");
+    put_file(dir, "vendor/lib/src/Support/Str.php",
+             "<?php namespace Lib\\Support;\n\nuse Base\\Str as StrHelper;\n\nclass Str extends StrHelper\n{\n"
+             "    public static function ordinal($n) {}\n}\n");
+    put_file(dir, "vendor/base/src/Str.php", "<?php namespace Base;\n\nclass Str\n{\n    public static function camel($v) {}\n}\n");
+    put_file(dir, "vendor/lib/src/Facades/Old.php",
+             "<?php namespace Lib\\Facades;\n\nuse Lib\\Flash\\FlashBag;\n\nclass Old extends Facade\n{\n"
+             "    protected static function getFacadeAccessor()\n    {\n        return FlashBag::class;\n    }\n}\n");
+    {
+        static const char *ctl = "<?php namespace Backend\\Classes;\n\nuse Flash;\nuse Str;\nuse Old;\n\nclass C\n{\n"
+                                 "    function f()\n    {\n        \n    }\n}\n";
+
+        php_case(dir, "modules/backend/C.php", ctl, "Flash::succ", 10, "        Flash::success(", 0);
+        php_case(dir, "modules/backend/C.php", ctl, "Str::ordi", 10, "        Str::ordinal(", 0);
+        php_case(dir, "modules/backend/C.php", ctl, "Str::came", 10, "        Str::camel(", 0);
+        php_case(dir, "modules/backend/C.php", ctl, "Old::succ", 10, "        Old::success(", 0);
+    }
+    rm_rf(dir);
+}
+
 /* Many classes reached from one file: the index cache must not drop one that is in use. */
 static void test_sym_cache_pressure(void)
 {
@@ -5031,7 +5085,7 @@ static void test_go_rust(void)
                           "impl Point {\n    pub fn new(x: f64, y: f64) -> Point {\n        Point { x, y }\n    }\n"
                           "    fn dist(&self, other: &Point) -> f64 {\n        0.0\n    }\n}\n\n"
                           "trait Shape {\n    fn area(&self) -> f64;\n}\n\nfn main() {\n"
-                          "    let p = Point::new(1.0, 2.0);\n    p.\n    HashMap::\n}\n");
+                          "    let p = Point::new(1.0, 2.0);\n    p.\n    HashMap::\n}\n\npub(crate) fn helper(x: i32) {}\n");
     snprintf(path, sizeof path, "%s/p.rs", dir);
     memset(&d, 0, sizeof d);
     CHECK(doc_load(&d, path, err, sizeof err) == 0);
@@ -5039,7 +5093,7 @@ static void test_go_rust(void)
     sym_outline(c, &d, out_cb, NULL);
     CHECK(strstr(out_text, "Point()") && strstr(out_text, "Point.new(x: f64, y: f64)") &&
           strstr(out_text, "Point.dist(other: &Point)") && strstr(out_text, "Shape()") &&
-          strstr(out_text, "main()"));
+          strstr(out_text, "main()") && strstr(out_text, "helper(x: i32)"));
     docs[0] = &d;
     y = 22;                                     /* p. : the fields and the methods of impl */
     sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
@@ -5109,6 +5163,14 @@ static void test_go_rust(void)
                  "fmt.Printl", 7, "import (\n\t\"fmt\"\n\n\t\"github.com/x/y\"\n)\n", 1);
         php_case(md, "cmd/b.go", "package main\n\nimport \"example.com/app/store\"\n\nfunc main() {\n\t\n}\n",
                  "store.Op", 5, "package main\n\nimport \"example.com/app/store\"\n\nfunc main() {\n", 0);
+        /* a package imported under another name: its members after the alias, no new import */
+        {
+            static const char *al = "package main\n\nimport (\n\tf \"fmt\"\n\tm \"example.com/app/store\"\n)\n\n"
+                                    "func main() {\n\t\n}\n";
+
+            php_case(md, "cmd/g.go", al, "m.Op", 8, "\tm.Open(", 0);
+            php_case(md, "cmd/g.go", al, "f.Printl", 8, "\tf.Println(", 0);
+        }
         snprintf(path, sizeof path, "%s/cmd/main.go", md);
         c = sym_cache_new();
         memset(&d, 0, sizeof d);
@@ -5139,31 +5201,35 @@ static void test_go_rust(void)
         put_file(rd, "Cargo.toml", "[package]\nname = \"app\"\n");
         put_file(rd, "src/net/http.rs", "pub fn fetch(url: &str) -> String {\n    String::new()\n}\n\n"
                                         "pub struct Client {\n    base: String,\n}\n\npub struct Zeta;\n\nfn private_fn() {}\n");
+        put_file(rd, "src/net/mod.rs", "pub mod http;\n");
+        put_file(rd, "src/orphan.rs", "pub fn orphan_fn() {}\n");
         put_file(rd, "src/util.rs", "pub(crate) const fn limit_of(n: usize) -> usize {\n    n\n}\n");
         put_file(rd, "src/bin/tool.rs", "pub fn tool_only() {}\n");
-        php_case(rd, "src/main.rs", "mod net;\n\nfn main() {\n    \n}\n", "fetc", 3,
+        php_case(rd, "src/main.rs", "mod net;\n\nfn main() {\n    \n}\n\nmod net;\nmod util;\n", "fetc", 3,
                  "mod net;\n\nuse crate::net::http::fetch;\n\nfn main() {\n", 1);
-        php_case(rd, "src/main.rs", "use std::fs;\n\nfn main() {\n    \n}\n", "Clien", 3,
+        php_case(rd, "src/main.rs", "use std::fs;\n\nfn main() {\n    \n}\n\nmod net;\nmod util;\n", "Clien", 3,
                  "use std::fs;\n\nuse crate::net::http::Client;\n\nfn main", 1);
         /* rustfmt's layout: the name joins the braces of its module, a use its group in order */
-        php_case(rd, "src/main.rs", "use crate::net::http::{Client, Other};\n\nfn main() {\n    \n}\n", "fetc", 3,
+        php_case(rd, "src/main.rs", "use crate::net::http::{Client, Other};\n\nfn main() {\n    \n}\n\nmod net;\nmod util;\n", "fetc", 3,
                  "use crate::net::http::{fetch, Client, Other};\n\nfn main", 2);
-        php_case(rd, "src/main.rs", "use crate::net::http::{Client};\n\nfn main() {\n    \n}\n", "Zet", 3,
+        php_case(rd, "src/main.rs", "use crate::net::http::{Client};\n\nfn main() {\n    \n}\n\nmod net;\nmod util;\n", "Zet", 3,
                  "use crate::net::http::{Client, Zeta};\n\nfn main", 2);
         php_case(rd, "src/main.rs",
                  "use std::fs;\n\nuse serde::Serialize;\n\nuse crate::a::B;\n#[cfg(x)]\nuse crate::z::Y;\nuse crate::Top;\n\n"
-                 "fn main() {\n    \n}\n", "Clien", 10,
+                 "fn main() {\n    \n}\n\nmod net;\nmod util;\n", "Clien", 10,
                  "use crate::a::B;\nuse crate::net::http::Client;\n#[cfg(x)]\nuse crate::z::Y;\nuse crate::Top;\n\nfn main", 1);
-        php_case(rd, "src/main.rs", "use serde::Serialize;\n\nuse crate::a::B;\n\nfn main() {\n    \n}\n", "HashMap::ne", 5,
+        php_case(rd, "src/main.rs", "use serde::Serialize;\n\nuse crate::a::B;\n\nfn main() {\n    \n}\n\nmod net;\nmod util;\n", "HashMap::ne", 5,
                  "use std::collections::HashMap;\n\nuse serde::Serialize;\n\nuse crate::a::B;\n", 1);
-        php_case(rd, "src/main.rs", "use crate::a::{\n    B,\n    fetch,\n};\n\nfn main() {\n    \n}\n", "Clien", 6,
+        php_case(rd, "src/main.rs", "use crate::a::{\n    B,\n    fetch,\n};\n\nfn main() {\n    \n}\n\nmod net;\nmod util;\n", "Clien", 6,
                  "use crate::a::{\n    B,\n    fetch,\n};\nuse crate::net::http::Client;\n\nfn main", 1);
-        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n", "limit_o", 1,
+        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n\nmod net;\nmod util;\n", "limit_o", 1,
                  "use crate::util::limit_of;\n\nfn main() {\n", 1);
-        php_case(rd, "src/main.rs", "use crate::net::http::fetch;\n\nfn main() {\n    \n}\n", "fetc", 3,
+        php_case(rd, "src/main.rs", "use crate::net::http::fetch;\n\nfn main() {\n    \n}\n\nmod net;\nmod util;\n", "fetc", 3,
                  "use crate::net::http::fetch;\n\nfn main() {\n", 0);
-        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n", "tool_on", 1, "fn main() {\n", 0);
-        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n", "private_f", 1, "fn main() {\n", 0);
+        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n\nmod net;\nmod util;\n", "tool_on", 1, "fn main() {\n", 0);
+        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n\nmod net;\nmod util;\n", "private_f", 1, "fn main() {\n", 0);
+        /* a file no mod declares is not part of the crate */
+        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n\nmod net;\nmod util;\n", "orphan_f", 1, "fn main() {\n", 0);
         rm_rf(rd);
     }
 
@@ -5193,6 +5259,17 @@ static void test_go_rust(void)
                  "mod cli;\n\nuse crate::cli::parse_args;\n\nfn main", 1);
         php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nuse crate::{\n    cli::parse_args,\n};\n\nfn main() {\n    \n}\n",
                  "parse_ar", 7, "use crate::{\n    cli::parse_args,\n};\n\nfn main", 0);
+        /* the braces of a use of the library (rustfmt's vertical and horizontal layouts) */
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nuse my_app::{\n    a::B,\n    zz::Y,\n    Helper,\n};\n\nfn main() {\n    \n}\n",
+                 "fetc", 9, "use my_app::{\n    a::B,\n    net::fetch,\n    zz::Y,\n    Helper,\n};\n", 1);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nuse my_app::{\n    a::B,\n};\n\nfn main() {\n    \n}\n",
+                 "Helpe", 7, "use my_app::{\n    a::B,\n    Helper,\n};\n", 1);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nuse my_app::{\n    a::B, zz::Y,\n};\n\nfn main() {\n    \n}\n",
+                 "fetc", 7, "use my_app::{\n    a::B, net::fetch, zz::Y,\n};\n", 2);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nuse my_app::{a::B, Helper};\n\nfn main() {\n    \n}\n",
+                 "fetc", 5, "use my_app::{a::B, net::fetch, Helper};\n", 2);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nuse my_app::{a::{B, C}, Helper};\n\nfn main() {\n    \n}\n",
+                 "fetc", 5, "use my_app::{a::{B, C}, net::fetch, Helper};\n", 2);
         /* in the library: the other modules, private ones too, and what lib.rs re-exports */
         php_case(rd, "src/net.rs", "pub fn fetch() {}\n\nfn g() {\n    \n}\n", "hus", 3,
                  "use crate::secret::hush;\n\npub fn fetch", 1);
@@ -5777,6 +5854,7 @@ int main(void)
     test_php_static_use();
     test_php_require_and_use_function();
     test_sym_cache_pressure();
+    test_php_facades();
     test_go_rust();
     test_config_merge();
     test_snippets();

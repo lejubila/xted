@@ -307,6 +307,13 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
                     if (!lit_match(p, pl, s, len, &j))
                         break;
                     k = j;
+                    /* Rust: pub(crate), pub(super), pub(in path) are pub */
+                    if (pl == 3 && memcmp(p, "pub", 3) == 0 && k < len && s[k] == '(') {
+                        const char *z = memchr(s + k, ')', len - k);
+
+                        if (z)
+                            k = (size_t)(z - s) + 1;
+                    }
                     while (k < len && is_blank(s[k]))
                         k++;
                     if (k >= len || !(is_idc((unsigned char)s[k]) || s[k] == '$' || s[k] == '&' ||
@@ -478,6 +485,7 @@ typedef struct {
 #define MAX_FRAMES 48
 #define DOC_MAX 96
 static const char *last_segment(const char *q);
+static const char *strstr_len(const char *hay, size_t n, const char *needle);
 static int token_start(const char *s, size_t i);
 
 typedef struct {
@@ -877,6 +885,125 @@ static void resolve_recv(SymIndex *x)
     }
 }
 
+/* A facade with no @see tag (October's, older packages'): the class it resolves to is told by a
+ * "Resolves to: - Ns\\Class" comment, or returned by getFacadeAccessor (Class::class or a string
+ * with a backslash); it becomes the facade's @see. */
+static void facade_targets(SymIndex *x, const Buffer *b)
+{
+    size_t i, j, n = x->n, y;
+
+    for (i = 0; i < n; i++) {
+        const Sym *c = &x->v[i];
+        int seen = 0, after = 0;
+        char found[PM_PARAMS];
+
+        if (c->kind != RULE_CLASS || strcmp(c->ret, "Facade") != 0)
+            continue;
+        for (j = i + 1; j < x->n && !seen; j++)
+            seen = x->v[j].owner == (long)i && strcmp(x->v[j].sig, "@see") == 0;
+        if (seen)
+            continue;
+        found[0] = '\0';
+        for (y = c->y0; y < b->nlines && y <= c->y1 && !found[0]; y++) {
+            const char *s = b->lines[y].s, *p;
+            size_t len = b->lines[y].len, k = 0, e;
+
+            while (k < len && (s[k] == ' ' || s[k] == '\t' || s[k] == '*'))
+                k++;
+            if (strstr_len(s, len, "Resolves to:")) {
+                after = 1;
+                continue;
+            }
+            if (after && k + 2 < len && s[k] == '-' && s[k + 1] == ' ') {
+                for (k += 2; k < len && s[k] == '\\'; k++)
+                    ;
+                for (e = k; e < len && (is_idc((unsigned char)s[e]) || s[e] == '\\'); e++)
+                    ;
+                if (e > k)
+                    put(found, sizeof found, s + k, e - k);
+                continue;
+            }
+            after = 0;
+            if ((p = strstr_len(s, len, "return ")) == NULL || y < c->y0)
+                continue;
+            k = (size_t)(p - s) + 7;
+            if (k < len && (s[k] == '\'' || s[k] == '"')) {
+                char q = s[k++];
+
+                for (e = k; e < len && s[e] != q; e++)
+                    ;
+                if (e < len && memchr(s + k, '\\', e - k)) {
+                    while (k < e && s[k] == '\\')
+                        k++;
+                    put(found, sizeof found, s + k, e - k);
+                    /* 'Ns\\Class' in a single-quoted string is written with doubled backslashes */
+                    {
+                        char *r = found, *w = found;
+
+                        for (; *r; r++)
+                            if (!(*r == '\\' && r[1] == '\\'))
+                                *w++ = *r;
+                        *w = '\0';
+                    }
+                }
+            } else {
+                for (e = k; e < len && (is_idc((unsigned char)s[e]) || s[e] == '\\'); e++)
+                    ;
+                if (e > k && e + 7 <= len && memcmp(s + e, "::class", 7) == 0) {
+                    while (k < e && s[k] == '\\')
+                        k++;
+                    put(found, sizeof found, s + k, e - k);
+                }
+            }
+        }
+        if (found[0]) {
+            char spec[PM_PARAMS + 1];
+
+            spec[0] = ':';
+            put(spec + 1, PM_PARAMS, found, strlen(found));
+            ix_inc(x, spec);
+            ix_add(x, RULE_VAR, "", "@see", last_segment(found), (long)i, c->y0);
+        }
+    }
+}
+
+/* The types written with an alias of the file ("use A\\Filesystem as FilesystemBase", "extends
+ * FilesystemBase") become the class itself, so that other files find it by its name. */
+static void resolve_aliases(SymIndex *x, const Buffer *b, const SynRule *r, size_t nr)
+{
+    size_t y, i, k, n = b->nlines < 400 ? b->nlines : 400, na = 0;
+    char al[16][PM_NAME], ty[16][PM_NAME];
+
+    for (k = 0; k < nr && r[k].kind != RULE_ALIAS; k++)
+        ;
+    if (k == nr)
+        return;
+    for (y = 0; y < n && na < 16; y++) {
+        const Line *l = &b->lines[y];
+
+        for (i = 0; i < l->len && na < 16; i++) {
+            PatMatch m;
+
+            if (!token_start(l->s, i))
+                continue;
+            for (k = 0; k < nr; k++)
+                if (r[k].kind == RULE_ALIAS && pat_match(r[k].pat, l->s, l->len, i, &m) && m.name[0] &&
+                    m.type[0] && strcmp(m.name, m.type) != 0) {
+                    put(al[na], PM_NAME, m.name, strlen(m.name));
+                    put(ty[na++], PM_NAME, m.type, strlen(m.type));
+                    break;
+                }
+        }
+    }
+    for (i = 0; i < x->n && na; i++)
+        for (k = 0; k < na; k++)
+            if (x->v[i].ret[0] && strcmp(x->v[i].ret, al[k]) == 0) {
+                free(x->v[i].ret);
+                x->v[i].ret = xstrdup(ty[k]);
+                break;
+            }
+}
+
 SymIndex *sym_build(const Buffer *b, Syntax *syn)
 {
     SymIndex *x = xmalloc(sizeof *x);
@@ -921,6 +1048,10 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
     for (i = 0; i < x->n; i++)
         if (x->v[i].y1 == (size_t)-1)
             x->v[i].y1 = B.indent ? B.last_code : b->nlines;
+    if (B.has_doc) {
+        resolve_aliases(x, b, B.r, B.nr);
+        facade_targets(x, b);
+    }
     x->gen = b->gen;
     return x;
 }
@@ -1067,6 +1198,8 @@ static void set_root(SymCache *c, const char *key)
     found[0] = '\0';
     if (key && key[0] == '/') {
         snprintf(dir, sizeof dir, "%s", key);
+        /* the folder with Composer's vendor/, however high: a package inside the project may
+         * have a composer.json of its own (October's modules/backend) */
         while ((sl = strrchr(dir, '/')) != NULL) {
             *sl = '\0';
             snprintf(probe_path, sizeof probe_path, "%s/vendor/composer/autoload_psr4.php", dir);
@@ -1074,13 +1207,22 @@ static void set_root(SymCache *c, const char *key)
                 snprintf(found, sizeof found, "%s", dir);
                 break;
             }
-            snprintf(probe_path, sizeof probe_path, "%s/composer.json", dir);
-            if (stat(probe_path, &st) == 0) {
-                snprintf(found, sizeof found, "%s", dir);
-                break;
-            }
             if (dir[0] == '\0')
                 break;
+        }
+        /* else the nearest composer.json (a project not installed yet) */
+        if (!found[0]) {
+            snprintf(dir, sizeof dir, "%s", key);
+            while ((sl = strrchr(dir, '/')) != NULL) {
+                *sl = '\0';
+                snprintf(probe_path, sizeof probe_path, "%s/composer.json", dir);
+                if (stat(probe_path, &st) == 0) {
+                    snprintf(found, sizeof found, "%s", dir);
+                    break;
+                }
+                if (dir[0] == '\0')
+                    break;
+            }
         }
         /* no Composer: the folder of the Git repository (a C project, for its headers) */
         if (!found[0]) {
@@ -1503,6 +1645,60 @@ static char *psr4_file(SymCache *c, const char *qual)
     }
 }
 
+/* A\\B\\Support\\Name that is not there: the PSR-4 folder of its namespace's parent is looked
+ * through one level for Name.php (a doc comment that names the wrong namespace). */
+static char *psr4_sibling(SymCache *c, const char *qual)
+{
+    const char *name = last_segment(qual);
+    char parent[PM_PATH], probe_q[PM_PATH * 2], *sl, *f = NULL;
+    size_t pl;
+
+    pl = (size_t)(name - qual);
+    if (pl < 2 || pl >= sizeof parent)
+        return NULL;
+    memcpy(parent, qual, pl - 1);           /* A\\B\\Support */
+    parent[pl - 1] = '\0';
+    sl = strrchr(parent, '\\');
+    if (!sl)
+        return NULL;
+    *sl = '\0';                             /* A\\B */
+    {
+        /* the folder of A\\B, from the PSR-4 prefix that covers it */
+        char dir[PATH_MAX];
+        DIR *d;
+        struct dirent *de;
+        size_t i;
+
+        load_psr4(c);
+        for (i = 0; i < c->nps && !f; i++) {
+            size_t ql = strlen(c->ps_prefix[i]), k, n;
+
+            snprintf(probe_q, sizeof probe_q, "%s\\", parent);
+            if (ql > strlen(probe_q) || strncmp(c->ps_prefix[i], probe_q, ql) != 0)
+                continue;
+            rooted(c, dir, sizeof dir, c->ps_dir[i]);
+            n = strlen(dir);
+            for (k = ql; probe_q[k] && n + 2 < sizeof dir; k++)
+                dir[n++] = probe_q[k] == '\\' ? '/' : probe_q[k];
+            dir[n] = '\0';
+            if (!(d = opendir(dir)))
+                continue;
+            while (!f && (de = readdir(d)) != NULL) {
+                char path[PATH_MAX + 600];
+                struct stat st;
+
+                if (de->d_name[0] == '.')
+                    continue;
+                snprintf(path, sizeof path, "%s/%s/%s.php", dir, de->d_name, name);
+                if (stat(path, &st) == 0 && S_ISREG(st.st_mode))
+                    f = realpath(path, NULL);
+            }
+            closedir(d);
+        }
+        return f;
+    }
+}
+
 /* A project file called Name.<ext>, for a class mentioned by name (PHP `use`): when qual has
  * a namespace, the file whose directories best match it. */
 static char *find_class_file(SymCache *c, const char *qual, const char *ext)
@@ -1538,7 +1734,7 @@ static char *find_class_file(SymCache *c, const char *qual, const char *ext)
         }
     }
     if (best < 0)
-        return NULL;
+        return strcmp(ext, "php") == 0 && strchr(qual, '\\') ? psr4_sibling(c, qual) : NULL;
     {
         char path[PATH_MAX];
 
@@ -1682,6 +1878,29 @@ static int env_has_class(const Env *e, const char *name);
 
 /* Adds the files included by e->v[k]. A class mentioned by name (PHP `use`, `new`) is looked
  * for in the project only when nothing loaded so far defines it. */
+static void load_aliases(SymCache *c);
+
+/* The file itself defines a class of that name: Facades\\Str forwarding to Support\\Str. */
+static int ix_defines(const SymIndex *x, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < x->n; i++)
+        if (x->v[i].kind == RULE_CLASS && strcmp(x->v[i].name, name) == 0)
+            return 1;
+    return 0;
+}
+
+static int ix_is_facade(const SymIndex *x)
+{
+    size_t i;
+
+    for (i = 0; i < x->n; i++)
+        if (x->v[i].kind == RULE_VAR && !x->v[i].name[0] && strcmp(x->v[i].sig, "@see") == 0)
+            return 1;
+    return 0;
+}
+
 static void env_includes(SymCache *c, Env *e, size_t k)
 {
     SymIndex *x = e->v[k];
@@ -1689,16 +1908,38 @@ static void env_includes(SymCache *c, Env *e, size_t k)
 
     resolve_includes(x);
     for (j = 0; j < x->ninc; j++) {
+        /* a class by name only is skipped when one of that name is there; a qualified one is
+         * looked up (another class may have the same last segment) */
         if (x->inc[j][0] == ':' && !x->incp[j] &&
-            !env_has_class(e, last_segment(x->inc[j] + 1))) {
-            char *f = find_class_file(c, x->inc[j] + 1, ext_of(x->key));
+            (strchr(x->inc[j] + 1, '\\') || !env_has_class(e, last_segment(x->inc[j] + 1)) ||
+             ix_defines(x, last_segment(x->inc[j] + 1)))) {
+            const char *want = x->inc[j] + 1;
+            char *f;
 
+            /* use File; with no namespace is a global name: a Laravel alias first */
+            if (!strchr(want, '\\') && strcmp(ext_of(x->key), "php") == 0) {
+                size_t a;
+
+                load_aliases(c);
+                for (a = 0; a < c->nal; a++)
+                    if (strcmp(c->al_name[a], want) == 0) {
+                        want = c->al_qual[a];
+                        break;
+                    }
+            }
+            f = find_class_file(c, want, ext_of(x->key));
             if (!f && !c->files_done)
                 continue;               /* the walk is not over: ask again next time */
             x->incp[j] = f ? f : xstrdup("");
         }
-        if (x->incp[j] && x->incp[j][0])
+        if (x->incp[j] && x->incp[j][0]) {
+            size_t before = e->n;
+
             env_add(e, index_of_path(c, x->incp[j]), e->depth[k] + 1);
+            /* a facade: the classes it forwards to come right after it, before the set is full */
+            if (e->n > before && e->depth[before] < INC_DEPTH && ix_is_facade(e->v[before]))
+                env_includes(c, e, before);
+        }
     }
 }
 
@@ -2445,49 +2686,94 @@ static void resolve_chain(const Env *e, Doc *cur, size_t y, size_t sep, char *ou
     put(out, cap, t, strlen(t));
 }
 
+static void alias_line(SymCache *c, char *line)
+{
+    char *p = line, *q, *arrow, name[PM_NAME], qual[PM_PATH];
+    size_t n;
+    int quoted;
+
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (*p != '\'' && *p != '"')
+        return;
+    q = strchr(p + 1, *p);
+    arrow = q ? strstr(q, "=>") : NULL;
+    if (!arrow || (size_t)(q - p - 1) >= sizeof name || q == p + 1)
+        return;
+    memcpy(name, p + 1, (size_t)(q - p - 1));
+    name[q - p - 1] = '\0';
+    p = arrow + 2;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    /* Ns\Class::class, or the older 'Ns\Class' */
+    quoted = *p == '\'' || *p == '"';
+    if (quoted)
+        p++;
+    while (*p == '\\')
+        p++;
+    for (n = 0; is_idc((unsigned char)p[n]) || p[n] == '\\'; n++)
+        ;
+    if (n == 0 || n >= sizeof qual || (quoted ? (p[n] != '\'' && p[n] != '"') : strncmp(p + n, "::class", 7) != 0))
+        return;
+    memcpy(qual, p, n);
+    qual[n] = '\0';
+    {
+        /* '\\' in a single-quoted string is one backslash */
+        char *r = qual, *w = qual;
+
+        for (; *r; r++)
+            if (!(*r == '\\' && r[1] == '\\'))
+                *w++ = *r;
+        *w = '\0';
+    }
+    c->al_name = xrealloc(c->al_name, (c->nal + 1) * sizeof *c->al_name);
+    c->al_qual = xrealloc(c->al_qual, (c->nal + 1) * sizeof *c->al_qual);
+    c->al_name[c->nal] = xstrdup(name);
+    c->al_qual[c->nal++] = xstrdup(qual);
+}
+
 /* The global class aliases of a Laravel project: 'URL' => Illuminate\\Support\\Facades\\URL::class
- * in config/app.php, read once. */
+ * in config/app.php and in the files it includes with base_path() (October's
+ * modules/system/aliases.php), read once. */
 static void load_aliases(SymCache *c)
 {
     FILE *f;
-    char line[512];
+    char line[512], path[PATH_MAX + 64], more[4][PM_PATH];
+    size_t nmore = 0, k;
 
     if (c->al_done)
         return;
     c->al_done = 1;
-    rooted(c, line, sizeof line, "config/app.php");
-    f = fopen(line, "r");
+    rooted(c, path, sizeof path, "config/app.php");
+    f = fopen(path, "r");
     if (!f)
         return;
     while (fgets(line, sizeof line, f)) {
-        char *p = line, *q, *arrow, name[PM_NAME], qual[PM_PATH];
-        size_t n;
+        char *b = strstr(line, "base_path(");
 
-        while (*p == ' ' || *p == '\t')
-            p++;
-        if (*p != '\'' && *p != '"')
+        if (b && nmore < 4 && strstr(line, "include")) {
+            char *a = strchr(b, '\''), *z;
+
+            if (!a)
+                a = strchr(b, '"');
+            z = a ? strchr(a + 1, *a) : NULL;
+            if (z && z - a - 1 > 4 && (size_t)(z - a - 1) < PM_PATH && memcmp(z - 4, ".php", 4) == 0) {
+                memcpy(more[nmore], a + 1, (size_t)(z - a - 1));
+                more[nmore++][z - a - 1] = '\0';
+            }
             continue;
-        q = strchr(p + 1, *p);
-        arrow = q ? strstr(q, "=>") : NULL;
-        if (!arrow || (size_t)(q - p - 1) >= sizeof name || q == p + 1)
-            continue;
-        memcpy(name, p + 1, (size_t)(q - p - 1));
-        name[q - p - 1] = '\0';
-        p = arrow + 2;
-        while (*p == ' ' || *p == '\t' || *p == '\\')
-            p++;
-        for (n = 0; is_idc((unsigned char)p[n]) || p[n] == '\\'; n++)
-            ;
-        if (n == 0 || n >= sizeof qual || strncmp(p + n, "::class", 7) != 0)
-            continue;
-        memcpy(qual, p, n);
-        qual[n] = '\0';
-        c->al_name = xrealloc(c->al_name, (c->nal + 1) * sizeof *c->al_name);
-        c->al_qual = xrealloc(c->al_qual, (c->nal + 1) * sizeof *c->al_qual);
-        c->al_name[c->nal] = xstrdup(name);
-        c->al_qual[c->nal++] = xstrdup(qual);
+        }
+        alias_line(c, line);
     }
     fclose(f);
+    for (k = 0; k < nmore; k++) {
+        rooted(c, path, sizeof path, more[k]);
+        if ((f = fopen(path, "r")) == NULL)
+            continue;
+        while (fgets(line, sizeof line, f))
+            alias_line(c, line);
+        fclose(f);
+    }
 }
 
 /* A global alias (Laravel facade: URL, Route, Session) written before the operator at (y, sep)
@@ -2513,8 +2799,14 @@ static void env_alias(SymCache *c, Env *e, Doc *cur, size_t y, size_t sep)
             char *f = find_class_file(c, c->al_qual[i], "php");
 
             if (f) {
+                size_t k = e->n;
+
                 env_add(e, index_of_path(c, f), 1);
                 free(f);
+                /* what the facade forwards to (its @see classes) comes with it */
+                for (; k < e->n; k++)
+                    if (e->depth[k] < INC_DEPTH)
+                        env_includes(c, e, k);
             }
             return;
         }
@@ -2723,6 +3015,7 @@ typedef struct {
 } Pass;
 
 static int go_pkg_members(SymCache *c, const Doc *cur, const char *name, SymFn fn, void *ctx);
+static int go_alias_members(SymCache *c, Env *e, const Doc *cur, const char *alias, SymFn fn, void *ctx);
 
 int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t sep,
                 SymFn fn, void *ctx)
@@ -2745,7 +3038,7 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
             st--;
         if (st < sep && sep - st < sizeof t && (st == 0 || (l->s[st - 1] != '.' && l->s[st - 1] != ')'))) {
             put(t, sizeof t, l->s + st, sep - st);
-            if (go_pkg_members(c, cur, t, fn, ctx))
+            if (go_alias_members(c, &e, cur, t, fn, ctx) || go_pkg_members(c, cur, t, fn, ctx))
                 return 1;
         }
     }
@@ -2764,7 +3057,6 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
 
 #define GO_DIRS 600                 /* folders of the module looked at */
 
-static const char *strstr_len(const char *hay, size_t n, const char *needle);
 
 /* The folder of cur and, if a go.mod is above it, the module's root and its name. */
 static int go_module(SymCache *c, const Doc *cur, char *curdir)
@@ -2885,8 +3177,36 @@ static int go_packages(SymCache *c, const Doc *cur, char *curdir)
     return 1;
 }
 
-/* The exported names (capitalised) of the package of the module called name, from the files of
- * its folder. Returns 1 if there is one. */
+/* The exported names (capitalised) of the Go files of a folder, tests left out. */
+static void go_dir_members(SymCache *c, const char *dir, SymFn fn, void *ctx)
+{
+    DIR *d;
+    struct dirent *de;
+
+    if (!(d = opendir(dir)))
+        return;
+    while ((de = readdir(d)) != NULL) {
+        size_t l = strlen(de->d_name), j;
+        char path[PATH_MAX + 260];
+        SymIndex *x;
+
+        if (l < 4 || strcmp(de->d_name + l - 3, ".go") != 0 || de->d_name[0] == '.' ||
+            (l > 8 && strcmp(de->d_name + l - 8, "_test.go") == 0))
+            continue;
+        snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
+        if (!(x = index_of_path(c, path)))
+            continue;
+        for (j = 0; j < x->n; j++) {
+            const Sym *s = &x->v[j];
+
+            if (s->owner < 0 && s->kind != RULE_METHOD && isupper((unsigned char)s->name[0]))
+                fn(ctx, s->name, s->kind, s->sig, s->ret, 1);
+        }
+    }
+    closedir(d);
+}
+
+/* The package of the module called name: its exported names. Returns 1 if there is one. */
 static int go_pkg_members(SymCache *c, const Doc *cur, const char *name, SymFn fn, void *ctx)
 {
     char curdir[PATH_MAX];
@@ -2895,35 +3215,73 @@ static int go_pkg_members(SymCache *c, const Doc *cur, const char *name, SymFn f
 
     if (!go_packages(c, cur, curdir))
         return 0;
-    for (p = 0; p < c->ngpk; p++) {
-        DIR *d;
-        struct dirent *de;
-
-        if (strcmp(c->gpk[p].name, name) != 0 || strcmp(c->gpk[p].dir, curdir) == 0 ||
-            !(d = opendir(c->gpk[p].dir)))
-            continue;
-        found = 1;
-        while ((de = readdir(d)) != NULL) {
-            size_t l = strlen(de->d_name), j;
-            char path[PATH_MAX + 260];
-            SymIndex *x;
-
-            if (l < 4 || strcmp(de->d_name + l - 3, ".go") != 0 || de->d_name[0] == '.' ||
-                (l > 8 && strcmp(de->d_name + l - 8, "_test.go") == 0))
-                continue;
-            snprintf(path, sizeof path, "%s/%s", c->gpk[p].dir, de->d_name);
-            if (!(x = index_of_path(c, path)))
-                continue;
-            for (j = 0; j < x->n; j++) {
-                const Sym *s = &x->v[j];
-
-                if (s->owner < 0 && s->kind != RULE_METHOD && isupper((unsigned char)s->name[0]))
-                    fn(ctx, s->name, s->kind, s->sig, s->ret, 1);
-            }
+    for (p = 0; p < c->ngpk; p++)
+        if (strcmp(c->gpk[p].name, name) == 0 && strcmp(c->gpk[p].dir, curdir) != 0) {
+            go_dir_members(c, c->gpk[p].dir, fn, ctx);
+            found = 1;
         }
-        closedir(d);
-    }
     return found;
+}
+
+/* The import path cur gives the name alias (m "example.com/app/store"); "" if none. */
+static void go_alias(const Doc *cur, const char *alias, char *out, size_t n)
+{
+    size_t y, lim = cur->buf.nlines < 300 ? cur->buf.nlines : 300, al = strlen(alias);
+    int block = 0;
+
+    out[0] = '\0';
+    for (y = 0; y < lim; y++) {
+        const char *s = cur->buf.lines[y].s, *q;
+        size_t len = cur->buf.lines[y].len, i = 0;
+
+        if (len >= 8 && memcmp(s, "import (", 8) == 0) {
+            block = 1;
+            continue;
+        }
+        if (block && len > 0 && s[0] == ')') {
+            block = 0;
+            continue;
+        }
+        if (!block) {
+            if (len < 8 || memcmp(s, "import ", 7) != 0)
+                continue;
+            i = 7;
+        }
+        while (i < len && (s[i] == ' ' || s[i] == '\t'))
+            i++;
+        if (i + al < len && memcmp(s + i, alias, al) == 0 && (s[i + al] == ' ' || s[i + al] == '\t') &&
+            (q = memchr(s + i + al, '"', len - i - al)) != NULL) {
+            const char *z = memchr(q + 1, '"', len - (size_t)(q + 1 - s));
+
+            if (z)
+                put(out, n, q + 1, (size_t)(z - q - 1));
+            return;
+        }
+    }
+}
+
+/* Go: the members after alias. of a package imported with that name: one of the module (its
+ * folder), else one of the standard library (by the last element of its path). */
+static int go_alias_members(SymCache *c, Env *e, const Doc *cur, const char *alias, SymFn fn, void *ctx)
+{
+    char path[PM_PATH], curdir[PATH_MAX];
+    const char *last;
+    size_t ml;
+
+    go_alias(cur, alias, path, sizeof path);
+    if (!path[0])
+        return 0;
+    if (go_module(c, cur, curdir) && (ml = strlen(c->gmod)) > 0 && strncmp(path, c->gmod, ml) == 0 &&
+        (path[ml] == '\0' || path[ml] == '/')) {
+        char dir[PATH_MAX + PM_PATH];
+
+        snprintf(dir, sizeof dir, "%s%s", c->groot, path + ml);
+        go_dir_members(c, dir, fn, ctx);
+        return 1;
+    }
+    last = strrchr(path, '/');
+    last = last ? last + 1 : path;
+    return env_members(e, last, fn, ctx, 0);
 }
 
 int sym_go_package(SymCache *c, Doc *cur, const char *name, char *out, size_t n)
@@ -3786,11 +4144,52 @@ static void php_project(SymCache *c, Env *e, HdrFn fn, void *ctx)
  * the prefix itself. */
 typedef struct {
     SymCache *c;
-    const char *top, *self, *prefix, *mods, *root;
+    const char *top, *self, *prefix, *mods;
+    const char *rootmods;           /* the modules the crate's root declares (" a b ") */
+    char ppath[PATH_MAX + 16];      /* the last parent module file read, and what it declares */
+    char pmods[4096];
     size_t seen;
     HdrFn fn;
     void *ctx;
 } RustWalk;
+
+static void rust_mods(const char *path, int pub_only, char *out, size_t n);
+
+/* A module file is part of the crate only if its parent declares it (mod net; in lib.rs, mod
+ * http; in net.rs or net/mod.rs). */
+static int rust_declared(RustWalk *w, const char *mod)
+{
+    char want[PM_NAME + 2], parent[PATH_MAX + 16];
+    const char *seg = mod, *sl;
+    struct stat st;
+
+    while ((sl = strchr(seg, '/')) != NULL || seg == mod) {
+        size_t n = sl ? (size_t)(sl - seg) : strlen(seg);
+
+        if (n + 2 >= sizeof want)
+            return 0;
+        snprintf(want, sizeof want, " %.*s ", (int)n, seg);
+        if (seg == mod) {
+            if (w->rootmods && !strstr(w->rootmods, want))
+                return 0;
+        } else {
+            /* the parent: top/a/b.rs or top/a/b/mod.rs for the part of mod before seg */
+            snprintf(parent, sizeof parent, "%s/%.*s.rs", w->top, (int)(seg - mod - 1), mod);
+            if (stat(parent, &st) != 0)
+                snprintf(parent, sizeof parent, "%s/%.*s/mod.rs", w->top, (int)(seg - mod - 1), mod);
+            if (strcmp(parent, w->ppath) != 0) {
+                snprintf(w->ppath, sizeof w->ppath, "%s", parent);
+                rust_mods(parent, 0, w->pmods, sizeof w->pmods);
+            }
+            if (!strstr(w->pmods, want))
+                return 0;
+        }
+        if (!sl)
+            break;
+        seg = sl + 1;
+    }
+    return 1;
+}
 
 static void rust_emit(RustWalk *w, const char *path, const char *mod)
 {
@@ -3853,6 +4252,8 @@ static void rust_walk(RustWalk *w, const char *dir, int depth)
             if (!strstr(w->mods, first))
                 continue;
         }
+        if (!rust_declared(w, mod))
+            continue;
         w->seen++;
         rust_emit(w, path, mod);
     }
@@ -3906,7 +4307,7 @@ static void rust_mods(const char *path, int pub_only, char *out, size_t n)
 static void rust_project(SymCache *c, const char *self, HdrFn fn, void *ctx)
 {
     char dir[PATH_MAX], probe[PATH_MAX + 32], src[PATH_MAX + 8], *sl;
-    char lib[PATH_MAX + 16], name[PM_NAME] = "", mods[4096], line[256];
+    char lib[PATH_MAX + 16], name[PM_NAME] = "", mods[4096], rmods[4096], line[256];
     struct stat st;
     RustWalk w;
     FILE *f;
@@ -3955,6 +4356,11 @@ static void rust_project(SymCache *c, const char *self, HdrFn fn, void *ctx)
     w.ctx = ctx;
     if (!haslib || (!inbin && !ismain)) {
         /* the library (or the one program): every module, and the names of the root */
+        char root[PATH_MAX + 16];
+
+        snprintf(root, sizeof root, "%s/%s", src, haslib ? "lib.rs" : "main.rs");
+        rust_mods(root, 0, rmods, sizeof rmods);
+        w.rootmods = stat(root, &st) == 0 ? rmods : NULL;
         w.top = src;
         w.prefix = "crate";
         rust_walk(&w, src, 0);
@@ -3967,9 +4373,12 @@ static void rust_project(SymCache *c, const char *self, HdrFn fn, void *ctx)
         const char *b0 = self + sl2 + 5, *b1 = strchr(b0, '/');
 
         if (b1) {
-            char bdir[2 * PATH_MAX + 16];
+            char bdir[2 * PATH_MAX + 16], root[2 * PATH_MAX + 32];
 
             snprintf(bdir, sizeof bdir, "%s/bin/%.*s", src, (int)(b1 - b0), b0);
+            snprintf(root, sizeof root, "%s/main.rs", bdir);
+            rust_mods(root, 0, rmods, sizeof rmods);
+            w.rootmods = rmods;
             w.top = bdir;
             w.prefix = "crate";
             rust_walk(&w, bdir, 0);
@@ -3985,6 +4394,8 @@ static void rust_project(SymCache *c, const char *self, HdrFn fn, void *ctx)
     if (!name[0])
         return;
     rust_mods(lib, 1, mods, sizeof mods);
+    w.rootmods = NULL;
+    w.ppath[0] = '\0';
     w.top = src;
     w.prefix = name;
     w.mods = mods;
