@@ -1,5 +1,5 @@
-#ifndef KED_MOUSE_H
-#define KED_MOUSE_H
+#ifndef XTED_MOUSE_H
+#define XTED_MOUSE_H
 
 #include "editor.h"
 #include "term.h"

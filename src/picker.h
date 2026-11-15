@@ -1,5 +1,5 @@
-#ifndef KED_PICKER_H
-#define KED_PICKER_H
+#ifndef XTED_PICKER_H
+#define XTED_PICKER_H
 
 #include <stddef.h>
 

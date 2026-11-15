@@ -1,5 +1,5 @@
-#ifndef KED_COMPLETE_H
-#define KED_COMPLETE_H
+#ifndef XTED_COMPLETE_H
+#define XTED_COMPLETE_H
 
 #include "doc.h"
 #include "symbols.h"

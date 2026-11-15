@@ -1,5 +1,5 @@
-#ifndef KED_CURSORS_H
-#define KED_CURSORS_H
+#ifndef XTED_CURSORS_H
+#define XTED_CURSORS_H
 
 #include "editor.h"
 

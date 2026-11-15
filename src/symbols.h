@@ -1,5 +1,5 @@
-#ifndef KED_SYMBOLS_H
-#define KED_SYMBOLS_H
+#ifndef XTED_SYMBOLS_H
+#define XTED_SYMBOLS_H
 
 #include "doc.h"
 #include "stdsym.h"

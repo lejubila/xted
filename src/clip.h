@@ -1,5 +1,5 @@
-#ifndef KED_CLIP_H
-#define KED_CLIP_H
+#ifndef XTED_CLIP_H
+#define XTED_CLIP_H
 
 #include "util.h"
 

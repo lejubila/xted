@@ -1,5 +1,5 @@
-#ifndef KED_CONFIG_H
-#define KED_CONFIG_H
+#ifndef XTED_CONFIG_H
+#define XTED_CONFIG_H
 
 #include <stddef.h>
 

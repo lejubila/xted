@@ -1,5 +1,5 @@
-#ifndef KED_GIT_H
-#define KED_GIT_H
+#ifndef XTED_GIT_H
+#define XTED_GIT_H
 
 #include <stddef.h>
 #include <stdint.h>

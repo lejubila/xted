@@ -1,5 +1,5 @@
-#ifndef KED_STDSYM_H
-#define KED_STDSYM_H
+#ifndef XTED_STDSYM_H
+#define XTED_STDSYM_H
 
 #include <stddef.h>
 

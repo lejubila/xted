@@ -1,5 +1,5 @@
-#ifndef KED_SESSION_H
-#define KED_SESSION_H
+#ifndef XTED_SESSION_H
+#define XTED_SESSION_H
 
 #include <stddef.h>
 

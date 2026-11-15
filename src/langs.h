@@ -1,5 +1,5 @@
-#ifndef KED_LANGS_H
-#define KED_LANGS_H
+#ifndef XTED_LANGS_H
+#define XTED_LANGS_H
 
 #include <stddef.h>
 

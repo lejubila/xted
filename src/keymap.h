@@ -1,5 +1,5 @@
-#ifndef KED_KEYMAP_H
-#define KED_KEYMAP_H
+#ifndef XTED_KEYMAP_H
+#define XTED_KEYMAP_H
 
 #include "term.h"
 

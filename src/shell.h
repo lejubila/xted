@@ -1,5 +1,5 @@
-#ifndef KED_SHELL_H
-#define KED_SHELL_H
+#ifndef XTED_SHELL_H
+#define XTED_SHELL_H
 
 #include "util.h"
 

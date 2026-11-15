@@ -1,5 +1,5 @@
-#ifndef KED_CFGSAVE_H
-#define KED_CFGSAVE_H
+#ifndef XTED_CFGSAVE_H
+#define XTED_CFGSAVE_H
 
 #include <stddef.h>
 

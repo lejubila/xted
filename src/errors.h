@@ -1,5 +1,5 @@
-#ifndef KED_ERRORS_H
-#define KED_ERRORS_H
+#ifndef XTED_ERRORS_H
+#define XTED_ERRORS_H
 
 #include <stddef.h>
 

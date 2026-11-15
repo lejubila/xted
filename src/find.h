@@ -1,5 +1,5 @@
-#ifndef KED_FIND_H
-#define KED_FIND_H
+#ifndef XTED_FIND_H
+#define XTED_FIND_H
 
 #include "editor.h"
 

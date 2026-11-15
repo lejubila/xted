@@ -1,5 +1,5 @@
-#ifndef KED_SNIPPET_H
-#define KED_SNIPPET_H
+#ifndef XTED_SNIPPET_H
+#define XTED_SNIPPET_H
 
 #include "util.h"
 

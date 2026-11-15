@@ -42,7 +42,7 @@ void config_free(Config *c)
     memset(c, 0, sizeof *c);
 }
 
-static void complain(Config *c, int line, const char *fmt, ...) KED_PRINTF(3, 4);
+static void complain(Config *c, int line, const char *fmt, ...) XTED_PRINTF(3, 4);
 
 static void complain(Config *c, int line, const char *fmt, ...)
 {

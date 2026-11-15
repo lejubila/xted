@@ -1,5 +1,5 @@
-#ifndef KED_DOC_H
-#define KED_DOC_H
+#ifndef XTED_DOC_H
+#define XTED_DOC_H
 
 #include "buffer.h"
 #include "syntax.h"

@@ -1,5 +1,5 @@
-#ifndef KED_TAGS_H
-#define KED_TAGS_H
+#ifndef XTED_TAGS_H
+#define XTED_TAGS_H
 
 #include "buffer.h"
 

@@ -1,5 +1,5 @@
-#ifndef KED_LAYOUT_H
-#define KED_LAYOUT_H
+#ifndef XTED_LAYOUT_H
+#define XTED_LAYOUT_H
 
 #include "doc.h"
 

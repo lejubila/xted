@@ -1,5 +1,5 @@
-#ifndef KED_FILES_H
-#define KED_FILES_H
+#ifndef XTED_FILES_H
+#define XTED_FILES_H
 
 #include <stddef.h>
 

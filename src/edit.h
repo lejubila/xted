@@ -1,5 +1,5 @@
-#ifndef KED_EDIT_H
-#define KED_EDIT_H
+#ifndef XTED_EDIT_H
+#define XTED_EDIT_H
 
 #include "editor.h"
 

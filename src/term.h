@@ -1,5 +1,5 @@
-#ifndef KED_TERM_H
-#define KED_TERM_H
+#ifndef XTED_TERM_H
+#define XTED_TERM_H
 
 #include <stddef.h>
 #include <stdint.h>

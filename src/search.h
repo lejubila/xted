@@ -1,5 +1,5 @@
-#ifndef KED_SEARCH_H
-#define KED_SEARCH_H
+#ifndef XTED_SEARCH_H
+#define XTED_SEARCH_H
 
 #include "buffer.h"
 #include "util.h"

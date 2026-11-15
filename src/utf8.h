@@ -1,5 +1,5 @@
-#ifndef KED_UTF8_H
-#define KED_UTF8_H
+#ifndef XTED_UTF8_H
+#define XTED_UTF8_H
 
 #include <stddef.h>
 #include <stdint.h>

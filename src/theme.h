@@ -1,5 +1,5 @@
-#ifndef KED_THEME_H
-#define KED_THEME_H
+#ifndef XTED_THEME_H
+#define XTED_THEME_H
 
 #include "syntax.h"
 #include "util.h"

@@ -1,5 +1,5 @@
-#ifndef KED_INDENT_H
-#define KED_INDENT_H
+#ifndef XTED_INDENT_H
+#define XTED_INDENT_H
 
 #include "buffer.h"
 

@@ -1,5 +1,5 @@
-#ifndef KED_EDITOR_H
-#define KED_EDITOR_H
+#ifndef XTED_EDITOR_H
+#define XTED_EDITOR_H
 
 #include "buffer.h"
 #include "doc.h"
@@ -232,7 +232,7 @@ size_t editor_view_col(const Buffer *b, const View *v, int tabw);
 void editor_store_view(Editor *e);
 
 /* Shows a message on the last row; ttl_ms == 0 keeps it until replaced. */
-void editor_set_msg(Editor *e, long ttl_ms, const char *fmt, ...) KED_PRINTF(3, 4);
+void editor_set_msg(Editor *e, long ttl_ms, const char *fmt, ...) XTED_PRINTF(3, 4);
 /* Display column of the cursor within its line. */
 size_t editor_cursor_col(const Editor *e);
 

@@ -1,5 +1,5 @@
-#ifndef KED_BUFFER_H
-#define KED_BUFFER_H
+#ifndef XTED_BUFFER_H
+#define XTED_BUFFER_H
 
 #include "undo.h"
 

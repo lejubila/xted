@@ -1,5 +1,5 @@
-#ifndef KED_SYNTAX_H
-#define KED_SYNTAX_H
+#ifndef XTED_SYNTAX_H
+#define XTED_SYNTAX_H
 
 #include "buffer.h"
 

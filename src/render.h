@@ -1,5 +1,5 @@
-#ifndef KED_RENDER_H
-#define KED_RENDER_H
+#ifndef XTED_RENDER_H
+#define XTED_RENDER_H
 
 #include <stddef.h>
 

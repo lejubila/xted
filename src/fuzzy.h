@@ -1,5 +1,5 @@
-#ifndef KED_FUZZY_H
-#define KED_FUZZY_H
+#ifndef XTED_FUZZY_H
+#define XTED_FUZZY_H
 
 /* Case-insensitive subsequence match of query in text. Returns -1 if the
  * query does not match, else a score (higher is better): consecutive

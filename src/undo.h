@@ -1,5 +1,5 @@
-#ifndef KED_UNDO_H
-#define KED_UNDO_H
+#ifndef XTED_UNDO_H
+#define XTED_UNDO_H
 
 #include <stddef.h>
 #include <stdint.h>

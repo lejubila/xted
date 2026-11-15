@@ -1,5 +1,5 @@
-#ifndef KED_EDITORCONFIG_H
-#define KED_EDITORCONFIG_H
+#ifndef XTED_EDITORCONFIG_H
+#define XTED_EDITORCONFIG_H
 
 /* The .editorconfig settings that apply to a file. -1 means "not set". */
 typedef struct {
