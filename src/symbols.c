@@ -637,10 +637,19 @@ static int try_other(Build *B, size_t y, const char *s, size_t len, size_t i, si
             continue;
         *end = m.end;
         if (kind == RULE_INCLUDE) {
+            if (!m.path[0] && !m.type[0] && m.name[0] && m.name[0] >= 'A' && m.name[0] <= 'Z') {
+                /* "Name ::": a class named by a static access (include @ ::) */
+                put(m.type, sizeof m.type, m.name, strlen(m.name));
+            }
             if (m.path[0]) {
                 ix_inc(B->x, m.path);
             } else if (m.type[0]) {
                 char spec[PM_PATH + 1];
+
+                /* Foo:: names a class; self::, static:: and parent:: do not */
+                if (strcmp(m.type, "self") == 0 || strcmp(m.type, "static") == 0 ||
+                    strcmp(m.type, "parent") == 0)
+                    continue;
 
                 spec[0] = ':';
                 put(spec + 1, sizeof spec - 1, m.qual[0] ? m.qual : m.type,
@@ -898,6 +907,7 @@ typedef struct {
     char *name, *sig, *ret;
     int kind;
     int def;                        /* JS/TS: the default export of the module */
+    char *ns;                       /* PHP: the namespace it is declared in (NULL: global) */
 } HSym;
 
 struct Hdr {
@@ -939,6 +949,7 @@ static void free_project(SymCache *c)
             free(c->hdr[i].v[k].name);
             free(c->hdr[i].v[k].sig);
             free(c->hdr[i].v[k].ret);
+            free(c->hdr[i].v[k].ns);
         }
         free(c->hdr[i].v);
         free(c->hdr[i].path);
@@ -2340,13 +2351,17 @@ static void walk_add(const char *rel, void *ctx)
     for (i = 0; fq[i]; i++)
         if (fq[i] == '/')
             fq[i] = '\\';
+    /* a class the classmap already listed */
+    for (i = 0; i < w->c->ncls; i++)
+        if (strcmp(w->c->cls[i], fq) == 0)
+            return;
     add_class(w->c, fq, strlen(fq));
 }
 
-/* config/app.php aliases, then vendor/composer/autoload_classmap.php (every class when Composer
- * was run with -o), else the project's own PSR-4 directories. It may take long on a big project
- * or a network disk: each call works until the deadline and goes on at the next; the classes
- * found so far are already usable. */
+/* config/app.php aliases, then vendor/composer/autoload_classmap.php, then the project's own
+ * PSR-4 directories (the classmap may be old: a class added since is only found there). It may
+ * take long on a big project or a network disk: each call works until the deadline and goes on
+ * at the next; the classes found so far are already usable. */
 static void load_classes(SymCache *c)
 {
     char line[1024];
@@ -2391,12 +2406,8 @@ static void load_classes(SymCache *c)
             fclose(c->cl_file);
         c->cl_file = NULL;
         c->cl_phase = 2;
-        if (c->cl_opt < 200) {
-            load_psr4(c);
-            c->cl_i = 0;
-        } else {
-            c->cl_i = (size_t)-1;       /* an optimized map lists everything */
-        }
+        load_psr4(c);
+        c->cl_i = 0;
     }
     while (c->cl_i != (size_t)-1 && c->cl_i < c->nps) {
         static const char *const prune[] = { "vendor", NULL };
@@ -2463,6 +2474,47 @@ void sym_classes(SymCache *c, Doc *cur, const char *prefix, size_t plen, int ful
         fn(ctx, fq, rank);
         found++;
     }
+}
+
+int sym_class_fq(SymCache *c, Doc *cur, const char *name, char *out, size_t n)
+{
+    size_t i, nl = strlen(name), best_len = 0;
+    const char *best = NULL;
+    int best_rank = -1;
+    long saved = c->deadline_us;
+
+    if (!nl)
+        return 0;
+    set_root(c, index_of_doc(c, cur)->key);
+    load_aliases(c);
+    for (i = 0; i < c->nal; i++)
+        if (strcmp(c->al_name[i], name) == 0) {
+            snprintf(out, n, "%s", c->al_qual[i]);
+            return 1;
+        }
+    /* the whole list: this is asked once, when a name is accepted */
+    c->deadline_us = 0;
+    for (i = 0; !c->cls_done && i < 100000; i++)
+        load_classes(c);
+    c->deadline_us = saved;
+    for (i = 0; i < c->ncls; i++) {
+        const char *fq = c->cls[i];
+        int rank;
+
+        if (strcmp(last_segment(fq), name) != 0)
+            continue;
+        /* the project's own first, then the facades, then the shortest name */
+        rank = strncmp(fq, "App\\", 4) == 0 ? 2 : strstr(fq, "\\Facades\\") ? 1 : 0;
+        if (rank > best_rank || (rank == best_rank && strlen(fq) < best_len)) {
+            best = fq;
+            best_rank = rank;
+            best_len = strlen(fq);
+        }
+    }
+    if (!best)
+        return 0;
+    snprintf(out, n, "%s", best);
+    return 1;
 }
 
 typedef struct {
@@ -2586,6 +2638,7 @@ static void hsym_add(struct Hdr *h, const char *name, size_t nl, int kind, const
     h->v[h->n].ret = xstrdup("");
     h->v[h->n].kind = kind;
     h->v[h->n].def = def;
+    h->v[h->n].ns = NULL;
     h->n++;
 }
 
@@ -2816,6 +2869,57 @@ static void py_exports(const Buffer *b, struct Hdr *h)
     }
 }
 
+/* The functions, classes and constants a PHP file defines at its top level (function, class,
+ * interface, trait, enum, const, define), each with the namespace of the file. */
+static void php_exports(const Buffer *b, struct Hdr *h)
+{
+    size_t y;
+    char ns[PM_PATH] = "";
+
+    for (y = 0; y < b->nlines; y++) {
+        const char *s = b->lines[y].s;
+        size_t len = b->lines[y].len, i = 0, e, p0, p1, before = h->n;
+
+        if (len == 0 || s[0] == ' ' || s[0] == '\t')
+            continue;
+        if (js_word(s, len, &i, "namespace")) {
+            for (e = i; e < len && s[e] != ';' && s[e] != ' ' && s[e] != '{'; e++)
+                ;
+            put(ns, sizeof ns, s + i, e - i);
+            continue;
+        }
+        js_word(s, len, &i, "abstract");
+        js_word(s, len, &i, "final");
+        js_word(s, len, &i, "readonly");
+        if (js_word(s, len, &i, "function")) {
+            if (i < len && s[i] == '&')
+                i++;
+            e = js_ident(s, len, i);
+            for (p0 = e; p0 < len && s[p0] != '('; p0++)
+                ;
+            for (p1 = p0; p1 < len && s[p1] != ')'; p1++)
+                ;
+            hsym_add(h, s + i, e - i, RULE_FUNC, s + p0 + (p0 < len), p1 > p0 ? p1 - p0 - 1 : 0, 0);
+        } else if (js_word(s, len, &i, "class") || js_word(s, len, &i, "interface") ||
+                   js_word(s, len, &i, "trait") || js_word(s, len, &i, "enum")) {
+            e = js_ident(s, len, i);
+            hsym_add(h, s + i, e - i, RULE_CLASS, "", 0, 0);
+        } else if (js_word(s, len, &i, "const")) {
+            e = js_ident(s, len, i);
+            hsym_add(h, s + i, e - i, RULE_CONST, "", 0, 0);
+        } else if (len > 8 && memcmp(s, "define(", 7) == 0 && (s[7] == '\'' || s[7] == '"')) {
+            char q = s[7];
+
+            for (e = 8; e < len && s[e] != q; e++)
+                ;
+            hsym_add(h, s + 8, e - 8, RULE_CONST, "", 0, 0);
+            continue;                       /* define() is always global */
+        }
+        if (h->n > before && ns[0])
+            h->v[h->n - 1].ns = xstrdup(ns);
+    }
+}
+
 /* The dotted name under which a Python file is imported: the folders above it that are packages
  * (they have __init__.py) and its name; a package's __init__.py is the package. */
 static void py_module_name(const char *real, char *out, size_t n)
@@ -2898,7 +3002,7 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         return h;
     if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
         return h;
-    js = is_js_module(real) ? 1 : strcmp(ext_of(real), "py") == 0 ? 2 : 0;
+    js = is_js_module(real) ? 1 : strcmp(ext_of(real), "py") == 0 ? 2 : strcmp(ext_of(real), "php") == 0 ? 3 : 0;
     if (h && h->mtime == (long)st.st_mtime && h->size == (long)st.st_size) {
         h->checked = now;
         return h;
@@ -2928,6 +3032,7 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
             free(h->v[i].name);
             free(h->v[i].sig);
             free(h->v[i].ret);
+            free(h->v[i].ns);
         }
         free(h->v);
         h->v = NULL;
@@ -2937,6 +3042,8 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         js_exports(&b, h);
     else if (js == 2)
         py_exports(&b, h);
+    else if (js == 3)
+        php_exports(&b, h);
     buf_free(&b);
     for (i = 0; x && i < x->n && h->n < HDR_SYMS; i++) {
         const Sym *s = &x->v[i];
@@ -2951,6 +3058,7 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         h->v[h->n].ret = xstrdup(s->ret ? s->ret : "");
         h->v[h->n].kind = s->kind;
         h->v[h->n].def = 0;
+        h->v[h->n].ns = NULL;
         h->n++;
     }
     if (x)
@@ -3061,6 +3169,101 @@ static void hdr_spec(const SymIndex *cur, const char *hdr, char *out, size_t n)
     rel_path(d, hdr, out, n);
 }
 
+/* PHP. With Composer: the functions and constants of the files it loads ("autoload": {"files"}),
+ * with "function Ns\\f" / "const Ns\\C" for those in a namespace ("" for the global ones: no import).
+ * Without Composer: the functions, classes and constants of the other files of the project that
+ * have no namespace, with their path for a require_once. */
+static void php_project(SymCache *c, Env *e, HdrFn fn, void *ctx)
+{
+    char path[PATH_MAX], spec[PATH_MAX + 32];
+    struct stat st;
+    size_t i, j, k, seen = 0;
+    int composer;
+
+    rooted(c, path, sizeof path, "composer.json");
+    composer = stat(path, &st) == 0;
+    if (composer) {
+        FILE *f = fopen(path, "r");
+        char *txt;
+        size_t n;
+        const char *p;
+
+        if (!f)
+            return;
+        txt = xmalloc(256 * 1024 + 1);
+        n = fread(txt, 1, 256 * 1024, f);
+        fclose(f);
+        txt[n] = '\0';
+        for (p = strstr(txt, "\"files\""); p; p = strstr(p + 7, "\"files\"")) {
+            const char *q = strchr(p, '['), *end = q ? strchr(q, ']') : NULL;
+
+            while (q && end && q < end) {
+                const char *a = strchr(q, '"'), *b;
+                char rel[PATH_MAX], *real;
+                struct Hdr *h;
+
+                if (!a || a > end)
+                    break;
+                b = strchr(a + 1, '"');
+                if (!b || b > end)
+                    break;
+                put(rel, sizeof rel, a + 1, (size_t)(b - a - 1));
+                q = b + 1;
+                rooted(c, path, sizeof path, rel);
+                real = realpath(path, NULL);
+                if (!real)
+                    continue;
+                h = hdr_get(c, real);
+                for (j = 0; h && j < h->n; j++) {
+                    const HSym *s = &h->v[j];
+
+                    if (s->kind == RULE_CLASS)
+                        continue;           /* classes come through Composer's maps and "use" */
+                    if (s->ns)
+                        snprintf(spec, sizeof spec, "%s %.200s\\%s", s->kind == RULE_FUNC ? "function" : "const",
+                                 s->ns, s->name);
+                    else
+                        spec[0] = '\0';
+                    fn(ctx, s->name, s->kind, s->sig, s->ret, spec);
+                }
+                free(real);
+            }
+        }
+        free(txt);
+        return;
+    }
+    if (!ensure_files(c))
+        return;
+    for (i = 0; i < c->nfiles && seen < HDR_MAX; i++) {
+        const char *rel = c->files[i];
+        size_t rl = strlen(rel);
+        char *real;
+        struct Hdr *h;
+        int visible = 0, nsd = 0;
+
+        if (strcmp(ext_of(rel), "php") != 0 || (rl > 10 && strcmp(rel + rl - 10, ".blade.php") == 0))
+            continue;
+        seen++;
+        rooted(c, path, sizeof path, rel);
+        real = realpath(path, NULL);
+        if (!real)
+            continue;
+        for (k = 0; k < e->n; k++)
+            if (e->v[k]->key && strcmp(e->v[k]->key, real) == 0)
+                visible = 1;
+        h = visible ? NULL : hdr_get(c, real);
+        for (j = 0; h && j < h->n; j++)
+            if (h->v[j].ns)
+                nsd = 1;                    /* a namespace without an autoloader: not this way */
+        if (h && h->n && !nsd) {
+            rel_path(e->v[0]->key, real, spec, sizeof spec);
+            for (j = 0; j < h->n; j++)
+                fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, spec);
+        }
+        free(real);
+    }
+}
+
 void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx)
 {
     Env e;
@@ -3068,11 +3271,18 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
     const char *lang = syn_name(cur->syn);
     int cl = strcmp(lang, "C") == 0, js = strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0;
     int py = strcmp(lang, "Python") == 0;
+    int php = strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0;
 
-    if (!cur->buf.path || (!cl && !js && !py))
+    if (!cur->buf.path || (!cl && !js && !py && !php))
         return;
     env_build(c, docs, ndocs, cur, &e);
-    if (!e.v[0]->key || !ensure_files(c))
+    if (!e.v[0]->key)
+        return;
+    if (php) {
+        php_project(c, &e, fn, ctx);
+        return;
+    }
+    if (!ensure_files(c))
         return;
     for (i = 0; i < c->nfiles && seen < HDR_MAX; i++) {
         char path[PATH_MAX], *real, spec[PATH_MAX + 1];

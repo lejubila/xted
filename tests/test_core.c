@@ -4757,6 +4757,178 @@ static void test_py_project_import(void)
     rm_rf(dir);
 }
 
+/* PHP: a member chosen after Name:: imports the class Name (an alias of Laravel, or a class of the
+ * project) in a file that has a namespace. */
+static void test_php_static_use(void)
+{
+    char dir[64], path[256], err[128];
+    Editor e;
+    Doc *d;
+    size_t i;
+    static const char *const sub[] = { "config", "vendor", "vendor/composer", "vendor/lv", "vendor/lv/src",
+                                       "vendor/lv/src/Support", "vendor/lv/src/Support/Facades", "app",
+                                       "app/Models", "app/Http" };
+    struct { const char *text, *typed, *want; size_t y; int changes; } t[] = {
+        { "<?php\n\nnamespace App\\Http;\n\nuse Illuminate\\Http\\Request;\n\nclass C\n{\n    function f()\n    {\n        Route::\n    }\n}\n",
+          "ge", "use Illuminate\\Http\\Request;\nuse Lv\\Support\\Facades\\Route;\n", 10, 1 },
+        { "<?php\n\nnamespace App\\Http;\n\nclass C\n{\n    function f()\n    {\n        User::\n    }\n}\n",
+          "fin", "namespace App\\Http;\n\nuse App\\Models\\User;\n\nclass C\n", 8, 1 },
+        { "<?php\n\nnamespace App\\Http;\n\nuse Lv\\Support\\Facades\\Route;\n\nclass C\n{\n    function f()\n    {\n        Route::\n    }\n}\n",
+          "ge", "use Lv\\Support\\Facades\\Route;\n\nclass C\n", 10, 0 },
+        { "<?php\n\nnamespace App\\Models;\n\nclass D\n{\n    function f()\n    {\n        User::\n    }\n}\n",
+          "fin", "namespace App\\Models;\n\nclass D\n", 8, 0 },
+    };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof sub / sizeof sub[0]; i++) {
+        snprintf(path, sizeof path, "%s/%s", dir, sub[i]);
+        mkdir(path, 0700);
+    }
+    put_file(dir, "composer.json", "{}\n");
+    put_file(dir, "config/app.php",
+             "<?php\nreturn [\n    'aliases' => [\n        'Route' => Lv\\Support\\Facades\\Route::class,\n    ],\n];\n");
+    put_file(dir, "vendor/composer/autoload_psr4.php",
+             "<?php\n$vendorDir = dirname(dirname(__FILE__));\n$baseDir = dirname($vendorDir);\nreturn array(\n"
+             "    'Lv\\\\' => array($vendorDir . '/lv/src'),\n    'App\\\\' => array($baseDir . '/app'),\n);\n");
+    put_file(dir, "vendor/lv/src/Support/Facades/Route.php",
+             "<?php\nnamespace Lv\\Support\\Facades;\n/**\n * @method static void get(string $uri, $action)\n */\n"
+             "class Route extends Facade {}\n");
+    put_file(dir, "app/Models/User.php",
+             "<?php\nnamespace App\\Models;\nclass User\n{\n    public static function find($id) {}\n}\n");
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char *q;
+        size_t y, nl0;
+        SBuf all = SBUF_INIT;
+
+        put_file(dir, i == 3 ? "app/Models/D.php" : "app/Http/C.php", t[i].text);
+        snprintf(path, sizeof path, "%s/%s", dir, i == 3 ? "app/Models/D.php" : "app/Http/C.php");
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        nl0 = e.buf->nlines;
+        e.cy = t[i].y;
+        e.cx = e.buf->lines[e.cy].len;
+        for (q = t[i].typed; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        CHECK(e.comp.on);
+        if (e.comp.on)
+            kkey(&e, KEY_ENTER, 0);
+        for (y = 0; y < e.buf->nlines; y++) {
+            sbuf_add(&all, e.buf->lines[y].s, e.buf->lines[y].len);
+            sbuf_adds(&all, "\n");
+        }
+        sbuf_add(&all, "", 1);
+        if (!strstr(all.p, t[i].want) || (t[i].changes ? e.buf->nlines == nl0 : e.buf->nlines != nl0))
+            fprintf(stderr, "case %zu:\n%s---\n", i, all.p);
+        CHECK(strstr(all.p, t[i].want) != NULL);
+        CHECK(t[i].changes ? e.buf->nlines > nl0 : e.buf->nlines == nl0);
+        if (t[i].changes) {
+            edit_undo(&e);
+            CHECK(e.buf->nlines == nl0);
+        }
+        sbuf_free(&all);
+        editor_free(&e);
+    }
+    rm_rf(dir);
+}
+
+/* PHP without Composer: a function or class of another file of the project gets its require_once;
+ * with Composer: a function or constant in a namespace of the "files" it loads gets its use. */
+static void php_case(const char *dir, const char *file, const char *text, const char *typed, size_t cy,
+                     const char *want, int changes)
+{
+    char path[256], err[128];
+    Editor e;
+    Doc *d;
+    const char *q;
+    size_t y, nl0;
+    SBuf all = SBUF_INIT;
+
+    put_file(dir, file, text);
+    snprintf(path, sizeof path, "%s/%s", dir, file);
+    editor_init(&e);
+    d = editor_open_doc(&e, path, err, sizeof err);
+    CHECK(d != NULL);
+    editor_activate(&e, d);
+    nl0 = e.buf->nlines;
+    e.cy = cy;
+    e.cx = e.buf->lines[e.cy].len;
+    for (q = typed; *q; q++)
+        kkey(&e, (uint32_t)(unsigned char)*q, 0);
+    if (e.comp.on)
+        kkey(&e, KEY_ENTER, 0);
+    for (y = 0; y < e.buf->nlines; y++) {
+        sbuf_add(&all, e.buf->lines[y].s, e.buf->lines[y].len);
+        sbuf_adds(&all, "\n");
+    }
+    sbuf_add(&all, "", 1);
+    if (!strstr(all.p, want) || (changes ? e.buf->nlines == nl0 : e.buf->nlines != nl0))
+        fprintf(stderr, "%s (%s):\n%s---\n", file, typed, all.p);
+    CHECK(strstr(all.p, want) != NULL);
+    CHECK(changes ? e.buf->nlines > nl0 : e.buf->nlines == nl0);
+    if (changes) {
+        edit_undo(&e);
+        CHECK(e.buf->nlines == nl0);
+    }
+    sbuf_free(&all);
+    editor_free(&e);
+}
+
+static void test_php_require_and_use_function(void)
+{
+    char dir[64], dir2[64], sub[200];
+    static const char *const s1[] = { ".git", "lib", "pages", "ns" };
+    static const char *const s2[] = { ".git", "app", "app/Http", "app/Support" };
+    size_t i;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof s1 / sizeof s1[0]; i++) {
+        snprintf(sub, sizeof sub, "%s/%s", dir, s1[i]);
+        mkdir(sub, 0755);
+    }
+    put_file(dir, "lib/utils.php", "<?php\nfunction format_money($v, $cur = 'EUR') {\n}\nclass Mailer {\n}\n"
+                                   "define('APP_NAME', 'x');\n");
+    put_file(dir, "ns/Thing.php", "<?php\nnamespace Foo;\nfunction thing_fn() {}\n");
+    php_case(dir, "index.php", "<?php\n\nfunction main() {\n    \n}\n", "format_mo", 3,
+             "<?php\n\nrequire_once __DIR__ . '/lib/utils.php';\n\nfunction main() {\n", 1);
+    php_case(dir, "pages/a.php", "<?php\nrequire_once __DIR__ . '/../lib/db.php';\n\nfunction f() {\n    \n}\n",
+             "Maile", 4,
+             "require_once __DIR__ . '/../lib/db.php';\nrequire_once __DIR__ . '/../lib/utils.php';\n\nfunction", 1);
+    php_case(dir, "b.php", "<?php\nrequire_once 'lib/utils.php';\n\nfunction f() {\n    \n}\n", "format_mo", 4,
+             "<?php\nrequire_once 'lib/utils.php';\n\nfunction f() {\n", 0);
+    php_case(dir, "c.php", "<?php\n\nfunction f() {\n    \n}\n", "thing_f", 3, "<?php\n\nfunction f() {\n", 0);
+    rm_rf(dir);
+
+    CHECK(make_dir(dir2, sizeof dir2) != NULL);
+    for (i = 0; i < sizeof s2 / sizeof s2[0]; i++) {
+        snprintf(sub, sizeof sub, "%s/%s", dir2, s2[i]);
+        mkdir(sub, 0755);
+    }
+    put_file(dir2, "composer.json", "{\n  \"autoload\": {\n    \"psr-4\": { \"App\\\\\": \"app/\" },\n"
+                                    "    \"files\": [\"app/helpers.php\", \"app/Support/money.php\"]\n  }\n}\n");
+    put_file(dir2, "app/helpers.php", "<?php\nfunction app_helper($x) {}\n");
+    put_file(dir2, "app/Support/money.php", "<?php\nnamespace App\\Support;\nfunction money_fmt($v) {}\n"
+                                            "const CURRENCY = 'EUR';\n");
+    {
+        static const char *ctl = "<?php\n\nnamespace App\\Http;\n\nuse Illuminate\\Http\\Request;\n\nclass C\n{\n"
+                                 "    function f()\n    {\n        \n    }\n}\n";
+
+        php_case(dir2, "app/Http/C.php", ctl, "money_fm", 10,
+                 "use Illuminate\\Http\\Request;\n\nuse function App\\Support\\money_fmt;\n\nclass C\n", 1);
+        php_case(dir2, "app/Http/C.php", ctl, "CURREN", 10,
+                 "use Illuminate\\Http\\Request;\n\nuse const App\\Support\\CURRENCY;\n\nclass C\n", 1);
+        php_case(dir2, "app/Http/C.php", ctl, "app_hel", 10, "use Illuminate\\Http\\Request;\n\nclass C\n", 0);
+        php_case(dir2, "app/Http/C.php",
+                 "<?php\n\nnamespace App\\Http;\n\nuse Illuminate\\Http\\Request;\n\nuse function App\\Support\\money_fmt;\n\n"
+                 "class C\n{\n    function f()\n    {\n        \n    }\n}\n",
+                 "CURREN", 12, "use function App\\Support\\money_fmt;\n\nuse const App\\Support\\CURRENCY;\n\nclass C\n", 1);
+        php_case(dir2, "app/Support/other.php", "<?php\n\nnamespace App\\Support;\n\nfunction g()\n{\n    \n}\n",
+                 "money_fm", 6, "namespace App\\Support;\n\nfunction g()\n", 0);
+    }
+    rm_rf(dir2);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5306,6 +5478,8 @@ int main(void)
     test_c_project_include();
     test_js_project_import();
     test_py_project_import();
+    test_php_static_use();
+    test_php_require_and_use_function();
     test_config_merge();
     test_snippets();
     test_cursors();

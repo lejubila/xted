@@ -107,6 +107,10 @@ typedef void (*ClassFn)(void *ctx, const char *fq, int rank);
 void sym_classes(SymCache *c, Doc *cur, const char *prefix, size_t plen, int full, ClassFn fn,
                  void *ctx);
 
+/* PHP: the qualified name of the class known as name (an alias of config/app.php, else a class
+ * of the project or of vendor with that last segment, the project's first). Returns 1 if found. */
+int sym_class_fq(SymCache *c, Doc *cur, const char *name, char *out, size_t n);
+
 /* The type name (class) of the expression before the operator at (y, sep), "" if unknown;
  * writes at most n bytes. Used by the tests. */
 int sym_type_before(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t sep,

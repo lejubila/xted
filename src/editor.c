@@ -2098,7 +2098,9 @@ static void accept_cand(Editor *e)
 typedef struct {
     int kind;               /* 0 nothing, 1 C include, 2 Python import, 3 Python from-import,
                                4 JS/TS default import, 5 JS/TS named import, 6 C local include,
-                               7 Python import from a module of the project */
+                               7 Python import from a module of the project,
+                               8 PHP use of the class before ::, 9 PHP require_once,
+                               10 PHP use function / use const */
     char mod[256];          /* the header, or the module */
     char name[64];          /* the imported name (from-import) */
 } Needs;
@@ -2153,6 +2155,40 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
         nd->kind = def ? 4 : 5;
         snprintf(nd->mod, sizeof nd->mod, "%s", c->inc + def);
         snprintf(nd->name, sizeof nd->name, "%s", c->text);
+        return;
+    }
+    if (c->inc && (strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0)) {
+        /* "function Ns\\f" / "const Ns\\C": a use; else the path of a file to require */
+        if (strncmp(c->inc, "function ", 9) == 0 || strncmp(c->inc, "const ", 6) == 0) {
+            size_t w = c->inc[0] == 'f' ? 8 : 5;
+
+            nd->kind = 10;
+            snprintf(nd->name, sizeof nd->name, "%.*s", (int)w, c->inc);
+            snprintf(nd->mod, sizeof nd->mod, "%s", c->inc + w + 1);
+        } else {
+            nd->kind = 9;
+            snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
+        }
+        return;
+    }
+    if ((strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0) && e->comp.x >= 2 &&
+        e->comp.x <= ln->len && ln->s[e->comp.x - 1] == ':' && ln->s[e->comp.x - 2] == ':') {
+        /* Route::get: the class before :: may not be imported yet */
+        size_t s = e->comp.x - 2, n;
+        char q[64];
+
+        while (s > 0 && (isalnum((unsigned char)ln->s[s - 1]) || ln->s[s - 1] == '_'))
+            s--;
+        n = e->comp.x - 2 - s;
+        if (n > 0 && n < sizeof q && (s == 0 || (ln->s[s - 1] != '\\' && ln->s[s - 1] != '$')) &&
+            isupper((unsigned char)ln->s[s])) {
+            memcpy(q, ln->s + s, n);
+            q[n] = '\0';
+            if (strcmp(q, "self") != 0 && strcmp(q, "static") != 0 && strcmp(q, "parent") != 0 &&
+                e->comp.sc && sym_class_fq(e->comp.sc, e->doc, q, nd->mod, sizeof nd->mod) &&
+                strchr(nd->mod, '\\'))
+                nd->kind = 8;
+        }
         return;
     }
     if (!c->std)
@@ -2272,6 +2308,15 @@ static void complete_accept(Editor *e)
         } else if (nd.kind == 2) {
             added = edit_add_py_import(e, nd.mod, NULL, 0);
             snprintf(what, sizeof what, "import %s", nd.mod);
+        } else if (nd.kind == 9) {
+            added = edit_add_require(e, nd.mod);
+            snprintf(what, sizeof what, "require_once __DIR__ . '/%s';", nd.mod);
+        } else if (nd.kind == 10) {
+            added = edit_add_use_fn(e, nd.name, nd.mod);
+            snprintf(what, sizeof what, "use %s %s;", nd.name, nd.mod);
+        } else if (nd.kind == 8) {
+            added = edit_add_use(e, nd.mod);
+            snprintf(what, sizeof what, "use %s;", nd.mod);
         } else if (nd.kind == 3 || nd.kind == 7) {
             added = edit_add_py_import(e, nd.mod, nd.name, nd.kind == 7);
             snprintf(what, sizeof what, "from %s import %s", nd.mod, nd.name);

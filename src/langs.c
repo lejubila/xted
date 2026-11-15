@@ -307,6 +307,7 @@ static const char *const lang_markdown[] = {
     "include require|require_once|include|include_once ~", \
     "include use % =;|as", \
     "include new %", \
+    "include @ ::", \
     "attr $ this -> @ = new %", \
     "attr $ this -> @ =", \
     "bind $ @ = new %", \

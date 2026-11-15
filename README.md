@@ -152,6 +152,12 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   Confermando una funzione si inserisce la chiamata con gli argomenti come segnaposti.
   - `Tab` accetta (dentro uno snippet solo dopo aver scelto con le frecce), `Invio` sceglie
     la voce evidenziata (la prima se non ci si è mossi) e non va a capo, `Esc` chiude.
+  - In PHP, scegliendo un metodo o una costante dopo `Nome::` (`Route::get`, `User::find`) si aggiunge
+    `use` della classe se manca (alias di `config/app.php`, poi le classi del progetto e di `vendor`).
+    Con Composer, le funzioni e costanti dei file di `"autoload": {"files"}` vengono proposte, e per
+    quelle in un namespace si aggiunge `use function Ns\fn;` o `use const Ns\C;` (dopo i `use` delle classi,
+    come vuole PSR-12). Senza Composer, le funzioni, le classi e le costanti degli altri file `.php` del
+    progetto (senza namespace) aggiungono `require_once __DIR__ . '/lib/utils.php';`.
   - In PHP, dopo `use`, propone le classi del progetto (classmap e PSR-4 di Composer, alias
     di `config/app.php`) e aggiunge l'istruzione `use` in ordine; i metodi dichiarati in
     `@method` (facade di Laravel) sono riconosciuti.

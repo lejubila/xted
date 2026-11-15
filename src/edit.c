@@ -1024,7 +1024,7 @@ static int starts_with(const Line *l, const char *w)
 
 /* The "use Class;" statement for a class of the project or of the library: nothing if it is
  * imported or defined in the file, or in the namespace of the file. Keeps the use block sorted. */
-static void add_use(Editor *e, const char *fq)
+int edit_add_use(Editor *e, const char *fq)
 {
     const Buffer *b = e->buf;
     const char *name = strrchr(fq, '\\');
@@ -1053,7 +1053,7 @@ static void add_use(Editor *e, const char *fq)
                 nsl = y;
             } else if (header && starts_with(&t, "use")) {
                 if (has_word(&t, name, nl))
-                    return;                         /* imported (maybe with as) */
+                    return 0;                         /* imported (maybe with as) */
                 if (memchr(t.s, '{', t.len) == NULL && memchr(t.s, '(', t.len) == NULL &&
                     !has_word(&t, "function", 8) && !has_word(&t, "const", 5)) {
                     if (first_use == (size_t)-1)
@@ -1087,7 +1087,7 @@ static void add_use(Editor *e, const char *fq)
                 for (k = 0; k + nl <= t.len; k++)
                     if (memcmp(t.s + k, name, nl) == 0 && k > 0 && t.s[k - 1] == ' ' &&
                         (k + nl == t.len || !is_word_ch(t.s[k + nl])))
-                        return;
+                        return 0;
             }
         }
     }
@@ -1104,20 +1104,20 @@ static void add_use(Editor *e, const char *fq)
         for (k = l->len; k > i && (l->s[k - 1] == ';' || l->s[k - 1] == ' '); k--)
             ;
         if (sep && (size_t)(sep - fq) == k - i && memcmp(fq, l->s + i, k - i) == 0)
-            return;
+            return 0;
     } else if (!strchr(fq, '\\')) {
-        return;                                     /* a global class in a file without namespace */
+        return 0;                                     /* a global class in a file without namespace */
     }
     sl = (size_t)snprintf(stmt, sizeof stmt, "use %s;\n", fq);
     if (sl >= sizeof stmt)
-        return;
+        return 0;
     if (first_use != (size_t)-1) {
         at = ins != (size_t)-1 ? ins : last_use + 1;
     } else {
         size_t base = nsl != (size_t)-1 ? nsl : php;
 
         if (base == (size_t)-1)
-            return;
+            return 0;
         at = base + 1;
         if (at < b->nlines && b->lines[at].len == 0)
             at++;                                   /* after the blank line */
@@ -1127,7 +1127,7 @@ static void add_use(Editor *e, const char *fq)
             post[0] = '\n';
     }
     if (at >= b->nlines)
-        return;
+        return 0;
     {
         SBuf text = SBUF_INIT;
         size_t yy = at, xx = 0, i;
@@ -1143,6 +1143,7 @@ static void add_use(Editor *e, const char *fq)
     }
     if (at <= e->cy)
         e->cy += added;
+    return 1;
 }
 
 /* 1 if two names are the same header: cstdio and stdio.h are. */
@@ -1857,6 +1858,170 @@ int edit_add_js_import(Editor *e, const char *mod, const char *name, int def, ch
     return 1;
 }
 
+/* Inserts text (ending with a newline) before line at, with blank lines before/after if pre/post;
+ * moves the cursor down when that is above it. */
+static void insert_lines(Editor *e, size_t at, const char *text, int pre, int post)
+{
+    SBuf all = SBUF_INIT;
+    size_t yy = at, xx = 0, added = 0, k;
+    const Buffer *b = e->buf;
+
+    if (pre)
+        sbuf_adds(&all, "\n");
+    sbuf_adds(&all, text);
+    if (post)
+        sbuf_adds(&all, "\n");
+    if (at >= b->nlines) {
+        SBuf t2 = SBUF_INIT;
+
+        yy = b->nlines - 1;
+        xx = b->lines[yy].len;
+        if (xx > 0)
+            sbuf_adds(&t2, "\n");
+        sbuf_add(&t2, all.p, all.len);
+        sbuf_free(&all);
+        all = t2;
+        at = b->nlines;
+    }
+    for (k = 0; k < all.len; k++)
+        if (all.p[k] == '\n')
+            added++;
+    buf_insert_text(e->buf, &yy, &xx, all.p, all.len);
+    sbuf_free(&all);
+    if (at <= e->cy)
+        e->cy += added;
+}
+
+/* The line just after "<?php" (and after a declare(strict_types=1); that follows it), or 0. */
+static size_t php_after_open(const Buffer *b, size_t lim)
+{
+    size_t y;
+
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+
+        if (strstr_n(l->s, l->len, "<?php")) {
+            size_t z = y + 1;
+
+            while (z < lim && b->lines[z].len == 0)
+                z++;
+            if (z < lim && strstr_n(b->lines[z].s, b->lines[z].len, "declare(") &&
+                b->lines[z].len > 0 && b->lines[z].s[0] == 'd')
+                return z + 1;
+            return y + 1;
+        }
+    }
+    return 0;
+}
+
+int edit_add_require(Editor *e, const char *spec)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 300 ? b->nlines : 300, y, last = (size_t)-1, at;
+    const char *base = strrchr(spec, '/');
+    char line[4200];
+
+    base = base ? base + 1 : spec;
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        size_t i = 0;
+
+        while (i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'))
+            i++;
+        if ((l->len - i >= 7 && memcmp(l->s + i, "require", 7) == 0) ||
+            (l->len - i >= 7 && memcmp(l->s + i, "include", 7) == 0)) {
+            const char *f = strstr_n(l->s, l->len, base);
+
+            /* the same file: its name after a / or a quote */
+            if (f && (f == l->s || f[-1] == '/' || f[-1] == '\'' || f[-1] == '"'))
+                return 0;
+            if (i == 0)
+                last = y;
+        }
+    }
+    snprintf(line, sizeof line, "require_once __DIR__ . '/%s';\n", spec);
+    if (last != (size_t)-1) {
+        insert_lines(e, last + 1, line, 0, 0);
+        return 1;
+    }
+    at = php_after_open(b, lim);
+    if (at < b->nlines && b->lines[at].len == 0)
+        insert_lines(e, at + 1, line, 0, at + 1 < b->nlines && b->lines[at + 1].len > 0);
+    else
+        insert_lines(e, at, line, at > 0, at < b->nlines && b->lines[at].len > 0);
+    return 1;
+}
+
+int edit_add_use_fn(Editor *e, const char *what, const char *fq)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 600 ? b->nlines : 600, y, wl = strlen(what), last_fn = (size_t)-1;
+    size_t last_use = (size_t)-1, nsl = (size_t)-1, ins = (size_t)-1, at, last_func = (size_t)-1;
+    const char *name = strrchr(fq, '\\');
+    char line[600], prefix[40];
+
+    name = name ? name + 1 : fq;
+    snprintf(prefix, sizeof prefix, "use %s ", what);
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+
+        if (l->len > 10 && memcmp(l->s, "namespace ", 10) == 0) {
+            const char *sep = strrchr(fq, '\\');
+            size_t k = 10, end = l->len;
+
+            while (end > k && (l->s[end - 1] == ';' || l->s[end - 1] == ' '))
+                end--;
+            if (sep && (size_t)(sep - fq) == end - k && memcmp(fq, l->s + k, end - k) == 0)
+                return 0;               /* the file's own namespace */
+            nsl = y;
+        } else if (l->len > 4 + wl + 1 && memcmp(l->s, prefix, 4 + wl + 1) == 0) {
+            Line t = *l;
+
+            if (py_has_word(&t, 4 + wl + 1, name))
+                return 0;
+            if (ins == (size_t)-1 && l->len - (4 + wl + 1) > 0) {
+                char cur[512];
+                size_t cl = l->len - (4 + wl + 1) < sizeof cur - 1 ? l->len - (4 + wl + 1) : sizeof cur - 1;
+
+                memcpy(cur, l->s + 4 + wl + 1, cl);
+                cur[cl] = '\0';
+                if (strcasecmp(cur, fq) > 0)
+                    ins = y;
+            }
+            last_fn = y;
+        } else if (l->len > 4 && memcmp(l->s, "use ", 4) == 0 && memchr(l->s, '(', l->len) == NULL) {
+            if (l->len > 13 && memcmp(l->s, "use function ", 13) == 0)
+                last_func = y;
+            else if (!(l->len > 10 && memcmp(l->s, "use const ", 10) == 0))
+                last_use = y;
+        } else if (l->len > 0 && l->s[0] != ' ' && l->s[0] != '\t' && l->s[0] != '/' && l->s[0] != '*' &&
+                   l->s[0] != '<' && l->s[0] != '#' && last_use != (size_t)-1 && y > last_use + 1) {
+            break;                      /* the code after the uses */
+        }
+    }
+    snprintf(line, sizeof line, "use %s %s;\n", what, fq);
+    if (last_fn != (size_t)-1) {
+        insert_lines(e, ins != (size_t)-1 ? ins : last_fn + 1, line, 0, 0);
+        return 1;
+    }
+    if (strcmp(what, "const") == 0 && last_func != (size_t)-1) {
+        insert_lines(e, last_func + 1, line, 1, 0);     /* constants after the functions */
+        return 1;
+    }
+    if (last_use != (size_t)-1) {
+        /* PSR-12: a group of its own after the classes */
+        at = last_use + 1;
+        insert_lines(e, at, line, 1, 0);
+        return 1;
+    }
+    at = nsl != (size_t)-1 ? nsl + 1 : php_after_open(b, lim);
+    if (at < b->nlines && b->lines[at].len == 0)
+        insert_lines(e, at + 1, line, 0, at + 1 < b->nlines && b->lines[at + 1].len > 0);
+    else
+        insert_lines(e, at, line, at > 0, at < b->nlines && b->lines[at].len > 0);
+    return 1;
+}
+
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq)
 {
     if (from_x > e->cx)
@@ -1867,7 +2032,7 @@ void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const
     buf_insert(e->buf, e->cy, from_x, s, n);
     e->cx = from_x + n;
     if (fq && fq[0])
-        add_use(e, fq);
+        edit_add_use(e, fq);
     finish(e);
 }
 

@@ -175,6 +175,8 @@ static void hdr_cb(void *ctx, const char *name, int kind, const char *sig, const
     size_t before = g->n, i, nl = strlen(name);
 
     sym_cb(ctx, name, kind, sig, ret, 3);
+    if (!spec[0])
+        return;                             /* reachable as it is: nothing to import */
     if (g->n > before) {
         g->v[g->n - 1].inc = xstrdup(spec);
         return;

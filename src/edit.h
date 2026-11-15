@@ -89,6 +89,16 @@ int edit_add_py_import(Editor *e, const char *mod, const char *name, int local);
  * An existing "import { a } from 'mod'" on one line is extended. stmt gets the text added. Returns 1
  * if the text changed. It does not open an undo group. */
 int edit_add_js_import(Editor *e, const char *mod, const char *name, int def, char *stmt, size_t n);
+/* Adds "use Fq;" to a PHP file unless the class is imported, defined in the file or in its
+ * namespace; the block of uses stays sorted. Returns 1 if a line was added. No undo group. */
+int edit_add_use(Editor *e, const char *fq);
+/* PHP: adds require_once __DIR__ . '/spec'; (spec relative to the file's folder) after the requires
+ * of the file, else after <?php, unless the file already requires or includes it. Returns 1 if a
+ * line was added. No undo group. */
+int edit_add_require(Editor *e, const char *spec);
+/* PHP: adds "use function Fq;" (what "function") or "use const Fq;" (what "const") after the uses
+ * of classes, unless it is there or Fq is in the file's own namespace. Returns 1 if added. */
+int edit_add_use_fn(Editor *e, const char *what, const char *fq);
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq);
 
 /* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */
