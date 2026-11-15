@@ -129,6 +129,7 @@ typedef struct Editor {
     int undo_hold;          /* inside cur_each: one undo group for all cursors */
     int picker_kind;        /* PK_* */
     unsigned pend;          /* PEND_*: changed since they were last saved */
+    char *proj;             /* the .xted whose global settings were applied at start, or NULL */
     SaveDest *dests;        /* PK_SAVECFG: what each item of the list means */
     size_t ndests;
     FScan *fscan;           /* PK_FILES: the walk of the project, still going on (else NULL) */
@@ -189,6 +190,9 @@ int editor_open(Editor *e, const char *path, char *err, size_t errlen);
 /* Reads the settings, themes and languages of the user and applies them (before the terminal
  * is started; a problem becomes the first message on screen). */
 void editor_load_config(Editor *e);
+/* Applies the global settings (theme, mouse, Git, clipboard) of the .xted nearest to the active
+ * document, else to the current folder: after the user's file, before any command. */
+void editor_load_project(Editor *e);
 void editor_run(Editor *e);
 
 /* Opens a file in the active pane (or shows it if already open). Returns the

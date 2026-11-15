@@ -120,6 +120,7 @@ int main(int argc, char **argv)
         editor_activate(&e, first);
     else if (argc == 1)
         editor_restore_session(&e);
+    editor_load_project(&e);
 
     if (term_init() < 0) {
         fputs("xted: serve un terminale interattivo\n", stderr);

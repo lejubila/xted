@@ -10,7 +10,7 @@ LDFLAGS += -fsanitize=address,undefined
 endif
 ifdef STATIC
 LDFLAGS += -static
-# a static binary is meant to be small (SPEC: under 440 KB): -Os unless CFLAGS is given
+# a static binary is meant to be small (SPEC: under 460 KB): -Os unless CFLAGS is given
 ifeq ($(origin CFLAGS),file)
 CFLAGS = -Os
 endif

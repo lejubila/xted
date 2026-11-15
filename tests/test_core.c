@@ -4094,6 +4094,79 @@ static void test_cfgsave(void)
 }
 
 /* A project's settings go over the user's: only what the project file says explicitly. */
+/* Saving the settings of several documents, and the global ones, in the project's .xted. */
+static void test_save_project(void)
+{
+    char dir[64], cfg[200], path[200], err[200], *old = getenv("XDG_CONFIG_HOME");
+    char saved[200] = "";
+    Editor e, e2;
+    Doc *a, *b, *a2;
+    const char *t;
+    size_t i;
+
+    if (old)
+        snprintf(saved, sizeof saved, "%s", old);
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "package.json", "{}\n");
+    put_file(dir, "a.py", "x = 1\n");
+    put_file(dir, "b.php", "<?php\n");
+    snprintf(cfg, sizeof cfg, "%s/cfg", dir);
+    setenv("XDG_CONFIG_HOME", cfg, 1);
+
+    editor_init(&e);
+    editor_load_config(&e);
+    snprintf(path, sizeof path, "%s/a.py", dir);
+    a = editor_open_doc(&e, path, err, sizeof err);
+    snprintf(path, sizeof path, "%s/b.php", dir);
+    b = editor_open_doc(&e, path, err, sizeof err);
+    CHECK(a && b);
+    editor_activate(&e, a);
+    editor_cmd_indent_spaces2(&e);
+    editor_activate(&e, b);
+    editor_cmd_indent_spaces4(&e);
+    editor_cmd_theme(&e);
+    editor_cmd_toggle_mouse(&e);
+    editor_cmd_save_settings(&e);
+    CHECK(e.picker.on && e.picker_kind == PK_SAVECFG);
+    /* the list says that the other document is saved too */
+    CHECK(strstr(e.picker.items[0], "Python") != NULL);
+    for (i = 0; i < e.ndests; i++)
+        if (e.dests[i].kind == DEST_PROJECT && e.dests[i].lang == 1)
+            break;
+    CHECK(i < e.ndests);
+    picker_select_item(&e.picker, i);
+    kkey(&e, KEY_ENTER, 0);
+    snprintf(path, sizeof path, "%s/.xted", dir);
+    t = slurp_file(path);
+    CHECK(strstr(t, "theme = ") != NULL && strstr(t, "mouse = false") != NULL);
+    CHECK(strstr(t, "[PHP]\nexpand_tab = true\nindent_width = 4") != NULL);
+    CHECK(strstr(t, "[Python]\nexpand_tab = true\nindent_width = 2") != NULL);
+    CHECK(e.pend == 0 && a->man.set == 0 && b->man.set == 0);
+    {
+        char name[64];
+
+        snprintf(name, sizeof name, "%s", e.theme->name);
+        editor_free(&e);
+
+        /* a new session in the project reads the global keys from the .xted */
+        editor_init(&e2);
+        editor_load_config(&e2);
+        snprintf(path, sizeof path, "%s/a.py", dir);
+        a2 = editor_open_doc(&e2, path, err, sizeof err);
+        CHECK(a2 != NULL);
+        editor_activate(&e2, a2);
+        editor_load_project(&e2);
+        CHECK(e2.proj != NULL && strcmp(e2.theme->name, name) == 0 && e2.mouse_on == 0);
+        CHECK(a2->expand_tab == 1 && a2->indent_w == 2);
+        editor_free(&e2);
+    }
+    if (saved[0])
+        setenv("XDG_CONFIG_HOME", saved, 1);
+    else
+        unsetenv("XDG_CONFIG_HOME");
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -4634,6 +4707,7 @@ int main(void)
     test_scan_steps();
     test_app_dir();
     test_cfgsave();
+    test_save_project();
     test_config_merge();
     test_snippets();
     test_cursors();
