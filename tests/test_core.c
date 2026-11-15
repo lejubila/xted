@@ -8,6 +8,7 @@
 #include "doc.h"
 #include "editorconfig.h"
 #include "indent.h"
+#include "i18n.h"
 #include "keymap.h"
 #include "errors.h"
 #include "edit.h"
@@ -4167,6 +4168,99 @@ static void test_save_project(void)
     rm_rf(dir);
 }
 
+static void test_i18n(void)
+{
+    char dir[64], path[200], codes[16][16], real[160];
+    char *old = getenv("LC_ALL"), saved[64] = "";
+    FILE *f;
+    char line[1024];
+    size_t n;
+    Editor e;
+
+    if (old)
+        snprintf(saved, sizeof saved, "%s", old);
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(path, sizeof path, "%s/lang", dir);
+    mkdir(path, 0755);
+    put_file(path, "xx",
+             "# comment\n"
+             "@name\tLingua X\n"
+             "Save\tSalvataggio\n"
+             "Line %zu of %s\tRiga %zu di %s\n"
+             "Bad %s\tSbagliato %d\n"
+             "Order %s %d\tOrdine %d %s\n"
+             "Two\\nlines\tDue\\nrighe\n"
+             "Empty\t\n"
+             "Percent 100%%\tPercento 100%%\n");
+    i18n_init(dir);
+    CHECK(i18n_set("en") == 0 && strcmp(i18n_code(), "en") == 0 && strcmp(tr("Save"), "Save") == 0);
+    CHECK(i18n_set("xx") == 0 && strcmp(i18n_code(), "xx") == 0 && strcmp(i18n_name(), "Lingua X") == 0);
+    CHECK(strcmp(tr("Save"), "Salvataggio") == 0);
+    CHECK(strcmp(tr("Line %zu of %s"), "Riga %zu di %s") == 0);
+    CHECK(strcmp(tr("Percent 100%%"), "Percento 100%%") == 0);
+    CHECK(strcmp(tr("Two\nlines"), "Due\nrighe") == 0);
+    /* a translation with other conversions is dropped, so is an empty one; unknown texts stay */
+    CHECK(strcmp(tr("Bad %s"), "Bad %s") == 0 && strcmp(tr("Order %s %d"), "Order %s %d") == 0);
+    CHECK(strcmp(tr("Empty"), "Empty") == 0 && strcmp(tr("Never seen"), "Never seen") == 0);
+    CHECK(i18n_same_formats("%s %d", "%s %d") && !i18n_same_formats("%s %d", "%d %s") &&
+          i18n_same_formats("100%% %-5s", "100%% %-5s") && !i18n_same_formats("%zu", "%d") &&
+          i18n_same_formats("none", "nulla") && !i18n_same_formats("%s", "none"));
+    n = i18n_available(codes, 16);
+    CHECK(n == 2 && strcmp(codes[0], "en") == 0 && strcmp(codes[1], "xx") == 0);
+    /* a language without a catalog: English, and the caller is told */
+    CHECK(i18n_set("zz") == -1 && strcmp(i18n_code(), "en") == 0 && strcmp(tr("Save"), "Save") == 0);
+    CHECK(i18n_set("../x") == -1);
+    /* auto: from the environment */
+    setenv("LC_ALL", "xx_XX.UTF-8", 1);
+    CHECK(i18n_set("auto") == 0 && strcmp(i18n_code(), "xx") == 0);
+    setenv("LC_ALL", "C", 1);
+    CHECK(i18n_set("auto") == 0 && strcmp(i18n_code(), "en") == 0);
+
+    /* the catalog that is shipped: every line keeps its conversions, and the palette reads it */
+    f = fopen("lang/it", "r");
+    CHECK(f != NULL);
+    while (f && fgets(line, sizeof line, f)) {
+        char *tab = strchr(line, '\t');
+
+        if (line[0] == '#' || line[0] == '@' || !tab)
+            continue;
+        *tab = '\0';
+        CHECK(i18n_same_formats(line, tab + 1));
+    }
+    if (f)
+        fclose(f);
+    snprintf(real, sizeof real, "%s/lang", dir);
+    {
+        char *txt;
+        long sz;
+
+        f = fopen("lang/it", "r");
+        CHECK(f != NULL);
+        fseek(f, 0, SEEK_END);
+        sz = ftell(f);
+        rewind(f);
+        txt = malloc((size_t)sz + 1);
+        CHECK(fread(txt, 1, (size_t)sz, f) == (size_t)sz);
+        txt[sz] = '\0';
+        fclose(f);
+        put_file(real, "it", txt);
+        free(txt);
+    }
+    CHECK(i18n_set("it") == 0 && strcmp(i18n_name(), "Italiano") == 0);
+    ed_load(&e, "x");
+    editor_cmd_palette(&e);
+    CHECK(strstr(e.picker.items[0], "Azioni") != NULL && strstr(e.picker.items[1], "Salva") != NULL);
+    picker_close(&e.picker);
+    editor_free(&e);
+    i18n_set("en");
+    i18n_init(NULL);
+    if (saved[0])
+        setenv("LC_ALL", saved, 1);
+    else
+        setenv("LC_ALL", "C", 1);
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -4652,6 +4746,7 @@ static void test_symbols(void)
 
 int main(void)
 {
+    setenv("LC_ALL", "C", 1);     /* the texts are checked in English whatever the environment says */
     test_utf8();
     test_edit();
     test_files();
@@ -4708,6 +4803,7 @@ int main(void)
     test_app_dir();
     test_cfgsave();
     test_save_project();
+    test_i18n();
     test_config_merge();
     test_snippets();
     test_cursors();

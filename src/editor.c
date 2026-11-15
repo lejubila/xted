@@ -9,6 +9,7 @@
 #include "find.h"
 #include "fold.h"
 #include "git.h"
+#include "i18n.h"
 #include "mouse.h"
 #include "run.h"
 #include "session.h"
@@ -366,6 +367,7 @@ void editor_load_config(Editor *e)
     e->theme_idx = 0;
     theme_clear_user();
     syn_clear_user();
+    i18n_init(e->cfgdir);
     if (e->cfgdir) {
         size_t sn = strlen(e->cfgdir) + 16;
         char *sub = xmalloc(sn);
@@ -376,6 +378,13 @@ void editor_load_config(Editor *e)
         snprintf(sub, sn, "%s/syntax", e->cfgdir);
         syn_load_dir(sub, report_cfg, e);
         free(sub);
+    }
+    if (i18n_set(e->cfg.language[0] ? e->cfg.language : "auto") < 0 && e->cfg.language[0] &&
+        strcmp(e->cfg.language, "auto") != 0) {
+        char lm[100];
+
+        snprintf(lm, sizeof lm, "language «%s» not found", e->cfg.language);
+        config_error(&e->cfg, 0, lm);
     }
     if (e->cfg.clipboard >= 0)
         e->clipboard_osc52 = e->cfg.clipboard;
@@ -2394,7 +2403,8 @@ static void palette_open(Editor *e, const char *query)
     e->pal = xmalloc((ncommands + G_COUNT) * sizeof *e->pal);
     e->pal_w1 = e->pal_w2 = e->pal_w3 = 0;
     for (i = 0; i < ncommands; i++) {
-        int w = (int)utf8_cols(commands[i].name, strlen(commands[i].name), strlen(commands[i].name), 0);
+        const char *nm = tr(commands[i].name);
+        int w = (int)utf8_cols(nm, strlen(nm), strlen(nm), 0);
 
         char label[100];
 
@@ -2415,15 +2425,16 @@ static void palette_open(Editor *e, const char *query)
 
         g = commands[i].group;
         if (g != last) {
-            snprintf(item, sizeof item, "%c%s%s", PICKER_HEAD,
-                     g == G_SETTINGS ? "" : "Azioni \xc2\xb7 ", command_groups[g]);
+            snprintf(item, sizeof item, "%c%s%s%s", PICKER_HEAD,
+                     g == G_SETTINGS ? "" : tr("Actions"), g == G_SETTINGS ? "" : " \xc2\xb7 ",
+                     tr(command_groups[g]));
             picker_add(&e->picker, item);
             e->pal[k++] = 0;
             last = g;
         }
         keymap_label(&e->km, (int)i, label, sizeof label);
         snprintf(item, sizeof item, "%c%s\x1f%s\x1f%s", on[i] == 1 ? '1' : on[i] == 0 ? '0' : ' ',
-                 commands[i].name, val[i], label);
+                 tr(commands[i].name), val[i], label);
         picker_add(&e->picker, item);
         e->pal[k++] = i;
     }
@@ -2540,6 +2551,20 @@ void editor_cmd_toggle_git(Editor *e)
     editor_set_msg(e, MSG_TTL_MS, "Indicatori Git %s", e->cfg.git ? "attivi" : "disattivati");
 }
 
+void editor_cmd_language(Editor *e)
+{
+    char codes[16][16];
+    size_t n = i18n_available(codes, 16), i, cur = 0;
+
+    for (i = 0; i < n; i++)
+        if (strcmp(codes[i], i18n_code()) == 0)
+            cur = i;
+    i18n_set(codes[(cur + 1) % n]);
+    e->pend |= PEND_LANG;
+    render_invalidate(e->render);
+    editor_set_msg(e, MSG_TTL_MS, tr("Language: %s"), i18n_name());
+}
+
 void editor_cmd_toggle_clipboard(Editor *e)
 {
     e->clipboard_osc52 = !e->clipboard_osc52;
@@ -2573,6 +2598,11 @@ static void project_globals(Editor *e, int live)
         e->cfg.git = c.git;
         if (live && changed)
             git_apply(e, 0);
+    }
+    if (c.language[0]) {
+        snprintf(e->cfg.language, sizeof e->cfg.language, "%s", c.language);
+        if (live)
+            i18n_set(c.language);
     }
     if (c.theme[0]) {
         int t = theme_by_name(c.theme);
@@ -2614,7 +2644,7 @@ typedef struct {
 } OtherLang;
 
 typedef struct {
-    CfgPair lp[6], gp[4];
+    CfgPair lp[6], gp[5];
     char val[6][16];
     size_t nl, ng;
     unsigned mask;
@@ -2674,6 +2704,10 @@ static void pending_get(const Editor *e, Pending *p)
     if (e->pend & PEND_CLIP) {
         p->gp[p->ng].key = "clipboard";
         p->gp[p->ng++].value = e->clipboard_osc52 ? "true" : "false";
+    }
+    if (e->pend & PEND_LANG) {
+        p->gp[p->ng].key = "language";
+        p->gp[p->ng++].value = i18n_code();
     }
     for (i = 0; i < e->ndocs && p->nmore < 6; i++) {
         Doc *o = e->docs[i];
@@ -2771,7 +2805,8 @@ static int proj_sets_globals(const Editor *e, const Pending *p)
         const char *k = p->gp[i].key;
 
         if ((strcmp(k, "theme") == 0 && c.theme[0]) || (strcmp(k, "mouse") == 0 && c.mouse >= 0) ||
-            (strcmp(k, "git") == 0 && c.git >= 0) || (strcmp(k, "clipboard") == 0 && c.clipboard >= 0))
+            (strcmp(k, "git") == 0 && c.git >= 0) || (strcmp(k, "clipboard") == 0 && c.clipboard >= 0) ||
+            (strcmp(k, "language") == 0 && c.language[0]))
             r = 1;
     }
     config_free(&c);

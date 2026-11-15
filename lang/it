@@ -1,0 +1,99 @@
+# Italian catalog of xted: English text, a TAB, the translation.
+# Texts with printf conversions (%s, %zu, ...) must keep them in the same order.
+@name	Italiano
+Actions	Azioni
+Add cursor above	Aggiungi cursore sopra
+Add cursor at next occurrence	Aggiungi cursore sulla prossima occorrenza
+Add cursor below	Aggiungi cursore sotto
+Add cursors at all occurrences	Aggiungi cursori su tutte le occorrenze
+Alt+C Case	Alt+C Maiuscole
+Alt+R Regex	Alt+R Regex
+Alt+W Word	Alt+W Parola
+Buffers and panes	Buffer e pannelli
+Change theme	Cambia tema
+Close buffer	Chiudi buffer
+Close pane	Chiudi pannello
+Command palette	Command palette
+Convert indentation to spaces	Converti l'indentazione in spazi
+Convert indentation to tabs	Converti l'indentazione in tabulatori
+Copy	Copia
+Cursors and blocks	Cursori e blocchi
+Cut	Taglia
+Delete lines	Elimina righe
+Detect indentation style	Rileva lo stile di indentazione
+Duplicate line above	Duplica riga sopra
+Duplicate line below	Duplica riga sotto
+Edit	Modifica
+Enter	Invio
+Enter closes	Invio chiude
+Enter next	Invio avanti
+Enter searches	Invio cerca
+Enter starts	Invio avvia
+Equalize panes	Pareggia i pannelli
+Esc cancels	Esc annulla
+File	File
+Filter through a command	Filtra con un comando
+Find	Cerca
+Find in files	Cerca nei file
+Fold all	Piega tutto
+Fold/unfold block	Piega/espandi blocco
+Go to definition	Vai alla definizione
+Go to line	Vai alla riga
+Go to symbol	Vai al simbolo
+Indentation: 2 spaces	Indentazione: 2 spazi
+Indentation: 4 spaces	Indentazione: 4 spazi
+Indentation: 8 spaces	Indentazione: 8 spazi
+Indentation: tab	Indentazione: tabulatore
+Join lines	Unisci righe
+Language	Lingua
+Language: %s	Lingua: %s
+List buffers	Elenco buffer
+Matching bracket	Parentesi corrispondente
+Move line down	Sposta riga in giu
+Move line up	Sposta riga in su
+Next buffer	Buffer successivo
+Next error	Errore successivo
+Next match	Occorrenza successiva
+Next pane	Pannello successivo
+Open file	Apri file
+Other	Altro
+Paste	Incolla
+Paste previous entry	Incolla la voce precedente
+Previous buffer	Buffer precedente
+Previous error	Errore precedente
+Previous match	Occorrenza precedente
+Previous pane	Pannello precedente
+Quick open	Apri rapido
+Quit	Esci
+Redo	Ripeti
+Redraw screen	Ridisegna lo schermo
+Refresh Git markers	Aggiorna gli indicatori Git
+Repeat last command	Ripeti ultimo comando
+Replace	Sostituisci
+Resize panes	Ridimensiona i pannelli
+Run	Esegui
+Run command	Esegui comando
+Save	Salva
+Save all	Salva tutto
+Save as	Salva con nome
+Save settings…	Salva le impostazioni…
+Search and go to	Cerca e vai
+Select all	Seleziona tutto
+Select line	Seleziona riga
+Select word	Seleziona parola
+Settings	Impostazioni
+Show/hide file browser	Mostra/nascondi browser dei file
+Split pane horizontally	Dividi pannello in orizzontale
+Split pane vertically	Dividi pannello in verticale
+Stop command	Interrompi comando
+Toggle Git markers	Attiva/disattiva gli indicatori Git
+Toggle auto-pairs	Attiva/disattiva le coppie automatiche
+Toggle autosuggest	Attiva/disattiva l'autosuggest
+Toggle comment	Commenta/decommenta
+Toggle mouse	Attiva/disattiva il mouse
+Toggle system clipboard	Attiva/disattiva gli appunti di sistema
+Undo	Annulla
+Unfold all	Espandi tutto
+active	attiva
+off	spento
+on	attivo

@@ -35,7 +35,7 @@ typedef struct {
 } SaveDest;
 
 /* Settings changed with a command in this session that are not tied to a document. */
-enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8 };
+enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8, PEND_LANG = 16 };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -270,6 +270,7 @@ void editor_cmd_toggle_autosuggest(Editor *e);
 void editor_cmd_toggle_autopair(Editor *e);
 void editor_cmd_toggle_git(Editor *e);
 void editor_cmd_toggle_clipboard(Editor *e);
+void editor_cmd_language(Editor *e);
 void editor_cmd_save_settings(Editor *e);
 void editor_cmd_resize_mode(Editor *e);
 void editor_cmd_equalize(Editor *e);

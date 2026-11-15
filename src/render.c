@@ -1,4 +1,5 @@
 #include "render.h"
+#include "i18n.h"
 #include "doc.h"
 #include "edit.h"
 #include "editor.h"
@@ -806,13 +807,13 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
 {
     const Find *f = &e->find;
     int mode = f->mode, cs = f->cs, wd = f->word, rx = f->regex;
-    const char *go = mode == FIND_FILES ? "Invio cerca" : f->replace ? "Invio avanti" : "Invio chiude";
+    const char *go = tr(mode == FIND_FILES ? "Enter searches" : f->replace ? "Enter next" : "Enter closes");
     HintSeg t[3][HINT_MAXSEG];
     size_t nt[3], k, i;
 
     if (mode == FIND_WITH) {
-        HintSeg a[] = { { "Invio avvia", -1 }, { "Esc annulla", -1 } };
-        HintSeg b[] = { { "Invio", -1 }, { "Esc", -1 } };
+        HintSeg a[] = { { tr("Enter starts"), -1 }, { tr("Esc cancels"), -1 } };
+        HintSeg b[] = { { tr("Enter"), -1 }, { "Esc", -1 } };
 
         memcpy(t[0], a, sizeof a);
         nt[0] = 2;
@@ -820,9 +821,9 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
         nt[1] = nt[2] = 2;
         memcpy(t[2], b, sizeof b);
     } else if (mode == FIND_SEARCH || mode == FIND_FILES) {
-        HintSeg a[] = { { "Alt+C Maiuscole", cs }, { "Alt+W Parola", wd }, { "Alt+R Regex", rx },
-                        { go, -1 }, { "Esc annulla", -1 } };
-        HintSeg b[] = { { "Alt+C Aa", cs }, { "Alt+W Parola", wd }, { "Alt+R Regex", rx },
+        HintSeg a[] = { { tr("Alt+C Case"), cs }, { tr("Alt+W Word"), wd }, { tr("Alt+R Regex"), rx },
+                        { go, -1 }, { tr("Esc cancels"), -1 } };
+        HintSeg b[] = { { "Alt+C Aa", cs }, { tr("Alt+W Word"), wd }, { tr("Alt+R Regex"), rx },
                         { "Esc", -1 } };
         HintSeg c[] = { { "Alt+C Aa", cs }, { "Alt+W W", wd }, { "Alt+R .*", rx } };
 

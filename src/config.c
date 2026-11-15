@@ -267,6 +267,17 @@ int config_parse(Config *c, const char *text, size_t n)
                     else
                         snprintf(c->theme, sizeof c->theme, "%s", val);
                     r = 0;
+                } else if (!strcmp(key, "language")) {
+                    size_t k;
+
+                    for (k = 0; lv[k] && (isalnum((unsigned char)lv[k]) || lv[k] == '_' || lv[k] == '-'); k++)
+                        ;
+                    if (!*lv || lv[k] || k >= sizeof c->language)
+                        r = -2;
+                    else
+                        snprintf(c->language, sizeof c->language, "%s", lv);
+                    if (r != -2)
+                        r = 0;
                 } else if (!strcmp(key, "clipboard") || !strcmp(key, "git") ||
                            !strcmp(key, "mouse")) {
                     int b = parse_bool(lv);
