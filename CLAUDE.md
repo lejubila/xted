@@ -92,8 +92,8 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 
 ```
 make                 # build ottimizzata (./xted)
-make STATIC=1        # link statico
-make SAN=1           # build con AddressSanitizer e UBSan
+make STATIC=1        # link statico (oggetti in build/static: la dimensione misurata è quella vera)
+make SAN=1           # build con AddressSanitizer e UBSan (oggetti in build/san)
 make test            # test automatici
 make smoke           # l'editor su un vero pseudo-terminale (tests/smoke, serve python3)
 make clean

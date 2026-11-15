@@ -4,11 +4,16 @@ LDFLAGS  ?=
 
 # make STATIC=1  -> statically linked binary (e.g. CC=musl-gcc)
 # make SAN=1     -> AddressSanitizer + UBSan build, for development
+# Every mode compiles into its own folder: objects of different flags never mix, and a size
+# measured with STATIC=1 is the size of a static build.
+BUILD    = build
 ifdef SAN
 CFLAGS   = -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address,undefined
+BUILD    = build/san
 endif
 ifdef STATIC
+BUILD    = build/static
 LDFLAGS += -static
 # a static binary is meant to be small (SPEC: under 520 KB): -Os unless CFLAGS is given
 ifeq ($(origin CFLAGS),file)
@@ -28,27 +33,32 @@ LINK     = $(LDFLAGS) -Wl,--gc-sections
 LIBSRC   = src/util.c src/utf8.c src/term.c src/undo.c src/clip.c src/buffer.c \
            src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c src/shell.c src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c src/mouse.c src/symbols.c src/stdsym.c src/indent.c src/editorconfig.c src/cfgsave.c src/i18n.c src/imports.c \
            src/render.c src/edit.c src/editor.c
-OBJ      = $(LIBSRC:src/%.c=build/%.o) build/main.o
+OBJ      = $(LIBSRC:src/%.c=$(BUILD)/%.o) $(BUILD)/main.o
 
 
 all: $(PROG)
 
-$(PROG): $(OBJ)
+# ./xted is the program of the mode just built: copied each time, so that switching mode (make,
+# make STATIC=1, make SAN=1) never leaves the binary of another one
+$(PROG): $(BUILD)/$(PROG)
+	cp $< $@
+
+$(BUILD)/$(PROG): $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LINK)
 ifndef SAN
 	strip -s $@
 endif
 
-build/%.o: src/%.c
-	@mkdir -p build
+$(BUILD)/%.o: src/%.c
+	@mkdir -p $(BUILD)
 	$(CC) $(ALLFLAGS) -c -o $@ $<
 
-build/test_core: tests/test_core.c $(LIBSRC)
-	@mkdir -p build
+$(BUILD)/test_core: tests/test_core.c $(LIBSRC)
+	@mkdir -p $(BUILD)
 	$(CC) $(WARN) $(DEFS) $(CFLAGS) -Isrc -o $@ $^ $(LDFLAGS)
 
-test: build/test_core
-	./build/test_core
+test: $(BUILD)/test_core
+	./$(BUILD)/test_core
 
 # the editor on a real pseudo-terminal: what is drawn and the files written (needs python3)
 smoke: $(PROG)
@@ -80,5 +90,5 @@ uninstall:
 	rm -f $(DESTDIR)$(MANDIR)/man1/xted.1 $(DESTDIR)$(MANDIR)/it/man1/xted.1
 	@if [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" = "$(PROG)" ]; then rm -f $(DESTDIR)$(PREFIX)/bin/xt; fi
 
-.PHONY: all test smoke clean install uninstall
+.PHONY: all test smoke clean install uninstall $(PROG)
 -include $(OBJ:.o=.d)
