@@ -6,6 +6,10 @@
 #define PICKER_QMAX 256
 #define PICKER_ROWS 10
 
+/* An item that starts with this byte is a section heading: shown only while the query is empty,
+ * never selected (the arrows skip it). */
+#define PICKER_HEAD '\x01'
+
 /* A list that is narrowed down while typing a fuzzy query. Items are
  * strings; the caller learns the chosen one by its index in the order they
  * were added. */
@@ -35,6 +39,8 @@ void picker_refilter(Picker *p);
 void picker_type(Picker *p, unsigned cp);
 void picker_backspace(Picker *p);
 void picker_move(Picker *p, long delta);
+/* 1 if the item shown at position pos is a heading. */
+int picker_is_head(const Picker *p, size_t pos);
 /* Index of the highlighted item in the order of picker_add, or -1. */
 long picker_chosen(const Picker *p);
 void picker_close(Picker *p);

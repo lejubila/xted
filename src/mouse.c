@@ -268,7 +268,7 @@ static void press_left(Editor *e, const MouseEv *ev, const MouseHit *h)
         Picker *p = &e->picker;
         size_t pos = p->top + h->index - 1;
 
-        if (h->index > 0 && pos < p->nshown) {
+        if (h->index > 0 && pos < p->nshown && !picker_is_head(p, pos)) {
             p->sel = pos;
             editor_key(e, enter);
         }

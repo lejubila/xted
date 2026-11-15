@@ -107,7 +107,7 @@ Ricerca incrementale nel file e ricerca globale nel progetto, con un motore rege
 - **Vai alla riga** (Ctrl+G) e alla colonna.
 - **Lista dei simboli** del file (funzioni, classi) ricavata dalle regole di sintassi, con salto rapido.
 - **Segnalibri** su righe e cronologia delle posizioni (indietro/avanti tra i salti).
-- **Command palette**: tutti i comandi cercabili per nome, con la loro scorciatoia.
+- **Command palette**: tutti i comandi cercabili per nome. Con la ricerca vuota sono divisi in sezioni (intestazioni non selezionabili): prima le **azioni**, per tema (File, Buffer e pannelli, Cerca e vai, Modifica, Cursori e blocchi, Esegui, Altro), poi le **impostazioni** che cambiano il comportamento dell'editor. Il nome è in grassetto, poi il valore corrente di un'impostazione (●/○ per attivo/non attivo, in evidenza se attivo; l'indentazione e il tema in uso sono segnati) e la scorciatoia nel colore dei commenti, in colonne uguali per tutte le righe. Digitando, le intestazioni spariscono e resta l'ordine per punteggio.
 
 ## Interfaccia, configurazione, prestazioni
 

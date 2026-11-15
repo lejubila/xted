@@ -234,6 +234,7 @@ void editor_free(Editor *e)
     free(e->dests);
     picker_free(&e->picker);
     free(e->outline);
+    free(e->pal);
     find_free(e);
     complete_free(&e->comp);
     cur_clear(e);
@@ -1354,7 +1355,7 @@ static void picker_accept(Editor *e)
     } else if (kind == PK_TAGS) {
         find_open_tag(e, (size_t)idx);
     } else if (kind == PK_COMMANDS) {
-        command_run(e, (int)idx);
+        command_run(e, (int)e->pal[idx]);
     } else if (kind == PK_FILES) {
         char err[256], *path = under_root(e, e->picker.items[idx]);
 
@@ -2330,18 +2331,47 @@ void editor_cmd_redraw(Editor *e)
 
 void editor_cmd_palette(Editor *e)
 {
-    size_t i;
-    char item[160];
+    size_t i, k = 0;
+    int g, last = -1;
+    char (*val)[24] = xmalloc(ncommands * sizeof *val);
+    int *on = xmalloc(ncommands * sizeof *on);
 
     picker_open(&e->picker, "Comando");
     e->picker_kind = PK_COMMANDS;
+    free(e->pal);
+    e->pal = xmalloc((ncommands + G_COUNT) * sizeof *e->pal);
+    e->pal_w1 = e->pal_w2 = 0;
     for (i = 0; i < ncommands; i++) {
-        char label[40];
+        int w = (int)utf8_cols(commands[i].name, strlen(commands[i].name), strlen(commands[i].name), 0);
 
-        keymap_label(&e->km, (int)i, label, sizeof label);
-        snprintf(item, sizeof item, "%-42s %s", commands[i].name, label);
-        picker_add(&e->picker, item);
+        on[i] = command_state(e, (int)i, val[i], sizeof val[i]);
+        if (w > e->pal_w1)
+            e->pal_w1 = w;
+        w = (int)utf8_cols(val[i], strlen(val[i]), strlen(val[i]), 0);
+        if (w > e->pal_w2)
+            e->pal_w2 = w;
     }
+    /* Item: marker (1 on, 0 off, space none), name, value, shortcut; the last three are cut at
+     * the unit separator by the renderer, so they line up in columns. */
+    for (i = 0; i < ncommands; i++) {
+        char item[200], label[40];
+
+        g = commands[i].group;
+        if (g != last) {
+            snprintf(item, sizeof item, "%c%s%s", PICKER_HEAD,
+                     g == G_SETTINGS ? "" : "Azioni \xc2\xb7 ", command_groups[g]);
+            picker_add(&e->picker, item);
+            e->pal[k++] = 0;
+            last = g;
+        }
+        keymap_label(&e->km, (int)i, label, sizeof label);
+        snprintf(item, sizeof item, "%c%s\x1f%s\x1f%s", on[i] == 1 ? '1' : on[i] == 0 ? '0' : ' ',
+                 commands[i].name, val[i], label);
+        picker_add(&e->picker, item);
+        e->pal[k++] = i;
+    }
+    free(val);
+    free(on);
     picker_filter(&e->picker);
 }
 

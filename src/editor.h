@@ -132,6 +132,8 @@ typedef struct Editor {
     SaveDest *dests;        /* PK_SAVECFG: what each item of the list means */
     size_t ndests;
     FScan *fscan;           /* PK_FILES: the walk of the project, still going on (else NULL) */
+    size_t *pal;            /* PK_COMMANDS: the command (table index) of each item, headings aside */
+    int pal_w1, pal_w2;     /* PK_COMMANDS: widths of the name and value columns */
     size_t *outline;        /* PK_SYMBOLS: line and byte of each item (pairs) */
     size_t noutline;
 

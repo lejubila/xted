@@ -2310,8 +2310,37 @@ static void test_commands(void)
     /* the palette lists them all, in order, so the chosen index is the table index */
     ed_load(&e, "x");
     editor_cmd_palette(&e);
-    CHECK(e.picker.on && e.picker_kind == PK_COMMANDS && e.picker.nitems == ncommands);
-    CHECK(strstr(e.picker.items[0], commands[0].name) != NULL);
+    CHECK(e.picker.on && e.picker_kind == PK_COMMANDS && e.picker.nitems > ncommands);
+    CHECK(e.picker.items[0][0] == PICKER_HEAD);
+    CHECK(e.picker.sel == 1 && strstr(e.picker.items[1], commands[0].name) != NULL);
+    CHECK(e.pal[1] == 0);
+    /* actions before settings; a setting shows its value */
+    for (i = 1; i < ncommands; i++)
+        CHECK(commands[i].group >= commands[i - 1].group);
+    for (i = 0; i < ncommands; i++)
+        if (strcmp(commands[i].id, "toggle_autopair") == 0) {
+            char v[24];
+
+            CHECK(commands[i].group == G_SETTINGS);
+            CHECK(command_state(&e, (int)i, v, sizeof v) >= 0 && v[0]);
+        } else if (strcmp(commands[i].id, "save") == 0) {
+            char v[24];
+
+            CHECK(command_state(&e, (int)i, v, sizeof v) == -1);
+        }
+    /* with a query the headings go away, and the arrows never stop on one */
+    picker_type(&e.picker, 's');
+    CHECK(e.picker.nshown > 0 && !picker_is_head(&e.picker, 0));
+    picker_filter(&e.picker);
+    e.picker.qlen = 0;
+    e.picker.query[0] = '\0';
+    picker_filter(&e.picker);
+    picker_move(&e.picker, -5);
+    CHECK(e.picker.sel == 1);
+    for (i = 0; i < 40; i++) {
+        picker_move(&e.picker, 1);
+        CHECK(!picker_is_head(&e.picker, e.picker.sel));
+    }
     picker_close(&e.picker);
     editor_free(&e);
 }

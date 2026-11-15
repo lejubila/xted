@@ -57,6 +57,12 @@ void picker_filter(Picker *p)
     int *scores = xmalloc((p->nitems ? p->nitems : 1) * sizeof *scores);
 
     for (i = 0; i < p->nitems; i++) {
+        if (p->items[i][0] == PICKER_HEAD) {
+            scores[i] = p->query[0] ? -1 : 0;
+            if (scores[i] >= 0)
+                p->shown[n++] = i;
+            continue;
+        }
         scores[i] = fuzzy_score(p->query, p->items[i]);
         if (scores[i] >= 0)
             p->shown[n++] = i;
@@ -69,6 +75,8 @@ void picker_filter(Picker *p)
     }
     free(scores);
     p->sel = p->top = 0;
+    if (n > 1 && picker_is_head(p, 0))
+        p->sel = 1;
 }
 
 void picker_refilter(Picker *p)
@@ -102,9 +110,14 @@ void picker_backspace(Picker *p)
     picker_filter(p);
 }
 
+int picker_is_head(const Picker *p, size_t pos)
+{
+    return pos < p->nshown && p->items[p->shown[pos]][0] == PICKER_HEAD;
+}
+
 void picker_move(Picker *p, long delta)
 {
-    long s = (long)p->sel + delta;
+    long s = (long)p->sel + delta, step = delta < 0 ? -1 : 1;
 
     if (p->nshown == 0)
         return;
@@ -112,7 +125,13 @@ void picker_move(Picker *p, long delta)
         s = 0;
     if (s >= (long)p->nshown)
         s = (long)p->nshown - 1;
+    while (s >= 0 && s < (long)p->nshown && picker_is_head(p, (size_t)s))
+        s += step;
+    if (s < 0 || s >= (long)p->nshown)
+        return;                 /* only headings that way: stay */
     p->sel = (size_t)s;
+    if (p->sel > 0 && picker_is_head(p, p->sel - 1) && p->top > p->sel - 1)
+        p->top = p->sel - 1;    /* keep the heading above the first item in view */
     if (p->sel < p->top)
         p->top = p->sel;
     if (p->sel >= p->top + PICKER_ROWS)

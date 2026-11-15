@@ -766,6 +766,59 @@ static const Win *win_at(Win *const *wins, size_t n, int x, int y)
     return NULL;
 }
 
+/* A palette row: marker, name in bold, the value of a setting (highlighted while it is on) and
+ * the shortcut in the colour of comments, the last two in columns shared by all rows. */
+static void palette_row(SBuf *o, const Editor *e, const char *it, int sel, size_t *used)
+{
+    size_t cols = (size_t)e->cols, w1 = (size_t)e->pal_w1, w2 = (size_t)e->pal_w2;
+    const char *name = it + 1, *v = strchr(name, '\x1f'), *key, *vend;
+    int color = e->color_depth != COLOR_NONE && !sel;
+    size_t u;
+
+    if (!v)
+        return;
+    v++;
+    vend = strchr(v, '\x1f');
+    key = vend ? vend + 1 : v + strlen(v);
+    if (!vend)
+        vend = key;
+    /* the marker: a filled circle for a setting that is on, an empty one for one that is off */
+    if (it[0] == '1') {
+        if (color)
+            theme_fg(o, e->color_depth, e->theme->cls[SC_KEYWORD]);
+        sbuf_adds(o, "\xe2\x97\x8f ");
+    } else if (it[0] == '0') {
+        sbuf_adds(o, "\xe2\x97\x8b ");
+    } else {
+        sbuf_adds(o, "  ");
+    }
+    if (color)
+        sbuf_adds(o, "\x1b[39m");
+    *used += 2;
+    sbuf_adds(o, "\x1b[1m");
+    u = fit_cols(o, name, (size_t)(v - 1 - name), cols > *used ? cols - *used : 0);
+    sbuf_adds(o, "\x1b[22m");
+    *used += u;
+    if (2 + w1 + 2 + w2 > cols)
+        return;                 /* too narrow for the columns: the name alone */
+    spaces(o, w1 - u + 2);
+    *used += w1 - u + 2;
+    if (it[0] == '1' || it[0] == ' ') {
+        sbuf_adds(o, "\x1b[1m");
+        if (color)
+            theme_fg(o, e->color_depth, e->theme->cls[SC_KEYWORD]);
+    }
+    u = fit_cols(o, v, (size_t)(vend - v), w2);
+    sbuf_adds(o, color ? "\x1b[39m\x1b[22m" : "\x1b[22m");
+    spaces(o, w2 - u + 2);
+    *used += w2 + 2;
+    sbuf_adds(o, sel || e->color_depth == COLOR_NONE ? "\x1b[2m" : "");
+    if (color)
+        theme_fg(o, e->color_depth, e->theme->cls[SC_COMMENT]);
+    *used += fit_cols(o, key, strlen(key), cols - *used);
+    sbuf_adds(o, color ? "\x1b[39m" : "\x1b[22m");
+}
+
 static void picker_row(SBuf *o, const Editor *e, int k)
 {
     const Picker *p = &e->picker;
@@ -800,7 +853,14 @@ static void picker_row(SBuf *o, const Editor *e, int k)
             const char *it = p->items[p->shown[pos]];
             const char *sep = e->picker_kind == PK_BUFFERS ? strstr(it, "   ") : NULL;
 
-            if (sep) {
+            if (it[0] == PICKER_HEAD) {
+                /* a section of the palette */
+                sbuf_adds(o, "\x1b[1m");
+                used += fit_cols(o, it + 1, strlen(it + 1), cols - used);
+                sbuf_adds(o, "\x1b[22m");
+            } else if (e->picker_kind == PK_COMMANDS) {
+                palette_row(o, e, it, pos == p->sel, &used);
+            } else if (sep) {
                 /* a buffer: its name stands out, the path is in the colour of comments */
                 sbuf_adds(o, "\x1b[1m");
                 used += fit_cols(o, it, (size_t)(sep - it), cols - used);
