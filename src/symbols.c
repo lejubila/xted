@@ -3,6 +3,7 @@
 #include "util.h"
 
 #include <ctype.h>
+#include <dirent.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -160,9 +161,23 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
             size_t qs, ls, qe;
             int got = 0;
 
-            /* a pointer or a reference to a type: *Server, &Point, &mut Point */
-            while (i < len && (s[i] == '*' || s[i] == '&'))
-                i++;
+            /* a pointer or a reference to a type: *Server, &Point, &mut Point; a slice or an
+             * array of it: []string, [4]*Node (the element type is kept) */
+            for (;;) {
+                while (i < len && (s[i] == '*' || s[i] == '&'))
+                    i++;
+                if (i + 1 < len && s[i] == '[') {
+                    size_t k = i + 1;
+
+                    while (k < len && isdigit((unsigned char)s[k]))
+                        k++;
+                    if (k < len && s[k] == ']') {
+                        i = k + 1;
+                        continue;
+                    }
+                }
+                break;
+            }
             if (i + 4 < len && memcmp(s + i, "mut ", 4) == 0 && s[i - 1] == '&')
                 i += 4;
             /* a type, or a union (A|B|null) of which the first real type is kept */
@@ -841,7 +856,8 @@ static void scan_indent(Build *B, size_t y, const char *s, size_t len, const uin
 }
 
 /* The methods written outside their type (decl recv) get the class of that name as owner; one
- * whose type is not in the file stays a function. */
+ * whose type is in another file (of the same Go package) keeps the mark "\x01Type" in ret, and
+ * members_of finds it from there. */
 static void resolve_recv(SymIndex *x)
 {
     size_t i, k;
@@ -856,10 +872,8 @@ static void resolve_recv(SymIndex *x)
                 break;
         if (k < x->n) {
             s->owner = (long)k;
-        } else {
-            s->kind = RULE_FUNC;
+            s->ret[0] = '\0';
         }
-        s->ret[0] = '\0';
     }
 }
 
@@ -952,6 +966,16 @@ struct SymCache {
     int lib_tried[LIB_N];
     struct Hdr *hdr;                /* C: the headers of the project and their top-level names */
     size_t nhdr;
+    char gdir[PATH_MAX];            /* Go: the folder whose files of the same package are in gsib */
+    char gpkg[PM_NAME];
+    char **gsib;
+    size_t ngsib;
+    long gtime;
+    char groot[PATH_MAX];           /* Go: the folder of go.mod, its module, its packages */
+    char gmod[PM_PATH];
+    struct GoPkg { char name[PM_NAME]; char *dir; } *gpk;
+    size_t ngpk;
+    long gptime;
 };
 
 /* A header of the project, kept while its modification time is the same: only what a file that
@@ -1101,6 +1125,12 @@ void sym_cache_free(SymCache *c)
 
     if (!c)
         return;
+    for (i = 0; i < c->ngsib; i++)
+        free(c->gsib[i]);
+    free(c->gsib);
+    for (i = 0; i < c->ngpk; i++)
+        free(c->gpk[i].dir);
+    free(c->gpk);
     for (i = 0; i < c->n; i++)
         sym_index_free(c->v[i]);
     free_project(c);
@@ -1672,6 +1702,88 @@ static void env_includes(SymCache *c, Env *e, size_t k)
     }
 }
 
+/* The package clause of a Go file ("main"), read from its first lines; "" if none. */
+static void go_package(const char *path, char *out, size_t n)
+{
+    FILE *f = fopen(path, "r");
+    char line[256];
+    int k;
+
+    out[0] = '\0';
+    if (!f)
+        return;
+    for (k = 0; k < 60 && fgets(line, sizeof line, f); k++)
+        if (strncmp(line, "package ", 8) == 0) {
+            size_t e = 8;
+
+            while (line[e] && (isalnum((unsigned char)line[e]) || line[e] == '_'))
+                e++;
+            put(out, n, line + 8, e - 8);
+            break;
+        }
+    fclose(f);
+}
+
+/* Go: the other files of the folder of cur that belong to its package (tests only for a test
+ * file), read again after two seconds. */
+static void go_siblings(SymCache *c, const Doc *cur)
+{
+    char dir[PATH_MAX], pkg[PM_NAME], *sl;
+    DIR *d;
+    struct dirent *de;
+    long now = (long)time(NULL);
+    size_t i, cl;
+    int test;
+
+    if (!cur->buf.path || !realpath(cur->buf.path, dir))
+        return;
+    cl = strlen(dir);
+    test = cl > 8 && strcmp(dir + cl - 8, "_test.go") == 0;
+    sl = strrchr(dir, '/');
+    if (!sl)
+        return;
+    *sl = '\0';
+    pkg[0] = '\0';
+    for (i = 0; i < cur->buf.nlines && i < 60; i++) {
+        const Line *l = &cur->buf.lines[i];
+
+        if (l->len > 8 && strncmp(l->s, "package ", 8) == 0) {
+            size_t e = 8;
+
+            while (e < l->len && (isalnum((unsigned char)l->s[e]) || l->s[e] == '_'))
+                e++;
+            put(pkg, sizeof pkg, l->s + 8, e - 8);
+            break;
+        }
+    }
+    if (strcmp(dir, c->gdir) == 0 && strcmp(pkg, c->gpkg) == 0 && now - c->gtime < 2)
+        return;
+    for (i = 0; i < c->ngsib; i++)
+        free(c->gsib[i]);
+    c->ngsib = 0;
+    snprintf(c->gdir, sizeof c->gdir, "%s", dir);
+    snprintf(c->gpkg, sizeof c->gpkg, "%s", pkg);
+    c->gtime = now;
+    if (!pkg[0] || !(d = opendir(dir)))
+        return;
+    while ((de = readdir(d)) != NULL && c->ngsib < SET_MAX) {
+        size_t n = strlen(de->d_name);
+        char path[PATH_MAX + 260], other[PM_NAME];
+
+        if (n < 4 || strcmp(de->d_name + n - 3, ".go") != 0 || de->d_name[0] == '.')
+            continue;
+        if (!test && n > 8 && strcmp(de->d_name + n - 8, "_test.go") == 0)
+            continue;
+        snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
+        go_package(path, other, sizeof other);
+        if (strcmp(other, pkg) != 0)
+            continue;
+        c->gsib = xrealloc(c->gsib, (c->ngsib + 1) * sizeof *c->gsib);
+        c->gsib[c->ngsib++] = xstrdup(path);
+    }
+    closedir(d);
+}
+
 static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env *e)
 {
     size_t i, k, others = 0;
@@ -1703,6 +1815,17 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
             env_add(e, index_of_doc(c, docs[i]), 1);
             others++;
         }
+    if (strcmp(lang, "Go") == 0) {
+        /* one package is one folder: its other files are visible without an import */
+        go_siblings(c, cur);
+        for (i = 0; i < c->ngsib; i++) {
+            char *real = realpath(c->gsib[i], NULL);
+
+            if (real && (!e->v[0]->key || strcmp(real, e->v[0]->key) != 0))
+                env_add(e, index_of_path(c, real), 1);
+            free(real);
+        }
+    }
     /* breadth first: the files included by the file, by those, up to INC_DEPTH levels */
     for (k = 0; k < e->n; k++)
         if (e->depth[k] < INC_DEPTH)
@@ -1779,6 +1902,16 @@ static int members_of(const Env *e, const char *cls, SymFn fn, void *ctx, int de
             }
         }
     }
+    /* Go: methods written in another file than their type (resolve_recv) */
+    for (i = 0; i < e->n; i++)
+        for (j = 0; j < e->v[i]->n; j++) {
+            const Sym *s = &e->v[i]->v[j];
+
+            if (s->kind == RULE_METHOD && s->owner < 0 && s->ret[0] == '\x01' && strcmp(s->ret + 1, cls) == 0) {
+                fn(ctx, s->name, s->kind, s->sig, "", i == 0 ? 0 : 1);
+                found = 1;
+            }
+        }
     sc.fn = fn;
     sc.ctx = ctx;
     sc.member = 1;
@@ -2589,6 +2722,8 @@ typedef struct {
     void *ctx;
 } Pass;
 
+static int go_pkg_members(SymCache *c, const Doc *cur, const char *name, SymFn fn, void *ctx);
+
 int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t sep,
                 SymFn fn, void *ctx)
 {
@@ -2601,6 +2736,19 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
     resolve_chain(&e, cur, y, sep, t, sizeof t);
     if (t[0] && env_members(&e, t, fn, ctx, 0))
         return 1;
+    /* Go: a package of the module (store.Open), a plain word before the dot */
+    if (!t[0] && strcmp(syn_name(cur->syn), "Go") == 0) {
+        const Line *l = &cur->buf.lines[y];
+        size_t st = sep;
+
+        while (st > 0 && (isalnum((unsigned char)l->s[st - 1]) || l->s[st - 1] == '_'))
+            st--;
+        if (st < sep && sep - st < sizeof t && (st == 0 || (l->s[st - 1] != '.' && l->s[st - 1] != ')'))) {
+            put(t, sizeof t, l->s + st, sep - st);
+            if (go_pkg_members(c, cur, t, fn, ctx))
+                return 1;
+        }
+    }
     /* unknown type: every member of every class we know */
     for (i = 0; i < e.n; i++)
         for (j = 0; j < e.v[i]->n; j++) {
@@ -2610,6 +2758,207 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
                 fn(ctx, s->name, s->kind, s->sig, s->ret, i == 0 ? 0 : 1);
         }
     return 0;
+}
+
+/* ---- the packages of a Go module ---------------------------------------- */
+
+#define GO_DIRS 600                 /* folders of the module looked at */
+
+static const char *strstr_len(const char *hay, size_t n, const char *needle);
+
+/* The folder of cur and, if a go.mod is above it, the module's root and its name. */
+static int go_module(SymCache *c, const Doc *cur, char *curdir)
+{
+    char dir[PATH_MAX], probe[PATH_MAX + 16], line[512], *sl;
+    int up;
+
+    if (!cur->buf.path || !realpath(cur->buf.path, dir) || !(sl = strrchr(dir, '/')))
+        return 0;
+    *sl = '\0';
+    snprintf(curdir, PATH_MAX, "%s", dir);
+    for (up = 0; up < 16 && dir[0]; up++) {
+        FILE *f;
+
+        snprintf(probe, sizeof probe, "%s/go.mod", dir);
+        if ((f = fopen(probe, "r")) != NULL) {
+            char mod[PM_PATH] = "";
+
+            while (fgets(line, sizeof line, f))
+                if (strncmp(line, "module ", 7) == 0) {
+                    size_t e = 7;
+
+                    while (line[e] == ' ' || line[e] == '"')
+                        e++;
+                    put(mod, sizeof mod, line + e, strcspn(line + e, " \"\r\n"));
+                    break;
+                }
+            fclose(f);
+            if (!mod[0])
+                return 0;
+            if (strcmp(dir, c->groot) != 0) {
+                size_t i;
+
+                for (i = 0; i < c->ngpk; i++)
+                    free(c->gpk[i].dir);
+                c->ngpk = 0;
+                c->gptime = 0;
+                snprintf(c->groot, sizeof c->groot, "%s", dir);
+            }
+            snprintf(c->gmod, sizeof c->gmod, "%s", mod);
+            return 1;
+        }
+        if (!(sl = strrchr(dir, '/')))
+            break;
+        *sl = '\0';
+    }
+    return 0;
+}
+
+/* The package of a folder: the clause of its first file that is not a test; "" if none. */
+static void go_dir_package(const char *dir, char *out, size_t n)
+{
+    DIR *d = opendir(dir);
+    struct dirent *de;
+
+    out[0] = '\0';
+    if (!d)
+        return;
+    while (!out[0] && (de = readdir(d)) != NULL) {
+        size_t l = strlen(de->d_name);
+        char path[PATH_MAX + 260];
+
+        if (l < 4 || strcmp(de->d_name + l - 3, ".go") != 0 || de->d_name[0] == '.' ||
+            (l > 8 && strcmp(de->d_name + l - 8, "_test.go") == 0))
+            continue;
+        snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
+        go_package(path, out, n);
+    }
+    closedir(d);
+}
+
+static void go_walk(SymCache *c, const char *dir, int depth, size_t *seen)
+{
+    DIR *d;
+    struct dirent *de;
+    char pkg[PM_NAME];
+
+    if (++*seen > GO_DIRS)
+        return;
+    go_dir_package(dir, pkg, sizeof pkg);
+    if (pkg[0] && strcmp(pkg, "main") != 0) {
+        c->gpk = xrealloc(c->gpk, (c->ngpk + 1) * sizeof *c->gpk);
+        snprintf(c->gpk[c->ngpk].name, sizeof c->gpk[c->ngpk].name, "%s", pkg);
+        c->gpk[c->ngpk++].dir = xstrdup(dir);
+    }
+    if (depth >= 8 || !(d = opendir(dir)))
+        return;
+    while ((de = readdir(d)) != NULL) {
+        char sub[PATH_MAX + 260];
+        struct stat st;
+
+        if (de->d_name[0] == '.' || de->d_name[0] == '_' || strcmp(de->d_name, "vendor") == 0 ||
+            strcmp(de->d_name, "testdata") == 0 || strcmp(de->d_name, "node_modules") == 0)
+            continue;
+        snprintf(sub, sizeof sub, "%s/%s", dir, de->d_name);
+        if (lstat(sub, &st) == 0 && S_ISDIR(st.st_mode))
+            go_walk(c, sub, depth + 1, seen);
+    }
+    closedir(d);
+}
+
+/* The packages of the module of cur (read again after ten seconds); 0 if cur is in none. */
+static int go_packages(SymCache *c, const Doc *cur, char *curdir)
+{
+    long now = (long)time(NULL);
+
+    if (!go_module(c, cur, curdir))
+        return 0;
+    if (!c->gptime || now - c->gptime >= 10) {
+        size_t i, seen = 0;
+
+        for (i = 0; i < c->ngpk; i++)
+            free(c->gpk[i].dir);
+        c->ngpk = 0;
+        go_walk(c, c->groot, 0, &seen);
+        c->gptime = now;
+    }
+    return 1;
+}
+
+/* The exported names (capitalised) of the package of the module called name, from the files of
+ * its folder. Returns 1 if there is one. */
+static int go_pkg_members(SymCache *c, const Doc *cur, const char *name, SymFn fn, void *ctx)
+{
+    char curdir[PATH_MAX];
+    size_t p;
+    int found = 0;
+
+    if (!go_packages(c, cur, curdir))
+        return 0;
+    for (p = 0; p < c->ngpk; p++) {
+        DIR *d;
+        struct dirent *de;
+
+        if (strcmp(c->gpk[p].name, name) != 0 || strcmp(c->gpk[p].dir, curdir) == 0 ||
+            !(d = opendir(c->gpk[p].dir)))
+            continue;
+        found = 1;
+        while ((de = readdir(d)) != NULL) {
+            size_t l = strlen(de->d_name), j;
+            char path[PATH_MAX + 260];
+            SymIndex *x;
+
+            if (l < 4 || strcmp(de->d_name + l - 3, ".go") != 0 || de->d_name[0] == '.' ||
+                (l > 8 && strcmp(de->d_name + l - 8, "_test.go") == 0))
+                continue;
+            snprintf(path, sizeof path, "%s/%s", c->gpk[p].dir, de->d_name);
+            if (!(x = index_of_path(c, path)))
+                continue;
+            for (j = 0; j < x->n; j++) {
+                const Sym *s = &x->v[j];
+
+                if (s->owner < 0 && s->kind != RULE_METHOD && isupper((unsigned char)s->name[0]))
+                    fn(ctx, s->name, s->kind, s->sig, s->ret, 1);
+            }
+        }
+        closedir(d);
+    }
+    return found;
+}
+
+int sym_go_package(SymCache *c, Doc *cur, const char *name, char *out, size_t n)
+{
+    char curdir[PATH_MAX];
+    size_t p, rl;
+    int found = 0;
+
+    if (!go_packages(c, cur, curdir))
+        return 0;
+    rl = strlen(c->groot);
+    for (p = 0; p < c->ngpk; p++) {
+        const char *rel = c->gpk[p].dir + rl;
+        char q[PM_PATH + PATH_MAX + 4];
+        size_t y;
+
+        if (strcmp(c->gpk[p].name, name) != 0 || strcmp(c->gpk[p].dir, curdir) == 0)
+            continue;
+        snprintf(out, n, "%s%s", c->gmod, rel);
+        found = 1;
+        /* of two packages with that name, the one the file already imports */
+        snprintf(q, sizeof q, "\"%s%s\"", c->gmod, rel);
+        for (y = 0; y < cur->buf.nlines && y < 200; y++)
+            if (strstr_len(cur->buf.lines[y].s, cur->buf.lines[y].len, q))
+                return 1;
+    }
+    if (found) {
+        /* the first one, written again */
+        for (p = 0; p < c->ngpk; p++)
+            if (strcmp(c->gpk[p].name, name) == 0 && strcmp(c->gpk[p].dir, curdir) != 0) {
+                snprintf(out, n, "%s%s", c->gmod, c->gpk[p].dir + rl);
+                break;
+            }
+    }
+    return found;
 }
 
 int sym_type_before(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t sep,
@@ -2634,7 +2983,7 @@ void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn
         for (j = 0; j < e.v[i]->n; j++) {
             const Sym *s = &e.v[i]->v[j];
 
-            if (s->owner < 0 && s->name[0])
+            if (s->owner < 0 && s->name[0] && s->kind != RULE_METHOD)
                 fn(ctx, s->name, s->kind, s->sig, s->ret, i == 0 ? 0 : 1);
         }
     sc.fn = fn;
@@ -2987,6 +3336,103 @@ static void php_exports(const Buffer *b, struct Hdr *h)
     }
 }
 
+/* The public items a Rust file defines at its top level: pub (pub(crate) too) fn, struct, enum,
+ * trait, union, type, const, static. */
+static void rust_exports(const Buffer *b, struct Hdr *h)
+{
+    size_t y;
+
+    for (y = 0; y < b->nlines; y++) {
+        const char *s = b->lines[y].s;
+        size_t len = b->lines[y].len, i = 0, e, p0, p1;
+        int isfn;
+
+        if (len < 5 || !js_word(s, len, &i, "pub"))
+            continue;
+        if (i < len && s[i] == '(') {
+            while (i < len && s[i] != ')')
+                i++;
+            i++;
+            while (i < len && (s[i] == ' ' || s[i] == '\t'))
+                i++;
+            if (i >= len)
+                continue;
+        }
+        isfn = 0;
+        if (js_word(s, len, &i, "use")) {
+            /* a re-export: pub use a::b::X; pub use a::{X, Y as Z}; (the last name of each) */
+            size_t st = i, k;
+
+            while (i < len && s[i] != '{' && s[i] != ';')
+                i++;
+            if (i < len && s[i] == '{')
+                st = i + 1;
+            for (k = st; k <= len; k++) {
+                if (k == len || s[k] == ',' || s[k] == '}' || s[k] == ';') {
+                    size_t a = st, z = k, w;
+
+                    while (a < z && s[a] == ' ')
+                        a++;
+                    while (z > a && s[z - 1] == ' ')
+                        z--;
+                    for (w = z; w > a && is_idc((unsigned char)s[w - 1]); w--)
+                        ;
+                    if (w < z && (z - w != 4 || memcmp(s + w, "self", 4) != 0) && s[w] != '*' &&
+                        !(z - w == 1 && s[w] == '_'))
+                        hsym_add(h, s + w, z - w, isupper((unsigned char)s[w]) ? RULE_CLASS : RULE_FUNC,
+                                 "", 0, 0);
+                    st = k + 1;
+                    if (k == len || s[k] != ',')
+                        break;
+                }
+            }
+            continue;
+        }
+        if (js_word(s, len, &i, "const")) {
+            js_word(s, len, &i, "unsafe");
+            if (!js_word(s, len, &i, "fn")) {
+                e = js_ident(s, len, i);
+                if (e > i)
+                    hsym_add(h, s + i, e - i, RULE_CONST, "", 0, 0);
+                continue;
+            }
+            isfn = 1;                       /* pub const fn */
+        }
+        if (!isfn) {
+            js_word(s, len, &i, "async");
+            js_word(s, len, &i, "unsafe");
+            if (js_word(s, len, &i, "extern") && i < len && s[i] == '"') {
+                for (i++; i < len && s[i] != '"'; i++)
+                    ;
+                for (i++; i < len && s[i] == ' '; i++)
+                    ;
+            }
+            isfn = js_word(s, len, &i, "fn");
+        }
+        if (isfn) {
+            e = js_ident(s, len, i);
+            if (e == i)
+                continue;
+            for (p0 = e; p0 < len && s[p0] != '('; p0++)
+                ;
+            for (p1 = p0; p1 < len && s[p1] != ')'; p1++)
+                ;
+            hsym_add(h, s + i, e - i, RULE_FUNC, s + p0 + (p0 < len), p1 > p0 ? p1 - p0 - 1 : 0, 0);
+        } else if (js_word(s, len, &i, "struct") || js_word(s, len, &i, "enum") ||
+                   js_word(s, len, &i, "trait") || js_word(s, len, &i, "union") ||
+                   js_word(s, len, &i, "type")) {
+            e = js_ident(s, len, i);
+            if (e > i)
+                hsym_add(h, s + i, e - i, RULE_CLASS, "", 0, 0);
+        } else if (js_word(s, len, &i, "static")) {
+            js_word(s, len, &i, "mut");
+            e = js_ident(s, len, i);
+            if (e > i)
+                hsym_add(h, s + i, e - i, RULE_CONST, "", 0, 0);
+        }
+    }
+}
+
 /* The dotted name under which a Python file is imported: the folders above it that are packages
  * (they have __init__.py) and its name; a package's __init__.py is the package. */
 static void py_module_name(const char *real, char *out, size_t n)
@@ -3069,7 +3515,8 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         return h;
     if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
         return h;
-    js = is_js_module(real) ? 1 : strcmp(ext_of(real), "py") == 0 ? 2 : strcmp(ext_of(real), "php") == 0 ? 3 : 0;
+    js = is_js_module(real) ? 1 : strcmp(ext_of(real), "py") == 0 ? 2 : strcmp(ext_of(real), "php") == 0 ? 3 :
+         strcmp(ext_of(real), "rs") == 0 ? 4 : 0;
     if (h && h->mtime == (long)st.st_mtime && h->size == (long)st.st_size) {
         h->checked = now;
         return h;
@@ -3111,6 +3558,8 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         py_exports(&b, h);
     else if (js == 3)
         php_exports(&b, h);
+    else if (js == 4)
+        rust_exports(&b, h);
     buf_free(&b);
     for (i = 0; x && i < x->n && h->n < HDR_SYMS; i++) {
         const Sym *s = &x->v[i];
@@ -3331,6 +3780,218 @@ static void php_project(SymCache *c, Env *e, HdrFn fn, void *ctx)
     }
 }
 
+/* Rust: the files below dir, with their module path from top ("net/http.rs" and
+ * "net/http/mod.rs" are net::http) after prefix (crate, or the library's name). Only the
+ * modules of the list mods (" a b ") at the first level, if given; the file root (lib.rs) is
+ * the prefix itself. */
+typedef struct {
+    SymCache *c;
+    const char *top, *self, *prefix, *mods, *root;
+    size_t seen;
+    HdrFn fn;
+    void *ctx;
+} RustWalk;
+
+static void rust_emit(RustWalk *w, const char *path, const char *mod)
+{
+    char spec[PATH_MAX + PM_NAME + 16], mp[PATH_MAX];
+    struct Hdr *h;
+    size_t j, k;
+
+    if (!(h = hdr_get(w->c, path)) || !h->n)
+        return;
+    for (j = 0, k = 0; mod[j] && k + 3 < sizeof mp; j++) {
+        if (mod[j] == '/') {
+            mp[k++] = ':';
+            mp[k++] = ':';
+        } else
+            mp[k++] = mod[j];
+    }
+    mp[k] = '\0';
+    for (j = 0; j < h->n; j++) {
+        snprintf(spec, sizeof spec, "%s%s%.2000s::%s", w->prefix, mp[0] ? "::" : "", mp, h->v[j].name);
+        w->fn(w->ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, spec);
+    }
+}
+
+static void rust_walk(RustWalk *w, const char *dir, int depth)
+{
+    DIR *d;
+    struct dirent *de;
+    size_t tl = strlen(w->top);
+
+    if (depth > 8 || !(d = opendir(dir)))
+        return;
+    while ((de = readdir(d)) != NULL && w->seen < HDR_MAX) {
+        char path[PATH_MAX + 260], mod[PATH_MAX], first[PM_NAME + 2];
+        struct stat st;
+        size_t l = strlen(de->d_name), m;
+
+        if (de->d_name[0] == '.')
+            continue;
+        snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
+        if (lstat(path, &st) != 0)
+            continue;
+        if (S_ISDIR(st.st_mode)) {
+            /* src/bin holds other programs, not modules of this crate */
+            if (!(strcmp(dir, w->top) == 0 && strcmp(de->d_name, "bin") == 0))
+                rust_walk(w, path, depth + 1);
+            continue;
+        }
+        if (l < 4 || strcmp(de->d_name + l - 3, ".rs") != 0 || strcmp(path, w->self) == 0)
+            continue;
+        if (strcmp(dir, w->top) == 0 && (strcmp(de->d_name, "lib.rs") == 0 || strcmp(de->d_name, "main.rs") == 0))
+            continue;                       /* a crate's root: its names are the prefix's */
+        snprintf(mod, sizeof mod, "%s", path + tl + 1);
+        mod[strlen(mod) - 3] = '\0';
+        m = strlen(mod);
+        if (m > 4 && strcmp(mod + m - 4, "/mod") == 0)
+            mod[m - 4] = '\0';
+        if (w->mods) {
+            snprintf(first, sizeof first, " %.*s ", (int)strcspn(mod, "/") < PM_NAME - 1 ?
+                     (int)strcspn(mod, "/") : PM_NAME - 1, mod);
+            if (!strstr(w->mods, first))
+                continue;
+        }
+        w->seen++;
+        rust_emit(w, path, mod);
+    }
+    closedir(d);
+}
+
+/* The modules a crate root declares (mod x; pub mod y;), as " x y "; only the pub ones (not
+ * pub(crate)) if pub_only. */
+static void rust_mods(const char *path, int pub_only, char *out, size_t n)
+{
+    FILE *f = fopen(path, "r");
+    char line[512];
+    size_t o = 0;
+
+    out[0] = '\0';
+    if (!f)
+        return;
+    out[o++] = ' ';
+    while (fgets(line, sizeof line, f)) {
+        const char *p = line;
+        int pub = strncmp(p, "pub ", 4) == 0;
+        size_t e;
+
+        if (pub)
+            p += 4;
+        else if (strncmp(p, "pub(", 4) == 0) {
+            p = strchr(p, ')');
+            if (!p)
+                continue;
+            for (p++; *p == ' '; p++)
+                ;
+        }
+        if (strncmp(p, "mod ", 4) != 0 || (pub_only && !pub))
+            continue;
+        p += 4;
+        for (e = 0; is_idc((unsigned char)p[e]); e++)
+            ;
+        if (e > 0 && o + e + 2 < n) {
+            memcpy(out + o, p, e);
+            o += e;
+            out[o++] = ' ';
+        }
+    }
+    out[o] = '\0';
+    fclose(f);
+}
+
+/* Rust. In the library (or a crate with no lib.rs) the other modules of src/ are crate::...; in a
+ * program (src/main.rs next to lib.rs, src/bin/...) its own modules are crate::... and the
+ * library is reached by its name (bat::output::OutputType) through what lib.rs makes pub. */
+static void rust_project(SymCache *c, const char *self, HdrFn fn, void *ctx)
+{
+    char dir[PATH_MAX], probe[PATH_MAX + 32], src[PATH_MAX + 8], *sl;
+    char lib[PATH_MAX + 16], name[PM_NAME] = "", mods[4096], line[256];
+    struct stat st;
+    RustWalk w;
+    FILE *f;
+    size_t sl2;
+    int haslib, inbin, ismain;
+
+    snprintf(dir, sizeof dir, "%s", self);
+    for (;;) {
+        if ((sl = strrchr(dir, '/')) == NULL || sl == dir)
+            return;
+        *sl = '\0';
+        snprintf(probe, sizeof probe, "%s/Cargo.toml", dir);
+        if (stat(probe, &st) == 0)
+            break;
+    }
+    snprintf(src, sizeof src, "%s/src", dir);
+    sl2 = strlen(src);
+    if (strncmp(self, src, sl2) != 0 || self[sl2] != '/')
+        return;                             /* only a file of src/ belongs to the crate */
+    if ((f = fopen(probe, "r")) != NULL) {
+        int pkg = 0;
+
+        while (fgets(line, sizeof line, f)) {
+            char *q;
+
+            if (line[0] == '[')
+                pkg = strncmp(line, "[package]", 9) == 0;
+            else if (pkg && !name[0] && strncmp(line, "name", 4) == 0 && (q = strchr(line, '"')) != NULL) {
+                size_t k;
+
+                for (k = 0, q++; *q && *q != '"' && k + 1 < sizeof name; q++)
+                    name[k++] = *q == '-' ? '_' : *q;
+                name[k] = '\0';
+            }
+        }
+        fclose(f);
+    }
+    snprintf(lib, sizeof lib, "%s/lib.rs", src);
+    haslib = stat(lib, &st) == 0;
+    inbin = strncmp(self + sl2, "/bin/", 5) == 0;
+    ismain = strcmp(self + sl2, "/main.rs") == 0;
+    memset(&w, 0, sizeof w);
+    w.c = c;
+    w.self = self;
+    w.fn = fn;
+    w.ctx = ctx;
+    if (!haslib || (!inbin && !ismain)) {
+        /* the library (or the one program): every module, and the names of the root */
+        w.top = src;
+        w.prefix = "crate";
+        rust_walk(&w, src, 0);
+        if (haslib && strcmp(self, lib) != 0)
+            rust_emit(&w, lib, "");
+        return;
+    }
+    if (inbin) {
+        /* src/bin/name/main.rs and its modules; src/bin/name.rs has none */
+        const char *b0 = self + sl2 + 5, *b1 = strchr(b0, '/');
+
+        if (b1) {
+            char bdir[2 * PATH_MAX + 16];
+
+            snprintf(bdir, sizeof bdir, "%s/bin/%.*s", src, (int)(b1 - b0), b0);
+            w.top = bdir;
+            w.prefix = "crate";
+            rust_walk(&w, bdir, 0);
+        }
+    } else {
+        /* src/main.rs: the modules it declares are its own */
+        rust_mods(self, 0, mods, sizeof mods);
+        w.top = src;
+        w.prefix = "crate";
+        w.mods = mods;
+        rust_walk(&w, src, 0);
+    }
+    if (!name[0])
+        return;
+    rust_mods(lib, 1, mods, sizeof mods);
+    w.top = src;
+    w.prefix = name;
+    w.mods = mods;
+    rust_walk(&w, src, 0);
+    rust_emit(&w, lib, "");
+}
+
 void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx)
 {
     Env e;
@@ -3339,12 +4000,17 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
     int cl = strcmp(lang, "C") == 0, js = strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0;
     int py = strcmp(lang, "Python") == 0;
     int php = strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0;
+    int rs = strcmp(lang, "Rust") == 0;
 
-    if (!cur->buf.path || (!cl && !js && !py && !php))
+    if (!cur->buf.path || (!cl && !js && !py && !php && !rs))
         return;
     env_build(c, docs, ndocs, cur, &e);
     if (!e.v[0]->key)
         return;
+    if (rs) {
+        rust_project(c, e.v[0]->key, fn, ctx);
+        return;
+    }
     if (php) {
         php_project(c, &e, fn, ctx);
         return;
@@ -4086,6 +4752,8 @@ int sym_outline(SymCache *c, Doc *cur, OutlineFn fn, void *ctx)
 
         if (s->owner >= 0 && (size_t)s->owner < x->n && x->v[s->owner].name[0])
             snprintf(q, sizeof q, "%s%s%s", x->v[s->owner].name, sep, s->name);
+        else if (s->kind == RULE_METHOD && s->ret[0] == '\x01')
+            snprintf(q, sizeof q, "%s%s%s", s->ret + 1, sep, s->name);    /* its type is elsewhere */
         else
             snprintf(q, sizeof q, "%s", s->name);
         fn(ctx, s->kind, q, s->sig, rows[i].y, rows[i].x);

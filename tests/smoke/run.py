@@ -240,6 +240,27 @@ def go_and_rust():
     quit_(r, discard=True)
     b.close()
 
+    # symbols of other files: a package of the Go module, a module of the Rust crate
+    b = Box()
+    b.write("go.mod", "module example.com/app\n")
+    b.write("store/store.go", "package store\n\nfunc Open(path string) error {\n\treturn nil\n}\n")
+    b.write("cmd/main.go", "package main\n\nfunc main() {\n\t\n}\n")
+    r = b.run(["cmd/main.go"])
+    r.type(DOWN, DOWN, DOWN, END, "store.Op", 0.4, ENTER, ctrl("s"))
+    check("Go: store.Open of the module adds import \"example.com/app/store\"",
+          b.read("cmd/main.go").startswith("package main\n\nimport \"example.com/app/store\"\n\nfunc main()"),
+          b.read("cmd/main.go"))
+    quit_(r, discard=True)
+    b.write("Cargo.toml", "[package]\nname = \"app\"\n")
+    b.write("src/net.rs", "pub fn fetch(url: &str) -> String {\n    String::new()\n}\n")
+    b.write("src/main.rs", "mod net;\n\nfn main() {\n    \n}\n")
+    r = b.run(["src/main.rs"])
+    r.type(DOWN, DOWN, DOWN, END, "fetc", 0.4, ENTER, ctrl("s"))
+    check("Rust: fetch of another module adds use crate::net::fetch; after the mods",
+          b.read("src/main.rs").startswith("mod net;\n\nuse crate::net::fetch;\n\nfn main()"), b.read("src/main.rs"))
+    quit_(r, discard=True)
+    b.close()
+
 
 @scenario
 def help_page():

@@ -4863,11 +4863,15 @@ static void php_case(const char *dir, const char *file, const char *text, const 
         sbuf_adds(&all, "\n");
     }
     sbuf_add(&all, "", 1);
-    if (!strstr(all.p, want) || (changes ? e.buf->nlines == nl0 : e.buf->nlines != nl0))
+    /* changes: 1 lines were added, 2 a line was changed (the name joined an import), 0 nothing */
+    if (!strstr(all.p, want) || (changes == 1 ? e.buf->nlines == nl0 : e.buf->nlines != nl0))
         fprintf(stderr, "%s (%s):\n%s---\n", file, typed, all.p);
     CHECK(strstr(all.p, want) != NULL);
-    CHECK(changes ? e.buf->nlines > nl0 : e.buf->nlines == nl0);
-    if (changes) {
+    CHECK(changes == 1 ? e.buf->nlines > nl0 : e.buf->nlines == nl0);
+    if (changes == 2) {
+        edit_undo(&e);
+        CHECK(e.buf->lines[0].len < strlen(want) || memcmp(e.buf->lines[0].s, want, strlen(want)) != 0);
+    } else if (changes) {
         edit_undo(&e);
         CHECK(e.buf->nlines == nl0);
     }
@@ -5049,6 +5053,153 @@ static void test_go_rust(void)
     CHECK(has_sym(&g, "new") && has_sym(&g, "insert"));
     doc_release(&d);
     sym_cache_free(c);
+
+    /* Go: the other files of the package (not those of another package or the tests) */
+    {
+        char gd[64];
+
+        CHECK(make_dir(gd, sizeof gd) != NULL);
+        put_file(gd, "types.go", "package srv\n\ntype Store struct {\n\tItems []string\n}\n\nfunc helperFn(n int) int {\n\treturn n\n}\n");
+        put_file(gd, "methods.go", "package srv\n\nfunc (s *Store) Save(path string) error {\n\treturn nil\n}\n");
+        put_file(gd, "x_test.go", "package srv\n\nfunc testOnly() {}\n");
+        put_file(gd, "gen.go", "package other\n\nfunc otherFn() {}\n");
+        put_file(gd, "main.go", "package srv\n\nfunc run() {\n\tst := &Store{}\n\tst.\n}\n");
+        snprintf(path, sizeof path, "%s/main.go", gd);
+        c = sym_cache_new();
+        memset(&d, 0, sizeof d);
+        CHECK(doc_load(&d, path, err, sizeof err) == 0);
+        docs[0] = &d;
+        memset(&g, 0, sizeof g);
+        sym_globals(c, docs, 1, &d, got_cb, &g);
+        CHECK(has_sym(&g, "helperFn") && has_sym(&g, "Store"));
+        CHECK(!has_sym(&g, "otherFn") && !has_sym(&g, "testOnly") && !has_sym(&g, "Save"));
+        y = 4;
+        sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+        memset(&g, 0, sizeof g);
+        CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+        CHECK(has_sym(&g, "Save"));
+        CHECK(has_sym(&g, "Items"));
+        doc_release(&d);
+        sym_cache_free(c);
+        rm_rf(gd);
+    }
+
+    /* Go: a package of the module (go.mod), its exported names and its import path */
+    {
+        char md[64], sub[128];
+
+        CHECK(make_dir(md, sizeof md) != NULL);
+        snprintf(sub, sizeof sub, "%s/store", md);
+        mkdir(sub, 0755);
+        snprintf(sub, sizeof sub, "%s/cmd", md);
+        mkdir(sub, 0755);
+        put_file(md, "go.mod", "module example.com/app\n\ngo 1.22\n");
+        put_file(md, "store/store.go", "package store\n\ntype DB struct {\n\tPath string\n}\n\n"
+                                       "func Open(path string) *DB {\n\treturn &DB{}\n}\n\nfunc hidden() {}\n");
+        php_case(md, "cmd/main.go", "package main\n\nimport \"fmt\"\n\nfunc main() {\n\t\n}\n", "store.Op", 5,
+                 "import (\n\t\"fmt\"\n\n\t\"example.com/app/store\"\n)\n", 1);
+        /* gofmt's groups: a module joins the modules, the library its own group */
+        php_case(md, "cmd/c.go", "package main\n\nimport (\n\t\"os\"\n\n\t\"github.com/x/y\"\n)\n\nfunc main() {\n\t\n}\n",
+                 "store.Op", 9, "import (\n\t\"os\"\n\n\t\"example.com/app/store\"\n\t\"github.com/x/y\"\n)\n", 1);
+        php_case(md, "cmd/d.go", "package main\n\nimport (\n\t\"os\"\n\n\t\"github.com/x/y\"\n)\n\nfunc main() {\n\t\n}\n",
+                 "fmt.Printl", 9, "import (\n\t\"fmt\"\n\t\"os\"\n\n\t\"github.com/x/y\"\n)\n", 1);
+        php_case(md, "cmd/e.go", "package main\n\nimport (\n\t\"os\"\n\t\"strings\"\n)\n\nfunc main() {\n\t\n}\n",
+                 "store.Op", 8, "import (\n\t\"os\"\n\t\"strings\"\n\n\t\"example.com/app/store\"\n)\n", 1);
+        php_case(md, "cmd/f.go", "package main\n\nimport (\n\t\"github.com/x/y\"\n)\n\nfunc main() {\n\t\n}\n",
+                 "fmt.Printl", 7, "import (\n\t\"fmt\"\n\n\t\"github.com/x/y\"\n)\n", 1);
+        php_case(md, "cmd/b.go", "package main\n\nimport \"example.com/app/store\"\n\nfunc main() {\n\t\n}\n",
+                 "store.Op", 5, "package main\n\nimport \"example.com/app/store\"\n\nfunc main() {\n", 0);
+        snprintf(path, sizeof path, "%s/cmd/main.go", md);
+        c = sym_cache_new();
+        memset(&d, 0, sizeof d);
+        CHECK(doc_load(&d, path, err, sizeof err) == 0);
+        docs[0] = &d;
+        {
+            char out[128];
+
+            CHECK(sym_go_package(c, &d, "store", out, sizeof out) == 1 && strcmp(out, "example.com/app/store") == 0);
+            CHECK(sym_go_package(c, &d, "nothere", out, sizeof out) == 0);
+        }
+        doc_release(&d);
+        sym_cache_free(c);
+        rm_rf(md);
+    }
+
+    /* Rust: the pub items of the other modules of the crate, with their use crate:: */
+    {
+        char rd[64], sub[128];
+
+        CHECK(make_dir(rd, sizeof rd) != NULL);
+        snprintf(sub, sizeof sub, "%s/src", rd);
+        mkdir(sub, 0755);
+        snprintf(sub, sizeof sub, "%s/src/net", rd);
+        mkdir(sub, 0755);
+        snprintf(sub, sizeof sub, "%s/src/bin", rd);
+        mkdir(sub, 0755);
+        put_file(rd, "Cargo.toml", "[package]\nname = \"app\"\n");
+        put_file(rd, "src/net/http.rs", "pub fn fetch(url: &str) -> String {\n    String::new()\n}\n\n"
+                                        "pub struct Client {\n    base: String,\n}\n\npub struct Zeta;\n\nfn private_fn() {}\n");
+        put_file(rd, "src/util.rs", "pub(crate) const fn limit_of(n: usize) -> usize {\n    n\n}\n");
+        put_file(rd, "src/bin/tool.rs", "pub fn tool_only() {}\n");
+        php_case(rd, "src/main.rs", "mod net;\n\nfn main() {\n    \n}\n", "fetc", 3,
+                 "mod net;\n\nuse crate::net::http::fetch;\n\nfn main() {\n", 1);
+        php_case(rd, "src/main.rs", "use std::fs;\n\nfn main() {\n    \n}\n", "Clien", 3,
+                 "use std::fs;\n\nuse crate::net::http::Client;\n\nfn main", 1);
+        /* rustfmt's layout: the name joins the braces of its module, a use its group in order */
+        php_case(rd, "src/main.rs", "use crate::net::http::{Client, Other};\n\nfn main() {\n    \n}\n", "fetc", 3,
+                 "use crate::net::http::{fetch, Client, Other};\n\nfn main", 2);
+        php_case(rd, "src/main.rs", "use crate::net::http::{Client};\n\nfn main() {\n    \n}\n", "Zet", 3,
+                 "use crate::net::http::{Client, Zeta};\n\nfn main", 2);
+        php_case(rd, "src/main.rs",
+                 "use std::fs;\n\nuse serde::Serialize;\n\nuse crate::a::B;\n#[cfg(x)]\nuse crate::z::Y;\nuse crate::Top;\n\n"
+                 "fn main() {\n    \n}\n", "Clien", 10,
+                 "use crate::a::B;\nuse crate::net::http::Client;\n#[cfg(x)]\nuse crate::z::Y;\nuse crate::Top;\n\nfn main", 1);
+        php_case(rd, "src/main.rs", "use serde::Serialize;\n\nuse crate::a::B;\n\nfn main() {\n    \n}\n", "HashMap::ne", 5,
+                 "use std::collections::HashMap;\n\nuse serde::Serialize;\n\nuse crate::a::B;\n", 1);
+        php_case(rd, "src/main.rs", "use crate::a::{\n    B,\n    fetch,\n};\n\nfn main() {\n    \n}\n", "Clien", 6,
+                 "use crate::a::{\n    B,\n    fetch,\n};\nuse crate::net::http::Client;\n\nfn main", 1);
+        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n", "limit_o", 1,
+                 "use crate::util::limit_of;\n\nfn main() {\n", 1);
+        php_case(rd, "src/main.rs", "use crate::net::http::fetch;\n\nfn main() {\n    \n}\n", "fetc", 3,
+                 "use crate::net::http::fetch;\n\nfn main() {\n", 0);
+        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n", "tool_on", 1, "fn main() {\n", 0);
+        php_case(rd, "src/main.rs", "fn main() {\n    \n}\n", "private_f", 1, "fn main() {\n", 0);
+        rm_rf(rd);
+    }
+
+    /* Rust: a program of src/bin reaches the library by the package's name, only through what
+     * lib.rs makes pub; its own modules are crate:: */
+    {
+        char rd[64], sub[160];
+        static const char *const dirs[] = { "src", "src/bin", "src/bin/tool" };
+        size_t k;
+
+        CHECK(make_dir(rd, sizeof rd) != NULL);
+        for (k = 0; k < 3; k++) {
+            snprintf(sub, sizeof sub, "%s/%s", rd, dirs[k]);
+            mkdir(sub, 0755);
+        }
+        put_file(rd, "Cargo.toml", "[package]\nname = \"my-app\"\nversion = \"0.1.0\"\n\n[dependencies]\nname = \"x\"\n");
+        put_file(rd, "src/lib.rs", "pub mod net;\nmod secret;\npub use secret::{Helper, other as _};\n");
+        put_file(rd, "src/net.rs", "pub fn fetch() {}\n");
+        put_file(rd, "src/secret.rs", "pub fn hush() {}\npub struct Helper;\n");
+        put_file(rd, "src/bin/tool/cli.rs", "pub fn parse_args() {}\n");
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nfn main() {\n    \n}\n", "fetc", 3,
+                 "mod cli;\n\nuse my_app::net::fetch;\n\nfn main", 1);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nfn main() {\n    \n}\n", "hus", 3, "mod cli;\n\nfn main", 0);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nfn main() {\n    \n}\n", "Helpe", 3,
+                 "mod cli;\n\nuse my_app::Helper;\n\nfn main", 1);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nfn main() {\n    \n}\n", "parse_ar", 3,
+                 "mod cli;\n\nuse crate::cli::parse_args;\n\nfn main", 1);
+        php_case(rd, "src/bin/tool/main.rs", "mod cli;\n\nuse crate::{\n    cli::parse_args,\n};\n\nfn main() {\n    \n}\n",
+                 "parse_ar", 7, "use crate::{\n    cli::parse_args,\n};\n\nfn main", 0);
+        /* in the library: the other modules, private ones too, and what lib.rs re-exports */
+        php_case(rd, "src/net.rs", "pub fn fetch() {}\n\nfn g() {\n    \n}\n", "hus", 3,
+                 "use crate::secret::hush;\n\npub fn fetch", 1);
+        php_case(rd, "src/net.rs", "use crate::secret::Helper;\n\nfn g() {\n    \n}\n", "Helpe", 3,
+                 "use crate::secret::Helper;\n\nfn g", 0);
+        rm_rf(rd);
+    }
 
     /* the imports */
     php_case(dir, "a.go", "package main\n\nfunc main() {\n\t\n}\n", "fmt.Printl", 3,

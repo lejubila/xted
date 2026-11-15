@@ -156,11 +156,25 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   - In Go, scegliendo un membro dopo il pacchetto (`fmt.Println`, `http.Get`) o il pacchetto stesso si
     aggiunge `"fmt"` (o `"net/http"`) nel blocco `import ( … )` in ordine; un `import "os"` su una riga
     diventa un blocco, e senza import si scrive `import "fmt"` dopo `package`. I metodi con ricevitore
-    (`func (s *Server) Start()`) sono metodi di `Server`.
+    (`func (s *Server) Start()`) sono metodi di `Server`, anche se scritti in un altro file.
+    Sono visibili senza import i nomi degli altri file `.go` della stessa cartella con lo stesso
+    `package` (i `_test.go` solo da un test). Dopo il nome di un pacchetto del modulo (`store.`, dove
+    c'è un `go.mod` sopra il file) si propongono i suoi nomi esportati e si aggiunge
+    `import "example.com/app/store"` (il `module` di `go.mod` più la cartella). Come fa goimports, nel
+    blocco la libreria standard sta nel primo gruppo e i moduli esterni in un gruppo dopo una riga vuota.
   - In Rust, scegliendo un tipo o un modulo fuori dal prelude (`HashMap`, `HashMap::new`, `fs::read`)
     si aggiunge `use std::collections::HashMap;` (o `use std::fs;`) tra gli `use` in ordine, oppure
     dopo i commenti `//!` e gli attributi `#![…]`; un `use std::collections::{HashMap, …}` conta già.
     I metodi dei blocchi `impl Tipo` e `impl Trait for Tipo` sono metodi del tipo.
+    Nei file di `src/` di un crate (con `Cargo.toml`) si propongono anche gli item `pub` degli altri
+    moduli (`src/net/http.rs`, `src/net/http/mod.rs`) e quelli di `lib.rs` (anche i `pub use`), e si
+    aggiunge `use crate::net::http::fetch;`. Da un programma (`src/bin/…`, o `src/main.rs` accanto a
+    `lib.rs`) i suoi moduli sono `crate::…` e la libreria si raggiunge col nome del pacchetto
+    (`use bat::output::OutputType;`), solo attraverso i `pub mod` e i `pub use` di `lib.rs`.
+    Gli `use` seguono rustfmt: gruppi `std`/`core`, altri crate, `crate`/`self`/`super`, in ordine
+    (i moduli prima dei tipi); un `use crate::net::{A, B};` su una riga accoglie il nome tra le graffe,
+    gli attributi `#[cfg(…)]` restano col loro `use`, e un nome già presente in graffe annidate
+    (`use crate::{app::App, …}`) non si aggiunge di nuovo. Senza `use`, si scrive dopo le `mod …;`.
   - In PHP, scegliendo un metodo o una costante dopo `Nome::` (`Route::get`, `User::find`) si aggiunge
     `use` della classe se manca (alias di `config/app.php`, poi le classi del progetto e di `vendor`).
     Con Composer, le funzioni e costanti dei file di `"autoload": {"files"}` vengono proposte, e per

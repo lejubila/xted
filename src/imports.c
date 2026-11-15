@@ -953,12 +953,21 @@ static void go_spec_text(const char *text, char *out, size_t n)
     go_spec(&l, out, n);
 }
 
+/* A path outside the standard library: its first element is a domain (github.com/x/y). */
+static int go_external(const char *path)
+{
+    size_t n = strcspn(path, "/");
+
+    return memchr(path, '.', n) != NULL;
+}
+
 int imp_go(Editor *e, const char *path)
 {
     const Buffer *b = e->buf;
     size_t lim = b->nlines < 400 ? b->nlines : 400, y, pk = (size_t)-1, blk = (size_t)-1, ins = (size_t)-1;
-    size_t grp_end = (size_t)-1, s0 = (size_t)-1, s1 = 0;
+    size_t grp_end = (size_t)-1, s0 = (size_t)-1, s1 = 0, first_spec = (size_t)-1, last_spec = 0;
     char spec[256], line[300];
+    int ext = go_external(path);
 
     for (y = 0; y < lim; y++) {
         const Line *l = &b->lines[y];
@@ -966,14 +975,18 @@ int imp_go(Editor *e, const char *path)
         if (pk == (size_t)-1 && l->len > 8 && memcmp(l->s, "package ", 8) == 0)
             pk = y;
         if (l->len >= 8 && memcmp(l->s, "import (", 8) == 0) {
-            int gap = 0;
+            int grp = 0, kind = -1, target = -1;
 
             blk = y;
+            /* gofmt's groups, split by blank lines: the standard library, then the modules; the
+             * path joins the first group of its own kind */
             for (y++; y < b->nlines && !(b->lines[y].len > 0 && b->lines[y].s[0] == ')'); y++) {
                 const Line *m = &b->lines[y];
 
                 if (m->len == 0) {
-                    gap = 1;                /* gofmt's groups: the first is the standard library */
+                    if (kind != -1)
+                        grp++;
+                    kind = -1;
                     continue;
                 }
                 go_spec(m, spec, sizeof spec);
@@ -981,14 +994,18 @@ int imp_go(Editor *e, const char *path)
                     continue;
                 if (strcmp(spec, path) == 0)
                     return 0;
-                if (!gap) {
+                if (first_spec == (size_t)-1)
+                    first_spec = y;
+                last_spec = y;
+                if (kind == -1)
+                    kind = go_external(spec);
+                if (kind == ext && (target == -1 || target == grp)) {
+                    target = grp;
                     grp_end = y;
                     if (ins == (size_t)-1 && strcmp(spec, path) > 0)
                         ins = y;
                 }
             }
-            if (grp_end == (size_t)-1)
-                grp_end = blk;
             continue;
         }
         if (l->len > 7 && memcmp(l->s, "import ", 7) == 0) {
@@ -1003,7 +1020,14 @@ int imp_go(Editor *e, const char *path)
     }
     if (blk != (size_t)-1) {
         snprintf(line, sizeof line, "\t\"%s\"\n", path);
-        insert_lines(e, ins != (size_t)-1 ? ins : grp_end + 1, line, 0, 0);
+        if (grp_end != (size_t)-1)
+            insert_lines(e, ins != (size_t)-1 ? ins : grp_end + 1, line, 0, 0);
+        else if (first_spec == (size_t)-1)
+            insert_lines(e, blk + 1, line, 0, 0);
+        else if (ext)
+            insert_lines(e, last_spec + 1, line, 1, 0);     /* the first module: a group of its own */
+        else
+            insert_lines(e, first_spec, line, 0, 1);        /* the library goes before the modules */
         return 1;
     }
     if (s0 != (size_t)-1) {
@@ -1011,7 +1035,7 @@ int imp_go(Editor *e, const char *path)
         SBuf t = SBUF_INIT;
         char (*v)[300] = xmalloc((s1 - s0 + 2) * sizeof *v);
         size_t n = 0, i, yy = s0, xx = 0, added;
-        int put = 0;
+        int put = 0, pass;
 
         for (y = s0; y <= s1; y++) {
             const Line *l = &b->lines[y];
@@ -1022,20 +1046,36 @@ int imp_go(Editor *e, const char *path)
             snprintf(v[n++], sizeof v[0], "%.*s", (int)(l->len - k), l->s + k);
         }
         sbuf_adds(&t, "import (\n");
-        for (i = 0; i <= n; i++) {
-            /* the new path before the first that sorts after it */
-            if (!put && (i == n || (go_spec_text(v[i], spec, sizeof spec), strcmp(spec, path) > 0))) {
-                sbuf_addf(&t, "\t\"%s\"\n", path);
-                put = 1;
+        /* the standard library first, then the modules after a blank line, each in order */
+        for (pass = 0; pass < 2; pass++) {
+            int any = 0;
+
+            for (i = 0; i <= n; i++) {
+                int k = i < n ? (go_spec_text(v[i], spec, sizeof spec), go_external(spec)) : pass;
+
+                if (k != pass || (i == n && (put || ext != pass)))
+                    continue;
+                if (!any && pass == 1 && t.len > 9)
+                    sbuf_adds(&t, "\n");
+                /* the new path before the first that sorts after it */
+                if (!put && ext == pass && (i == n || strcmp(spec, path) > 0)) {
+                    sbuf_addf(&t, "\t\"%s\"\n", path);
+                    put = 1;
+                    any = 1;
+                }
+                if (i < n) {
+                    sbuf_addf(&t, "\t%s\n", v[i]);
+                    any = 1;
+                }
             }
-            if (i < n)
-                sbuf_addf(&t, "\t%s\n", v[i]);
         }
         sbuf_adds(&t, ")");
         free(v);
         buf_delete_range(e->buf, s0, 0, s1, b->lines[s1].len);
         buf_insert_text(e->buf, &yy, &xx, t.p, t.len);
-        added = n + 3 - (s1 - s0 + 1);
+        for (added = 0, i = 0; i < t.len; i++)
+            added += t.p[i] == '\n';
+        added = added + 1 - (s1 - s0 + 1);
         sbuf_free(&t);
         if (e->cy > s1)
             e->cy += added;
@@ -1046,58 +1086,265 @@ int imp_go(Editor *e, const char *path)
     return 1;
 }
 
+/* Rust's groups of uses: 0 std, core, alloc; 1 other crates; 2 crate, self, super. */
+static int rust_kind(const char *p, size_t n)
+{
+    static const char *const k0[] = { "std", "core", "alloc" }, *const k2[] = { "crate", "self", "super" };
+    size_t s = 0, i;
+
+    while (s < n && !(p[s] == ':' && s + 1 < n && p[s + 1] == ':'))
+        s++;
+    for (i = 0; i < 3; i++) {
+        if (s == strlen(k0[i]) && memcmp(p, k0[i], s) == 0)
+            return 0;
+        if (s == strlen(k2[i]) && memcmp(p, k2[i], s) == 0)
+            return 2;
+    }
+    return 1;
+}
+
+/* rustfmt's order of two paths: segment by segment, a lowercase one (a module) before an
+ * uppercase one (a type), else by bytes. */
+static int rust_cmp(const char *a, size_t an, const char *b, size_t bn)
+{
+    size_t i = 0, j = 0;
+
+    while (i < an && j < bn) {
+        size_t ie = i, je = j;
+        int ua, ub, c;
+
+        while (ie < an && a[ie] != ':' && a[ie] != '{' && a[ie] != ';')
+            ie++;
+        while (je < bn && b[je] != ':' && b[je] != '{' && b[je] != ';')
+            je++;
+        ua = isupper((unsigned char)a[i]) != 0;
+        ub = isupper((unsigned char)b[j]) != 0;
+        if (ua != ub)
+            return ua - ub;
+        c = memcmp(a + i, b + j, ie - i < je - j ? ie - i : je - j);
+        if (c || ie - i != je - j)
+            return c ? c : (ie - i < je - j ? -1 : 1);
+        i = ie;
+        j = je;
+        while (i < an && a[i] == ':')
+            i++;
+        while (j < bn && b[j] == ':')
+            j++;
+        if (i < an && a[i] == '{')
+            return 1;
+        if (j < bn && b[j] == '{')
+            return -1;
+    }
+    return (i < an) - (j < bn);
+}
+
+#define RUST_USES 200
+
 int imp_rust(Editor *e, const char *path)
 {
     const Buffer *b = e->buf;
-    size_t lim = b->nlines < 400 ? b->nlines : 400, y, first = (size_t)-1, last = 0, ins = (size_t)-1;
-    size_t at = 0, pl = strlen(path);
+    size_t lim = b->nlines < 600 ? b->nlines : 600, y, at = 0, pl = strlen(path), pre, k, n = 0;
     const char *name = path;
     char line[300];
-    size_t k;
+    int body = 0, grp = 0, kind = rust_kind(path, pl), gap = 0;
+    size_t attr = (size_t)-1;
+    struct { size_t y0, y1, u, ul; int kind, grp; } *v = xmalloc(RUST_USES * sizeof *v);
 
     for (k = 0; k + 2 <= pl; k++)
         if (path[k] == ':' && path[k + 1] == ':')
             name = path + k + 2;
-    for (y = 0; y < lim; y++) {
+    pre = (size_t)(name - path);            /* "crate::net::" */
+    for (y = 0; y < lim && n < RUST_USES; y++) {
         const Line *l = &b->lines[y];
         size_t i = 0;
 
-        if (l->len > 8 && memcmp(l->s, "pub use ", 8) == 0)
-            i = 4;
+        if (l->len > 4 && memcmp(l->s, "pub", 3) == 0 && (l->s[3] == ' ' || l->s[3] == '(')) {
+            i = 3;
+            if (l->s[i] == '(')
+                while (i < l->len && l->s[i] != ')')
+                    i++;
+            while (i < l->len && (l->s[i] == ')' || l->s[i] == ' '))
+                i++;
+        }
         if (l->len - i > 4 && memcmp(l->s + i, "use ", 4) == 0) {
             const char *u = l->s + i + 4;
-            size_t ul = l->len - i - 4, pre = (size_t)(name - path);
+            size_t ul = l->len - i - 4, y1 = y, j;
 
             while (ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '))
                 ul--;
-            /* use std::collections::HashMap; or use std::collections::{HashMap, ...}; or ::* */
-            if (ul == pl && memcmp(u, path, pl) == 0)
+            if (ul == pl && memcmp(u, path, pl) == 0) {
+                free(v);
                 return 0;
-            if (pre > 2 && ul > pre && memcmp(u, path, pre) == 0 && (u[pre] == '{' || u[pre] == '*')) {
-                Line t = *l;
+            }
+            /* a use that goes on below: use crate::x::{\n a,\n b,\n}; */
+            while (y1 + 1 < b->nlines && memchr(b->lines[y1].s, ';', b->lines[y1].len) == NULL)
+                y1++;
+            /* use crate::x::{A, B}, use crate::{x::A, y}, use crate::x::*: the name may be there */
+            for (k = 0; k + 2 < pre + 1; k++) {
+                size_t bp = k + 2;
+                int has;
 
-                if (u[pre] == '*' || has_word(&t, i + 4 + pre, name))
+                if (!(path[k] == ':' && path[k + 1] == ':') || ul <= bp || memcmp(u, path, bp) != 0 ||
+                    (u[bp] != '{' && !(bp == pre && u[bp] == '*')))
+                    continue;
+                has = u[bp] == '*';
+                for (j = y; j <= y1 && !has; j++)
+                    has = has_word(&b->lines[j], j == y ? i + 4 + bp : 0, name);
+                if (has) {
+                    free(v);
                     return 0;
+                }
             }
-            if (first == (size_t)-1)
-                first = y;
-            if (y == last + 1 || y == first) {
-                last = y;
-                if (ins == (size_t)-1 && (size_t)ul > 0 && strncmp(u, path, ul < pl ? ul : pl) > 0)
-                    ins = y;
-            }
+            if (gap && n > 0)
+                grp++;
+            gap = 0;
+            v[n].y0 = attr != (size_t)-1 ? attr : y;
+            v[n].y1 = y1;
+            v[n].u = i + 4;
+            v[n].ul = ul;
+            v[n].kind = rust_kind(u, ul);
+            v[n++].grp = grp;
+            attr = (size_t)-1;
+            y = y1;
             continue;
         }
-        /* where the uses go in a file without any: past //! comments and #![...] attributes */
-        if (first == (size_t)-1 && ((l->len >= 3 && memcmp(l->s, "//!", 3) == 0) ||
-                                    (l->len >= 3 && memcmp(l->s, "#![", 3) == 0)))
-            at = y + 1;
+        if (l->len == 0) {
+            gap = 1;
+            attr = (size_t)-1;
+            continue;
+        }
+        if (l->len >= 2 && l->s[0] == '#' && l->s[1] == '[') {
+            if (attr == (size_t)-1)
+                attr = y;                   /* #[cfg(...)] goes with the use below it */
+            continue;
+        }
+        if (l->len >= 2 && l->s[0] == '/' && l->s[1] == '/' && !(l->len >= 3 && l->s[2] == '!'))
+            continue;
+        if (n > 0)
+            break;                          /* the code after the uses */
+        attr = (size_t)-1;
+        /* where the uses go in a file without any: past //! comments, #![...] attributes and the
+         * mod declarations that open the file (mod net;) */
+        if (!body) {
+            size_t m = l->len > 4 && memcmp(l->s, "pub ", 4) == 0 ? 4 : 0;
+
+            if ((l->len >= 3 && memcmp(l->s, "//!", 3) == 0) || (l->len >= 3 && memcmp(l->s, "#![", 3) == 0) ||
+                (l->len > m + 4 && memcmp(l->s + m, "mod ", 4) == 0 && l->s[l->len - 1] == ';'))
+                at = y + 1;
+            else
+                body = 1;
+        }
     }
-    snprintf(line, sizeof line, "use %s;\n", path);
-    if (first != (size_t)-1) {
-        insert_lines(e, ins != (size_t)-1 ? ins : last + 1, line, 0, 0);
+    if (n == 0) {
+        free(v);
+        snprintf(line, sizeof line, "use %s;\n", path);
+        insert_block(e, at, line);
         return 1;
     }
-    insert_block(e, at, line);
+    /* use crate::x::{A, C}; on one line: the name joins the braces, in order */
+    for (k = 0; k < n; k++) {
+        const Line *l = &b->lines[v[k].y1];
+        const char *u = l->s + (v[k].y0 == v[k].y1 ? v[k].u : 0);
+        size_t ul = v[k].ul, x, end;
+
+        if (v[k].y1 != v[k].y0 && b->lines[v[k].y0].s[0] != '#')
+            continue;
+        if (v[k].y0 != v[k].y1) {
+            /* an attribute above: the use is the last line */
+            size_t i = 0;
+
+            u = l->s;
+            while (i + 4 < l->len && memcmp(l->s + i, "use ", 4) != 0)
+                i++;
+            if (i + 4 >= l->len)
+                continue;
+            u = l->s + i + 4;
+            for (ul = l->len - i - 4; ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '); ul--)
+                ;
+        }
+        if (ul <= pre + 1 || memcmp(u, path, pre) != 0 || u[pre] != '{' || u[ul - 1] != '}' ||
+            memchr(u + pre + 1, '{', ul - pre - 1) != NULL)
+            continue;
+        for (x = pre + 1, end = ul - 1; x < end;) {
+            size_t ie = x;
+
+            while (ie < end && u[ie] != ',')
+                ie++;
+            if (strcmp(name, "self") != 0 && !(ie - x == 4 && memcmp(u + x, "self", 4) == 0) &&
+                rust_cmp(u + x, ie - x, name, strlen(name)) > 0)
+                break;
+            x = ie;
+            while (x < end && (u[x] == ',' || u[x] == ' '))
+                x++;
+        }
+        {
+            size_t col = (size_t)(u - l->s) + x;
+
+            snprintf(line, sizeof line, x < end ? "%s, " : ", %s", name);
+            buf_insert(e->buf, v[k].y1, x < end ? col : (size_t)(u - l->s) + end, line, strlen(line));
+            if (e->cy == v[k].y1 && e->cx >= col)
+                e->cx += strlen(line);
+        }
+        free(v);
+        return 1;
+    }
+    snprintf(line, sizeof line, "use %s;\n", path);
+    {
+        /* the group of the same kind; of those of other crates, the one of the same crate */
+        int g = -1;
+        size_t ins = (size_t)-1, last = 0, seg = strcspn(path, ":");
+
+        for (k = 0; k < n; k++)
+            if (v[k].kind == kind) {
+                const char *u = b->lines[v[k].y1].s + (v[k].y0 == v[k].y1 ? v[k].u : 0);
+
+                if (v[k].y0 != v[k].y1)
+                    u = strstr_n(b->lines[v[k].y1].s, b->lines[v[k].y1].len, "use ") ?
+                        strstr_n(b->lines[v[k].y1].s, b->lines[v[k].y1].len, "use ") + 4 : u;
+                if (g == -1 || kind != 1 || (strncmp(u, path, seg) == 0 && u[seg] == ':'))
+                    g = v[k].grp;
+                if (kind != 1 && g != -1)
+                    break;
+            }
+        if (g != -1) {
+            for (k = 0; k < n; k++) {
+                const Line *l = &b->lines[v[k].y0 == v[k].y1 ? v[k].y0 : v[k].y1];
+                const char *u = l->s;
+                size_t ul;
+
+                if (v[k].grp != g)
+                    continue;
+                if (v[k].y0 == v[k].y1) {
+                    u = l->s + v[k].u;
+                    ul = v[k].ul;
+                } else {
+                    const char *q = strstr_n(l->s, l->len, "use ");
+
+                    if (q) {
+                        u = q + 4;
+                        ul = l->len - (size_t)(u - l->s);
+                    } else {
+                        u = b->lines[v[k].y0].s + v[k].u;
+                        ul = v[k].ul;
+                    }
+                }
+                last = v[k].y1;
+                if (ins == (size_t)-1 && rust_cmp(u, ul, path, pl) > 0)
+                    ins = v[k].y0;
+            }
+            insert_lines(e, ins != (size_t)-1 ? ins : last + 1, line, 0, 0);
+        } else if (kind == 0) {
+            insert_lines(e, v[0].y0, line, 0, 1);       /* the library comes first */
+        } else {
+            /* other crates before the crate's own, which come last */
+            for (k = 0; k < n && !(kind == 1 && v[k].kind == 2); k++)
+                ;
+            if (k < n)
+                insert_lines(e, v[k].y0, line, 0, 1);
+            else
+                insert_lines(e, v[n - 1].y1 + 1, line, 1, 0);
+        }
+    }
+    free(v);
     return 1;
 }

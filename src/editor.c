@@ -2158,6 +2158,12 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
         snprintf(nd->name, sizeof nd->name, "%s", c->text);
         return;
     }
+    if (c->inc && strcmp(lang, "Rust") == 0) {
+        /* an item of another module of the crate: crate::net::http::Client */
+        nd->kind = 12;
+        snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
+        return;
+    }
     if (c->inc && (strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0)) {
         /* "function Ns\\f" / "const Ns\\C": a use; else the path of a file to require */
         if (strncmp(c->inc, "function ", 9) == 0 || strncmp(c->inc, "const ", 6) == 0) {
@@ -2189,6 +2195,22 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
                 e->comp.sc && sym_class_fq(e->comp.sc, e->doc, q, nd->mod, sizeof nd->mod) &&
                 strchr(nd->mod, '\\'))
                 nd->kind = 8;
+        }
+        return;
+    }
+    if (!c->std && qualified && strcmp(lang, "Go") == 0 && e->comp.sc) {
+        /* store.Open: a package of the module, imported by its path under go.mod */
+        size_t s = e->comp.x - 1, n;
+        char q[64];
+
+        while (s > 0 && (isalnum((unsigned char)ln->s[s - 1]) || ln->s[s - 1] == '_'))
+            s--;
+        n = e->comp.x - 1 - s;
+        if (n > 0 && n < sizeof q && (s == 0 || ln->s[s - 1] != '.') && isupper((unsigned char)c->text[0])) {
+            memcpy(q, ln->s + s, n);
+            q[n] = '\0';
+            if (sym_go_package(e->comp.sc, e->doc, q, nd->mod, sizeof nd->mod))
+                nd->kind = 11;
         }
         return;
     }
