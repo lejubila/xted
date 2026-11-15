@@ -79,58 +79,109 @@ staticmethod()>staticmethod
 classmethod()>classmethod
 super()>super
 type()>type
+@os
 os:
+@sys
 sys:
+@re
 re:
+@json
 json:
+@math
 math:
+@random
 random:
+@time
 time:
+@datetime
 datetime:
+@collections
 collections:
+@itertools
 itertools:
+@functools
 functools:
+@pathlib
 pathlib:
+@subprocess
 subprocess:
+@argparse
 argparse:
+@logging
 logging:
+@io
 io:
+@shutil
 shutil:
+@string
 string:
+@glob
 glob:
+@copy
 copy:
+@csv
 csv:
+@tempfile
 tempfile:
+@threading
 threading:
+@socket
 socket:
+@struct
 struct:
+@hashlib
 hashlib:
+@base64
 base64:
 request:
 parse:
+@sqlite3
 sqlite3:
+@enum
 enum:
+@dataclasses
 dataclasses:
+@typing
 typing:
+@contextlib
 contextlib:
+@operator
 operator:
+@statistics
 statistics:
+@textwrap
 textwrap:
+@platform
 platform:
+@signal
 signal:
+@traceback
 traceback:
+@uuid
 uuid:
+@heapq
 heapq:
+@bisect
 bisect:
+@queue
 queue:
+@asyncio
 asyncio:
+@unittest
 unittest:
+@pickle
 pickle:
+@zipfile
 zipfile:
+@decimal
 decimal:
+@fractions
 fractions:
+@secrets
 secrets:
+@shlex
 shlex:
+@pprint
 pprint:
 #str
 capitalize()>str
@@ -390,6 +441,7 @@ tobytes(order='C')>
 tolist()>
 toreadonly()>
 #TextIOWrapper:_TextIOBase
+@io
 buffer:
 close()>
 closed:
@@ -414,6 +466,7 @@ writable()>
 write(text)>
 write_through:
 #BufferedReader:_BufferedIOBase
+@io
 close()>
 closed:
 detach()>
@@ -435,6 +488,7 @@ seekable()>
 tell()>
 truncate(pos=None)>
 #BytesIO:_BufferedIOBase
+@io
 close()>
 closed:
 flush()>
@@ -455,6 +509,7 @@ writable()>
 write(b)>
 writelines(lines)>
 #StringIO:_TextIOBase
+@io
 close()>
 closed:
 getvalue()>
@@ -470,6 +525,7 @@ truncate(pos=None)>
 writable()>
 write(s)>
 #Path:PurePath
+@pathlib
 absolute()>Path
 as_uri()>
 chmod(mode, *, follow_symlinks=True)>
@@ -518,6 +574,7 @@ walk(top_down=True, on_error=None, follow_symlinks=False)>
 write_bytes(data)>
 write_text(data, encoding=None, errors=None, newline=None)>
 #datetime:date
+@datetime
 astimezone()>datetime
 combine()>
 ctime()>
@@ -548,6 +605,7 @@ utcnow(type)>datetime
 utcoffset()>
 utctimetuple()>
 #date
+@datetime
 ctime()>
 day:
 fromisocalendar()>
@@ -570,6 +628,7 @@ toordinal()>
 weekday()>
 year:
 #time
+@datetime
 dst()>
 fold:
 fromisoformat(type, object)>
@@ -588,6 +647,7 @@ tzinfo:
 tzname()>
 utcoffset()>
 #timedelta
+@datetime
 days:
 max:timedelta
 microseconds:
@@ -596,6 +656,7 @@ resolution:timedelta
 seconds:
 total_seconds()>float
 #Pattern
+@re
 findall(string, pos=0, endpos=9223372036854775807)>list
 finditer(string, pos=0, endpos=9223372036854775807)>
 flags:
@@ -610,6 +671,7 @@ split(string, maxsplit=0)>list
 sub(repl, string, count=0)>str
 subn(repl, string, count=0)>
 #Match
+@re
 end(group=0)>int
 endpos:
 expand(template)>
@@ -625,6 +687,7 @@ span(group=0)>tuple
 start(group=0)>int
 string:
 #deque
+@collections
 append(item)>
 appendleft(item)>
 clear()>
@@ -641,6 +704,7 @@ remove(value)>
 reverse()>
 rotate(n=1)>
 #Counter:dict
+@collections
 copy()>Counter
 elements()>
 fromkeys(cls, iterable, v=None)>
@@ -649,6 +713,7 @@ subtract(iterable=None, **kwds)>
 total()>
 update(iterable=None, **kwds)>
 #OrderedDict:dict
+@collections
 clear()>
 copy()>
 fromkeys(type, iterable, value=None)>
@@ -661,9 +726,11 @@ setdefault(key, default=None)>
 update()>
 values()>
 #defaultdict:dict
+@collections
 copy()>
 default_factory:
 #Popen
+@subprocess
 communicate(input=None, timeout=None)>tuple
 kill()>
 poll()>int
@@ -672,8 +739,10 @@ terminate()>
 universal_newlines:
 wait(timeout=None)>int
 #CompletedProcess
+@subprocess
 check_returncode()>
 #ArgumentParser:_AttributeHolder
+@argparse
 add_subparsers(**kwargs)>
 convert_arg_line_to_args(arg_line)>
 error(message)>
@@ -687,7 +756,9 @@ parse_known_intermixed_args(args=None, namespace=None)>
 print_help(file=None)>
 print_usage(file=None)>
 #Namespace:_AttributeHolder
+@argparse
 #Logger:Filterer
+@logging
 addHandler(hdlr)>
 callHandlers(record)>
 critical(msg, *args, **kwargs)>
@@ -712,6 +783,7 @@ setLevel(level)>
 warn(msg, *args, **kwargs)>
 warning(msg, *args, **kwargs)>
 #Thread
+@threading
 daemon:
 getName()>
 ident:
@@ -725,6 +797,7 @@ setDaemon(daemonic)>
 setName(name)>
 start()>
 #Lock
+@threading
 acquire(blocking=True, timeout=-1)>
 acquire_lock(blocking=True, timeout=-1)>
 locked()>
@@ -732,12 +805,14 @@ locked_lock()>
 release()>
 release_lock()>
 #Event
+@threading
 clear()>
 isSet()>
 is_set()>
 set()>
 wait(timeout=None)>
 #socket
+@socket
 accept()>tuple
 close()>
 detach()>
@@ -749,6 +824,7 @@ sendfile(file, offset=0, count=None)>
 set_inheritable(inheritable)>
 type:
 #Queue
+@queue
 empty()>
 full()>
 get(block=True, timeout=None)>
@@ -760,6 +836,7 @@ qsize()>
 shutdown(immediate=False)>
 task_done()>
 #Connection
+@sqlite3
 DataError:
 DatabaseError:
 Error:
@@ -803,6 +880,7 @@ setlimit(category, limit)>
 text_factory:
 total_changes:
 #Cursor
+@sqlite3
 arraysize:
 close()>
 connection:
@@ -819,12 +897,15 @@ rowcount:
 setinputsizes(sizes)>
 setoutputsize(size, column=None)>
 #DictReader
+@csv
 fieldnames:
 #DictWriter
+@csv
 writeheader()>
 writerow(rowdict)>
 writerows(rowdicts)>
 #Random
+@random
 VERSION:
 betavariate(alpha, beta)>
 binomialvariate(n=1, p=0.5)>
@@ -849,6 +930,7 @@ uniform(a, b)>
 vonmisesvariate(mu, kappa)>
 weibullvariate(alpha, beta)>
 #Decimal
+@decimal
 adjusted()>
 as_integer_ratio()>
 as_tuple()>
@@ -906,6 +988,7 @@ to_integral(rounding=None, context=None)>
 to_integral_exact(rounding=None, context=None)>
 to_integral_value(rounding=None, context=None)>
 #Fraction:Rational
+@fractions
 as_integer_ratio()>
 denominator:
 from_decimal(cls, dec)>
@@ -915,6 +998,7 @@ is_integer()>
 limit_denominator(max_denominator=1000000)>
 numerator:
 #ZipFile
+@zipfile
 close()>
 comment:
 extract(member, path=None, pwd=None)>
@@ -932,6 +1016,7 @@ testzip()>
 write(filename, arcname=None, compress_type=None, compresslevel=None)>
 writestr(zinfo_or_arcname, data, compress_type=None, compresslevel=None)>
 #UUID
+@uuid
 bytes:
 bytes_le:
 clock_seq:

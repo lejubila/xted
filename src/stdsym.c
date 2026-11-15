@@ -269,7 +269,7 @@ void std_members(const StdLib *l, const char *cls, size_t cl, StdFn fn, void *ct
     }
 }
 
-const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl)
+const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl, int type)
 {
     size_t i;
 
@@ -278,11 +278,12 @@ const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl)
         size_t p = s->from;
         const char *cur = NULL;
         size_t cl = 0;
+        /* the global section and the "std" one of the C++ list hold the functions in groups */
+        int group = s->nl == 0 || (s->nl == 3 && memcmp(l->text + s->name, "std", 3) == 0);
 
-        if (s->nl != 0 && !(s->nl == 3 && memcmp(l->text + s->name, "std", 3) == 0)) {
-            /* a type: its header is the first line of the section (the section "std" of the C++
-             * list holds the functions of the namespace, in groups like the global one) */
-            if (s->nl == nl && memcmp(l->text + s->name, name, nl) == 0 && s->from < s->to &&
+        if (!group) {
+            /* a type: its header is the first line of the section */
+            if (type && s->nl == nl && memcmp(l->text + s->name, name, nl) == 0 && s->from < s->to &&
                 l->text[s->from] == '@') {
                 size_t e = s->from;
 
@@ -293,6 +294,8 @@ const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl)
             }
             continue;
         }
+        if (type)
+            continue;
         while (p < s->to) {
             size_t e = p, k;
 

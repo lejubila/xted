@@ -21,8 +21,9 @@ typedef void (*StdFn)(void *ctx, const char *name, size_t nl, const char *params
 /* Global functions and constants, and every class by name. */
 void std_globals(const StdLib *l, StdFn fn, void *ctx);
 /* The header that declares a global function, constant or type of the C library (the lines
- * "@stdio.h" of the list), NULL if the list has none for it; *hl is its length. */
-const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl);
+ * "@stdio.h" of the list), NULL if the list has none for it; *hl is its length. type is 1 for a
+ * class or type (a section of the list), 0 for a function, constant or variable. */
+const char *std_header(const StdLib *l, const char *name, size_t nl, size_t *hl, int type);
 /* 1 if a class (or module) of that name exists. */
 int std_class(const StdLib *l, const char *cls, size_t cl);
 /* Members of a class followed by those of its base classes. */

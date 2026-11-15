@@ -161,6 +161,13 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     l'header equivalente (`<cstdio>` o `<stdio.h>`) né `<bits/stdc++.h>`: tra gli
     `#include <…>` esistenti in ordine, prima di quelli locali `"…"`, oppure in cima al file dopo i
     commenti e l'include guard. Un solo Annulla toglie sia l'include sia il testo inserito.
+  - In Python, scegliendo un modulo della libreria standard (`os`, `json`, `pathlib`, …), una sua
+    classe (`Path`, `OrderedDict`, `deque`, …) o un membro dopo il nome del modulo (`os.getcwd`)
+    l'editor aggiunge `import os` o `from pathlib import Path` se manca. L'import va nel primo blocco di
+    import in ordine alfabetico (gli `import x` prima dei `from x import`); un `from modulo import a, b`
+    già presente diventa `from modulo import a, b, Path`; senza import si inserisce dopo i commenti
+    iniziali e il docstring. Non fa nulla se il nome è già importato, se il file lo assegna o lo
+    definisce (`os = …`), e per i nomi predefiniti (`str`, `ValueError`, …).
 - **Snippet** con segnaposti navigabili con Tab (`for` → ciclo completo, e così via).
 - **Esecuzione di comandi** (`Alt+R`, poi `F5` per ripeterlo, `Shift+F5` per interromperlo):
   l'output compare in un pannello `[Output]`. `F8` e `Shift+F8` saltano all'errore

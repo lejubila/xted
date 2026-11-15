@@ -4374,6 +4374,72 @@ static void test_c_include(void)
     rm_rf(dir);
 }
 
+/* Accepting a symbol of Python's standard library adds the import it needs. */
+static void test_py_import(void)
+{
+    char dir[64], path[128], err[128];
+    Editor e;
+    Doc *d;
+    size_t i;
+    struct { const char *text, *typed, *head; size_t y, x; int changes; } t[] = {
+        { "import sys\n\ndef f():\n    \n", "pathli", "import pathlib\nimport sys\n\ndef f():\n", 3, 4, 1 },
+        { "import os\nimport sys\n\ndef f():\n    \n", "Ordered",
+          "import os\nimport sys\nfrom collections import OrderedDict\n\ndef f():\n", 4, 4, 1 },
+        { "from collections import deque\n\ndef f():\n    \n", "Ordered",
+          "from collections import deque, OrderedDict\n\ndef f():\n", 3, 4, 1 },
+        { "from collections import OrderedDict\n\ndef f():\n    \n", "Ordered",
+          "from collections import OrderedDict\n\ndef f():\n", 3, 4, 0 },
+        { "def f():\n    \n", "os.getc", "import os\n\ndef f():\n", 1, 4, 1 },
+        { "\"\"\"Doc.\"\"\"\n\ndef f():\n    \n", "pathli", "\"\"\"Doc.\"\"\"\n\nimport pathlib\n\ndef f():\n", 3, 4, 1 },
+        { "\"\"\"Doc\nmore.\n\"\"\"\ndef f():\n    \n", "pathli",
+          "\"\"\"Doc\nmore.\n\"\"\"\n\nimport pathlib\n\ndef f():\n", 4, 4, 1 },
+        { "from __future__ import annotations\n\ndef f():\n    \n", "pathli",
+          "from __future__ import annotations\nimport pathlib\n\ndef f():\n", 3, 4, 1 },
+        { "import os, pathlib\n\ndef f():\n    \n", "pathli", "import os, pathlib\n\ndef f():\n", 3, 4, 0 },
+        { "from pathlib import Path\n\ndef f():\n    \n", "Pat", "from pathlib import Path\n\ndef f():\n", 3, 4, 0 },
+        { "def f():\n    \n", "ValueEr", "def f():\n", 1, 4, 0 },
+        { "pathlib = 1\ndef f():\n    \n", "pathlib.", "pathlib = 1\ndef f():\n", 2, 4, 0 },
+        { "os = 1\ndef f():\n    \n", "os.getc", "os = 1\ndef f():\n", 2, 4, 0 },
+    };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char *q;
+        size_t y, nl0;
+        SBuf all = SBUF_INIT;
+
+        put_file(dir, "t.py", t[i].text);
+        snprintf(path, sizeof path, "%s/t.py", dir);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        nl0 = e.buf->nlines;
+        e.cy = t[i].y;
+        e.cx = t[i].x;
+        for (q = t[i].typed; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        if (e.comp.on)
+            kkey(&e, KEY_ENTER, 0);
+        for (y = 0; y < e.buf->nlines; y++) {
+            sbuf_add(&all, e.buf->lines[y].s, e.buf->lines[y].len);
+            sbuf_adds(&all, "\n");
+        }
+        sbuf_add(&all, "", 1);
+        if (strncmp(all.p, t[i].head, strlen(t[i].head)) != 0)
+            fprintf(stderr, "case %zu:\n%s---\n", i, all.p);
+        CHECK(strncmp(all.p, t[i].head, strlen(t[i].head)) == 0);
+        if (t[i].changes) {
+            /* one Undo takes back the import and the word */
+            edit_undo(&e);
+            CHECK(e.buf->nlines == nl0);
+        }
+        sbuf_free(&all);
+        editor_free(&e);
+    }
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -4918,6 +4984,7 @@ int main(void)
     test_save_project();
     test_i18n();
     test_c_include();
+    test_py_import();
     test_config_merge();
     test_snippets();
     test_cursors();

@@ -76,6 +76,11 @@ void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n);
  * (in order if they are in order), else before the first local one, else at the top after the
  * comments and the include guard. Returns 1 if a line was added. It does not open an undo group. */
 int edit_add_include(Editor *e, const char *hdr);
+/* Adds "import mod" (name NULL) or "from mod import name" to a Python file unless it has it: an
+ * existing single-line "from mod import ..." is extended, else a new line goes into the first block
+ * of imports in order, or after the docstring if there are none. Returns 1 if the text changed. It
+ * does not open an undo group. */
+int edit_add_py_import(Editor *e, const char *mod, const char *name);
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq);
 
 /* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */

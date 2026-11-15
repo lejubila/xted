@@ -1281,6 +1281,226 @@ int edit_add_include(Editor *e, const char *hdr)
     return 1;
 }
 
+/* The first dotted name of an import line, after "import " or "from ": up to a blank or comma. */
+static size_t py_mod_name(const Line *l, size_t from, char *out, size_t n)
+{
+    size_t i = from, k = 0;
+
+    while (i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'))
+        i++;
+    while (i < l->len && (is_word_ch(l->s[i]) || l->s[i] == '.') && k + 1 < n)
+        out[k++] = l->s[i++];
+    out[k] = '\0';
+    return i;
+}
+
+/* True if the line has the word name (identifier boundaries) at or after column from. */
+static int py_has_word(const Line *l, size_t from, const char *name)
+{
+    size_t nl = strlen(name), i;
+
+    for (i = from; i + nl <= l->len; i++)
+        if (memcmp(l->s + i, name, nl) == 0 && (i == 0 || !is_word_ch(l->s[i - 1])) &&
+            (i + nl == l->len || !is_word_ch(l->s[i + nl])))
+            return 1;
+    return 0;
+}
+
+int edit_add_py_import(Editor *e, const char *mod, const char *name)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 300 ? b->nlines : 300, y;
+    size_t blk_start = (size_t)-1, blk_end = 0, fut_end = (size_t)-1, ext = (size_t)-1;
+    size_t last_imp = (size_t)-1, ins = (size_t)-1, at, added = 0;
+    int blk_open = 1, depth = 0;
+    char pre[2] = "", post[2] = "", cur[96];
+    SBuf text = SBUF_INIT;
+
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        int is_imp, is_from;
+
+        if (depth > 0) {                    /* the rest of a parenthesized "from ... import (" */
+            if (name && py_has_word(l, 0, name))
+                return 0;
+            if (memchr(l->s, ')', l->len))
+                depth = 0;
+            if (blk_open && blk_start != (size_t)-1)
+                blk_end = y;
+            continue;
+        }
+        if (l->len == 0 || l->s[0] == ' ' || l->s[0] == '\t')
+            continue;
+        is_imp = l->len > 7 && memcmp(l->s, "import ", 7) == 0;
+        is_from = l->len > 5 && memcmp(l->s, "from ", 5) == 0;
+        if (!is_imp && !is_from) {
+            if (l->s[0] != '#' && blk_start != (size_t)-1)
+                blk_open = 0;               /* code after the first block of imports */
+            continue;
+        }
+        if (blk_start == (size_t)-1)
+            blk_start = y;
+        if (blk_open)
+            blk_end = y;
+        if (is_imp) {
+            /* import a, b.c as d: a name that is imported (maybe by its first part) */
+            size_t p = 7;
+
+            while (p < l->len) {
+                size_t q = py_mod_name(l, p, cur, sizeof cur);
+                char *dot = strchr(cur, '.');
+
+                if (dot)
+                    *dot = '\0';
+                if (!name && strcmp(cur, mod) == 0)
+                    return 0;
+                while (q < l->len && l->s[q] != ',')
+                    q++;
+                p = q + 1;
+            }
+            if (blk_open) {
+                py_mod_name(l, 7, cur, sizeof cur);
+                if (ins == (size_t)-1 && !name && strcasecmp(cur, mod) > 0)
+                    ins = y;
+                last_imp = y;
+            }
+        } else {
+            size_t q = py_mod_name(l, 5, cur, sizeof cur);
+
+            while (q < l->len && l->s[q] == ' ')
+                q++;
+            if (strcmp(cur, "__future__") == 0)
+                fut_end = y;
+            if (q + 6 <= l->len && memcmp(l->s + q, "import", 6) == 0) {
+                const char *rest = l->s + q + 6;
+                size_t rl = l->len - q - 6;
+                int paren = memchr(rest, '(', rl) != NULL;
+
+                if (memchr(rest, '*', rl) && name && strcmp(cur, mod) == 0)
+                    return 0;                   /* from mod import * */
+                if (name && strcmp(cur, mod) == 0) {
+                    if (py_has_word(l, q + 6, name))
+                        return 0;
+                    if (!paren && l->s[l->len - 1] != '\\' && !memchr(rest, '#', rl))
+                        ext = y;
+                }
+                if (paren && !memchr(rest, ')', rl))
+                    depth = 1;
+                if (blk_open && name && ins == (size_t)-1 && strcmp(cur, "__future__") != 0 &&
+                    strcasecmp(cur, mod) > 0)
+                    ins = y;
+            }
+        }
+    }
+    /* "from mod import a, b" gets ", name" */
+    if (name && ext != (size_t)-1) {
+        size_t yy = ext, xx = b->lines[ext].len;
+        SBuf add = SBUF_INIT;
+
+        while (xx > 0 && (b->lines[ext].s[xx - 1] == ' ' || b->lines[ext].s[xx - 1] == '\t'))
+            xx--;
+        sbuf_adds(&add, ", ");
+        sbuf_adds(&add, name);
+        buf_insert_text(e->buf, &yy, &xx, add.p, add.len);
+        sbuf_free(&add);
+        return 1;
+    }
+    if (blk_start != (size_t)-1) {
+        if (!name) {
+            /* "import x" lines come first in the block; sorted among them */
+            at = ins != (size_t)-1 ? ins : last_imp != (size_t)-1 ? last_imp + 1 : blk_start;
+            if (last_imp == (size_t)-1 && fut_end != (size_t)-1 && at <= fut_end)
+                at = fut_end + 1;
+        } else {
+            at = ins != (size_t)-1 ? ins : blk_end + 1;
+        }
+    } else {
+        /* no imports: after the shebang, comments and the docstring */
+        size_t i;
+
+        at = 0;
+        for (y = 0; y < lim; y++) {
+            const Line *l = &b->lines[y];
+
+            for (i = 0; i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'); i++)
+                ;
+            if (l->len == i) {
+                if (at == y)
+                    at = y + 1;
+                continue;
+            }
+            if (l->s[i] == '#') {
+                at = y + 1;
+                continue;
+            }
+            if (l->s[i] == '"' || l->s[i] == '\'' || ((l->s[i] == 'r' || l->s[i] == 'u') && i + 1 < l->len &&
+                                                        (l->s[i + 1] == '"' || l->s[i + 1] == '\''))) {
+                size_t q = i + (l->s[i] == 'r' || l->s[i] == 'u');
+                char quote = l->s[q];
+                int triple = q + 2 < l->len && l->s[q + 1] == quote && l->s[q + 2] == quote;
+                size_t from = triple ? q + 3 : q + 1, yy;
+
+                for (yy = y; yy < lim; yy++, from = 0) {
+                    const Line *m = &b->lines[yy];
+                    size_t k;
+                    int closed = 0;
+
+                    for (k = from; k < m->len; k++) {
+                        if (triple ? (k + 2 < m->len && m->s[k] == quote && m->s[k + 1] == quote &&
+                                      m->s[k + 2] == quote)
+                                   : (m->s[k] == quote && (k == 0 || m->s[k - 1] != '\\'))) {
+                            closed = 1;
+                            break;
+                        }
+                    }
+                    if (closed || !triple) {
+                        at = yy + 1;
+                        break;
+                    }
+                }
+                if (yy >= lim)
+                    return 0;               /* a docstring that does not end in view: leave it */
+            }
+            break;
+        }
+        if (at > 0 && at <= b->nlines && b->lines[at - 1].len > 0)
+            pre[0] = '\n';
+        if (at < b->nlines && b->lines[at].len > 0)
+            post[0] = '\n';
+    }
+    sbuf_adds(&text, pre);
+    if (name)
+        sbuf_addf(&text, "from %s import %s\n", mod, name);
+    else
+        sbuf_addf(&text, "import %s\n", mod);
+    sbuf_adds(&text, post);
+    {
+        size_t yy = at, xx = 0, k;
+
+        if (at >= b->nlines) {
+            yy = b->nlines - 1;
+            xx = b->lines[yy].len;
+            if (xx > 0) {
+                SBuf t2 = SBUF_INIT;
+
+                sbuf_adds(&t2, "\n");
+                sbuf_add(&t2, text.p, text.len);
+                sbuf_free(&text);
+                text = t2;
+            }
+            at = b->nlines;
+        }
+        for (k = 0; k < text.len; k++)
+            if (text.p[k] == '\n')
+                added++;
+        buf_insert_text(e->buf, &yy, &xx, text.p, text.len);
+    }
+    sbuf_free(&text);
+    if (at <= e->cy)
+        e->cy += added;
+    return 1;
+}
+
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq)
 {
     if (from_x > e->cx)

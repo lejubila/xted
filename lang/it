@@ -29,7 +29,7 @@ Add cursor above	Aggiungi cursore sopra
 Add cursor at next occurrence	Aggiungi cursore sulla prossima occorrenza
 Add cursor below	Aggiungi cursore sotto
 Add cursors at all occurrences	Aggiungi cursori su tutte le occorrenze
-Added #include <%s>	Aggiunto #include <%s>
+Added %s	Aggiunto %s
 Alt+C Case	Alt+C Maiuscole
 Alt+R Regex	Alt+R Regex
 Alt+V replaces the last paste	Alt+V sostituisce l'ultimo incolla

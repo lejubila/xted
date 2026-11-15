@@ -17,6 +17,7 @@
 #include "utf8.h"
 #include "util.h"
 
+#include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -2092,16 +2093,87 @@ static void accept_cand(Editor *e)
 
 /* Accepting inside a snippet session: keep the current stop's length right (a new snippet
  * from the choice replaces the session; a changed line count ends it). */
-/* The header to include for the highlighted candidate, if it is a symbol of the C library the
- * file does not include: copied to out; returns 1 if there is one. */
-static int c_include_for(const Editor *e, const Cand *c, char *out, size_t n)
+/* What accepting the highlighted candidate must add to the file, if it is a symbol of the standard
+ * library the file does not have yet. */
+typedef struct {
+    int kind;               /* 0 nothing, 1 C include, 2 Python import, 3 Python from-import */
+    char mod[64];           /* the header, or the module */
+    char name[64];          /* the imported name (from-import) */
+} Needs;
+
+/* True if the document assigns or defines name somewhere in its first lines: then a word before a
+ * dot is a variable and not a module. */
+static int py_shadowed(const Buffer *b, const char *name)
+{
+    size_t y, nl = strlen(name), lim = b->nlines < 2000 ? b->nlines : 2000;
+
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        size_t i = 0;
+
+        while (i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'))
+            i++;
+        if (l->len - i > nl + 2 && memcmp(l->s + i, name, nl) == 0 && l->s[i + nl] == ' ' &&
+            l->s[i + nl + 1] == '=' && l->s[i + nl + 2] != '=')
+            return 1;
+        if (l->len - i > 4 && memcmp(l->s + i, "def ", 4) == 0 && memcmp(l->s + i + 4, name, nl) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static void needs_for(const Editor *e, const Cand *c, Needs *nd)
 {
     static const char *const libs[] = { "cpp", "c" };
+    const char *lang = e->doc->syn ? syn_name(e->doc->syn) : "";
+    const Line *ln = &e->buf->lines[e->cy];
     size_t hl = 0, k;
+    int qualified = e->comp.x > 0 && e->comp.x <= ln->len && ln->s[e->comp.x - 1] == '.';
 
-    if (!c->std || !e->doc->syn || strcmp(syn_name(e->doc->syn), "C") != 0 ||
+    memset(nd, 0, sizeof *nd);
+    if (!c->std)
+        return;
+    if (strcmp(lang, "Python") == 0) {
+        StdLib *l = std_open("py");
+        const char *h;
+
+        if (!l)
+            return;
+        if (qualified) {
+            /* os.getcwd: the word before the dot is a module the file may not import yet */
+            size_t s = e->comp.x - 1, n;
+            char q[64];
+
+            while (s > 0 && (isalnum((unsigned char)ln->s[s - 1]) || ln->s[s - 1] == '_'))
+                s--;
+            n = e->comp.x - 1 - s;
+            if (n > 0 && n < sizeof q && (s == 0 || ln->s[s - 1] != '.')) {
+                memcpy(q, ln->s + s, n);
+                q[n] = '\0';
+                h = std_header(l, q, n, &hl, 0);
+                if (h && hl == n && memcmp(h, q, n) == 0 && !py_shadowed(e->buf, q)) {
+                    nd->kind = 2;
+                    snprintf(nd->mod, sizeof nd->mod, "%s", q);
+                }
+            }
+        } else if (c->kind == CAND_CLASS || c->kind == CAND_PROP) {
+            h = std_header(l, c->text, strlen(c->text), &hl, c->kind == CAND_CLASS);
+            if (h && hl > 0 && hl < sizeof nd->mod) {
+                snprintf(nd->mod, sizeof nd->mod, "%.*s", (int)hl, h);
+                if (c->kind == CAND_CLASS) {
+                    nd->kind = 3;
+                    snprintf(nd->name, sizeof nd->name, "%s", c->text);
+                } else if (strcmp(nd->mod, c->text) == 0) {
+                    nd->kind = 2;
+                }
+            }
+        }
+        std_close(l);
+        return;
+    }
+    if (strcmp(lang, "C") != 0 ||
         (c->kind != CAND_FUNC && c->kind != CAND_CONST && c->kind != CAND_CLASS && c->kind != CAND_PROP))
-        return 0;
+        return;
     /* a C++ document: the C++ library first (<cstdio>, <vector>), then the C one */
     for (k = sym_is_cxx(e->doc) ? 0 : 1; k < 2 && hl == 0; k++) {
         StdLib *l = std_open(libs[k]);
@@ -2109,37 +2181,48 @@ static int c_include_for(const Editor *e, const Cand *c, char *out, size_t n)
 
         if (!l)
             continue;
-        h = std_header(l, c->text, strlen(c->text), &hl);
-        if (h && hl > 0 && hl < n) {
-            memcpy(out, h, hl);
-            out[hl] = '\0';
+        h = std_header(l, c->text, strlen(c->text), &hl, c->kind == CAND_CLASS);
+        if (h && hl > 0 && hl < sizeof nd->mod) {
+            memcpy(nd->mod, h, hl);
+            nd->mod[hl] = '\0';
+            nd->kind = 1;
         } else {
             hl = 0;
         }
         std_close(l);
     }
-    return hl > 0;
 }
 
-/* Accepts the highlighted candidate; a symbol of the C library also gets its #include, in the
- * same undo step. */
+/* Accepts the highlighted candidate; a symbol of the standard library also gets the #include or
+ * the import it needs, in the same undo step. */
 static void complete_accept(Editor *e)
 {
-    char hdr[64];
-    int inc = c_include_for(e, &e->comp.v[e->comp.sel], hdr, sizeof hdr), added = 0;
+    Needs nd;
+    char what[160];
+    int added = 0;
 
-    if (inc) {
+    needs_for(e, &e->comp.v[e->comp.sel], &nd);
+    if (nd.kind) {
         buf_undo_begin(e->buf, e->cy, e->cx);
         e->undo_hold++;
-        added = edit_add_include(e, hdr);
+        if (nd.kind == 1) {
+            added = edit_add_include(e, nd.mod);
+            snprintf(what, sizeof what, "#include <%s>", nd.mod);
+        } else if (nd.kind == 2) {
+            added = edit_add_py_import(e, nd.mod, NULL);
+            snprintf(what, sizeof what, "import %s", nd.mod);
+        } else {
+            added = edit_add_py_import(e, nd.mod, nd.name);
+            snprintf(what, sizeof what, "from %s import %s", nd.mod, nd.name);
+        }
     }
     accept_cand(e);
-    if (inc) {
+    if (nd.kind) {
         e->undo_hold--;
         buf_undo_cursor(e->buf, e->cy, e->cx);
         buf_undo_close(e->buf);
         if (added)
-            editor_set_msg(e, MSG_TTL_MS, tr("Added #include <%s>"), hdr);
+            editor_set_msg(e, MSG_TTL_MS, tr("Added %s"), what);
     }
 }
 
