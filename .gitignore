@@ -1,3 +1,4 @@
 build/
 /xted
 /ked
+__pycache__/

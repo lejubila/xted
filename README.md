@@ -47,6 +47,7 @@ Altre modalità di compilazione:
 make STATIC=1 CC=musl-gcc    # binario statico e piccolo (-Os)
 make SAN=1                   # AddressSanitizer e UBSan, per lo sviluppo
 make test                    # test automatici
+make smoke                   # prove sull'editor in un vero pseudo-terminale (python3)
 make clean
 ```
 
@@ -496,6 +497,8 @@ Le regole per chi modifica il codice (vincoli, stile, metodo di lavoro) sono in
 La libreria standard usata dall'autosuggest sta in `tools/lib/*.txt` (alcuni file sono
 generati da `tools/gen_py.py` e `tools/gen_c.py`) e viene compressa nel binario da
 `tools/packlib.py`.
+
+Le prove su terminale (`make smoke`, in `tests/smoke/`) lanciano l'editor su uno pseudo-terminale, gli mandano i tasti e leggono lo schermo con un piccolo emulatore (`vt.py`): palette, lingua, Ctrl+T, Ctrl+E, Ctrl+P, barra di ricerca, tema chiaro, salvataggio delle impostazioni, import automatici. Ogni scenario lavora in una cartella temporanea, con configurazione e stato propri.
 
 I test (`make test`) provano buffer, undo/redo, ricerca, sintassi, configurazione,
 salvataggio delle impostazioni, comandi e comportamento dell'editor senza terminale.

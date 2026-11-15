@@ -50,6 +50,10 @@ build/test_core: tests/test_core.c $(LIBSRC)
 test: build/test_core
 	./build/test_core
 
+# the editor on a real pseudo-terminal: what is drawn and the files written (needs python3)
+smoke: $(PROG)
+	python3 tests/smoke/run.py ./$(PROG)
+
 clean:
 	rm -rf build $(PROG)
 
@@ -76,5 +80,5 @@ uninstall:
 	rm -f $(DESTDIR)$(MANDIR)/man1/xted.1 $(DESTDIR)$(MANDIR)/it/man1/xted.1
 	@if [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" = "$(PROG)" ]; then rm -f $(DESTDIR)$(PREFIX)/bin/xt; fi
 
-.PHONY: all test clean install uninstall
+.PHONY: all test smoke clean install uninstall
 -include $(OBJ:.o=.d)

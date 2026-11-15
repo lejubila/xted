@@ -61,7 +61,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/i18n.[ch]` | Traduzioni: `tr("English text")` dà la traduzione del testo dal catalogo della lingua in uso (file `lang/<codice>`, una riga `testo inglese<TAB>traduzione`, cartelle: `<config>/lang`, `lang/` e `../share/xted/lang` accanto all'eseguibile, `XTED_DATADIR/lang`), o il testo stesso; i testi nel codice sono in inglese, il catalogo non è nel binario; una traduzione con conversioni `printf` diverse viene scartata; `i18n_set` (`auto` legge `LC_ALL`, `LC_MESSAGES`, `LANG`), chiave `language`, comando `language` |
 | `src/util.[ch]` | `die`, `xmalloc`, stringa dinamica |
 | `man/` | Pagine del manuale: `xted.1` (inglese) e `it/xted.1` (italiano), installate da `make install`; vanno aggiornate quando cambiano opzioni, scorciatoie o chiavi di configurazione |
-| `tests/` | Test automatici |
+| `tests/` | Test automatici: `test_core.c` (moduli e comandi senza terminale) e `smoke/` (`vt.py` emula un terminale, `run.py` gli scenari: palette, lingua, Ctrl+T/E/P, ricerca, tema chiaro, salvataggio impostazioni, import; cartelle temporanee per configurazione e stato) |
 
 - Le cartelle di configurazione e di stato si chiamavano `ked`: `app_dir` (util.c) usa ancora quella vecchia se è l'unica che esiste, e le sessioni con intestazione `ked-session` si leggono ancora.
 - Testi per l'utente: in inglese nel codice, sempre dentro `tr("...")` (per un testo senza argomenti passato come formato usare `"%s", tr(...)`); la traduzione italiana sta in `lang/it`, da tenere allineata (`make test` ne controlla i formati). I nomi dei comandi (`commands[].name`), i titoli dei gruppi e i valori delle impostazioni si traducono al momento di mostrarli; id dei comandi, chiavi di configurazione e nomi dei tasti restano in inglese.
@@ -94,6 +94,7 @@ make                 # build ottimizzata (./xted)
 make STATIC=1        # link statico
 make SAN=1           # build con AddressSanitizer e UBSan
 make test            # test automatici
+make smoke           # l'editor su un vero pseudo-terminale (tests/smoke, serve python3)
 make clean
 ./xted [file]        # esecuzione
 make install         # in $(PREFIX)/bin (predefinito /usr/local): xted e il collegamento xt
@@ -103,6 +104,6 @@ make install         # in $(PREFIX)/bin (predefinito /usr/local): xted e il coll
 
 1. Una sola fase della roadmap alla volta, solo quella richiesta.
 2. Prima di scrivere codice, proporre un piano (file coinvolti, strutture dati) e aspettare l'ok.
-3. A fine fase: compilare senza warning, eseguire i test (anche con `make SAN=1`), provare l'editor in un terminale.
+3. A fine fase: compilare senza warning, eseguire i test (anche con `make SAN=1`) e `make smoke`, provare l'editor in un terminale. Una funzione nuova visibile a schermo ha il suo scenario in `tests/smoke/run.py`.
 4. Poi commit Git, solo su richiesta esplicita dell'utente.
 5. Le decisioni ancora aperte in `SPEC.md` (nome, scorciatoie predefinite) non si decidono da soli: chiedere.
