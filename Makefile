@@ -15,7 +15,7 @@ endif
 ifdef STATIC
 BUILD    = build/static
 LDFLAGS += -static
-# a static binary is meant to be small (SPEC: under 520 KB): -Os unless CFLAGS is given
+# a static binary is meant to be small (SPEC: under 560 KB): -Os unless CFLAGS is given
 ifeq ($(origin CFLAGS),file)
 CFLAGS = -Os
 endif
