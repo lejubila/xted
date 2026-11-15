@@ -23,6 +23,7 @@ definizioni, tutto interno: non serve alcun language server.
 - [Temi e linguaggi dell'utente](#temi-e-linguaggi-dellutente)
 - [Sviluppo](#sviluppo)
 - [Stato del progetto](#stato-del-progetto)
+- [Licenza](#licenza)
 
 ## Installazione
 
@@ -455,5 +456,12 @@ salvataggio delle impostazioni, comandi e comportamento dell'editor senza termin
 
 Le fasi 1–9 della roadmap di `SPEC.md` sono completate: nucleo, editing, sintassi,
 multifile, ricerca, produttività, strumenti, configurazione e rifiniture. Resta fuori il
-client LSP (opzionale). Non ci sono ancora una licenza (da decidere), una pagina `man` né
-la guida integrata con `F1`.
+client LSP (opzionale). Non ci sono ancora una pagina `man` né la guida integrata con `F1`.
+
+## Licenza
+
+xted è distribuito con licenza **MIT**: puoi usarlo, modificarlo e ridistribuirlo liberamente,
+anche in programmi chiusi, mantenendo l'avviso di copyright. Il testo completo è nel file
+[`LICENSE`](LICENSE).
+
+Copyright (c) 2026 David Bigagli.

@@ -9,7 +9,7 @@ Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico b
 - **Zero dipendenze**: niente ncurses, niente librerie esterne; controllo del terminale via termios e sequenze ANSI/VT100 scritte a mano.
 - **Linguaggio**: C99 (alternativa: Rust senza crate esterni, ma binario più grande).
 - **Build**: un solo `Makefile`, compilabile con `gcc` o `clang`, opzione di link statico (`-static`, es. con musl).
-- **Nome**: `xted` (X = Unix/Linux, T = text/terminal, ED = editor), con `xt` come comando breve (collegamento creato da `make install`). **Licenza**: da decidere.
+- **Nome**: `xted` (X = Unix/Linux, T = text/terminal, ED = editor), con `xt` come comando breve (collegamento creato da `make install`). **Licenza**: MIT (file `LICENSE`).
 - **Ispirazione**: kilo/antirez per la base, nano per la semplicità, micro per i comandi familiari (Ctrl+C/Ctrl+V).
 
 ## Architettura e terminale
