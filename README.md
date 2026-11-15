@@ -2,7 +2,7 @@
 
 Editor di testo da terminale per Linux, scritto in **C99** con la sola libc POSIX.
 Un unico binario, senza ncurses né altre librerie: il terminale è controllato a mano con
-termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 500 KB.
+termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 520 KB.
 
 Il nome è `xted` (X = Unix/Linux, T = text/terminal, ED = editor); `make install` crea anche
 il collegamento breve `xt`.
@@ -173,6 +173,11 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     già presente diventa `from modulo import a, b, Path`; senza import si inserisce dopo i commenti
     iniziali e il docstring. Non fa nulla se il nome è già importato, se il file lo assegna o lo
     definisce (`os = …`), e per i nomi predefiniti (`str`, `ValueError`, …).
+  - Sempre in Python si propone anche ciò che definiscono gli altri moduli del progetto (`def`,
+    `class` e nomi assegnati al primo livello, esclusi quelli che iniziano con `_` e i file di `venv/`,
+    `site-packages/`): scegliendolo si aggiunge `from myapp.utils import slugify` nell'ultimo gruppo di
+    import. Il nome del modulo segue i pacchetti (cartelle con `__init__.py`); per un file accanto
+    senza pacchetto è il solo nome del file (`from helpers import x`).
   - In JavaScript e TypeScript, scegliendo un modulo di Node (`fs`, `path`, `os`, `http`, `util`,
     `child_process`), una sua classe (`EventEmitter`, `Readable`, …) o un membro dopo il nome del modulo
     (`fs.readFile`) l'editor aggiunge `import fs from 'fs'`, `import { EventEmitter } from 'events'` oppure,

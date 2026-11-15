@@ -77,11 +77,12 @@ void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n);
  * local one, a local one after the last system one; else at the top after the comments and the
  * include guard. Returns 1 if a line was added. It does not open an undo group. */
 int edit_add_include(Editor *e, const char *hdr, int local);
-/* Adds "import mod" (name NULL) or "from mod import name" to a Python file unless it has it: an
+/* Adds "import mod" (name NULL) or "from mod import name" (local: a module of the
+ * project, which goes into the last group of imports) to a Python file unless it has it: an
  * existing single-line "from mod import ..." is extended, else a new line goes into the first block
  * of imports in order, or after the docstring if there are none. Returns 1 if the text changed. It
  * does not open an undo group. */
-int edit_add_py_import(Editor *e, const char *mod, const char *name);
+int edit_add_py_import(Editor *e, const char *mod, const char *name, int local);
 /* Adds the import of a Node module to a JavaScript or TypeScript file unless the file has the name
  * already: "import fs from 'fs'" (def 1) or "import { EventEmitter } from 'events'" (def 0), or the
  * require() form in a file that uses it; quotes, semicolons and "import * as" follow what the file does.

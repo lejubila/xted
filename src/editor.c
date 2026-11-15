@@ -2097,7 +2097,8 @@ static void accept_cand(Editor *e)
  * library the file does not have yet. */
 typedef struct {
     int kind;               /* 0 nothing, 1 C include, 2 Python import, 3 Python from-import,
-                               4 JS/TS default import, 5 JS/TS named import, 6 C local include */
+                               4 JS/TS default import, 5 JS/TS named import, 6 C local include,
+                               7 Python import from a module of the project */
     char mod[256];          /* the header, or the module */
     char name[64];          /* the imported name (from-import) */
 } Needs;
@@ -2136,6 +2137,13 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
         /* a symbol of a header of the project */
         nd->kind = 6;
         snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
+        return;
+    }
+    if (c->inc && strcmp(lang, "Python") == 0) {
+        /* a name a module of the project defines */
+        nd->kind = 7;
+        snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
+        snprintf(nd->name, sizeof nd->name, "%s", c->text);
         return;
     }
     if (c->inc && (strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0)) {
@@ -2262,10 +2270,10 @@ static void complete_accept(Editor *e)
             added = edit_add_include(e, nd.mod, nd.kind == 6);
             snprintf(what, sizeof what, nd.kind == 6 ? "#include \"%s\"" : "#include <%s>", nd.mod);
         } else if (nd.kind == 2) {
-            added = edit_add_py_import(e, nd.mod, NULL);
+            added = edit_add_py_import(e, nd.mod, NULL, 0);
             snprintf(what, sizeof what, "import %s", nd.mod);
-        } else if (nd.kind == 3) {
-            added = edit_add_py_import(e, nd.mod, nd.name);
+        } else if (nd.kind == 3 || nd.kind == 7) {
+            added = edit_add_py_import(e, nd.mod, nd.name, nd.kind == 7);
             snprintf(what, sizeof what, "from %s import %s", nd.mod, nd.name);
         } else {
             added = edit_add_js_import(e, nd.mod, nd.name, nd.kind == 4, what, sizeof what);

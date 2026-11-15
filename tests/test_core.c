@@ -4683,6 +4683,80 @@ static void test_js_project_import(void)
     rm_rf(dir);
 }
 
+/* What another module of a Python project defines: suggested, and accepting it adds
+ * "from package.module import name" into the last group of imports. */
+static void test_py_project_import(void)
+{
+    char dir[64], path[200], err[128], sub[200];
+    Editor e;
+    Doc *d;
+    size_t i;
+    struct { const char *file, *text, *typed, *head; size_t y, x; int changes; } t[] = {
+        { "myapp/views.py", "import os\nimport sys\n\nfrom django.db import models\n\ndef f():\n    \n", "slugi",
+          "import os\nimport sys\n\nfrom django.db import models\nfrom myapp.utils import slugify\n\ndef f():\n", 6, 4, 1 },
+        { "main.py", "def main():\n    \n", "Confi", "from myapp.utils import Config\n\ndef main():\n", 1, 4, 1 },
+        { "main2.py", "from myapp.utils import slugify\n\ndef f():\n    \n", "MAX_SI",
+          "from myapp.utils import slugify, MAX_SIZE\n\ndef f():\n", 3, 4, 1 },
+        { "scripts/run.py", "def f():\n    \n", "run_to", "from tool_helpers import run_tool\n\ndef f():\n", 1, 4, 1 },
+        { "main3.py", "from myapp.utils import slugify\n\ndef f():\n    \n", "slugi",
+          "from myapp.utils import slugify\n\ndef f():\n", 3, 4, 0 },
+        { "main4.py", "def f():\n    \n", "pack_he", "from myapp import pack_helper\n\ndef f():\n", 1, 4, 1 },
+    };
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(sub, sizeof sub, "%s/.git", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/myapp", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/scripts", dir);
+    mkdir(sub, 0755);
+    snprintf(sub, sizeof sub, "%s/venv", dir);
+    mkdir(sub, 0755);
+    put_file(dir, "myapp/__init__.py", "def pack_helper():\n    pass\n");
+    put_file(dir, "myapp/utils.py", "def slugify(text, sep='-'):\n    pass\n\nclass Config:\n    pass\n\n"
+                                    "MAX_SIZE = 10\n_private = 1\ndef _hidden():\n    pass\n");
+    put_file(dir, "scripts/tool_helpers.py", "def run_tool(x):\n    pass\n");
+    put_file(dir, "venv/lib.py", "def slugify_venv(x):\n    pass\n");
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char *q;
+        size_t y, nl0, k;
+        SBuf all = SBUF_INIT;
+
+        put_file(dir, t[i].file, t[i].text);
+        snprintf(path, sizeof path, "%s/%s", dir, t[i].file);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        nl0 = e.buf->nlines;
+        e.cy = t[i].y;
+        e.cx = t[i].x;
+        for (q = t[i].typed; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        /* private names and virtual environments are left out */
+        for (k = 0; k < e.comp.n; k++)
+            CHECK((strcmp(e.comp.v[k].text, "_hidden") != 0 && strcmp(e.comp.v[k].text, "slugify_venv") != 0) ||
+                  !e.comp.v[k].inc);
+        if (e.comp.on)
+            kkey(&e, KEY_ENTER, 0);
+        for (y = 0; y < e.buf->nlines; y++) {
+            sbuf_add(&all, e.buf->lines[y].s, e.buf->lines[y].len);
+            sbuf_adds(&all, "\n");
+        }
+        sbuf_add(&all, "", 1);
+        if (strncmp(all.p, t[i].head, strlen(t[i].head)) != 0)
+            fprintf(stderr, "case %zu (%s):\n%s---\n", i, t[i].file, all.p);
+        CHECK(strncmp(all.p, t[i].head, strlen(t[i].head)) == 0);
+        if (t[i].changes) {
+            edit_undo(&e);
+            CHECK(e.buf->nlines == nl0);
+        }
+        sbuf_free(&all);
+        editor_free(&e);
+    }
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5231,6 +5305,7 @@ int main(void)
     test_js_import();
     test_c_project_include();
     test_js_project_import();
+    test_py_project_import();
     test_config_merge();
     test_snippets();
     test_cursors();

@@ -1335,13 +1335,13 @@ static int py_has_word(const Line *l, size_t from, const char *name)
     return 0;
 }
 
-int edit_add_py_import(Editor *e, const char *mod, const char *name)
+int edit_add_py_import(Editor *e, const char *mod, const char *name, int local)
 {
     const Buffer *b = e->buf;
     size_t lim = b->nlines < 300 ? b->nlines : 300, y;
     size_t blk_start = (size_t)-1, blk_end = 0, fut_end = (size_t)-1, ext = (size_t)-1;
-    size_t last_imp = (size_t)-1, ins = (size_t)-1, at, added = 0;
-    int blk_open = 1, depth = 0;
+    size_t last_imp = (size_t)-1, ins = (size_t)-1, at, added = 0, grp = (size_t)-1;
+    int blk_open = 1, depth = 0, gap = 0;
     char pre[2] = "", post[2] = "", cur[96];
     SBuf text = SBUF_INIT;
 
@@ -1358,6 +1358,8 @@ int edit_add_py_import(Editor *e, const char *mod, const char *name)
                 blk_end = y;
             continue;
         }
+        if (l->len == 0)
+            gap = 1;                        /* a blank line: the next imports are another group */
         if (l->len == 0 || l->s[0] == ' ' || l->s[0] == '\t')
             continue;
         is_imp = l->len > 7 && memcmp(l->s, "import ", 7) == 0;
@@ -1369,8 +1371,12 @@ int edit_add_py_import(Editor *e, const char *mod, const char *name)
         }
         if (blk_start == (size_t)-1)
             blk_start = y;
-        if (blk_open)
+        if (blk_open) {
             blk_end = y;
+            if (grp == (size_t)-1 || gap)
+                grp = y;
+        }
+        gap = 0;
         if (is_imp) {
             /* import a, b.c as d: a name that is imported (maybe by its first part) */
             size_t p = 7;
@@ -1440,6 +1446,20 @@ int edit_add_py_import(Editor *e, const char *mod, const char *name)
             at = ins != (size_t)-1 ? ins : last_imp != (size_t)-1 ? last_imp + 1 : blk_start;
             if (last_imp == (size_t)-1 && fut_end != (size_t)-1 && at <= fut_end)
                 at = fut_end + 1;
+        } else if (local && grp != (size_t)-1) {
+            /* a module of the project: into the last group of imports, in order there */
+            at = blk_end + 1;
+            for (y = grp; y <= blk_end; y++) {
+                const Line *l = &b->lines[y];
+
+                if (l->len > 5 && memcmp(l->s, "from ", 5) == 0) {
+                    py_mod_name(l, 5, cur, sizeof cur);
+                    if (strcmp(cur, "__future__") != 0 && strcasecmp(cur, mod) > 0) {
+                        at = y;
+                        break;
+                    }
+                }
+            }
         } else {
             at = ins != (size_t)-1 ? ins : blk_end + 1;
         }

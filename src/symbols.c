@@ -2743,6 +2743,129 @@ static void js_exports(const Buffer *b, struct Hdr *h)
     }
 }
 
+/* A Python file of the project, not one of a virtual environment or an installed package. */
+static int is_py_module(const char *rel)
+{
+    static const char *const skip[] = { "venv", "env", "site-packages", "__pycache__", "dist-packages", NULL };
+    size_t i;
+
+    if (strcmp(ext_of(rel), "py") != 0)
+        return 0;
+    for (i = 0; skip[i]; i++) {
+        size_t n = strlen(skip[i]);
+        const char *p = rel;
+
+        while ((p = strstr(p, skip[i])) != NULL) {
+            if ((p == rel || p[-1] == '/') && p[n] == '/')
+                return 0;
+            p += n;
+        }
+    }
+    return 1;
+}
+
+/* The public names a Python module defines at its top level: def, async def, class, and the
+ * names it assigns (NAME = ..., name: type = ...); those starting with "_" are left out. */
+static void py_exports(const Buffer *b, struct Hdr *h)
+{
+    size_t y;
+
+    for (y = 0; y < b->nlines; y++) {
+        const char *s = b->lines[y].s;
+        size_t len = b->lines[y].len, i = 0, e, p0, p1;
+
+        if (len == 0 || s[0] == ' ' || s[0] == '\t' || s[0] == '#' || s[0] == '_')
+            continue;
+        js_word(s, len, &i, "async");
+        if (js_word(s, len, &i, "def")) {
+            e = js_ident(s, len, i);
+            if (e == i || s[i] == '_')
+                continue;
+            for (p0 = e; p0 < len && s[p0] != '('; p0++)
+                ;
+            for (p1 = p0; p1 < len && s[p1] != ')'; p1++)
+                ;
+            hsym_add(h, s + i, e - i, RULE_FUNC, s + p0 + (p0 < len), p1 > p0 ? p1 - p0 - 1 : 0, 0);
+        } else if (js_word(s, len, &i, "class")) {
+            e = js_ident(s, len, i);
+            if (e > i && s[i] != '_')
+                hsym_add(h, s + i, e - i, RULE_CLASS, "", 0, 0);
+        } else {
+            size_t k;
+            int upper = 1;
+
+            e = js_ident(s, len, 0);
+            if (e == 0)
+                continue;
+            for (k = e; k < len && s[k] == ' '; k++)
+                ;
+            if (k < len && s[k] == ':') {
+                while (k < len && s[k] != '=')
+                    k++;
+            }
+            if (k >= len || s[k] != '=' || (k + 1 < len && s[k + 1] == '='))
+                continue;
+            for (k = 0; k < e; k++)
+                if (s[k] >= 'a' && s[k] <= 'z')
+                    upper = 0;
+            /* keywords that look like assignments at the top level are not names */
+            if ((e == 2 && memcmp(s, "if", 2) == 0) || (e == 5 && memcmp(s, "while", 5) == 0))
+                continue;
+            hsym_add(h, s, e, upper ? RULE_CONST : RULE_VAR, "", 0, 0);
+        }
+    }
+}
+
+/* The dotted name under which a Python file is imported: the folders above it that are packages
+ * (they have __init__.py) and its name; a package's __init__.py is the package. */
+static void py_module_name(const char *real, char *out, size_t n)
+{
+    char dir[PATH_MAX], probe_path[PATH_MAX + 16], parts[PATH_MAX];
+    char *sl;
+    struct stat st;
+    size_t l;
+
+    snprintf(dir, sizeof dir, "%s", real);
+    sl = strrchr(dir, '/');
+    if (!sl) {
+        snprintf(out, n, "%s", real);
+        return;
+    }
+    *sl = '\0';
+    snprintf(parts, sizeof parts, "%s", sl + 1);
+    l = strlen(parts);
+    if (l > 3)
+        parts[l - 3] = '\0';           /* .py */
+    if (strcmp(parts, "__init__") == 0) {
+        sl = strrchr(dir, '/');
+        if (!sl) {
+            snprintf(out, n, "%s", dir);
+            return;
+        }
+        *sl = '\0';
+        snprintf(parts, sizeof parts, "%s", sl + 1);
+    }
+    for (;;) {
+        SBuf t = SBUF_INIT;
+
+        snprintf(probe_path, sizeof probe_path, "%s/__init__.py", dir);
+        if (stat(probe_path, &st) != 0)
+            break;
+        sl = strrchr(dir, '/');
+        if (!sl)
+            break;
+        sbuf_adds(&t, sl + 1);
+        sbuf_adds(&t, ".");
+        sbuf_adds(&t, parts);
+        sbuf_add(&t, "", 1);
+        if (t.len <= sizeof parts)
+            memcpy(parts, t.p, t.len);
+        sbuf_free(&t);
+        *sl = '\0';
+    }
+    snprintf(out, n, "%s", parts);
+}
+
 /* A macro that only guards the header against a second inclusion (XTED_BUFFER_H). */
 static int guard_macro(const char *n)
 {
@@ -2775,7 +2898,7 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         return h;
     if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
         return h;
-    js = is_js_module(real);
+    js = is_js_module(real) ? 1 : strcmp(ext_of(real), "py") == 0 ? 2 : 0;
     if (h && h->mtime == (long)st.st_mtime && h->size == (long)st.st_size) {
         h->checked = now;
         return h;
@@ -2810,8 +2933,10 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         h->v = NULL;
         h->n = 0;
     }
-    if (js)
+    if (js == 1)
         js_exports(&b, h);
+    else if (js == 2)
+        py_exports(&b, h);
     buf_free(&b);
     for (i = 0; x && i < x->n && h->n < HDR_SYMS; i++) {
         const Sym *s = &x->v[i];
@@ -2942,8 +3067,9 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
     size_t i, j, k, seen = 0;
     const char *lang = syn_name(cur->syn);
     int cl = strcmp(lang, "C") == 0, js = strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0;
+    int py = strcmp(lang, "Python") == 0;
 
-    if (!cur->buf.path || (!cl && !js))
+    if (!cur->buf.path || (!cl && !js && !py))
         return;
     env_build(c, docs, ndocs, cur, &e);
     if (!e.v[0]->key || !ensure_files(c))
@@ -2953,7 +3079,7 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
         struct Hdr *h;
         int visible = 0;
 
-        if (cl ? !is_header(c->files[i]) : !is_js_module(c->files[i]))
+        if (cl ? !is_header(c->files[i]) : py ? !is_py_module(c->files[i]) : !is_js_module(c->files[i]))
             continue;
         seen++;
         rooted(c, path, sizeof path, c->files[i]);
@@ -2976,13 +3102,15 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
         if (h && h->n) {
             if (cl)
                 hdr_spec(e.v[0], real, spec, sizeof spec);
+            else if (py)
+                py_module_name(real, spec, sizeof spec);
             else
                 js_spec(e.v[0], real, spec + 1, sizeof spec - 1);
-            if (!cl)
+            if (js)
                 spec[0] = '=';              /* a default export is told by a leading "=" */
             for (j = 0; j < h->n; j++)
                 fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret,
-                   cl || h->v[j].def ? spec : spec + 1);
+                   !js || h->v[j].def ? spec : spec + 1);
         }
         free(real);
     }
