@@ -1,4 +1,5 @@
 #include "cursors.h"
+#include "i18n.h"
 #include "edit.h"
 #include "utf8.h"
 #include "util.h"
@@ -206,9 +207,9 @@ static int add_one(Editor *e)
         edit_select_word(e);
         if (!one_line_sel(e, &y, &x0, &x1)) {
             if (edit_sel_active(e))
-                editor_set_msg(e, MSG_TTL_MS, "La selezione deve stare su una riga");
+                editor_set_msg(e, MSG_TTL_MS, tr("The selection must be on one line"));
             else
-                editor_set_msg(e, MSG_TTL_MS, "Nessuna parola sotto il cursore");
+                editor_set_msg(e, MSG_TTL_MS, tr("No word under the cursor"));
             return -1;
         }
         return 2;       /* the first press only selects the word */
@@ -249,9 +250,9 @@ void cur_add_next(Editor *e)
     int r = add_one(e);
 
     if (r == 0)
-        editor_set_msg(e, MSG_TTL_MS, "Nessun'altra occorrenza");
+        editor_set_msg(e, MSG_TTL_MS, tr("No other occurrence"));
     else if (r == 1)
-        editor_set_msg(e, MSG_TTL_MS, "%zu cursori", cur_count(e));
+        editor_set_msg(e, MSG_TTL_MS, tr("%zu cursors"), cur_count(e));
 }
 
 void cur_add_all(Editor *e)
@@ -263,7 +264,7 @@ void cur_add_all(Editor *e)
         ;
     if (r < 0)
         return;
-    editor_set_msg(e, MSG_TTL_MS, "%zu cursori", cur_count(e));
+    editor_set_msg(e, MSG_TTL_MS, tr("%zu cursors"), cur_count(e));
 }
 
 void cur_add_vertical(Editor *e, int down)

@@ -1,4 +1,5 @@
 #include "doc.h"
+#include "i18n.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -108,7 +109,7 @@ int doc_reload(Doc *d, char *err, size_t errlen)
     int r;
 
     if (!path) {
-        snprintf(err, errlen, "nessun nome file");
+        snprintf(err, errlen, tr("no file name"));
         return -1;
     }
     r = doc_load(d, path, err, errlen);
@@ -123,7 +124,7 @@ const char *doc_base_name(const Doc *d)
     if (d->title)
         return d->title;
     if (!p)
-        return "[Senza nome]";
+        return tr("[Untitled]");
     s = strrchr(p, '/');
     return s && s[1] ? s + 1 : p;
 }

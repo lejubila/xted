@@ -1,4 +1,5 @@
 #include "fold.h"
+#include "i18n.h"
 #include "utf8.h"
 
 #include <string.h>
@@ -211,7 +212,7 @@ void fold_toggle(Editor *e)
         }
     }
     if (h == (size_t)-1) {
-        editor_set_msg(e, MSG_TTL_MS, "Niente da piegare");
+        editor_set_msg(e, MSG_TTL_MS, tr("Nothing to fold"));
         return;
     }
     b->lines[h].fold = (uint32_t)(last - h);
@@ -239,7 +240,7 @@ void fold_all(Editor *e)
     }
     put_cursor_on_head(e);
     if (count == 0)
-        editor_set_msg(e, MSG_TTL_MS, "Niente da piegare");
+        editor_set_msg(e, MSG_TTL_MS, tr("Nothing to fold"));
 }
 
 void unfold_all(Editor *e)

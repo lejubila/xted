@@ -21,11 +21,14 @@ static size_t nent;
 static char *blob;
 static char code[16] = "en", name[48] = "English";
 static char *cfg_dir;
+static char *cat_path;
 
 static void clear(void)
 {
     free(ent);
     free(blob);
+    free(cat_path);
+    cat_path = NULL;
     ent = NULL;
     blob = NULL;
     nent = 0;
@@ -210,7 +213,10 @@ int i18n_set(const char *lang)
 
         snprintf(path, l, "%s/%s", dirs[i], want);
         text = slurp(path);
-        free(path);
+        if (text)
+            cat_path = path;
+        else
+            free(path);
     }
     free_dirs(dirs);
     if (!text)
@@ -241,6 +247,11 @@ int i18n_set(const char *lang)
     qsort(ent, nent, sizeof *ent, cmp_ent);
     snprintf(code, sizeof code, "%s", want);
     return 0;
+}
+
+const char *i18n_path(void)
+{
+    return cat_path;
 }
 
 const char *i18n_code(void)

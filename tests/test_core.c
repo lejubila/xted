@@ -958,7 +958,7 @@ static void test_syntax_parse(void)
     Syntax *s;
 
     CHECK(syn_parse("name X\nregion bogus a b\n", 24, err, sizeof err) == NULL);
-    CHECK(strstr(err, "riga 2") != NULL);
+    CHECK(strstr(err, "line 2") != NULL);
     CHECK(syn_parse("region comment a b\n", 19, err, sizeof err) == NULL);
     CHECK(syn_parse("name X\nfoo\n", 11, err, sizeof err) == NULL);
     CHECK(syn_parse("name X\nregion comment a $ ml\n", 29, err, sizeof err) == NULL);
@@ -1162,7 +1162,7 @@ static void test_syntax_embed(void)
 
     /* the directive: errors and a language that does not exist */
     CHECK(syn_parse("name X\nembed Y keyword <a\n", 28, err, sizeof err) == NULL &&
-          strstr(err, "riga 2") != NULL);
+          strstr(err, "line 2") != NULL);
     CHECK(syn_parse("name X\nembed Y nonsense <a </a>\n", 34, err, sizeof err) == NULL);
     CHECK(syn_parse("name X\nembed Y keyword <a </a> what\n", 38, err, sizeof err) == NULL);
     {
@@ -1455,7 +1455,7 @@ static void test_resize_mode(void)
     b = w[1];
     CHECK(e.layout.active == b && a->w == 39);
     kkey(&e, 'e', MOD_ALT);
-    CHECK(e.resize_mode && strstr(e.msg, "Ridimensiona") != NULL);
+    CHECK(e.resize_mode && strstr(e.msg, "Resize") != NULL);
     kkey(&e, KEY_LEFT, 0);                                  /* b grows: its border moves left */
     CHECK(a->w == 37 && b->w == 42);
     kkey(&e, KEY_LEFT, MOD_SHIFT);
@@ -1793,7 +1793,7 @@ static void test_docs(void)
     CHECK(doc_disk_changed(d) == DISK_SAME);
     CHECK(doc_save(d, NULL, err, sizeof err) >= 0 && doc_disk_changed(d) == DISK_SAME);
     CHECK(doc_save(d, p2, err, sizeof err) >= 0 && strcmp(doc_base_name(d), "b.txt") == 0);
-    CHECK(strcmp(syn_name(d->syn), "Testo") == 0 || d->syn == NULL);    /* language follows the name */
+    CHECK(strcmp(syn_name(d->syn), "Text") == 0 || d->syn == NULL);    /* language follows the name */
     unlink(p2);
     CHECK(doc_disk_changed(d) == DISK_MISSING);
     doc_free(d);
@@ -2853,7 +2853,7 @@ static void test_run(void)
 
         CHECK(b->nlines >= 5 && line_is(b, 1, "x.c:4:2: error: y") && line_is(b, 2, "red"));
         CHECK(!b->modified);
-        CHECK(b->nlines > 5 && strstr(b->lines[b->nlines - 2].s, "uscito con 3") != NULL);
+        CHECK(b->nlines > 5 && strstr(b->lines[b->nlines - 2].s, "exited with 3") != NULL);
         CHECK(line_is(b, 0, "$ printf 'x.c:4:2: error: y\\n\\033[31mred\\033[0m\\r\\nq.c:1: no file\\n'; exit 3"));
     }
     /* the focus stayed on the text pane and the output pane is a scratch buffer */
@@ -2939,7 +2939,7 @@ static void test_filter(void)
     /* failure and timeout leave the text alone */
     ed_load(&e, "keep");
     edit_filter_cmd(&e, "exit 3");
-    CHECK(buf_is(e.buf, "keep") && strstr(e.msg, "errore") != NULL);
+    CHECK(buf_is(e.buf, "keep") && strstr(e.msg, "error") != NULL);
     edit_filter_cmd(&e, "echo boom >&2; exit 1");
     CHECK(buf_is(e.buf, "keep") && strstr(e.msg, "boom") != NULL);
     CHECK(!e.buf->modified);
@@ -3106,7 +3106,7 @@ static void test_config(void)
 
         config_init(&c);
         CHECK(config_parse(&c, bad, strlen(bad)) == 7);
-        CHECK(strstr(c.first_error, "riga 1:") != NULL && strstr(c.first_error, "tab_width") != NULL);
+        CHECK(strstr(c.first_error, "line 1:") != NULL && strstr(c.first_error, "tab_width") != NULL);
         l = config_lang(&c, "C");
         CHECK(l.tab_width == 3 || l.tab_width == 8);        /* the bad value was not taken */
         CHECK(l.tab_width != 40 && l.expand_tab == 0);
@@ -3174,7 +3174,7 @@ static void test_config_apply(void)
     editor_load_config(&e);
     CHECK(e.cfg.nerrors == 0 && e.msg[0] == '\0');
     CHECK(e.doc->tabw == 2 && e.tabw == 2 && !e.doc->expand_tab);
-    CHECK(strcmp(e.theme->name, "chiaro") == 0 && e.clipboard_osc52 == 0);
+    CHECK(strcmp(e.theme->name, "light") == 0 && e.clipboard_osc52 == 0);
     CHECK(!e.doc->autosuggest && e.doc->trim_space && e.doc->final_nl);
     CHECK(key_parse("alt+j", &k, err, sizeof err) == 0 && keymap_find(&e.km, k) == command_by_id("duplicate_up"));
     CHECK(keymap_find(&e.km, key_norm((Key){ CTRL('s'), 0 })) == -1);
@@ -3216,7 +3216,7 @@ static void test_config_apply(void)
     ed_load(&e, "x");
     editor_load_config(&e);
     CHECK(e.cfg.nerrors == 4 && strncmp(e.msg, "config:", 7) == 0);
-    CHECK(strstr(e.msg, "nonesiste") != NULL && strstr(e.msg, "altri") != NULL);
+    CHECK(strstr(e.msg, "nonesiste") != NULL && strstr(e.msg, "other") != NULL);
     editor_free(&e);
 
     unsetenv("XDG_CONFIG_HOME");
@@ -3257,12 +3257,13 @@ static void test_user_themes_syntax(void)
     CHECK(theme_get((size_t)i)->cls[SC_COMMENT].r == 0x80 && theme_get((size_t)i)->fg.g == 0xee);
     CHECK(theme_get((size_t)i)->cls[SC_NORMAL].r == 0xee && theme_get((size_t)i)->git_add.g == 255);
     CHECK(theme_get((size_t)i)->cls[SC_STRING].r == theme_get(0)->cls[SC_STRING].r);
-    CHECK(theme_by_name("scuro") == 0 && theme_by_name("chiaro") == 1 && theme_by_name("zzz") == -1);
+    CHECK(theme_by_name("dark") == 0 && theme_by_name("light") == 1 && theme_by_name("scuro") == 0 &&
+          theme_by_name("chiaro") == 1 && theme_by_name("zzz") == -1);
     CHECK(theme_get(n0)->has_bg && theme_get(n0 + 1) == theme_get(0));      /* wraps around */
     CHECK(theme_add_user("name X\nbackground none\n", 24, err, sizeof err) == 0);
     CHECK(!theme_get(n0 + 1)->has_bg);
     /* errors */
-    CHECK(theme_add_user("name X\ncomment red\n", 20, err, sizeof err) < 0 && strstr(err, "riga 2") != NULL);
+    CHECK(theme_add_user("name X\ncomment red\n", 20, err, sizeof err) < 0 && strstr(err, "line 2") != NULL);
     CHECK(theme_add_user("name X\nbanana #000000\n", 23, err, sizeof err) < 0 && strstr(err, "banana") != NULL);
     CHECK(theme_add_user("comment #000000\n", 16, err, sizeof err) < 0 && strstr(err, "name") != NULL);
     CHECK(theme_count() == n0 + 2);
@@ -3301,7 +3302,7 @@ static void test_user_themes_syntax(void)
     syn_free(s);
     buf_free(&b);
     CHECK(syn_add_user("ext foo\n", 8, err, sizeof err) < 0);
-    CHECK(syn_add_user("name Bad\nfrobnicate\n", 20, err, sizeof err) < 0 && strstr(err, "riga 2") != NULL);
+    CHECK(syn_add_user("name Bad\nfrobnicate\n", 20, err, sizeof err) < 0 && strstr(err, "line 2") != NULL);
 
     /* folders: alphabetical, bad files reported and skipped, hidden files ignored */
     CHECK(mkdtemp(dir) != NULL);
@@ -4250,6 +4251,18 @@ static void test_i18n(void)
     ed_load(&e, "x");
     editor_cmd_palette(&e);
     CHECK(strstr(e.picker.items[0], "Azioni") != NULL && strstr(e.picker.items[1], "Salva") != NULL);
+    /* the row of the language says where its catalog was read from */
+    {
+        size_t k;
+        int found = 0;
+
+        for (k = 0; k < e.picker.nitems; k++)
+            if (strstr(e.picker.items[k], "Lingua") && strstr(e.picker.items[k], "lang/it") &&
+                strstr(e.picker.items[k], "Italiano"))
+                found = 1;
+        CHECK(found);
+        CHECK(i18n_path() != NULL && strstr(i18n_path(), "/lang/it") != NULL);
+    }
     picker_close(&e.picker);
     editor_free(&e);
     i18n_set("en");

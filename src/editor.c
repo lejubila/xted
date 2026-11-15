@@ -267,11 +267,11 @@ static int same_file(const char *a, const char *b)
 static void note_doc(Editor *e, const Doc *d)
 {
     if (d->buf.is_new)
-        editor_set_msg(e, MSG_TTL_MS, "Nuovo file");
+        editor_set_msg(e, MSG_TTL_MS, tr("New file"));
     else if (d->buf.has_nul)
-        editor_set_msg(e, MSG_TTL_MS, "Attenzione: il file contiene byte NUL (binario?)");
+        editor_set_msg(e, MSG_TTL_MS, tr("Warning: the file contains NUL bytes (binary?)"));
     else if (d->readonly)
-        editor_set_msg(e, MSG_TTL_MS, "File in sola lettura");
+        editor_set_msg(e, MSG_TTL_MS, tr("File is read-only"));
 }
 
 /* An untouched, unnamed, empty document is replaced by the first file opened. */
@@ -383,7 +383,7 @@ void editor_load_config(Editor *e)
         strcmp(e->cfg.language, "auto") != 0) {
         char lm[100];
 
-        snprintf(lm, sizeof lm, "language «%s» not found", e->cfg.language);
+        snprintf(lm, sizeof lm, tr("language «%s» not found"), e->cfg.language);
         config_error(&e->cfg, 0, lm);
     }
     if (e->cfg.clipboard >= 0)
@@ -397,7 +397,7 @@ void editor_load_config(Editor *e)
             e->theme_idx = (size_t)t;
             e->theme = theme_get((size_t)t);
         } else {
-            snprintf(msg, sizeof msg, "tema «%s» sconosciuto", e->cfg.theme);
+            snprintf(msg, sizeof msg, tr("unknown theme «%s»"), e->cfg.theme);
             config_error(&e->cfg, 0, msg);
         }
     }
@@ -413,7 +413,7 @@ void editor_load_config(Editor *e)
         if (strcmp(kl->cmd, "none") != 0) {
             cmd = command_by_id(kl->cmd);
             if (cmd < 0) {
-                snprintf(msg, sizeof msg, "comando «%s» sconosciuto", kl->cmd);
+                snprintf(msg, sizeof msg, tr("unknown command «%s»"), kl->cmd);
                 config_error(&e->cfg, kl->line, msg);
                 continue;
             }
@@ -424,7 +424,7 @@ void editor_load_config(Editor *e)
         apply_cfg(e, e->docs[i]);
     if (e->cfg.nerrors > 0)
         editor_set_msg(e, 0, "config: %s%s", e->cfg.first_error,
-                       e->cfg.nerrors > 1 ? " (e altri errori)" : "");
+                       e->cfg.nerrors > 1 ? tr(" (and other errors)") : "");
 }
 
 /* Marks the lines of d that differ from HEAD. Only for a document that matches its file on disk. */
@@ -454,13 +454,13 @@ static void git_refresh_doc(Editor *e, Doc *d)
 void editor_cmd_git(Editor *e)
 {
     if (e->doc->buf.modified)
-        editor_set_msg(e, MSG_TTL_MS, "Salva il file per aggiornare gli indicatori Git");
+        editor_set_msg(e, MSG_TTL_MS, tr("Save the file to refresh the Git markers"));
     else {
         e->git_off = 0;
         git_refresh_doc(e, e->doc);
         relayout(e);
-        editor_set_msg(e, MSG_TTL_MS, e->doc->gutter ? "Indicatori Git aggiornati"
-                                                      : "Il file non è in un repository Git");
+        editor_set_msg(e, MSG_TTL_MS, e->doc->gutter ? tr("Git markers refreshed")
+                                                      : tr("The file is not in a Git repository"));
     }
 }
 
@@ -722,6 +722,12 @@ static int ask(Editor *e, const char *question, const char *keys)
             return 0;
         }
         c = (k.code >= 'A' && k.code <= 'Z') ? k.code + 32 : k.code;
+        /* the prompts name the answers in the language of the user (s/n in Italian, y/n in
+         * English); the callers test for s and t, so y and a count as those */
+        if (c == 'y' && strchr(keys, 's'))
+            c = 's';
+        else if (c == 'a' && strchr(keys, 't'))
+            c = 't';
         if (c != 0 && c < 0x80 && strchr(keys, (int)c)) {
             e->msg[0] = '\0';
             return (int)c;
@@ -919,20 +925,20 @@ static int on_disk_change(Editor *e, Doc *d)
         return 0;
     if (st == DISK_MISSING) {
         d->disk_known = 0;
-        editor_set_msg(e, MSG_TTL_MS, "«%s» non esiste più su disco", doc_base_name(d));
+        editor_set_msg(e, MSG_TTL_MS, tr("«%s» no longer exists on disk"), doc_base_name(d));
         return 0;
     }
-    snprintf(q, sizeof q, "«%s» è cambiato su disco%s. Ricaricare? (r = ricarica, i = ignora)",
-             doc_base_name(d), d->buf.modified ? " e hai modifiche non salvate" : "");
+    snprintf(q, sizeof q, tr("«%s» changed on disk%s. Reload? (r = reload, i = ignore)"),
+             doc_base_name(d), d->buf.modified ? tr(" and you have unsaved changes") : "");
     c = ask(e, q, "ri");
     if (c == 'r') {
         if (doc_reload(d, err, sizeof err) < 0) {
-            editor_set_msg(e, MSG_TTL_MS, "Ricarica fallita: %s", err);
+            editor_set_msg(e, MSG_TTL_MS, tr("Reload failed: %s"), err);
             return 0;
         }
         view_clamp(&d->buf, &e->layout.active->view);
         load_win(e, e->layout.active);
-        editor_set_msg(e, MSG_TTL_MS, "Ricaricato da disco");
+        editor_set_msg(e, MSG_TTL_MS, tr("Reloaded from disk"));
         return 1;
     }
     doc_accept_disk(d);
@@ -946,26 +952,26 @@ static int save_doc_as(Editor *e, Doc *d, int force_prompt)
     long n;
 
     if (!d->buf.path || force_prompt) {
-        if (prompt(e, "Salva con nome: ", d->buf.path, name, sizeof name) == 0) {
-            editor_set_msg(e, MSG_TTL_MS, "Salvataggio annullato");
+        if (prompt(e, tr("Save as: "), d->buf.path, name, sizeof name) == 0) {
+            editor_set_msg(e, MSG_TTL_MS, tr("Save cancelled"));
             return -1;
         }
         target = name;
         if (d->buf.path && strcmp(name, d->buf.path) == 0)
             target = NULL;
         else if (access(name, F_OK) == 0) {
-            int c = ask(e, "Il file esiste già. Sovrascrivere? (s = sì, n = no)", "sn");
+            int c = ask(e, tr("The file already exists. Overwrite? (y = yes, n = no)"), "sn");
 
             if (c != 's') {
-                editor_set_msg(e, MSG_TTL_MS, "Salvataggio annullato");
+                editor_set_msg(e, MSG_TTL_MS, tr("Save cancelled"));
                 return -1;
             }
         }
     } else if (doc_disk_changed(d) == DISK_CHANGED) {
-        int c = ask(e, "Il file è cambiato su disco. Sovrascrivere? (s = sì, n = no)", "sn");
+        int c = ask(e, tr("The file changed on disk. Overwrite? (y = yes, n = no)"), "sn");
 
         if (c != 's') {
-            editor_set_msg(e, MSG_TTL_MS, "Salvataggio annullato");
+            editor_set_msg(e, MSG_TTL_MS, tr("Save cancelled"));
             return -1;
         }
     }
@@ -975,12 +981,12 @@ static int save_doc_as(Editor *e, Doc *d, int force_prompt)
         d->buf.final_newline = 1;
     n = doc_save(d, target, err, sizeof err);
     if (n < 0) {
-        editor_set_msg(e, MSG_TTL_MS, "Errore di salvataggio: %s", err);
+        editor_set_msg(e, MSG_TTL_MS, tr("Save error: %s"), err);
         return -1;
     }
     apply_cfg(e, d);
     git_refresh_doc(e, d);
-    editor_set_msg(e, MSG_TTL_MS, "%zu righe, %ld byte scritti", d->buf.nlines, n);
+    editor_set_msg(e, MSG_TTL_MS, tr("%zu lines, %ld bytes written"), d->buf.nlines, n);
     return 0;
 }
 
@@ -1011,7 +1017,7 @@ static void cmd_save_all(Editor *e)
             char err[256];
 
             if (doc_save(d, NULL, err, sizeof err) < 0) {
-                editor_set_msg(e, MSG_TTL_MS, "Errore su «%s»: %s", doc_base_name(d), err);
+                editor_set_msg(e, MSG_TTL_MS, tr("Error on «%s»: %s"), doc_base_name(d), err);
                 return;
             }
             saved++;
@@ -1024,14 +1030,14 @@ static void cmd_save_all(Editor *e)
     }
     if (e->doc != keep)
         show_doc(e, keep);
-    editor_set_msg(e, MSG_TTL_MS, "%zu file salvati", saved);
+    editor_set_msg(e, MSG_TTL_MS, tr("%zu files saved"), saved);
 }
 
 static void cmd_open(Editor *e)
 {
     char path[sizeof e->prompt_text], err[256];
 
-    if (prompt(e, "Apri file: ", NULL, path, sizeof path) == 0)
+    if (prompt(e, tr("Open file: "), NULL, path, sizeof path) == 0)
         return;
     buf_undo_close(e->buf);
     if (!editor_open_doc(e, path, err, sizeof err))
@@ -1095,8 +1101,8 @@ static int confirm_discard(Editor *e, Doc *d, int *all)
     if (*all)
         c = 's';
     else {
-        snprintf(q, sizeof q, "«%s» ha modifiche non salvate. Salvare? (s = sì, n = no%s, Esc = annulla)",
-                 doc_base_name(d), e->ndocs > 1 ? ", t = salva tutti" : "");
+        snprintf(q, sizeof q, tr("«%s» has unsaved changes. Save? (y = yes, n = no%s, Esc = cancel)"),
+                 doc_base_name(d), e->ndocs > 1 ? tr(", a = save all") : "");
         c = ask(e, q, e->ndocs > 1 ? "snt" : "sn");
     }
     if (c == 0)
@@ -1164,13 +1170,13 @@ int editor_ask(Editor *e, const char *question, const char *keys)
 static void cmd_split(Editor *e, int vertical)
 {
     if (editor_split(e, vertical) < 0)
-        editor_set_msg(e, MSG_TTL_MS, "Spazio insufficiente per dividere");
+        editor_set_msg(e, MSG_TTL_MS, tr("Not enough room to split"));
 }
 
 static void cmd_close_win(Editor *e)
 {
     if (layout_count(&e->layout) < 2) {
-        editor_set_msg(e, MSG_TTL_MS, "È l'unico pannello");
+        editor_set_msg(e, MSG_TTL_MS, tr("This is the only pane"));
         return;
     }
     editor_store_view(e);
@@ -1216,7 +1222,7 @@ static void cmd_buffers(Editor *e)
 {
     size_t i;
 
-    picker_open(&e->picker, "Buffer");
+    picker_open(&e->picker, tr("Buffer"));
     e->picker_kind = PK_BUFFERS;
     e->pal_w1 = 0;
     for (i = 0; i < e->ndocs; i++) {
@@ -1284,7 +1290,7 @@ static void cmd_symbols(Editor *e)
     o.cap = e->noutline = 0;
     free(e->outline);
     e->outline = NULL;
-    picker_open(&e->picker, "Simboli");
+    picker_open(&e->picker, tr("Symbols"));
     e->picker_kind = PK_SYMBOLS;
     if (!e->comp.sc)
         e->comp.sc = sym_cache_new();
@@ -1292,7 +1298,7 @@ static void cmd_symbols(Editor *e)
     sym_outline(e->comp.sc, e->doc, outline_cb, &o);
     if (e->picker.nitems == 0) {
         picker_close(&e->picker);
-        editor_set_msg(e, MSG_TTL_MS, "Nessun simbolo in questo file");
+        editor_set_msg(e, MSG_TTL_MS, tr("No symbols in this file"));
         return;
     }
     /* column widths: name, parameters, line number */
@@ -1346,7 +1352,7 @@ static void files_scan_pump(Editor *e)
     if (done) {
         files_scan_stop(e);
         if (e->picker.nitems == 0)
-            editor_set_msg(e, MSG_TTL_MS, "Nessun file trovato");
+            editor_set_msg(e, MSG_TTL_MS, tr("No files found"));
     }
 }
 
@@ -2174,7 +2180,7 @@ static int handle_resize_key(Editor *e, Key k)
     }
     if (dir >= 0 && !(k.mods & (MOD_ALT | MOD_CTRL))) {
         if (layout_resize(&e->layout, e->layout.active, dir, (k.mods & MOD_SHIFT) ? 10 : 2) < 0)
-            editor_set_msg(e, MSG_TTL_MS, "Nessuno split in quella direzione");
+            editor_set_msg(e, MSG_TTL_MS, tr("No split in that direction"));
         return 1;
     }
     if (k.code == '=' && !k.mods) {
@@ -2225,7 +2231,7 @@ static void handle_key(Editor *e, Key k)
     cmd = keymap_find(&e->km, k);
     mod = cmd >= 0 ? commands[cmd].modifies : modifies(k);
     if (e->doc->readonly && mod) {
-        editor_set_msg(e, MSG_TTL_MS, "File in sola lettura (Alt+S per salvare con un altro nome)");
+        editor_set_msg(e, MSG_TTL_MS, tr("File is read-only (Alt+S to save under another name)"));
         return;
     }
     /* editing a folded line opens it: the edit must not leave the cursor in a fold */
@@ -2309,7 +2315,7 @@ void editor_cmd_match(Editor *e)
         e->cy = e->my;
         e->cx = e->mx;
     } else {
-        editor_set_msg(e, MSG_TTL_MS, "Nessuna parentesi corrispondente");
+        editor_set_msg(e, MSG_TTL_MS, tr("No matching bracket"));
     }
 }
 
@@ -2327,9 +2333,9 @@ static void set_indent(Editor *e, int expand, int width)
     apply_cfg(e, d);
     render_invalidate(e->render);
     if (expand)
-        editor_set_msg(e, MSG_TTL_MS, "Indentazione: %d spazi", d->indent_w);
+        editor_set_msg(e, MSG_TTL_MS, tr("Indentation: %d spaces"), d->indent_w);
     else
-        editor_set_msg(e, MSG_TTL_MS, "Indentazione: tabulatore (larghezza %d)", d->tabw);
+        editor_set_msg(e, MSG_TTL_MS, tr("Indentation: tab (width %d)"), d->tabw);
 }
 
 void editor_cmd_indent_tabs(Editor *e) { set_indent(e, 0, 0); }
@@ -2351,8 +2357,8 @@ static void convert_indent(Editor *e, int to_tabs)
     d->man.tabw = to_tabs ? level : d->tabw;
     apply_cfg(e, d);
     render_invalidate(e->render);
-    editor_set_msg(e, MSG_TTL_MS, "%zu righe: indentazione con %s", n,
-                   to_tabs ? "tabulatori" : "spazi");
+    editor_set_msg(e, MSG_TTL_MS, to_tabs ? tr("%zu lines: indentation with tabs")
+                                          : tr("%zu lines: indentation with spaces"), n);
 }
 
 void editor_cmd_indent_to_tabs(Editor *e) { convert_indent(e, 1); }
@@ -2365,12 +2371,12 @@ void editor_cmd_indent_detect(Editor *e)
     memset(&d->man, 0, sizeof d->man);
     if (detect_indent(d)) {
         apply_cfg(e, d);
-        editor_set_msg(e, MSG_TTL_MS, d->expand_tab ? "Indentazione rilevata: %d spazi"
-                                                    : "Indentazione rilevata: tabulatore (%d)",
+        editor_set_msg(e, MSG_TTL_MS, d->expand_tab ? tr("Detected indentation: %d spaces")
+                                                    : tr("Detected indentation: tab (%d)"),
                        d->expand_tab ? d->indent_w : d->tabw);
     } else {
         apply_cfg(e, d);
-        editor_set_msg(e, MSG_TTL_MS, "Indentazione non riconoscibile: valgono le impostazioni");
+        editor_set_msg(e, MSG_TTL_MS, tr("Indentation not recognised: the settings apply"));
     }
     render_invalidate(e->render);
 }
@@ -2381,12 +2387,38 @@ void editor_cmd_theme(Editor *e)
     e->theme = theme_get(e->theme_idx);
     e->pend |= PEND_THEME;
     render_invalidate(e->render);
-    editor_set_msg(e, MSG_TTL_MS, "Tema: %s", e->theme->name);
+    editor_set_msg(e, MSG_TTL_MS, tr("Theme: %s"), e->theme->name);
 }
 
 void editor_cmd_redraw(Editor *e)
 {
     render_invalidate(e->render);
+}
+
+/* Where the language in use comes from, for the palette: the catalog file (with ~ for the home
+ * folder, cut at the front if long), or "built in" for English. */
+static void lang_label(char *out, size_t n)
+{
+    const char *path = i18n_path(), *home = getenv("HOME");
+    char tmp[PATH_MAX];
+    size_t hl = home ? strlen(home) : 0, len;
+
+    if (!path) {
+        snprintf(out, n, "%s", tr("built in"));
+        return;
+    }
+    if (hl > 1 && strncmp(path, home, hl) == 0 && path[hl] == '/')
+        snprintf(tmp, sizeof tmp, "~%s", path + hl);
+    else
+        snprintf(tmp, sizeof tmp, "%s", path);
+    len = strlen(tmp);
+    if (len > 44) {
+        const char *cut = strchr(tmp + len - 43, '/');
+
+        snprintf(out, n, "\xe2\x80\xa6%.60s", cut ? cut : tmp + len - 43);
+    } else {
+        snprintf(out, n, "%.60s", tmp);
+    }
 }
 
 /* Opens the palette with the query typed so far, on the command used last. */
@@ -2397,7 +2429,7 @@ static void palette_open(Editor *e, const char *query)
     char (*val)[24] = xmalloc(ncommands * sizeof *val);
     int *on = xmalloc(ncommands * sizeof *on);
 
-    picker_open(&e->picker, "Comando");
+    picker_open(&e->picker, tr("Command"));
     e->picker_kind = PK_COMMANDS;
     free(e->pal);
     e->pal = xmalloc((ncommands + G_COUNT) * sizeof *e->pal);
@@ -2410,7 +2442,7 @@ static void palette_open(Editor *e, const char *query)
 
         on[i] = command_state(e, (int)i, val[i], sizeof val[i]);
         keymap_label(&e->km, (int)i, label, sizeof label);
-        if ((int)strlen(label) > e->pal_w3)
+        if (commands[i].state != ST_LANG && (int)strlen(label) > e->pal_w3)
             e->pal_w3 = (int)strlen(label);
         if (w > e->pal_w1)
             e->pal_w1 = w;
@@ -2432,7 +2464,10 @@ static void palette_open(Editor *e, const char *query)
             e->pal[k++] = 0;
             last = g;
         }
-        keymap_label(&e->km, (int)i, label, sizeof label);
+        if (commands[i].state == ST_LANG)
+            lang_label(label, sizeof label);
+        else
+            keymap_label(&e->km, (int)i, label, sizeof label);
         snprintf(item, sizeof item, "%c%s\x1f%s\x1f%s", on[i] == 1 ? '1' : on[i] == 0 ? '0' : ' ',
                  tr(commands[i].name), val[i], label);
         picker_add(&e->picker, item);
@@ -2476,12 +2511,12 @@ void editor_key(Editor *e, Key k)
 void editor_cmd_resize_mode(Editor *e)
 {
     if (layout_count(&e->layout) < 2) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun altro pannello da ridimensionare");
+        editor_set_msg(e, MSG_TTL_MS, tr("No other pane to resize"));
         return;
     }
     e->resize_mode = 1;
     editor_set_msg(e, 0,
-                   "Ridimensiona: frecce spostano il bordo (Maiusc x10)  = pareggia  Esc esci");
+                   tr("Resize: arrows move the border (Shift x10)  = equalize  Esc to exit"));
 }
 
 void editor_cmd_equalize(Editor *e)
@@ -2494,7 +2529,7 @@ void editor_cmd_toggle_mouse(Editor *e)
     e->mouse_on = !e->mouse_on;
     e->pend |= PEND_MOUSE;
     term_mouse(e->mouse_on);
-    editor_set_msg(e, MSG_TTL_MS, e->mouse_on ? "Mouse attivo" : "Mouse disattivato");
+    editor_set_msg(e, MSG_TTL_MS, e->mouse_on ? tr("Mouse on") : tr("Mouse off"));
 }
 
 /* ---- switches and saving the settings ----------------------------------- */
@@ -2512,14 +2547,14 @@ void editor_cmd_toggle_autosuggest(Editor *e)
 {
     e->doc->man_sug = e->doc->autosuggest ? 2 : 1;
     apply_cfg(e, e->doc);
-    editor_set_msg(e, MSG_TTL_MS, "Autosuggest %s", e->doc->autosuggest ? "attivo" : "disattivato");
+    editor_set_msg(e, MSG_TTL_MS, "%s", e->doc->autosuggest ? tr("Autosuggest on") : tr("Autosuggest off"));
 }
 
 void editor_cmd_toggle_autopair(Editor *e)
 {
     e->doc->man_pair = e->doc->autopair ? 2 : 1;
     apply_cfg(e, e->doc);
-    editor_set_msg(e, MSG_TTL_MS, "Coppie automatiche %s", e->doc->autopair ? "attive" : "disattivate");
+    editor_set_msg(e, MSG_TTL_MS, "%s", e->doc->autopair ? tr("Auto-pairs on") : tr("Auto-pairs off"));
 }
 
 /* The Git marks for the present e->cfg.git: computed again, or cleared. */
@@ -2548,7 +2583,7 @@ void editor_cmd_toggle_git(Editor *e)
     e->cfg.git = e->cfg.git == 0 ? 1 : 0;
     e->pend |= PEND_GIT;
     git_apply(e, 1);
-    editor_set_msg(e, MSG_TTL_MS, "Indicatori Git %s", e->cfg.git ? "attivi" : "disattivati");
+    editor_set_msg(e, MSG_TTL_MS, "%s", e->cfg.git ? tr("Git markers on") : tr("Git markers off"));
 }
 
 void editor_cmd_language(Editor *e)
@@ -2569,7 +2604,7 @@ void editor_cmd_toggle_clipboard(Editor *e)
 {
     e->clipboard_osc52 = !e->clipboard_osc52;
     e->pend |= PEND_CLIP;
-    editor_set_msg(e, MSG_TTL_MS, "Appunti di sistema %s", e->clipboard_osc52 ? "attivi" : "disattivati");
+    editor_set_msg(e, MSG_TTL_MS, "%s", e->clipboard_osc52 ? tr("System clipboard on") : tr("System clipboard off"));
 }
 
 /* The global settings of the project's .xted: they win over the user's file; with live they also
@@ -2616,7 +2651,7 @@ static void project_globals(Editor *e, int live)
         } else {
             char msg[100];
 
-            snprintf(msg, sizeof msg, "tema «%s» sconosciuto nel .xted", c.theme);
+            snprintf(msg, sizeof msg, tr("unknown theme «%s» in .xted"), c.theme);
             config_error(&e->cfg, 0, msg);
         }
     }
@@ -2745,8 +2780,8 @@ static void doc_saved(Doc *d, int keep_flags)
 static void add_dest(Editor *e, int kind, int lang, const char *path, const char *what, const char *note)
 {
     char item[PATH_MAX + 160], shown[PATH_MAX + 2];
-    const char *home = getenv("HOME"), *label = kind == DEST_USER ? "Utente" :
-                       kind == DEST_PROJECT ? "Progetto" : ".editorconfig";
+    const char *home = getenv("HOME"), *label = kind == DEST_USER ? tr("User") :
+                       kind == DEST_PROJECT ? tr("Project") : ".editorconfig";
     size_t hl = home ? strlen(home) : 0;
 
     if (hl > 1 && strncmp(path, home, hl) == 0 && path[hl] == '/')
@@ -2837,7 +2872,7 @@ void editor_cmd_save_settings(Editor *e)
 
     pending_get(e, &p);
     if (p.nl == 0 && p.ng == 0 && p.nmore == 0) {
-        editor_set_msg(e, MSG_TTL_MS, "Niente da salvare: cambia prima qualcosa (indentazione, tema, interruttori)");
+        editor_set_msg(e, MSG_TTL_MS, tr("Nothing to save: change something first (indentation, theme, switches)"));
         return;
     }
     if (has_path) {
@@ -2851,7 +2886,7 @@ void editor_cmd_save_settings(Editor *e)
     free(e->dests);
     e->dests = NULL;
     e->ndests = 0;
-    picker_open(&e->picker, "Salva dove");
+    picker_open(&e->picker, tr("Save where"));
     e->picker_kind = PK_SAVECFG;
     e->pal_w1 = e->pal_w2 = e->pal_w3 = 0;
     nscope = p.nl > 0 && lang ? 2 : 1;
@@ -2863,8 +2898,8 @@ void editor_cmd_save_settings(Editor *e)
         for (scope = 0; scope < nscope; scope++) {
             what[0] = '\0';
             if (p.nl > 0)
-                snprintf(what, sizeof what, scope ? "solo %s" : "tutti i linguaggi", lang);
-            snprintf(note, sizeof note, "%s%s", over ? " (nel progetto vince il suo .xted)" : "", more);
+                snprintf(what, sizeof what, scope ? tr("only %s") : tr("all languages"), lang);
+            snprintf(note, sizeof note, "%s%s", over ? tr(" (the project's .xted wins)") : "", more);
             add_dest(e, DEST_USER, scope, f, what, note);
         }
         free(f);
@@ -2873,7 +2908,7 @@ void editor_cmd_save_settings(Editor *e)
     for (scope = 0; scope < nscope; scope++) {
         what[0] = '\0';
         if (p.nl > 0)
-            snprintf(what, sizeof what, scope ? "solo %s" : "tutti i linguaggi", lang);
+            snprintf(what, sizeof what, scope ? tr("only %s") : tr("all languages"), lang);
         add_dest(e, DEST_PROJECT, scope, f, what, more);
     }
     free(f);
@@ -2885,10 +2920,10 @@ void editor_cmd_save_settings(Editor *e)
     if (ecpath) {
         f = cfgsave_editorconfig_path(ecpath);
         if (has_path && ((u_set | p_set) & p.mask & ec_bits))
-            snprintf(note, sizeof note, " (ignorato: vince %s)",
-                     p_set & p.mask & ec_bits ? ".xted del progetto" : "il file utente");
+            snprintf(note, sizeof note, tr(" (ignored: %s wins)"),
+                     p_set & p.mask & ec_bits ? tr("the project's .xted") : tr("the user file"));
         else
-            snprintf(note, sizeof note, "%s%s", (p.mask & ~ec_bits) || p.ng ? " (solo l'indentazione)" : "",
+            snprintf(note, sizeof note, "%s%s", (p.mask & ~ec_bits) || p.ng ? tr(" (indentation only)") : "",
                      more);
         add_dest(e, DEST_EDITORCONFIG, 0, f, "", note);
         free(f);
@@ -2902,11 +2937,11 @@ void editor_cmd_save_settings(Editor *e)
         snprintf(keys + strlen(keys), sizeof keys - strlen(keys), "%s%s", keys[0] ? "," : "", more);
     if (e->ndests == 0) {
         picker_close(&e->picker);
-        editor_set_msg(e, MSG_TTL_MS, "Nessuna destinazione disponibile per queste impostazioni");
+        editor_set_msg(e, MSG_TTL_MS, tr("No destination available for these settings"));
         return;
     }
     picker_filter(&e->picker);
-    editor_set_msg(e, MSG_TTL_MS, "Da salvare: %s", keys);
+    editor_set_msg(e, MSG_TTL_MS, tr("To save: %s"), keys);
 }
 
 /* The language sections of the other documents, then the global keys, in a file of our own format. */
@@ -2938,7 +2973,7 @@ static void save_settings_to(Editor *e, size_t idx)
     err[0] = '\0';
     if (dst->kind == DEST_USER) {
         if (!e->cfgdir) {
-            editor_set_msg(e, MSG_TTL_MS, "Nessuna cartella di configurazione (HOME non impostata)");
+            editor_set_msg(e, MSG_TTL_MS, tr("No configuration folder (HOME is not set)"));
             return;
         }
         snprintf(file, sizeof file, "%s/config", e->cfgdir);
@@ -2982,7 +3017,7 @@ static void save_settings_to(Editor *e, size_t idx)
             }
         }
         if (r == 0 && written == 0) {
-            editor_set_msg(e, MSG_TTL_MS, ".editorconfig non può contenere queste impostazioni");
+            editor_set_msg(e, MSG_TTL_MS, tr(".editorconfig cannot hold these settings"));
             return;
         }
     }
@@ -3023,7 +3058,7 @@ static void save_settings_to(Editor *e, size_t idx)
         e->cfg.git = git_now;
     }
     apply_all(e);
-    editor_set_msg(e, MSG_TTL_MS, "Salvato in %s: %s", file, keys);
+    editor_set_msg(e, MSG_TTL_MS, tr("Saved in %s: %s"), file, keys);
 }
 
 void editor_run(Editor *e)
@@ -3031,7 +3066,7 @@ void editor_run(Editor *e)
     resize(e);
     term_mouse(e->mouse_on);
     if (!e->msg[0])
-        editor_set_msg(e, MSG_TTL_MS, "Ctrl+S salva  Ctrl+Q esci  Alt+X comandi");
+        editor_set_msg(e, MSG_TTL_MS, tr("Ctrl+S save  Ctrl+Q quit  Alt+X commands"));
 
     while (!e->quit) {
         Key k;

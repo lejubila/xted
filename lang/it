@@ -1,6 +1,29 @@
 # Italian catalog of xted: English text, a TAB, the translation.
 # Texts with printf conversions (%s, %zu, ...) must keep them in the same order.
 @name	Italiano
+  Spaces %d	  Spazi %d
+ (and other errors)	 (e altri errori)
+ (ignored: %s wins)	 (ignorato: vince %s)
+ (indentation only)	 (solo l'indentazione)
+ (the project's .xted wins)	 (nel progetto vince il suo .xted)
+ (too large for the system clipboard)	 (troppo grande per gli appunti di sistema)
+ (wrapped)	 (da capo)
+ Loading %c %zu 	 Caricamento %c %zu 
+ Scanning %c 	 Scansione %c 
+ and you have unsaved changes	 e hai modifiche non salvate
+ in a language section	 in una sezione di linguaggio
+ ⋯ %zu lines	 ⋯ %zu righe
+%s: %zu bytes%s	%s: %zu byte%s
+%zu cursors	%zu cursori
+%zu files saved	%zu file salvati
+%zu lines, %ld bytes written	%zu righe, %ld byte scritti
+%zu lines: indentation with spaces	%zu righe: indentazione con spazi
+%zu lines: indentation with tabs	%zu righe: indentazione con tabulatori
+%zu replaced	%zu sostituiti
+%zu replacements	%zu sostituzioni
+, a = save all	, t = salva tutti
+.editorconfig cannot hold these settings	.editorconfig non può contenere queste impostazioni
+A command is running. Stop it? (y = yes, n = no)	Un comando è in esecuzione. Interromperlo? (s = sì, n = no)
 Actions	Azioni
 Add cursor above	Aggiungi cursore sopra
 Add cursor at next occurrence	Aggiungi cursore sulla prossima occorrenza
@@ -8,19 +31,35 @@ Add cursor below	Aggiungi cursore sotto
 Add cursors at all occurrences	Aggiungi cursori su tutte le occorrenze
 Alt+C Case	Alt+C Maiuscole
 Alt+R Regex	Alt+R Regex
+Alt+V replaces the last paste	Alt+V sostituisce l'ultimo incolla
 Alt+W Word	Alt+W Parola
+Auto-pairs off	Coppie automatiche disattivate
+Auto-pairs on	Coppie automatiche attive
+Autosuggest off	Autosuggest disattivato
+Autosuggest on	Autosuggest attivo
+Buffer	Buffer
 Buffers and panes	Buffer e pannelli
+Cannot read the tags file	Impossibile leggere il file tags
+Cannot start the command	Impossibile avviare il comando
+Cannot start the command: %s	Impossibile avviare il comando: %s
 Change theme	Cambia tema
+Clipboard is empty	Appunti vuoti
 Close buffer	Chiudi buffer
 Close pane	Chiudi pannello
+Command	Comando
 Command palette	Command palette
 Convert indentation to spaces	Converti l'indentazione in spazi
 Convert indentation to tabs	Converti l'indentazione in tabulatori
+Copied	Copiato
 Copy	Copia
+Ctrl+S save  Ctrl+Q quit  Alt+X commands	Ctrl+S salva  Ctrl+Q esci  Alt+X comandi
 Cursors and blocks	Cursori e blocchi
-Cut	Taglia
+Cut	Tagliato
+Definition	Definizione
 Delete lines	Elimina righe
 Detect indentation style	Rileva lo stile di indentazione
+Detected indentation: %d spaces	Indentazione rilevata: %d spazi
+Detected indentation: tab (%d)	Indentazione rilevata: tabulatore (%d)
 Duplicate line above	Duplica riga sopra
 Duplicate line below	Duplica riga sotto
 Edit	Modifica
@@ -30,54 +69,121 @@ Enter next	Invio avanti
 Enter searches	Invio cerca
 Enter starts	Invio avvia
 Equalize panes	Pareggia i pannelli
+Error on «%s»: %s	Errore su «%s»: %s
 Esc cancels	Esc annulla
 File	File
+File is read-only	File in sola lettura
+File is read-only (Alt+S to save under another name)	File in sola lettura (Alt+S per salvare con un altro nome)
 Filter through a command	Filtra con un comando
+Filter with: 	Filtra con: 
+Filtered with: %s	Filtrato con: %s
+Filtering…	Filtro in corso…
 Find	Cerca
 Find in files	Cerca nei file
+Find in files: 	Cerca nei file: 
+Find: 	Cerca: 
 Fold all	Piega tutto
 Fold/unfold block	Piega/espandi blocco
+Git markers off	Indicatori Git disattivati
+Git markers on	Indicatori Git attivi
+Git markers refreshed	Indicatori Git aggiornati
 Go to definition	Vai alla definizione
 Go to line	Vai alla riga
+Go to line[:column]: 	Vai a riga[:colonna]: 
 Go to symbol	Vai al simbolo
+Indentation not recognised: the settings apply	Indentazione non riconoscibile: valgono le impostazioni
+Indentation: %d spaces	Indentazione: %d spazi
 Indentation: 2 spaces	Indentazione: 2 spazi
 Indentation: 4 spaces	Indentazione: 4 spazi
 Indentation: 8 spaces	Indentazione: 8 spazi
 Indentation: tab	Indentazione: tabulatore
+Indentation: tab (width %d)	Indentazione: tabulatore (larghezza %d)
+Invalid format: use 12, 12:5 or :5	Formato non valido: usa 12, 12:5 o :5
 Join lines	Unisci righe
 Language	Lingua
 Language: %s	Lingua: %s
 List buffers	Elenco buffer
 Matching bracket	Parentesi corrispondente
+Mouse off	Mouse disattivato
+Mouse on	Mouse attivo
 Move line down	Sposta riga in giu
 Move line up	Sposta riga in su
+New file	Nuovo file
 Next buffer	Buffer successivo
 Next error	Errore successivo
 Next match	Occorrenza successiva
 Next pane	Pannello successivo
+No command has been run (Alt+R)	Nessun comando eseguito (Alt+R)
+No command is running	Nessun comando in esecuzione
+No comment defined for this language	Nessun commento definito per questo linguaggio
+No configuration folder (HOME is not set)	Nessuna cartella di configurazione (HOME non impostata)
+No definition of «%s»	Nessuna definizione di «%s»
+No destination available for these settings	Nessuna destinazione disponibile per queste impostazioni
+No error on this line	Nessun errore su questa riga
+No files found	Nessun file trovato
+No matching bracket	Nessuna parentesi corrispondente
+No more errors	Nessun altro errore
+No other occurrence	Nessun'altra occorrenza
+No other pane to resize	Nessun altro pannello da ridimensionare
+No output to search	Nessun output da cercare
+No previous clipboard entry	Nessuna voce precedente negli appunti
+No previous error	Nessun errore precedente
+No replacements	Nessuna sostituzione
+No results for «%s»	Nessun risultato per «%s»
+No search yet: press Ctrl+F	Nessuna ricerca: premi Ctrl+F
+No split in that direction	Nessuno split in quella direzione
+No symbols in this file	Nessun simbolo in questo file
+No tags file (create it with ctags -R)	Nessun file tags (si crea con ctags -R)
+No word under the cursor	Nessuna parola sotto il cursore
+Not enough room to split	Spazio insufficiente per dividere
+Nothing to fold	Niente da piegare
+Nothing to redo	Niente da ripetere
+Nothing to save: change something first (indentation, theme, switches)	Niente da salvare: cambia prima qualcosa (indentazione, tema, interruttori)
+Nothing to undo	Niente da annullare
 Open file	Apri file
+Open file: 	Apri file: 
 Other	Altro
+Past the end: line %zu	Oltre la fine: riga %zu
 Paste	Incolla
 Paste previous entry	Incolla la voce precedente
 Previous buffer	Buffer precedente
 Previous error	Errore precedente
 Previous match	Occorrenza precedente
 Previous pane	Pannello precedente
+Project	Progetto
 Quick open	Apri rapido
 Quit	Esci
 Redo	Ripeti
 Redraw screen	Ridisegna lo schermo
 Refresh Git markers	Aggiorna gli indicatori Git
+Reload failed: %s	Ricarica fallita: %s
+Reloaded from disk	Ricaricato da disco
 Repeat last command	Ripeti ultimo comando
 Replace	Sostituisci
+Replace - find: 	Sostituisci - cerca: 
+Replace with: 	Sostituisci con: 
+Replace? (y = yes, n = no, a = all, Esc = done) 	Sostituire? (s = sì, n = no, t = tutte, Esc = fine) 
 Resize panes	Ridimensiona i pannelli
+Resize: arrows move the border (Shift x10)  = equalize  Esc to exit	Ridimensiona: frecce spostano il bordo (Maiusc x10)  = pareggia  Esc esci
+Results	Risultati
+Results truncated to the first %d	Risultati troncati ai primi %d
 Run	Esegui
 Run command	Esegui comando
+Run: 	Esegui: 
+Running: %s (Shift+F5 stops)	In esecuzione: %s (Maiusc+F5 interrompe)
 Save	Salva
 Save all	Salva tutto
 Save as	Salva con nome
+Save as: 	Salva con nome: 
+Save cancelled	Salvataggio annullato
+Save error: %s	Errore di salvataggio: %s
 Save settings…	Salva le impostazioni…
+Save the file to refresh the Git markers	Salva il file per aggiornare gli indicatori Git
+Save where	Salva dove
+Saved in %s: %s	Salvato in %s: %s
 Search and go to	Cerca e vai
+Search wrapped to the end	Ricerca ripartita dalla fine
+Search wrapped to the start	Ricerca ripartita dall'inizio
 Select all	Seleziona tutto
 Select line	Seleziona riga
 Select word	Seleziona parola
@@ -86,6 +192,20 @@ Show/hide file browser	Mostra/nascondi browser dei file
 Split pane horizontally	Dividi pannello in orizzontale
 Split pane vertically	Dividi pannello in verticale
 Stop command	Interrompi comando
+Stop requested	Interruzione richiesta
+Symbols	Simboli
+System clipboard off	Appunti di sistema disattivati
+System clipboard on	Appunti di sistema attivi
+The command exited with an error: text unchanged	Il comando è uscito con errore: testo invariato
+The command failed: %.*s	Il comando è fallito: %.*s
+The command took more than %d s: text unchanged	Il comando ha superato %d s: testo invariato
+The file already exists. Overwrite? (y = yes, n = no)	Il file esiste già. Sovrascrivere? (s = sì, n = no)
+The file changed on disk. Overwrite? (y = yes, n = no)	Il file è cambiato su disco. Sovrascrivere? (s = sì, n = no)
+The file is not in a Git repository	Il file non è in un repository Git
+The selection must be on one line	La selezione deve stare su una riga
+Theme: %s	Tema: %s
+This is the only pane	È l'unico pannello
+To save: %s	Da salvare: %s
 Toggle Git markers	Attiva/disattiva gli indicatori Git
 Toggle auto-pairs	Attiva/disattiva le coppie automatiche
 Toggle autosuggest	Attiva/disattiva l'autosuggest
@@ -94,6 +214,78 @@ Toggle mouse	Attiva/disattiva il mouse
 Toggle system clipboard	Attiva/disattiva gli appunti di sistema
 Undo	Annulla
 Unfold all	Espandi tutto
+User	Utente
+Warning: the file contains NUL bytes (binary?)	Attenzione: il file contiene byte NUL (binario?)
+[Untitled]	[Senza nome]
+[not started: %s]\n	[non avviato: %s]\n
+[output truncated at 5 MB]	[output troncato a 5 MB]
+\n[exited with %d, %ld.%ld s]\n	\n[uscito con %d, %ld,%ld s]\n
+\n[finished, %ld.%ld s]\n	\n[terminato, %ld,%ld s]\n
 active	attiva
+all languages	tutti i linguaggi
+built in	integrata
+cannot read %s: %s	non posso leggere %s: %s
+cannot write %s: %s	non posso scrivere %s: %s
+ctrl+%c is the same as Tab, Enter or Backspace: the terminal cannot tell them apart	ctrl+%c coincide con Tab, Invio o Backspace: il terminale non li distingue
+error	errore
+finished	terminato
+interrupted	interrotto
+invalid key «%s»	tasto «%s» non valido
+invalid section «%s»	sezione non valida «%s»
+invalid theme	tema non valido
+invalid value «%s» for %s	valore non valido «%s» per %s
+is a directory	è una directory
+is not a regular file	non è un file regolare
+language «%s» not found	lingua «%s» non trovata
+line %d: %s	riga %d: %s
+line %d: invalid colour «%s» (#rrggbb needed)	riga %d: colore non valido «%s» (serve #rrggbb)
+line %d: missing name	riga %d: manca il nome
+line %d: unknown key «%s»	riga %d: chiave sconosciuta «%s»
+line %zu: a region up to the end of the line cannot be ml	riga %zu: una regione fino a fine riga non può essere ml
+line %zu: calls needs a class	riga %zu: calls richiede una classe
+line %zu: comment needs a symbol	riga %zu: comment richiede un simbolo
+line %zu: decl needs class, func, method, prop, const, var or ns	riga %zu: decl richiede class, func, method, prop, const, var o ns
+line %zu: embed needs a language, a class, a start and an end	riga %zu: embed richiede linguaggio, classe, inizio e fine
+line %zu: embeds must come before the other regions	riga %zu: le embed vanno scritte prima delle altre regioni
+line %zu: idchars needs characters	riga %zu: idchars richiede dei caratteri
+line %zu: member needs operators	riga %zu: member richiede degli operatori
+line %zu: missing name	riga %zu: manca il nome
+line %zu: missing pattern	riga %zu: manca il modello
+line %zu: operators needs characters	riga %zu: operators richiede dei caratteri
+line %zu: region needs a class, a start and an end	riga %zu: region richiede classe, inizio e fine
+line %zu: scope needs indent or brace	riga %zu: scope richiede indent o brace
+line %zu: sigil needs a class and a character	riga %zu: sigil richiede classe e un carattere
+line %zu: too many regions	riga %zu: troppe regioni
+line %zu: unknown class	riga %zu: classe sconosciuta
+line %zu: unknown directive	riga %zu: direttiva sconosciuta
+line %zu: unknown option	riga %zu: opzione sconosciuta
+line %zu: word too long	riga %zu: parola troppo lunga
+line %zu: words needs a class and words	riga %zu: words richiede classe e parole
+missing command for «%s»	manca il comando per «%s»
+missing key in «%s»	manca il tasto in «%s»
+missing name directive	manca la direttiva name
+missing «=» in «%s»	manca «=» in «%s»
+missing «name» line	manca la riga «name»
+no file name	nessun nome file
+no results	nessun risultato
 off	spento
+ok	ok
 on	attivo
+only %s	solo %s
+out of memory	memoria esaurita
+the project's .xted	.xted del progetto
+the user file	il file utente
+unknown command «%s»	comando «%s» sconosciuto
+unknown key «%s»	tasto «%s» sconosciuto
+unknown key «%s»%s	chiave sconosciuta «%s»%s
+unknown modifier «%s» (ctrl, alt, shift)	modificatore «%s» sconosciuto (ctrl, alt, shift)
+unknown theme «%s»	tema «%s» sconosciuto
+unknown theme «%s» in .xted	tema «%s» sconosciuto nel .xted
+usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\nconfiguration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\nconfigurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/, lang/\n
+xted: '-' needs the text on stdin (only once)\n	xted: '-' richiede il testo su stdin (una volta sola)\n
+xted: an interactive terminal is needed\n	xted: serve un terminale interattivo\n
+xted: unknown option: %s\n	xted: opzione sconosciuta: %s\n
+«%s» changed on disk%s. Reload? (r = reload, i = ignore)	«%s» è cambiato su disco%s. Ricaricare? (r = ricarica, i = ignora)
+«%s» has unsaved changes. Save? (y = yes, n = no%s, Esc = cancel)	«%s» ha modifiche non salvate. Salvare? (s = sì, n = no%s, Esc = annulla)
+«%s» is no longer where the tags file says	«%s» non si trova più dove dice il file tags
+«%s» no longer exists on disk	«%s» non esiste più su disco

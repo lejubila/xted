@@ -1,4 +1,5 @@
 #include "config.h"
+#include "i18n.h"
 #include "util.h"
 
 #include <ctype.h>
@@ -56,7 +57,7 @@ static void complain(Config *c, int line, const char *fmt, ...)
     vsnprintf(msg, sizeof msg, fmt, ap);
     va_end(ap);
     if (line > 0)
-        snprintf(c->first_error, sizeof c->first_error, "riga %d: %s", line, msg);
+        snprintf(c->first_error, sizeof c->first_error, tr("line %d: %s"), line, msg);
     else
         snprintf(c->first_error, sizeof c->first_error, "%s", msg);
 }
@@ -209,7 +210,7 @@ int config_parse(Config *c, const char *text, size_t n)
             size_t kl = strlen(key);
 
             if (key[kl - 1] != ']' || kl < 3) {
-                complain(c, lineno, "sezione non valida «%s»", key);
+                complain(c, lineno, tr("invalid section «%s»"), key);
                 where = TOP;
                 sec = NULL;
                 free(line);
@@ -229,7 +230,7 @@ int config_parse(Config *c, const char *text, size_t n)
         }
         eq = strchr(key, '=');
         if (!eq) {
-            complain(c, lineno, "manca «=» in «%s»", key);
+            complain(c, lineno, tr("missing «=» in «%s»"), key);
             free(line);
             continue;
         }
@@ -238,7 +239,7 @@ int config_parse(Config *c, const char *text, size_t n)
         key = trim(key);
         if (where == KEYS) {
             if (!*val) {
-                complain(c, lineno, "manca il comando per «%s»", key);
+                complain(c, lineno, tr("missing command for «%s»"), key);
             } else {
                 if (c->nkeys == c->keycap) {
                     c->keycap = c->keycap ? c->keycap * 2 : 16;
@@ -263,7 +264,7 @@ int config_parse(Config *c, const char *text, size_t n)
             if (r == -1 && where == TOP) {
                 if (!strcmp(key, "theme")) {
                     if (!*val || strlen(val) >= sizeof c->theme)
-                        complain(c, lineno, "tema non valido");
+                        complain(c, lineno, tr("invalid theme"));
                     else
                         snprintf(c->theme, sizeof c->theme, "%s", val);
                     r = 0;
@@ -296,10 +297,10 @@ int config_parse(Config *c, const char *text, size_t n)
                 }
             }
             if (r == -1)
-                complain(c, lineno, "chiave sconosciuta «%s»%s", key,
-                         where == LANG ? " in una sezione di linguaggio" : "");
+                complain(c, lineno, tr("unknown key «%s»%s"), key,
+                         where == LANG ? tr(" in a language section") : "");
             else if (r == -2)
-                complain(c, lineno, "valore non valido «%s» per %s", val, key);
+                complain(c, lineno, tr("invalid value «%s» for %s"), val, key);
             free(lv);
         }
         free(line);

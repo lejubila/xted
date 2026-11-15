@@ -1,4 +1,6 @@
+#include "config.h"
 #include "editor.h"
+#include "i18n.h"
 #include "term.h"
 
 #include <ctype.h>
@@ -10,9 +12,9 @@
 
 static void usage(FILE *f)
 {
-    fputs("uso: xted [file[:riga[:colonna]] ...]\n"
-          "     xted -       legge il testo da stdin\n"
-          "configurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/\n", f);
+    fputs(tr("usage: xted [file[:line[:column]] ...]\n"
+             "     xted -       reads the text from stdin\n"
+             "configuration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n"), f);
 }
 
 /* Splits "name:12:3" into the name and a line/column, but only when the
@@ -65,14 +67,20 @@ int main(int argc, char **argv)
     Editor e;
     Doc *first = NULL;
     int i, stdin_used = 0;
+    char *cd = config_dir();
 
+    /* the language of the command line messages comes from the environment (the configuration
+     * is read later and may choose another one) */
+    i18n_init(cd);
+    i18n_set("auto");
+    free(cd);
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             usage(stdout);
             return 0;
         }
         if (argv[i][0] == '-' && argv[i][1] != '\0') {
-            fprintf(stderr, "xted: opzione sconosciuta: %s\n", argv[i]);
+            fprintf(stderr, tr("xted: unknown option: %s\n"), argv[i]);
             usage(stderr);
             return 2;
         }
@@ -86,7 +94,7 @@ int main(int argc, char **argv)
 
         if (strcmp(argv[i], "-") == 0) {
             if (stdin_used || isatty(STDIN_FILENO)) {
-                fputs("xted: '-' richiede il testo su stdin (una volta sola)\n", stderr);
+                fputs(tr("xted: '-' needs the text on stdin (only once)\n"), stderr);
                 return 2;
             }
             stdin_used = 1;
@@ -123,7 +131,7 @@ int main(int argc, char **argv)
     editor_load_project(&e);
 
     if (term_init() < 0) {
-        fputs("xted: serve un terminale interattivo\n", stderr);
+        fputs(tr("xted: an interactive terminal is needed\n"), stderr);
         return 1;
     }
     editor_run(&e);

@@ -1,4 +1,5 @@
 #include "cfgsave.h"
+#include "i18n.h"
 #include "editorconfig.h"
 #include "util.h"
 
@@ -83,7 +84,7 @@ static int write_lines(const char *file, const Lines *L, char *err, size_t errn)
     snprintf(tmp, n, "%s.xted-tmp-%ld", file, (long)getpid());
     f = fopen(tmp, "w");
     if (!f) {
-        snprintf(err, errn, "non posso scrivere %s: %s", file, strerror(errno));
+        snprintf(err, errn, tr("cannot write %s: %s"), file, strerror(errno));
         free(tmp);
         return -1;
     }
@@ -96,7 +97,7 @@ static int write_lines(const char *file, const Lines *L, char *err, size_t errn)
     if (ok)
         chmod(tmp, mode);
     if (!ok || rename(tmp, file) != 0) {
-        snprintf(err, errn, "non posso scrivere %s: %s", file, strerror(errno));
+        snprintf(err, errn, tr("cannot write %s: %s"), file, strerror(errno));
         unlink(tmp);
         free(tmp);
         return -1;
@@ -190,7 +191,7 @@ int cfgsave_write(const char *file, const char *section, const CfgPair *p, size_
     int r;
 
     if (read_lines(file, &L) < 0) {
-        snprintf(err, errn, "non posso leggere %s: %s", file, strerror(errno));
+        snprintf(err, errn, tr("cannot read %s: %s"), file, strerror(errno));
         return -1;
     }
     if (!find_section(&L, section, &from, &to)) {
@@ -398,7 +399,7 @@ int cfgsave_editorconfig(const char *docpath, const CfgPair *p, size_t n, char *
         free(rp);
     }
     if (read_lines(full, &L) < 0) {
-        snprintf(err, errn, "non posso leggere %s: %s", full, strerror(errno));
+        snprintf(err, errn, tr("cannot read %s: %s"), full, strerror(errno));
         r = -1;
         goto done;
     }

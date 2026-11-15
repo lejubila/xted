@@ -1,4 +1,5 @@
 #include "find.h"
+#include "i18n.h"
 #include "edit.h"
 #include "files.h"
 #include "utf8.h"
@@ -109,7 +110,7 @@ static void refresh(Editor *e)
         set_info(e, tail);
     } else {
         restore_origin(e);
-        set_info(e, "nessun risultato");
+        set_info(e, tr("no results"));
     }
 }
 
@@ -143,7 +144,7 @@ static void step(Editor *e, int forward)
         f->oy = h.y;
         f->ox = h.x;
         search_stats(f->m, e->buf, h.y, h.x, STATS_CAP, &before, &total);
-        snprintf(tail, sizeof tail, "%zu/%zu%s", before + 1, total, wr ? " (da capo)" : "");
+        snprintf(tail, sizeof tail, "%zu/%zu%s", before + 1, total, wr ? tr(" (wrapped)") : "");
         set_info(e, tail);
     }
 }
@@ -154,7 +155,7 @@ void find_open(Editor *e, int replace)
     size_t n;
 
     if (replace && e->doc->readonly) {
-        editor_set_msg(e, MSG_TTL_MS, "File in sola lettura (Alt+S per salvare con un altro nome)");
+        editor_set_msg(e, MSG_TTL_MS, tr("File is read-only (Alt+S to save under another name)"));
         return;
     }
     buf_undo_close(e->buf);
@@ -192,7 +193,7 @@ void find_open(Editor *e, int replace)
     (void)n;
     e->prompt_on = 1;
     snprintf(e->prompt_label, sizeof e->prompt_label, "%s",
-             replace ? "Sostituisci - cerca: " : "Cerca: ");
+             replace ? tr("Replace - find: ") : tr("Find: "));
     if (e->prompt_len > 0)
         refresh(e);
     else
@@ -212,7 +213,7 @@ void find_files_open(Editor *e)
     snprintf(e->prompt_text, sizeof e->prompt_text, "%s", f->pat);
     e->prompt_len = strlen(e->prompt_text);
     e->prompt_on = 1;
-    snprintf(e->prompt_label, sizeof e->prompt_label, "Cerca nei file: ");
+    snprintf(e->prompt_label, sizeof e->prompt_label, tr("Find in files: "));
     if (e->prompt_len > 0)
         refresh(e);
     else
@@ -244,10 +245,10 @@ static void confirm_prompt(Editor *e)
     char tail[48];
 
     snprintf(e->prompt_label, sizeof e->prompt_label,
-             "Sostituire? (s = sì, n = no, t = tutte, Esc = fine) ");
+             tr("Replace? (y = yes, n = no, a = all, Esc = done) "));
     e->prompt_len = 0;
     e->prompt_text[0] = '\0';
-    snprintf(tail, sizeof tail, "%zu sostituiti", e->find.nrepl);
+    snprintf(tail, sizeof tail, tr("%zu replaced"), e->find.nrepl);
     snprintf(e->prompt_info, sizeof e->prompt_info, "%s", tail);
 }
 
@@ -264,9 +265,9 @@ static void finish_replace(Editor *e)
     e->sel_on = 0;
     f->hl = 0;
     if (f->nrepl > 0)
-        editor_set_msg(e, MSG_TTL_MS, "%zu sostituzioni", f->nrepl);
+        editor_set_msg(e, MSG_TTL_MS, tr("%zu replacements"), f->nrepl);
     else
-        editor_set_msg(e, MSG_TTL_MS, "Nessuna sostituzione");
+        editor_set_msg(e, MSG_TTL_MS, tr("No replacements"));
 }
 
 /* Moves to the next match at or after (y,x); finishes when there is none left. */
@@ -342,12 +343,12 @@ static void handle_confirm(Editor *e, Key k)
 
     if (c >= 'A' && c <= 'Z')
         c += 32;
-    if (c == 's' || k.code == KEY_ENTER) {
+    if (c == 's' || c == 'y' || k.code == KEY_ENTER) {
         replace_current(e);
         confirm_advance(e, f->hit.y, e->cx);
     } else if (c == 'n') {
         confirm_advance(e, f->hit.y, f->hit.end);
-    } else if (c == 't') {
+    } else if (c == 't' || c == 'a') {
         while (f->mode == FIND_CONFIRM) {
             replace_current(e);
             confirm_advance(e, f->hit.y, e->cx);
@@ -399,10 +400,10 @@ static void run_files(Editor *e)
     }
     search_dir(f->m, e->root ? e->root : ".", seen_skip, &seen, &f->files, FIND_MAX_RESULTS);
     if (f->files.n == 0) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun risultato per «%s»", f->pat);
+        editor_set_msg(e, MSG_TTL_MS, tr("No results for «%s»"), f->pat);
         return;
     }
-    picker_open(&e->picker, "Risultati");
+    picker_open(&e->picker, tr("Results"));
     e->picker_kind = PK_RESULTS;
     for (i = 0; i < f->files.n; i++) {
         const FileHit *h = &f->files.v[i];
@@ -415,7 +416,7 @@ static void run_files(Editor *e)
     sbuf_free(&item);
     picker_filter(&e->picker);
     if (f->files.truncated)
-        editor_set_msg(e, MSG_TTL_MS, "Risultati troncati ai primi %d", FIND_MAX_RESULTS);
+        editor_set_msg(e, MSG_TTL_MS, tr("Results truncated to the first %d"), FIND_MAX_RESULTS);
 }
 
 void find_open_result(Editor *e, size_t idx)
@@ -508,14 +509,14 @@ void find_handle_key(Editor *e, Key k)
             run_files(e);
         } else if (f->replace) {
             f->mode = FIND_WITH;
-            snprintf(e->prompt_label, sizeof e->prompt_label, "Sostituisci con: ");
+            snprintf(e->prompt_label, sizeof e->prompt_label, tr("Replace with: "));
             snprintf(e->prompt_text, sizeof e->prompt_text, "%s", f->repl);
             e->prompt_len = strlen(e->prompt_text);
             e->prompt_info[0] = '\0';
         } else {
             if (!f->hit_valid) {
                 restore_origin(e);
-                editor_set_msg(e, MSG_TTL_MS, "Nessun risultato per «%s»", f->pat);
+                editor_set_msg(e, MSG_TTL_MS, tr("No results for «%s»"), f->pat);
             }
             close_bar(e);
         }
@@ -535,7 +536,7 @@ void find_next(Editor *e, int forward)
     size_t y, x;
 
     if (!f->m || !f->m->valid) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessuna ricerca: premi Ctrl+F");
+        editor_set_msg(e, MSG_TTL_MS, tr("No search yet: press Ctrl+F"));
         return;
     }
     if (edit_sel_active(e)) {
@@ -549,14 +550,14 @@ void find_next(Editor *e, int forward)
         x = e->cx;
     }
     if (!search_next(f->m, e->buf, y, x, forward, 1, NULL, &h, &wr)) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun risultato per «%s»", f->pat);
+        editor_set_msg(e, MSG_TTL_MS, tr("No results for «%s»"), f->pat);
         return;
     }
     set_sel(e, &h);
     f->hl = 1;
     if (wr)
-        editor_set_msg(e, MSG_TTL_MS, forward ? "Ricerca ripartita dall'inizio"
-                                              : "Ricerca ripartita dalla fine");
+        editor_set_msg(e, MSG_TTL_MS, forward ? tr("Search wrapped to the start")
+                                              : tr("Search wrapped to the end"));
 }
 
 void find_goto(Editor *e)
@@ -564,16 +565,16 @@ void find_goto(Editor *e)
     char text[64];
     size_t line, col;
 
-    if (editor_prompt(e, "Vai a riga[:colonna]: ", NULL, text, sizeof text) == 0)
+    if (editor_prompt(e, tr("Go to line[:column]: "), NULL, text, sizeof text) == 0)
         return;
     if (search_parse_goto(text, &line, &col) < 0) {
-        editor_set_msg(e, MSG_TTL_MS, "Formato non valido: usa 12, 12:5 o :5");
+        editor_set_msg(e, MSG_TTL_MS, tr("Invalid format: use 12, 12:5 or :5"));
         return;
     }
     buf_undo_close(e->buf);
     if (line > e->buf->nlines) {
         line = e->buf->nlines;
-        editor_set_msg(e, MSG_TTL_MS, "Oltre la fine: riga %zu", line);
+        editor_set_msg(e, MSG_TTL_MS, tr("Past the end: line %zu"), line);
     }
     editor_goto(e, line ? line : e->cy + 1, col ? col : 1);
 }
@@ -643,7 +644,7 @@ static void goto_hit(Editor *e, const TagHit *h)
     line = tag_resolve(h, e->find.tag_name, e->buf);
     if (line == 0) {
         editor_goto(e, 1, 1);
-        editor_set_msg(e, MSG_TTL_MS, "«%s» non si trova più dove dice il file tags", e->find.tag_name);
+        editor_set_msg(e, MSG_TTL_MS, tr("«%s» is no longer where the tags file says"), e->find.tag_name);
     } else {
         editor_goto(e, line, 1);
     }
@@ -661,7 +662,7 @@ void find_tag(Editor *e)
     size_t i;
 
     if (word_under_cursor(e, name, sizeof name) == 0) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessuna parola sotto il cursore");
+        editor_set_msg(e, MSG_TTL_MS, tr("No word under the cursor"));
         return;
     }
     dir = from ? xstrdup(from) : xstrdup(e->root ? e->root : ".");
@@ -681,7 +682,7 @@ void find_tag(Editor *e)
     file = tags_find_file(dir);
     free(dir);
     if (!file) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun file tags (si crea con ctags -R)");
+        editor_set_msg(e, MSG_TTL_MS, tr("No tags file (create it with ctags -R)"));
         return;
     }
     taghits_free(&f->tags);
@@ -694,18 +695,18 @@ void find_tag(Editor *e)
     n = tags_lookup(file, name, &f->tags);
     free(file);
     if (n < 0) {
-        editor_set_msg(e, MSG_TTL_MS, "Impossibile leggere il file tags");
+        editor_set_msg(e, MSG_TTL_MS, tr("Cannot read the tags file"));
         return;
     }
     if (n == 0) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessuna definizione di «%s»", name);
+        editor_set_msg(e, MSG_TTL_MS, tr("No definition of «%s»"), name);
         return;
     }
     if (n == 1) {
         goto_hit(e, &f->tags.v[0]);
         return;
     }
-    picker_open(&e->picker, "Definizione");
+    picker_open(&e->picker, tr("Definition"));
     e->picker_kind = PK_TAGS;
     for (i = 0; i < f->tags.n; i++) {
         const TagHit *h = &f->tags.v[i];

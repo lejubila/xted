@@ -565,7 +565,7 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
 
         if (y + 1 + hid > d->buf.nlines)
             hid = d->buf.nlines - 1 - y;
-        snprintf(lab, sizeof lab, " \xe2\x8b\xaf %zu righe", hid);
+        snprintf(lab, sizeof lab, tr(" \xe2\x8b\xaf %zu lines"), hid);
         sbuf_adds(o, "\x1b[2m");
         col += fit_cols(o, lab, strlen(lab), right - col);
         sbuf_adds(o, "\x1b[22m");
@@ -683,7 +683,7 @@ static void status_row(SBuf *o, const Win *w, int active, int scan, const Editor
 {
     const Doc *d = w->doc;
     SBuf right = SBUF_INIT;
-    const char *name = d->title ? d->title : d->buf.path ? d->buf.path : "[Senza nome]";
+    const char *name = d->title ? d->title : d->buf.path ? d->buf.path : tr("[Untitled]");
     char mark[16];
     size_t cols = (size_t)w->w, lmax, used = 0, marklen;
     int hint_on;
@@ -691,7 +691,7 @@ static void status_row(SBuf *o, const Win *w, int active, int scan, const Editor
     snprintf(mark, sizeof mark, "%s%s", d->buf.modified ? " [+]" : "", d->readonly && !d->scratch ? " [RO]" : "");
     marklen = strlen(mark);
     if (scan >= 0 && cols >= 48)
-        sbuf_addf(&right, " Scansione %c ", "|/-\\"[scan & 3]);
+        sbuf_addf(&right, tr(" Scanning %c "), "|/-\\"[scan & 3]);
     else if (scan >= 0)
         sbuf_addf(&right, " %c ", "|/-\\"[scan & 3]);
     hint_on = active && e->hint[0] && cols >= 48;
@@ -699,7 +699,7 @@ static void status_row(SBuf *o, const Win *w, int active, int scan, const Editor
         char style[24] = "";
 
         if (cols >= 62)
-            snprintf(style, sizeof style, d->expand_tab ? "  Spazi %d" : "  Tab %d",
+            snprintf(style, sizeof style, d->expand_tab ? tr("  Spaces %d") : "  Tab %d",
                      d->expand_tab ? d->indent_w : d->tabw);
         sbuf_addf(&right, " %s  %s  UTF-8%s  Ln %zu, Col %zu ", syn_name(d->syn),
                   d->buf.crlf ? "CRLF" : "LF", style, w->view.cy + 1,
@@ -807,7 +807,8 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
 {
     const Find *f = &e->find;
     int mode = f->mode, cs = f->cs, wd = f->word, rx = f->regex;
-    const char *go = tr(mode == FIND_FILES ? "Enter searches" : f->replace ? "Enter next" : "Enter closes");
+    const char *go = mode == FIND_FILES ? tr("Enter searches") : f->replace ? tr("Enter next")
+                                                                       : tr("Enter closes");
     HintSeg t[3][HINT_MAXSEG];
     size_t nt[3], k, i;
 
@@ -1130,7 +1131,7 @@ static void picker_row(SBuf *o, const Editor *e, int k)
         used += fit_cols(o, p->query, p->qlen, cols > used ? cols - used : 0);
         if (p->loading) {
             char ind[48];
-            size_t n = (size_t)snprintf(ind, sizeof ind, " Caricamento %c %zu ",
+            size_t n = (size_t)snprintf(ind, sizeof ind, tr(" Loading %c %zu "),
                                         "|/-\\"[p->spin & 3], p->nitems);
 
             if (cols > used + n) {

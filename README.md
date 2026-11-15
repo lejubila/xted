@@ -290,7 +290,8 @@ L'editor funziona senza alcun file di configurazione. Se vuoi cambiare qualcosa,
 ~/.config/xted/
 ├── config          impostazioni e scorciatoie
 ├── syntax/         linguaggi aggiuntivi (un file per linguaggio)
-└── themes/         temi aggiuntivi (un file per tema)
+├── themes/         temi aggiuntivi (un file per tema)
+└── lang/           cataloghi di traduzione (un file per lingua)
 ```
 
 ### Il file `config`
@@ -301,7 +302,8 @@ maiuscole) le cambia per quel linguaggio; `[keys]` contiene le scorciatoie.
 
 ```
 # globali
-theme = chiaro            # scuro (predefinito) o chiaro, o un tema tuo
+theme = light             # dark (predefinito) o light, o un tema tuo (anche scuro/chiaro)
+language = auto           # auto (da LC_ALL, LC_MESSAGES, LANG), en, it, o un codice con catalogo
 mouse = on
 git = on
 clipboard = on            # copie anche negli appunti di sistema (OSC 52)
@@ -382,16 +384,39 @@ Accanto a ogni destinazione una nota avvisa se verrebbe ignorata da un file più
 progetto vince il suo .xted», «ignorato: vince il file utente»). I file si modificano riga
 per riga, senza perdere commenti e ordine, e si scrivono in modo atomico.
 
+## Lingua dell'interfaccia
+
+I testi dell'editor (messaggi, domande, nomi dei comandi nella palette, errori) sono in
+inglese nel codice. La traduzione sta in file esterni, non nel binario: oggi c'è l'italiano,
+`lang/it`, nel repository.
+
+- La lingua si sceglie con `language = auto | en | it` nel `config` (o nel `.xted`). Con `auto`
+  si legge `LC_ALL`, `LC_MESSAGES` e `LANG` (`it_IT.UTF-8` → italiano); se la lingua non è
+  nota o il suo file manca si usa l'inglese, senza errori.
+- Dalla palette (`Alt+X`) il comando **Language / Lingua**, tra le impostazioni, passa alla
+  lingua successiva. Nella stessa riga compare il file da cui è stata caricata («built in» per
+  l'inglese). «Salva le impostazioni…» la salva come chiave `language`.
+- Un catalogo è un file di testo chiamato come la lingua (`it`): una riga per testo,
+  `testo inglese<TAB>traduzione`, `#` per i commenti, `@name<TAB>Nome della lingua`, e `\n`,
+  `\t`, `\\` come escape. Una traduzione con conversioni `printf` (`%s`, `%zu`, …) diverse
+  dall'originale viene ignorata.
+- I cataloghi si cercano, nell'ordine, in `~/.config/xted/lang/`, in `lang/` e
+  `../share/xted/lang/` accanto all'eseguibile, e in `$PREFIX/share/xted/lang/`. `make install`
+  li copia lì. Per aggiungere una lingua basta un nuovo file, anche solo in `~/.config/xted/lang/`,
+  senza ricompilare.
+- `tools/i18n_check.py` confronta i testi del codice con il catalogo e segnala quelli senza
+  traduzione o non più usati.
+
 ## Temi e linguaggi dell'utente
 
 **Temi** (`themes/NOME`): righe `chiave valore` con i colori `#rrggbb`:
 `name`, `foreground`, `background` (anche `none` per usare lo sfondo del terminale), una riga
 per classe di sintassi, `match`, `popup`, `popup_sel`, `git_add`, `git_mod`, `git_del`. Ciò
-che manca viene dal tema scuro. I colori si adattano al terminale: truecolor, 256 o 16
+che manca viene dal tema `dark`. I colori si adattano al terminale: truecolor, 256 o 16
 colori, rilevati da `$COLORTERM` e `$TERM`; con `NO_COLOR` si disattivano.
 
-I temi con uno sfondo (come `chiaro`) colorano anche barre, tab, riga di stato, elenchi e
-cursore con i propri colori; senza sfondo (come `scuro`) si usano i colori del terminale.
+I temi con uno sfondo (come `light`) colorano anche barre, tab, riga di stato, elenchi e
+cursore con i propri colori; senza sfondo (come `dark`) si usano i colori del terminale.
 
 **Linguaggi** (`syntax/NOME`): file di testo con le stesse direttive dei linguaggi
 incorporati (`name`, `ext`, `words`, `comment`, `region`, `decl`, `member`, …); il formato è

@@ -129,7 +129,8 @@ L'interfaccia è minimale ma informativa; tutto è configurabile da un file di t
 - **Salva le impostazioni…** (palette): scrive ciò che è stato cambiato con comandi (indentazione, tema, interruttori di autosuggest, coppie automatiche, mouse, Git, appunti di sistema) nel file scelto dall'utente: utente (sezione globale o del linguaggio), `.xted` di progetto (creato nella radice del progetto se manca; riceve anche tema, mouse, Git e appunti) o `.editorconfig` (solo indentazione). Le modifiche degli altri documenti aperti si salvano insieme, una sezione `[Linguaggio]` per linguaggio (nel `.editorconfig`, nella sezione del file di ciascun documento); «tutti i linguaggi» riguarda il solo documento attivo. Ogni destinazione indica se verrebbe ignorata da un file più forte. I file si modificano riga per riga, senza perdere commenti e ordine.
 - Scorciatoie da tastiera rimappabili.
 - Cartella `~/.config/xted/syntax/` per aggiungere linguaggi senza ricompilare.
-- Temi in `~/.config/xted/themes/`.
+- Temi in `~/.config/xted/themes/` (i predefiniti si chiamano `dark` e `light`; `scuro` e `chiaro` si accettano ancora).
+- **Lingua dell'interfaccia**: i testi nel codice sono in inglese e si traducono da cataloghi esterni (`lang/<codice>`, cercati in `~/.config/xted/lang/`, accanto all'eseguibile e in `$PREFIX/share/xted/lang/`), non incorporati nel binario. Chiave `language = auto|en|it` (`auto` da `LC_ALL`, `LC_MESSAGES`, `LANG`) e comando «Language» nella palette, che mostra il file del catalogo in uso. Una traduzione con conversioni `printf` diverse viene scartata.
 - Valori predefiniti sensati: l'editor funziona senza alcun file di configurazione.
 
 ### Prestazioni e qualità

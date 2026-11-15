@@ -1,4 +1,5 @@
 #include "run.h"
+#include "i18n.h"
 #include "errors.h"
 #include "files.h"
 #include "utf8.h"
@@ -103,7 +104,7 @@ void run_append(Editor *e, const char *s, size_t n)
             if (!r->trunc) {
                 flush(b, &seg);
                 buf_split(b, b->nlines - 1, b->lines[b->nlines - 1].len);
-                sbuf_adds(&seg, "[output troncato a 5 MB]");
+                sbuf_adds(&seg, tr("[output truncated at 5 MB]"));
                 flush(b, &seg);
                 r->trunc = 1;
             }
@@ -185,15 +186,15 @@ static void finish(Editor *e)
     char line[96];
 
     if (code >= 0)
-        snprintf(line, sizeof line, "\n[uscito con %d, %ld,%ld s]\n", code, ms / 1000,
+        snprintf(line, sizeof line, tr("\n[exited with %d, %ld.%ld s]\n"), code, ms / 1000,
                  (ms % 1000) / 100);
     else
-        snprintf(line, sizeof line, "\n[terminato, %ld,%ld s]\n", ms / 1000, (ms % 1000) / 100);
+        snprintf(line, sizeof line, tr("\n[finished, %ld.%ld s]\n"), ms / 1000, (ms % 1000) / 100);
     r->bytes = 0;
     if (!r->trunc)
         run_append(e, line, strlen(line));
     editor_set_msg(e, MSG_TTL_MS, "%s: %s", r->cmd,
-                   code == 0 ? "ok" : code < 0 ? "terminato" : code > 128 ? "interrotto" : "errore");
+                   code == 0 ? tr("ok") : code < 0 ? tr("finished") : code > 128 ? tr("interrupted") : tr("error"));
     shell_close(&r->job);
     r->on = 0;
 }
@@ -256,16 +257,16 @@ void run_command(Editor *e, const char *cmd)
     show_output(e);
     snprintf(header, sizeof header, "$ %s\n", cmd);
     if (shell_start(&r->job, cmd, e->root, err, sizeof err) < 0) {
-        snprintf(header + strlen(header), sizeof header - strlen(header), "[non avviato: %s]\n",
+        snprintf(header + strlen(header), sizeof header - strlen(header), tr("[not started: %s]\n"),
                  err);
         run_append(e, header, strlen(header));
-        editor_set_msg(e, MSG_TTL_MS, "Impossibile avviare il comando: %s", err);
+        editor_set_msg(e, MSG_TTL_MS, tr("Cannot start the command: %s"), err);
         return;
     }
     r->on = 1;
     r->t0 = now_ms();
     run_append(e, header, strlen(header));
-    editor_set_msg(e, 0, "In esecuzione: %s (Maiusc+F5 interrompe)", cmd);
+    editor_set_msg(e, 0, tr("Running: %s (Shift+F5 stops)"), cmd);
 }
 
 void run_prompt(Editor *e)
@@ -273,12 +274,12 @@ void run_prompt(Editor *e)
     char text[sizeof e->run.cmd];
 
     if (e->run.on) {
-        int c = editor_ask(e, "Un comando è in esecuzione. Interromperlo? (s = sì, n = no)", "sn");
+        int c = editor_ask(e, tr("A command is running. Stop it? (y = yes, n = no)"), "sn");
 
         if (c != 's')
             return;
     }
-    if (editor_prompt(e, "Esegui: ", e->run.cmd, text, sizeof text) == 0)
+    if (editor_prompt(e, tr("Run: "), e->run.cmd, text, sizeof text) == 0)
         return;
     run_command(e, text);
 }
@@ -286,7 +287,7 @@ void run_prompt(Editor *e)
 void run_again(Editor *e)
 {
     if (!e->run.cmd[0]) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun comando eseguito (Alt+R)");
+        editor_set_msg(e, MSG_TTL_MS, tr("No command has been run (Alt+R)"));
         return;
     }
     run_command(e, e->run.cmd);
@@ -295,11 +296,11 @@ void run_again(Editor *e)
 void run_stop(Editor *e)
 {
     if (!e->run.on) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun comando in esecuzione");
+        editor_set_msg(e, MSG_TTL_MS, tr("No command is running"));
         return;
     }
     shell_stop(&e->run.job);
-    editor_set_msg(e, MSG_TTL_MS, "Interruzione richiesta");
+    editor_set_msg(e, MSG_TTL_MS, tr("Stop requested"));
 }
 
 int run_is_output(const Editor *e, const Doc *d)
@@ -412,7 +413,7 @@ static void step_error(Editor *e, int dir)
     long y;
 
     if (!r->out || r->out->buf.nlines <= 1) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun output da cercare");
+        editor_set_msg(e, MSG_TTL_MS, tr("No output to search"));
         return;
     }
     b = &r->out->buf;
@@ -430,7 +431,7 @@ static void step_error(Editor *e, int dir)
             return;
         }
     }
-    editor_set_msg(e, MSG_TTL_MS, dir > 0 ? "Nessun altro errore" : "Nessun errore precedente");
+    editor_set_msg(e, MSG_TTL_MS, dir > 0 ? tr("No more errors") : tr("No previous error"));
 }
 
 void run_next_error(Editor *e)
@@ -452,7 +453,7 @@ int run_enter(Editor *e)
         return 0;
     p = line_error(e, e->cy, &ln, &col);
     if (!p) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun errore su questa riga");
+        editor_set_msg(e, MSG_TTL_MS, tr("No error on this line"));
         return 1;
     }
     free(p);

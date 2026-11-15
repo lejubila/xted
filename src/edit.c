@@ -1,4 +1,5 @@
 #include "edit.h"
+#include "i18n.h"
 #include "cursors.h"
 #include "shell.h"
 #include "utf8.h"
@@ -580,8 +581,8 @@ static void store_clip(Editor *e, char *text, size_t n, int whole, const char *v
         sbuf_free(&osc);
     }
     clip_push(&e->clip, text, n, whole);
-    editor_set_msg(e, MSG_TTL_MS, "%s: %zu byte%s", verb, n,
-                   too_big ? " (troppo grande per gli appunti di sistema)" : "");
+    editor_set_msg(e, MSG_TTL_MS, tr("%s: %zu bytes%s"), verb, n,
+                   too_big ? tr(" (too large for the system clipboard)") : "");
 }
 
 static void copy_to_clip(Editor *e, const char *verb)
@@ -621,14 +622,14 @@ static void settle_cursor(Editor *e, size_t y)
 
 void edit_copy(Editor *e)
 {
-    copy_to_clip(e, "Copiato");
+    copy_to_clip(e, tr("Copied"));
 }
 
 void edit_cut(Editor *e)
 {
     int had_sel = edit_sel_active(e);
 
-    copy_to_clip(e, "Tagliato");
+    copy_to_clip(e, tr("Cut"));
     begin(e);
     if (had_sel) {
         delete_selection(e);
@@ -660,7 +661,7 @@ void edit_paste(Editor *e)
     int had_sel;
 
     if (!c) {
-        editor_set_msg(e, MSG_TTL_MS, "Appunti vuoti");
+        editor_set_msg(e, MSG_TTL_MS, tr("Clipboard is empty"));
         return;
     }
     begin(e);
@@ -677,11 +678,11 @@ void edit_paste_older(Editor *e)
     const ClipEntry *c;
 
     if (!e->paste_valid) {
-        editor_set_msg(e, MSG_TTL_MS, "Alt+V sostituisce l'ultimo incolla");
+        editor_set_msg(e, MSG_TTL_MS, tr("Alt+V replaces the last paste"));
         return;
     }
     if (e->clip.count < 2) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessuna voce precedente negli appunti");
+        editor_set_msg(e, MSG_TTL_MS, tr("No previous clipboard entry"));
         e->paste_valid = 1;
         return;
     }
@@ -736,7 +737,7 @@ void edit_undo(Editor *e)
     e->sel_on = 0;
     cur_clear(e);
     if (!buf_undo(e->buf, &y, &x)) {
-        editor_set_msg(e, MSG_TTL_MS, "Niente da annullare");
+        editor_set_msg(e, MSG_TTL_MS, tr("Nothing to undo"));
         return;
     }
     e->cy = y;
@@ -750,7 +751,7 @@ void edit_redo(Editor *e)
     e->sel_on = 0;
     cur_clear(e);
     if (!buf_redo(e->buf, &y, &x)) {
-        editor_set_msg(e, MSG_TTL_MS, "Niente da ripetere");
+        editor_set_msg(e, MSG_TTL_MS, tr("Nothing to redo"));
         return;
     }
     e->cy = y;
@@ -909,7 +910,7 @@ void edit_toggle_comment(Editor *e)
 
     sel_lines(e, &a, &b);
     if (!syn_comment_at(e->doc->syn, e->buf, a, &open, &close)) {
-        editor_set_msg(e, MSG_TTL_MS, "Nessun commento definito per questo linguaggio");
+        editor_set_msg(e, MSG_TTL_MS, tr("No comment defined for this language"));
         return;
     }
     olen = strlen(open);
@@ -1270,7 +1271,7 @@ void edit_filter(Editor *e)
 {
     char cmd[sizeof e->run.filter];
 
-    if (editor_prompt(e, "Filtra con: ", e->run.filter, cmd, sizeof cmd) == 0)
+    if (editor_prompt(e, tr("Filter with: "), e->run.filter, cmd, sizeof cmd) == 0)
         return;
     snprintf(e->run.filter, sizeof e->run.filter, "%s", cmd);
     edit_filter_cmd(e, cmd);
@@ -1296,13 +1297,13 @@ void edit_filter_cmd(Editor *e, const char *cmd)
     argv[1] = "-c";
     argv[2] = cmd;
     argv[3] = NULL;
-    editor_set_msg(e, 0, "Filtro in corso…");
+    editor_set_msg(e, 0, tr("Filtering…"));
     r = shell_capture(argv, e->root, in, n, &out, &err, FILTER_TIMEOUT_MS, FILTER_MAX_OUTPUT,
                       &st);
     if (r == -1) {
-        editor_set_msg(e, MSG_TTL_MS, "Impossibile avviare il comando");
+        editor_set_msg(e, MSG_TTL_MS, tr("Cannot start the command"));
     } else if (r == -2) {
-        editor_set_msg(e, MSG_TTL_MS, "Il comando ha superato %d s: testo invariato",
+        editor_set_msg(e, MSG_TTL_MS, tr("The command took more than %d s: text unchanged"),
                        FILTER_TIMEOUT_MS / 1000);
     } else if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) {
         size_t k = 0;
@@ -1310,10 +1311,10 @@ void edit_filter_cmd(Editor *e, const char *cmd)
         while (k < err.len && err.p[k] != '\n')
             k++;
         if (k > 0)
-            editor_set_msg(e, MSG_TTL_MS, "Il comando è fallito: %.*s", (int)(k > 120 ? 120 : k),
+            editor_set_msg(e, MSG_TTL_MS, tr("The command failed: %.*s"), (int)(k > 120 ? 120 : k),
                            err.p);
         else
-            editor_set_msg(e, MSG_TTL_MS, "Il comando è uscito con errore: testo invariato");
+            editor_set_msg(e, MSG_TTL_MS, tr("The command exited with an error: text unchanged"));
     } else {
         size_t ny = y0, nx = x0;
 
@@ -1335,7 +1336,7 @@ void edit_filter_cmd(Editor *e, const char *cmd)
             e->cx = e->cx < cur_line(e)->len ? e->cx : cur_line(e)->len;
         }
         finish(e);
-        editor_set_msg(e, MSG_TTL_MS, "Filtrato con: %s", cmd);
+        editor_set_msg(e, MSG_TTL_MS, tr("Filtered with: %s"), cmd);
     }
     free(in);
     sbuf_free(&out);

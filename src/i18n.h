@@ -21,6 +21,9 @@
 #endif
 
 const char *tr(const char *msg) XTED_FORMAT_ARG(1);
+/* Marks a text that is translated later, with tr() of a variable (the table of commands): the
+ * text stays as it is, and tools/i18n_check.py reads it like a tr(). */
+#define N_(s) s
 
 /* Sets the folder of the user's configuration (NULL: none); call before i18n_set. */
 void i18n_init(const char *cfgdir);
@@ -29,6 +32,8 @@ void i18n_init(const char *cfgdir);
 int i18n_set(const char *lang);
 const char *i18n_code(void);    /* "en", "it", ... */
 const char *i18n_name(void);    /* "English", "Italiano", ... */
+/* The file the catalog in use was read from, NULL for English. */
+const char *i18n_path(void);
 /* The language codes that can be used, "en" first, then the catalogs found; returns how many. */
 size_t i18n_available(char (*codes)[16], size_t max);
 /* The language wanted by the environment ("en" if none or not known). */

@@ -1,4 +1,5 @@
 #include "theme.h"
+#include "i18n.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -8,7 +9,7 @@
 
 static const Theme themes[] = {
     {
-        "scuro", 0, { 212, 212, 212 }, { 0, 0, 0 },
+        "dark", 0, { 212, 212, 212 }, { 0, 0, 0 },
         {
             /* normal */   { 212, 212, 212 },
             /* comment */  { 106, 153, 85 },
@@ -30,7 +31,7 @@ static const Theme themes[] = {
         { 60, 170, 60 }, { 200, 160, 40 }, { 210, 70, 70 }
     },
     {
-        "chiaro", 1, { 56, 58, 66 }, { 236, 236, 239 },
+        "light", 1, { 56, 58, 66 }, { 236, 236, 239 },
         {
             /* normal */   { 56, 58, 66 },
             /* comment */  { 110, 130, 100 },
@@ -83,6 +84,11 @@ int theme_by_name(const char *name)
 {
     size_t i;
 
+    /* the names the themes had before the texts became English */
+    if (same_name("scuro", name))
+        name = "dark";
+    else if (same_name("chiaro", name))
+        name = "light";
     for (i = theme_count(); i-- > 0;)
         if (same_name(theme_get(i)->name, name))
             return (int)i;
@@ -259,7 +265,7 @@ int theme_add_user(const char *text, size_t n, char *err, size_t errlen)
             val[i - 1] = '\0';
         if (strcmp(key, "name") == 0) {
             if (!*val) {
-                snprintf(err, errlen, "riga %d: manca il nome", lineno);
+                snprintf(err, errlen, tr("line %d: missing name"), lineno);
                 free(name);
                 return -1;
             }
@@ -272,7 +278,7 @@ int theme_add_user(const char *text, size_t n, char *err, size_t errlen)
             continue;
         }
         if (parse_color(val, &c) < 0) {
-            snprintf(err, errlen, "riga %d: colore non valido «%s» (serve #rrggbb)", lineno, val);
+            snprintf(err, errlen, tr("line %d: invalid colour «%s» (#rrggbb needed)"), lineno, val);
             free(name);
             return -1;
         }
@@ -299,7 +305,7 @@ int theme_add_user(const char *text, size_t n, char *err, size_t errlen)
                 if (strcmp(key, class_keys[i]) == 0)
                     break;
             if (i == SC_COUNT) {
-                snprintf(err, errlen, "riga %d: chiave sconosciuta «%s»", lineno, key);
+                snprintf(err, errlen, tr("line %d: unknown key «%s»"), lineno, key);
                 free(name);
                 return -1;
             }
@@ -307,7 +313,7 @@ int theme_add_user(const char *text, size_t n, char *err, size_t errlen)
         }
     }
     if (!name) {
-        snprintf(err, errlen, "manca la riga «name»");
+        snprintf(err, errlen, tr("missing «name» line"));
         return -1;
     }
     t.name = name;

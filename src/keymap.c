@@ -1,4 +1,5 @@
 #include "keymap.h"
+#include "i18n.h"
 #include "commands.h"
 
 #include <ctype.h>
@@ -47,7 +48,7 @@ int key_parse(const char *spec, Key *out, char *err, size_t errlen)
             break;
         n = (size_t)(plus - p);
         if (n == 0 || n >= sizeof tok) {
-            snprintf(err, errlen, "tasto «%s» non valido", spec);
+            snprintf(err, errlen, tr("invalid key «%s»"), spec);
             return -1;
         }
         memcpy(tok, p, n);
@@ -61,18 +62,18 @@ int key_parse(const char *spec, Key *out, char *err, size_t errlen)
         else if (strcmp(tok, "shift") == 0)
             k.mods |= MOD_SHIFT;
         else {
-            snprintf(err, errlen, "modificatore «%s» sconosciuto (ctrl, alt, shift)", tok);
+            snprintf(err, errlen, tr("unknown modifier «%s» (ctrl, alt, shift)"), tok);
             return -1;
         }
         p = plus + 1;
     }
     /* what is left is the key */
     if (*p == '\0') {
-        snprintf(err, errlen, "manca il tasto in «%s»", spec);
+        snprintf(err, errlen, tr("missing key in «%s»"), spec);
         return -1;
     }
     if (strlen(p) >= sizeof tok) {
-        snprintf(err, errlen, "tasto «%s» non valido", spec);
+        snprintf(err, errlen, tr("invalid key «%s»"), spec);
         return -1;
     }
     for (i = 0; p[i]; i++)
@@ -102,7 +103,7 @@ int key_parse(const char *spec, Key *out, char *err, size_t errlen)
             k.code = (uint32_t)(u[0] & 0x0F) << 12 | (uint32_t)(u[1] & 0x3F) << 6 | (u[2] & 0x3F);
     }
     if (!k.code) {
-        snprintf(err, errlen, "tasto «%s» sconosciuto", p);
+        snprintf(err, errlen, tr("unknown key «%s»"), p);
         return -1;
     }
     if (k.mods & MOD_CTRL) {
@@ -111,7 +112,7 @@ int key_parse(const char *spec, Key *out, char *err, size_t errlen)
 
             if (c == KEY_TAB || c == KEY_ENTER || c == 8) {
                 snprintf(err, errlen,
-                         "ctrl+%c coincide con Tab, Invio o Backspace: il terminale non li distingue",
+                         tr("ctrl+%c is the same as Tab, Enter or Backspace: the terminal cannot tell them apart"),
                          (int)k.code);
                 return -1;
             }

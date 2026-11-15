@@ -1,4 +1,5 @@
 #include "util.h"
+#include "i18n.h"
 #include "term.h"
 
 #include <stdarg.h>
@@ -25,7 +26,7 @@ void *xmalloc(size_t n)
     void *p = malloc(n ? n : 1);
 
     if (!p)
-        die("memoria esaurita");
+        die(tr("out of memory"));
     return p;
 }
 
@@ -33,7 +34,7 @@ void *xrealloc(void *p, size_t n)
 {
     p = realloc(p, n ? n : 1);
     if (!p)
-        die("memoria esaurita");
+        die(tr("out of memory"));
     return p;
 }
 

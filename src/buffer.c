@@ -1,4 +1,5 @@
 #include "buffer.h"
+#include "i18n.h"
 #include "util.h"
 
 #include <errno.h>
@@ -189,8 +190,8 @@ int buf_load(Buffer *b, const char *path, char *err, size_t errlen)
         return -1;
     }
     if (!S_ISREG(st.st_mode)) {
-        snprintf(err, errlen, "%s", S_ISDIR(st.st_mode) ? "è una directory"
-                                                        : "non è un file regolare");
+        snprintf(err, errlen, "%s", S_ISDIR(st.st_mode) ? tr("is a directory")
+                                                        : tr("is not a regular file"));
         close(fd);
         return -1;
     }
@@ -233,7 +234,7 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
     long total = 0;
 
     if (!want) {
-        snprintf(err, errlen, "nessun nome file");
+        snprintf(err, errlen, tr("no file name"));
         return -1;
     }
     real = realpath(want, NULL);

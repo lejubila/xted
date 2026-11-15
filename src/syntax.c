@@ -1,4 +1,5 @@
 #include "syntax.h"
+#include "i18n.h"
 #include "langs.h"
 #include "util.h"
 
@@ -201,7 +202,7 @@ void syn_free(Syntax *s)
 
 const char *syn_name(const Syntax *s)
 {
-    return s ? s->name : "Testo";
+    return s ? s->name : "Text";
 }
 
 const SynRule *syn_rules(const Syntax *s, size_t *n)
@@ -285,7 +286,7 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
 
         if (tok_is(t[0], "name")) {
             if (nt < 2)
-                PERR("riga %zu: manca il nome", lineno);
+                PERR(tr("line %zu: missing name"), lineno);
             free(s->name);
             s->name = xmalloc(len + 1);
             /* the name is the rest of the line, blanks included */
@@ -298,10 +299,10 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             int cl;
 
             if (nt < 3)
-                PERR("riga %zu: words richiede classe e parole", lineno);
+                PERR(tr("line %zu: words needs a class and words"), lineno);
             cl = class_by_name(t[1].p, t[1].n);
             if (cl < 0)
-                PERR("riga %zu: classe sconosciuta", lineno);
+                PERR(tr("line %zu: unknown class"), lineno);
             /* a word list can span many tokens: re-split without the 16 limit */
             {
                 const char *q = t[2].p, *end = ln + len;
@@ -316,7 +317,7 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                         e++;
                     if (e > q) {
                         if (e - q > 255)
-                            PERR("riga %zu: parola troppo lunga", lineno);
+                            PERR(tr("line %zu: word too long"), lineno);
                         if (npw == pwcap) {
                             pwcap = pwcap ? pwcap * 2 : 64;
                             pw = xrealloc(pw, pwcap * sizeof *pw);
@@ -333,7 +334,7 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             }
         } else if (tok_is(t[0], "comment")) {
             if (nt < 2)
-                PERR("riga %zu: comment richiede un simbolo", lineno);
+                PERR(tr("line %zu: comment needs a symbol"), lineno);
             free(s->cmt);
             free(s->cmt_end);
             s->cmt = xmalloc(t[1].n + 1);
@@ -353,23 +354,23 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             int cl = nt > 1 ? class_by_name(t[1].p, t[1].n) : -1;
 
             if (cl < 0)
-                PERR("riga %zu: calls richiede una classe", lineno);
+                PERR(tr("line %zu: calls needs a class"), lineno);
             s->calls = 1;
             s->call_cls = (uint8_t)cl;
         } else if (tok_is(t[0], "sigil")) {
             int cl = nt > 2 ? class_by_name(t[1].p, t[1].n) : -1;
 
             if (cl < 0 || t[2].n != 1)
-                PERR("riga %zu: sigil richiede classe e un carattere", lineno);
+                PERR(tr("line %zu: sigil needs a class and a character"), lineno);
             s->sigil = (uint8_t)t[2].p[0];
             s->sigil_cls = (uint8_t)cl;
         } else if (tok_is(t[0], "operators")) {
             if (nt < 2)
-                PERR("riga %zu: operators richiede dei caratteri", lineno);
+                PERR(tr("line %zu: operators needs characters"), lineno);
             set_chars(s->opch, t[1].p, t[1].n);
         } else if (tok_is(t[0], "idchars")) {
             if (nt < 2)
-                PERR("riga %zu: idchars richiede dei caratteri", lineno);
+                PERR(tr("line %zu: idchars needs characters"), lineno);
             set_chars(s->idch, t[1].p, t[1].n);
             set_chars(s->idstart, t[1].p, t[1].n);
         } else if (tok_is(t[0], "embed")) {
@@ -377,12 +378,12 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             int cl;
 
             if (nt < 5)
-                PERR("riga %zu: embed richiede linguaggio, classe, inizio e fine", lineno);
+                PERR(tr("line %zu: embed needs a language, a class, a start and an end"), lineno);
             cl = class_by_name(t[2].p, t[2].n);
             if (cl < 0)
-                PERR("riga %zu: classe sconosciuta", lineno);
+                PERR(tr("line %zu: unknown class"), lineno);
             if (s->nreg >= EMBED_MAX_REGION)
-                PERR("riga %zu: le embed vanno scritte prima delle altre regioni", lineno);
+                PERR(tr("line %zu: embeds must come before the other regions"), lineno);
             if (s->nreg == s->regcap) {
                 s->regcap = s->regcap ? s->regcap * 2 : 8;
                 s->reg = xrealloc(s->reg, s->regcap * sizeof *s->reg);
@@ -412,7 +413,7 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                     memcpy(r->open, t[i].p + 5, r->ol);
                     r->open[r->ol] = '\0';
                 } else {
-                    PERR("riga %zu: opzione sconosciuta", lineno);
+                    PERR(tr("line %zu: unknown option"), lineno);
                 }
             }
         } else if (tok_is(t[0], "region")) {
@@ -420,16 +421,16 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             int cl;
 
             if (nt < 4)
-                PERR("riga %zu: region richiede classe, inizio e fine", lineno);
+                PERR(tr("line %zu: region needs a class, a start and an end"), lineno);
             cl = class_by_name(t[1].p, t[1].n);
             if (cl < 0)
-                PERR("riga %zu: classe sconosciuta", lineno);
+                PERR(tr("line %zu: unknown class"), lineno);
             if (s->nreg == s->regcap) {
                 s->regcap = s->regcap ? s->regcap * 2 : 8;
                 s->reg = xrealloc(s->reg, s->regcap * sizeof *s->reg);
             }
             if (s->nreg >= STATE_MAX_REGIONS)
-                PERR("riga %zu: troppe regioni", lineno);
+                PERR(tr("line %zu: too many regions"), lineno);
             r = &s->reg[s->nreg];
             memset(r, 0, sizeof *r);
             r->cls = (uint8_t)cl;
@@ -457,10 +458,10 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                 else if (t[i].n == 5 && memcmp(t[i].p, "esc=", 4) == 0)
                     r->esc = t[i].p[4];
                 else
-                    PERR("riga %zu: opzione sconosciuta", lineno);
+                    PERR(tr("line %zu: unknown option"), lineno);
             }
             if (r->ml && !r->end)
-                PERR("riga %zu: una regione fino a fine riga non può essere ml", lineno);
+                PERR(tr("line %zu: a region up to the end of the line cannot be ml"), lineno);
         } else if (tok_is(t[0], "decl") || tok_is(t[0], "include") || tok_is(t[0], "bind") ||
                    tok_is(t[0], "attr") || tok_is(t[0], "synonym") ||
                    tok_is(t[0], "docmember")) {
@@ -475,7 +476,7 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                     if (tok_is(t[1], kinds[k]))
                         kind = (int)k;
                 if (kind < 0)
-                    PERR("riga %zu: decl richiede class, func, method, prop, const, var o ns",
+                    PERR(tr("line %zu: decl needs class, func, method, prop, const, var or ns"),
                          lineno);
             } else {
                 kind = tok_is(t[0], "include") ? RULE_INCLUDE
@@ -484,7 +485,7 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                        : tok_is(t[0], "docmember") ? RULE_DOC : RULE_ATTR;
             }
             if (nt <= (size_t)first)
-                PERR("riga %zu: manca il modello", lineno);
+                PERR(tr("line %zu: missing pattern"), lineno);
             plen = (size_t)(ln + len - t[first].p);
             if (s->nrules == s->rulecap) {
                 s->rulecap = s->rulecap ? s->rulecap * 2 : 16;
@@ -495,20 +496,20 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             s->nrules++;
         } else if (tok_is(t[0], "scope")) {
             if (nt < 2 || !(tok_is(t[1], "indent") || tok_is(t[1], "brace")))
-                PERR("riga %zu: scope richiede indent o brace", lineno);
+                PERR(tr("line %zu: scope needs indent or brace"), lineno);
             s->indent_scope = tok_is(t[1], "indent");
         } else if (tok_is(t[0], "member")) {
             if (nt < 2)
-                PERR("riga %zu: member richiede degli operatori", lineno);
+                PERR(tr("line %zu: member needs operators"), lineno);
             free(s->seps);
             s->seps = xstrndup(t[1].p, (size_t)(ln + len - t[1].p));
         } else {
-            PERR("riga %zu: direttiva sconosciuta", lineno);
+            PERR(tr("line %zu: unknown directive"), lineno);
         }
     }
 
     if (!s->name)
-        PERR("manca la direttiva name");
+        PERR(tr("missing name directive"));
     s->pool = sbuf_steal(&pool);
     build_table(s, pw, npw);
     free(pw);
