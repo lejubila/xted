@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "edit.h"
+#include "imports.h"
 #include "cfgsave.h"
 #include "commands.h"
 #include "config.h"
@@ -2303,25 +2304,25 @@ static void complete_accept(Editor *e)
         buf_undo_begin(e->buf, e->cy, e->cx);
         e->undo_hold++;
         if (nd.kind == 1 || nd.kind == 6) {
-            added = edit_add_include(e, nd.mod, nd.kind == 6);
+            added = imp_include(e, nd.mod, nd.kind == 6);
             snprintf(what, sizeof what, nd.kind == 6 ? "#include \"%s\"" : "#include <%s>", nd.mod);
         } else if (nd.kind == 2) {
-            added = edit_add_py_import(e, nd.mod, NULL, 0);
+            added = imp_python(e, nd.mod, NULL, 0);
             snprintf(what, sizeof what, "import %s", nd.mod);
         } else if (nd.kind == 9) {
-            added = edit_add_require(e, nd.mod);
+            added = imp_php_require(e, nd.mod);
             snprintf(what, sizeof what, "require_once __DIR__ . '/%s';", nd.mod);
         } else if (nd.kind == 10) {
-            added = edit_add_use_fn(e, nd.name, nd.mod);
+            added = imp_php_use_fn(e, nd.name, nd.mod);
             snprintf(what, sizeof what, "use %s %s;", nd.name, nd.mod);
         } else if (nd.kind == 8) {
-            added = edit_add_use(e, nd.mod);
+            added = imp_php_use(e, nd.mod);
             snprintf(what, sizeof what, "use %s;", nd.mod);
         } else if (nd.kind == 3 || nd.kind == 7) {
-            added = edit_add_py_import(e, nd.mod, nd.name, nd.kind == 7);
+            added = imp_python(e, nd.mod, nd.name, nd.kind == 7);
             snprintf(what, sizeof what, "from %s import %s", nd.mod, nd.name);
         } else {
-            added = edit_add_js_import(e, nd.mod, nd.name, nd.kind == 4, what, sizeof what);
+            added = imp_js(e, nd.mod, nd.name, nd.kind == 4, what, sizeof what);
         }
     }
     accept_cand(e);

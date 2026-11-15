@@ -72,33 +72,6 @@ void edit_replace_word(Editor *e, size_t from_x, const char *s, size_t n);
 
 /* Like edit_replace_word for a class chosen in the suggestions; in a PHP file also adds the
  * "use fq;" statement when the class is not yet imported (fq NULL: just the word). One undo step. */
-/* Adds "#include <hdr>" (local: "#include \"hdr\"") to a C file unless the file already has it:
- * among the includes of its kind (in order if they are in order); a system one before the first
- * local one, a local one after the last system one; else at the top after the comments and the
- * include guard. Returns 1 if a line was added. It does not open an undo group. */
-int edit_add_include(Editor *e, const char *hdr, int local);
-/* Adds "import mod" (name NULL) or "from mod import name" (local: a module of the
- * project, which goes into the last group of imports) to a Python file unless it has it: an
- * existing single-line "from mod import ..." is extended, else a new line goes into the first block
- * of imports in order, or after the docstring if there are none. Returns 1 if the text changed. It
- * does not open an undo group. */
-int edit_add_py_import(Editor *e, const char *mod, const char *name, int local);
-/* Adds the import of a Node module to a JavaScript or TypeScript file unless the file has the name
- * already: "import fs from 'fs'" (def 1) or "import { EventEmitter } from 'events'" (def 0), or the
- * require() form in a file that uses it; quotes, semicolons and "import * as" follow what the file does.
- * An existing "import { a } from 'mod'" on one line is extended. stmt gets the text added. Returns 1
- * if the text changed. It does not open an undo group. */
-int edit_add_js_import(Editor *e, const char *mod, const char *name, int def, char *stmt, size_t n);
-/* Adds "use Fq;" to a PHP file unless the class is imported, defined in the file or in its
- * namespace; the block of uses stays sorted. Returns 1 if a line was added. No undo group. */
-int edit_add_use(Editor *e, const char *fq);
-/* PHP: adds require_once __DIR__ . '/spec'; (spec relative to the file's folder) after the requires
- * of the file, else after <?php, unless the file already requires or includes it. Returns 1 if a
- * line was added. No undo group. */
-int edit_add_require(Editor *e, const char *spec);
-/* PHP: adds "use function Fq;" (what "function") or "use const Fq;" (what "const") after the uses
- * of classes, unless it is there or Fq is in the file's own namespace. Returns 1 if added. */
-int edit_add_use_fn(Editor *e, const char *what, const char *fq);
 void edit_replace_class(Editor *e, size_t from_x, const char *s, size_t n, const char *fq);
 
 /* Puts text (malloc'ed, taken over) in the kill ring and the system clipboard. */
