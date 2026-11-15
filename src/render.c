@@ -782,6 +782,69 @@ static void sidebar_row(SBuf *o, const Editor *e, int y)
 }
 
 /* *pcol receives the cursor column (0-based) when a prompt is active. */
+/* The keys that work in the search bar, shown at the right of its row: the options with the state
+ * they are in (bold when on), then Invio and Esc. Longer wordings first; the first that fits is used. */
+typedef struct {
+    const char *txt;
+    int on;                 /* 1: the option is on, 0: off, -1: not an option */
+} HintSeg;
+
+#define HINT_MAXSEG 6
+
+static size_t hint_cols(const HintSeg *g, size_t n)
+{
+    size_t i, w = 0;
+
+    for (i = 0; i < n; i++)
+        w += utf8_cols(g[i].txt, strlen(g[i].txt), strlen(g[i].txt), 8) + (i ? 2 : 0);
+    return w;
+}
+
+/* Picks the longest wording that fits in room cells; returns its width (0: none fits) and the
+ * segments in g and *n. */
+static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
+{
+    const Find *f = &e->find;
+    int mode = f->mode, cs = f->cs, wd = f->word, rx = f->regex;
+    const char *go = mode == FIND_FILES ? "Invio cerca" : f->replace ? "Invio avanti" : "Invio chiude";
+    HintSeg t[3][HINT_MAXSEG];
+    size_t nt[3], k, i;
+
+    if (mode == FIND_WITH) {
+        HintSeg a[] = { { "Invio avvia", -1 }, { "Esc annulla", -1 } };
+        HintSeg b[] = { { "Invio", -1 }, { "Esc", -1 } };
+
+        memcpy(t[0], a, sizeof a);
+        nt[0] = 2;
+        memcpy(t[1], b, sizeof b);
+        nt[1] = nt[2] = 2;
+        memcpy(t[2], b, sizeof b);
+    } else if (mode == FIND_SEARCH || mode == FIND_FILES) {
+        HintSeg a[] = { { "Alt+C Maiuscole", cs }, { "Alt+W Parola", wd }, { "Alt+R Regex", rx },
+                        { go, -1 }, { "Esc annulla", -1 } };
+        HintSeg b[] = { { "Alt+C Aa", cs }, { "Alt+W Parola", wd }, { "Alt+R Regex", rx },
+                        { "Esc", -1 } };
+        HintSeg c[] = { { "Alt+C Aa", cs }, { "Alt+W W", wd }, { "Alt+R .*", rx } };
+
+        memcpy(t[0], a, sizeof a);
+        nt[0] = 5;
+        memcpy(t[1], b, sizeof b);
+        nt[1] = 4;
+        memcpy(t[2], c, sizeof c);
+        nt[2] = 3;
+    } else {
+        return 0;
+    }
+    for (k = 0; k < 3; k++)
+        if (hint_cols(t[k], nt[k]) <= room) {
+            for (i = 0; i < nt[k]; i++)
+                g[i] = t[k][i];
+            *n = nt[k];
+            return hint_cols(t[k], nt[k]);
+        }
+    return 0;
+}
+
 static void message_row(SBuf *o, const Editor *e, int *pcol)
 {
     size_t cols = (size_t)e->cols;
@@ -803,14 +866,32 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
         }
         fit_cols(o, t + start, tl - start, avail);
         *pcol = (int)(lw + tw);
-        if (e->prompt_info[0]) {
+        {
             size_t iw = utf8_cols(e->prompt_info, strlen(e->prompt_info), strlen(e->prompt_info), 8);
-            size_t used = lw + (tw < avail ? tw : avail);
+            size_t used = lw + (tw < avail ? tw : avail), room, hw, i, n = 0;
+            HintSeg g[HINT_MAXSEG];
+            int info = e->prompt_info[0] != '\0';
 
-            if (cols > used + iw + 2) {
-                spaces(o, cols - used - iw - 1);
+            room = cols > used + (info ? iw + 2 : 0) + 3 ? cols - used - (info ? iw + 2 : 0) - 3 : 0;
+            hw = find_hint(e, room, g, &n);
+            if (hw > 0 || (info && cols > used + iw + 2)) {
+                size_t block = hw + (hw && info ? 2 : 0) + (info ? iw : 0);
+
+                spaces(o, cols - used - block - 1);
                 sbuf_adds(o, "\x1b[2m");
-                sbuf_adds(o, e->prompt_info);
+                for (i = 0; i < n; i++) {
+                    if (i)
+                        sbuf_adds(o, "  ");
+                    if (g[i].on == 1)
+                        sbuf_adds(o, "\x1b[22m\x1b[1m");
+                    sbuf_adds(o, g[i].txt);
+                    if (g[i].on == 1)
+                        sbuf_adds(o, "\x1b[22m\x1b[2m");
+                }
+                if (info) {
+                    sbuf_adds(o, hw ? "  " : "");
+                    sbuf_adds(o, e->prompt_info);
+                }
                 sbuf_adds(o, "\x1b[22m");
                 sbuf_adds(o, "\x1b[K");
                 return;

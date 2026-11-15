@@ -118,7 +118,7 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
 ### Ricerca
 
 - **Cerca** (`Ctrl+F`): incrementale, evidenzia tutte le occorrenze mentre si digita.
-  Opzioni con `Alt+C` (maiuscole/minuscole), `Alt+W` (parola intera) e `Alt+R` (espressione
+  Sulla riga della barra compaiono i tasti utili (le opzioni attive in grassetto, poi `Invio` ed `Esc`, in forma più corta se lo schermo è stretto). Opzioni con `Alt+C` (maiuscole/minuscole), `Alt+W` (parola intera) e `Alt+R` (espressione
   regolare POSIX ERE, con gruppi di cattura nella sostituzione). `F3` e `Shift+F3` (o
   `Alt+N` e `Alt+P`) passano all'occorrenza successiva e precedente.
 - **Sostituisci** (`Ctrl+R`): con conferma per ogni occorrenza («s = sì, n = no, t = tutte,
