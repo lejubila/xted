@@ -271,6 +271,8 @@ void editor_cmd_toggle_autopair(Editor *e);
 void editor_cmd_toggle_git(Editor *e);
 void editor_cmd_toggle_clipboard(Editor *e);
 void editor_cmd_language(Editor *e);
+/* F1: the help page, a read-only document "[Help]" made from the commands and their keys. */
+void editor_cmd_help(Editor *e);
 void editor_cmd_save_settings(Editor *e);
 void editor_cmd_resize_mode(Editor *e);
 void editor_cmd_equalize(Editor *e);

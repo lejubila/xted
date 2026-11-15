@@ -224,6 +224,29 @@ def imports():
 
 
 @scenario
+def help_page():
+    b = Box()
+    b.write("a.txt", "text\n")
+    r = b.run(["a.txt"], rows=40)
+    r.type("\x1bOP")
+    t = r.screen().text()
+    check("F1 opens the help page with the commands and their keys",
+          "xted: help" in t and "Ctrl+S" in t and "Save" in t and "[Help]" in t, t[:600])
+    r.type("x")
+    check("the help page cannot be changed", "read-only" in r.screen().text())
+    r.type(ctrl("w"))
+    t = r.screen().text()
+    check("Ctrl+W closes it and the file is back", "[Help]" not in t and "text" in t)
+    quit_(r)
+    r = b.run(["a.txt"], rows=40, env={"LANG": "it_IT.UTF-8"})
+    r.type("\x1bOP")
+    t = r.screen().text()
+    check("the help page follows the language", "xted: guida" in t and "Salva" in t, t[:400])
+    quit_(r)
+    b.close()
+
+
+@scenario
 def panes_and_quick_open():
     b = Box()
     b.write("one.txt", "1\n")

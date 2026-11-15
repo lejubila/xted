@@ -120,7 +120,7 @@ L'interfaccia è minimale ma informativa; tutto è configurabile da un file di t
 - **Riga messaggi/prompt** per input dei comandi, conferme ed errori.
 - **Righello** a colonna configurabile (es. 80) e a capo visivo (soft wrap) attivabile.
 - **Scorrimento** con margine (il cursore non tocca il bordo) e scorrimento orizzontale per righe lunghe.
-- **Help integrato** (F1) con l'elenco delle scorciatoie.
+- **Help integrato** (F1): documento in sola lettura «[Help]» generato dai comandi e dalle scorciatoie in uso (anche quelle cambiate in `[keys]`), con i tasti di barra di ricerca, elenchi, suggerimenti e mouse e i file di configurazione e lingua; tradotto come il resto dell'interfaccia.
 
 ### Configurazione
 

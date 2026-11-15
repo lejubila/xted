@@ -2830,6 +2830,79 @@ void editor_cmd_toggle_git(Editor *e)
     editor_set_msg(e, MSG_TTL_MS, "%s", e->cfg.git ? tr("Git markers on") : tr("Git markers off"));
 }
 
+void editor_cmd_help(Editor *e)
+{
+    Doc *d = NULL;
+    SBuf t = SBUF_INIT;
+    size_t i, y = 0, x = 0, kw = 0;
+    int g, last = -1;
+    char label[100], cfg[PATH_MAX + 16];
+
+    for (i = 0; i < e->ndocs; i++)
+        if (e->docs[i]->scratch && e->docs[i]->title && strcmp(e->docs[i]->title, "[Help]") == 0)
+            d = e->docs[i];
+    if (!d) {
+        d = doc_new();
+        d->title = xstrdup("[Help]");
+        d->scratch = 1;
+        d->readonly = 1;
+        if (e->ndocs == e->docs_cap) {
+            e->docs_cap = e->docs_cap ? e->docs_cap * 2 : 8;
+            e->docs = xrealloc(e->docs, e->docs_cap * sizeof *e->docs);
+        }
+        e->docs[e->ndocs++] = d;
+    }
+    for (i = 0; i < ncommands; i++) {
+        keymap_label(&e->km, (int)i, label, sizeof label);
+        if (strlen(label) > kw)
+            kw = strlen(label);
+    }
+    if (kw > 30)
+        kw = 30;
+    sbuf_adds(&t, tr("xted: help\n\nF1 shows this page, Ctrl+W closes it, Ctrl+F searches in it. Every key can be\n"
+                     "changed in the [keys] section of the configuration (see Files below).\n"));
+    for (i = 0; i < ncommands; i++) {
+        g = commands[i].group;
+        if (g != last) {
+            sbuf_addf(&t, "\n%s\n", tr(command_groups[g]));
+            last = g;
+        }
+        keymap_label(&e->km, (int)i, label, sizeof label);
+        sbuf_addf(&t, "  %-*s  %s\n", (int)kw, label, tr(commands[i].name));
+    }
+    sbuf_addf(&t, "\n%s\n", tr("Search bar"));
+    sbuf_adds(&t, tr("  Alt+C  match case          Alt+W  whole words      Alt+R  regular expression\n"
+                     "  Up, Down  previous and next match     Enter  keep it     Esc  go back\n"
+                     "  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n"));
+    sbuf_addf(&t, "\n%s\n", tr("Lists (palette, buffers, symbols, files)"));
+    sbuf_adds(&t, tr("  Type to filter; Up, Down, PgUp, PgDn move; Enter chooses; Esc closes.\n"
+                     "  In the palette Enter on a setting changes it and leaves the palette open.\n"));
+    sbuf_addf(&t, "\n%s\n", tr("Suggestions"));
+    sbuf_adds(&t, tr("  They appear while typing: Up and Down choose, Tab or Enter accept, Esc closes.\n"
+                     "  Accepting a name of a library or of another file of the project also adds its\n"
+                     "  #include, import, use or require. In a snippet Tab goes to the next placeholder.\n"));
+    sbuf_addf(&t, "\n%s\n", tr("Mouse"));
+    sbuf_adds(&t, tr("  Click moves the cursor, a double click selects a word, a triple click a line;\n"
+                     "  dragging selects; Alt+click adds a cursor; the wheel scrolls; dragging a border\n"
+                     "  resizes the panes.\n"));
+    sbuf_addf(&t, "\n%s\n", tr("Files"));
+    snprintf(cfg, sizeof cfg, "%s/config", e->cfgdir ? e->cfgdir : "~/.config/xted");
+    sbuf_addf(&t, tr("  Configuration: %s (and .xted in a project)\n"), cfg);
+    sbuf_addf(&t, tr("  Language: %s, %s\n"), i18n_name(), i18n_path() ? i18n_path() : tr("built in"));
+    sbuf_adds(&t, tr("  Manual: man xted\n"));
+    /* the page is made again each time: the keys or the language may have changed */
+    if (d->buf.nlines > 1 || d->buf.lines[0].len > 0)
+        buf_delete_range(&d->buf, 0, 0, d->buf.nlines - 1, d->buf.lines[d->buf.nlines - 1].len);
+    buf_insert_text(&d->buf, &y, &x, t.p, t.len);
+    sbuf_free(&t);
+    undo_free(&d->buf.undo);
+    d->buf.modified = 0;
+    editor_activate(e, d);
+    e->cy = e->cx = 0;
+    e->rowoff = 0;
+    render_invalidate(e->render);
+}
+
 void editor_cmd_language(Editor *e)
 {
     char codes[16][16];

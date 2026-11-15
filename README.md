@@ -304,6 +304,7 @@ annulla, `Invio` conferma.
 
 | Tasto | Comando |
 |---|---|
+| `F1` | Guida: tutti i comandi con le scorciatoie attuali, i tasti delle liste e della ricerca, i file usati |
 | `Alt+X` | Command palette |
 | `Alt+T` | Cambia tema |
 | `Ctrl+L` | Ridisegna lo schermo |
@@ -507,7 +508,7 @@ salvataggio delle impostazioni, comandi e comportamento dell'editor senza termin
 
 Le fasi 1–9 della roadmap di `SPEC.md` sono completate: nucleo, editing, sintassi,
 multifile, ricerca, produttività, strumenti, configurazione e rifiniture. Resta fuori il
-client LSP (opzionale). Non c'è ancora la guida integrata con `F1`.
+client LSP (opzionale). La guida è sempre a portata di `F1`.
 
 ## Licenza
 

@@ -1,7 +1,14 @@
 # Italian catalog of xted: English text, a TAB, the translation.
 # Texts with printf conversions (%s, %zu, ...) must keep them in the same order.
 @name	Italiano
+  Alt+C  match case          Alt+W  whole words      Alt+R  regular expression\n  Up, Down  previous and next match     Enter  keep it     Esc  go back\n  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n	  Alt+C  maiuscole e minuscole   Alt+W  parole intere    Alt+R  espressione regolare\n  Su, Giù  occorrenza precedente e successiva     Invio  la tiene     Esc  torna indietro\n  Sostituendo: s sostituisce, n salta, t sostituisce tutte le altre, Esc si ferma.\n
+  Click moves the cursor, a double click selects a word, a triple click a line;\n  dragging selects; Alt+click adds a cursor; the wheel scrolls; dragging a border\n  resizes the panes.\n	  Il clic sposta il cursore, il doppio clic seleziona una parola, il triplo clic una riga;\n  trascinando si seleziona; Alt+clic aggiunge un cursore; la rotella scorre; trascinando un\n  bordo si ridimensionano i pannelli.\n
+  Configuration: %s (and .xted in a project)\n	  Configurazione: %s (e .xted in un progetto)\n
+  Language: %s, %s\n	  Lingua: %s, %s\n
+  Manual: man xted\n	  Manuale: man xted\n
   Spaces %d	  Spazi %d
+  They appear while typing: Up and Down choose, Tab or Enter accept, Esc closes.\n  Accepting a name of a library or of another file of the project also adds its\n  #include, import, use or require. In a snippet Tab goes to the next placeholder.\n	  Compaiono mentre si scrive: Su e Giù scelgono, Tab o Invio accettano, Esc chiude.\n  Accettando un nome di una libreria o di un altro file del progetto si aggiunge anche il\n  suo #include, import, use o require. In uno snippet Tab passa al segnaposto successivo.\n
+  Type to filter; Up, Down, PgUp, PgDn move; Enter chooses; Esc closes.\n  In the palette Enter on a setting changes it and leaves the palette open.\n	  Si scrive per filtrare; Su, Giù, PgSu, PgGiù spostano; Invio sceglie; Esc chiude.\n  Nella palette Invio su un'impostazione la cambia e lascia la palette aperta.\n
  (and other errors)	 (e altri errori)
  (ignored: %s wins)	 (ignorato: vince %s)
  (indentation only)	 (solo l'indentazione)
@@ -75,6 +82,7 @@ Esc cancels	Esc annulla
 File	File
 File is read-only	File in sola lettura
 File is read-only (Alt+S to save under another name)	File in sola lettura (Alt+S per salvare con un altro nome)
+Files	File
 Filter through a command	Filtra con un comando
 Filter with: 	Filtra con: 
 Filtered with: %s	Filtrato con: %s
@@ -92,6 +100,7 @@ Go to definition	Vai alla definizione
 Go to line	Vai alla riga
 Go to line[:column]: 	Vai a riga[:colonna]: 
 Go to symbol	Vai al simbolo
+Help	Guida
 Indentation not recognised: the settings apply	Indentazione non riconoscibile: valgono le impostazioni
 Indentation: %d spaces	Indentazione: %d spazi
 Indentation: 2 spaces	Indentazione: 2 spazi
@@ -104,7 +113,9 @@ Join lines	Unisci righe
 Language	Lingua
 Language: %s	Lingua: %s
 List buffers	Elenco buffer
+Lists (palette, buffers, symbols, files)	Elenchi (palette, buffer, simboli, file)
 Matching bracket	Parentesi corrispondente
+Mouse	Mouse
 Mouse off	Mouse disattivato
 Mouse on	Mouse attivo
 Move line down	Sposta riga in giu
@@ -183,6 +194,7 @@ Save the file to refresh the Git markers	Salva il file per aggiornare gli indica
 Save where	Salva dove
 Saved in %s: %s	Salvato in %s: %s
 Search and go to	Cerca e vai
+Search bar	Barra di ricerca
 Search wrapped to the end	Ricerca ripartita dalla fine
 Search wrapped to the start	Ricerca ripartita dall'inizio
 Select all	Seleziona tutto
@@ -194,6 +206,7 @@ Split pane horizontally	Dividi pannello in orizzontale
 Split pane vertically	Dividi pannello in verticale
 Stop command	Interrompi comando
 Stop requested	Interruzione richiesta
+Suggestions	Suggerimenti
 Symbols	Simboli
 System clipboard off	Appunti di sistema disattivati
 System clipboard on	Appunti di sistema attivi
@@ -285,6 +298,7 @@ unknown theme «%s» in .xted	tema «%s» sconosciuto nel .xted
 usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\nconfiguration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\nconfigurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/, lang/\n
 xted: '-' needs the text on stdin (only once)\n	xted: '-' richiede il testo su stdin (una volta sola)\n
 xted: an interactive terminal is needed\n	xted: serve un terminale interattivo\n
+xted: help\n\nF1 shows this page, Ctrl+W closes it, Ctrl+F searches in it. Every key can be\nchanged in the [keys] section of the configuration (see Files below).\n	xted: guida\n\nF1 mostra questa pagina, Ctrl+W la chiude, Ctrl+F cerca al suo interno. Ogni tasto si\npuò cambiare nella sezione [keys] della configurazione (vedi File, in fondo).\n
 xted: unknown option: %s\n	xted: opzione sconosciuta: %s\n
 «%s» changed on disk%s. Reload? (r = reload, i = ignore)	«%s» è cambiato su disco%s. Ricaricare? (r = ricarica, i = ignora)
 «%s» has unsaved changes. Save? (y = yes, n = no%s, Esc = cancel)	«%s» ha modifiche non salvate. Salvare? (s = sì, n = no%s, Esc = annulla)
