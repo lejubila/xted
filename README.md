@@ -187,8 +187,17 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     `import java.util.*;` o una classe con lo stesso nome importata da un altro package contano già.
     Le classi dello stesso package (la stessa cartella) si vedono senza import; le classi pubbliche
     degli altri package del progetto si propongono con il loro import (`com.acme.util.TextUtils`), quelle
-    di `src/test/` solo dai test. La radice del progetto è il repository Git o, senza, la cartella di
-    `settings.gradle`, `pom.xml` o `build.gradle` più esterna.
+    di `src/test/` solo dai test. In una build a più moduli (Maven o Gradle) si propongono solo le classi
+    dei moduli da cui dipende quello del file, anche indirettamente: in Maven gli `<artifactId>` delle
+    `<dependencies>` del modulo e dei pom padre (non quelli di `<dependencyManagement>` né dei plugin), in
+    Gradle `project(':core')`, `project(path: ':core')`, `projects.core` (`projects.myLib` per `my-lib`)
+    e quelli del build della radice (`subprojects { }`), con i nomi dati in `settings.gradle` alle
+    cartelle (`project(':core').projectDir = file('libs/engine')`); le dipendenze di test
+    (`<scope>test</scope>`, `testImplementation`) valgono solo nei test. Si leggono fino a 4000 file Java,
+    un po' alla volta mentre si scrive. La radice del progetto è il repository Git o, senza, la
+    cartella di `settings.gradle`, `pom.xml` o `build.gradle` più esterna. Dopo il nome di un enum si
+    propongono le sue costanti (`Color.RED`); `import static java.lang.Math.max;` (o `Classe.*`) rende
+    il membro suggeribile senza la classe.
   - In PHP, scegliendo un metodo o una costante dopo `Nome::` (`Route::get`, `User::find`) si aggiunge
     `use` della classe se manca (alias di `config/app.php`, poi le classi del progetto e di `vendor`).
     Con Composer, le funzioni e costanti dei file di `"autoload": {"files"}` vengono proposte, e per

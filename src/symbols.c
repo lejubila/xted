@@ -1009,6 +1009,76 @@ static void resolve_aliases(SymIndex *x, const Buffer *b, const SynRule *r, size
             }
 }
 
+/* Java: the constants of an enum (RED, GREEN("g"), BLUE { ... };) are the names at the start of
+ * its body, before the first ";", as members of the enum. */
+static void java_enums(SymIndex *x, const Buffer *b)
+{
+    size_t i, n = x->n;
+
+    for (i = 0; i < n; i++) {
+        const Sym *c = &x->v[i];
+        const Line *l;
+        const char *e;
+        size_t y, k;
+        int depth = 0, started = 0, want = 1, cmt = 0;
+
+        if (c->kind != RULE_CLASS || c->y0 >= b->nlines)
+            continue;
+        l = &b->lines[c->y0];
+        if (!(e = strstr_len(l->s, l->len, "enum ")) || !strstr_len(e, l->len - (size_t)(e - l->s), c->name))
+            continue;
+        k = (size_t)(e - l->s);
+        for (y = c->y0; y < b->nlines && y <= c->y1; y++, k = 0) {
+            const char *s = b->lines[y].s;
+            size_t len = b->lines[y].len;
+
+            for (; k < len; k++) {
+                char ch = s[k];
+
+                if (cmt) {
+                    if (ch == '*' && k + 1 < len && s[k + 1] == '/')
+                        cmt = 0, k++;
+                    continue;
+                }
+                if (ch == '/' && k + 1 < len && s[k + 1] == '/')
+                    break;
+                if (ch == '/' && k + 1 < len && s[k + 1] == '*') {
+                    cmt = 1;
+                    k++;
+                    continue;
+                }
+                if (!started) {
+                    started = ch == '{';
+                    continue;
+                }
+                if (ch == '(' || ch == '{')
+                    depth++;
+                else if (ch == ')' || (ch == '}' && depth > 0))
+                    depth--;
+                else if (depth == 0 && (ch == ';' || ch == '}'))
+                    goto done;
+                else if (depth == 0 && ch == ',')
+                    want = 1;
+                else if (depth == 0 && ch == '@') {
+                    while (k + 1 < len && is_idc((unsigned char)s[k + 1]))
+                        k++;            /* an annotation */
+                } else if (depth == 0 && want && is_idc((unsigned char)ch) && !isdigit((unsigned char)ch)) {
+                    size_t st = k;
+                    char nm[PM_NAME];
+
+                    while (k + 1 < len && is_idc((unsigned char)s[k + 1]))
+                        k++;
+                    put(nm, sizeof nm, s + st, k + 1 - st);
+                    ix_add(x, RULE_CONST, nm, "", c->name, (long)i, y);
+                    want = 0;
+                }
+            }
+        }
+done:
+        ;
+    }
+}
+
 SymIndex *sym_build(const Buffer *b, Syntax *syn)
 {
     SymIndex *x = xmalloc(sizeof *x);
@@ -1057,6 +1127,8 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
         resolve_aliases(x, b, B.r, B.nr);
         facade_targets(x, b);
     }
+    if (B.nr > 0 && strcmp(syn_name(syn), "Java") == 0)
+        java_enums(x, b);
     x->gen = b->gen;
     return x;
 }
@@ -1102,6 +1174,8 @@ struct SymCache {
     int lib_tried[LIB_N];
     struct Hdr *hdr;                /* C: the headers of the project and their top-level names */
     size_t nhdr;
+    size_t *hix, hixcap;            /* hdr by path: open addressing, slots hold index + 1 */
+    size_t hdrcap;
     char gdir[PATH_MAX];            /* Go: the folder whose files of the same package are in gsib */
     char gpkg[PM_NAME];
     char **gsib;
@@ -1112,6 +1186,9 @@ struct SymCache {
     struct GoPkg { char name[PM_NAME]; char *dir; } *gpk;
     size_t ngpk;
     long gptime;
+    struct JMod { char *dir, *name, *parent, *deps, *tdeps; int ok, gradle; } *jm;  /* Java: the build's modules */
+    size_t njm;
+    int jm_done;
 };
 
 /* A header of the project, kept while its modification time is the same: only what a file that
@@ -1170,6 +1247,20 @@ static void free_project(SymCache *c)
     free(c->hdr);
     c->hdr = NULL;
     c->nhdr = 0;
+    free(c->hix);
+    c->hix = NULL;
+    c->hixcap = c->hdrcap = 0;
+    for (i = 0; i < c->njm; i++) {
+        free(c->jm[i].dir);
+        free(c->jm[i].name);
+        free(c->jm[i].parent);
+        free(c->jm[i].deps);
+        free(c->jm[i].tdeps);
+    }
+    free(c->jm);
+    c->jm = NULL;
+    c->njm = 0;
+    c->jm_done = 0;
     files_scan_free(c->files_fs);
     files_scan_free(c->cl_fs);
     if (c->cl_file)
@@ -2054,6 +2145,8 @@ static void go_siblings(SymCache *c, const Doc *cur, const char *ext)
     closedir(d);
 }
 
+static int java_static_import(const Line *l, char *fq, size_t fn_, char *cls, size_t cn, char *mem, size_t mn);
+
 static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env *e)
 {
     size_t i, k, others = 0;
@@ -2096,6 +2189,21 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
             if (real && (!e->v[0]->key || strcmp(real, e->v[0]->key) != 0))
                 env_add(e, index_of_path(c, real), 1);
             free(real);
+        }
+    }
+    if (strcmp(lang, "Java") == 0) {
+        /* import static a.b.Cls.m: the class Cls is what to load */
+        size_t y, lim = cur->buf.nlines < 300 ? cur->buf.nlines : 300;
+
+        for (y = 0; y < lim; y++) {
+            char fq[PM_PATH], cls[PM_NAME], mem[PM_NAME], *f;
+
+            if (!java_static_import(&cur->buf.lines[y], fq, sizeof fq, cls, sizeof cls, mem, sizeof mem))
+                continue;
+            if ((f = find_class_file(c, fq, "java")) != NULL) {
+                env_add(e, index_of_path(c, f), 1);
+                free(f);
+            }
         }
     }
     /* breadth first: the files included by the file, by those, up to INC_DEPTH levels */
@@ -3361,6 +3469,46 @@ int sym_type_before(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_
     return out[0] != '\0';
 }
 
+/* Java: import static a.b.Cls.name; (or .*) on line y of cur: the class (Cls), its qualified name
+ * and the member (name, or "" for all). Returns 1 if the line is one. */
+static int java_static_import(const Line *l, char *fq, size_t fn_, char *cls, size_t cn, char *mem, size_t mn)
+{
+    const char *u, *d;
+    size_t ul;
+
+    if (l->len < 16 || memcmp(l->s, "import static ", 14) != 0)
+        return 0;
+    u = l->s + 14;
+    for (ul = l->len - 14; ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '); ul--)
+        ;
+    for (d = u + ul; d > u && d[-1] != '.'; d--)
+        ;
+    if (d == u)
+        return 0;
+    put(mem, mn, d, (size_t)(u + ul - d));
+    if (strcmp(mem, "*") == 0)
+        mem[0] = '\0';
+    put(fq, fn_, u, (size_t)(d - 1 - u));
+    put(cls, cn, last_segment(fq), strlen(last_segment(fq)));
+    return 1;
+}
+
+typedef struct {
+    SymFn fn;
+    void *ctx;
+    const char *only;
+} StaticCtx;
+
+static void static_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret, int rank)
+{
+    StaticCtx *s = ctx;
+
+    (void)rank;
+    if (s->only[0] && strcmp(s->only, name) != 0)
+        return;
+    s->fn(s->ctx, name, kind == RULE_METHOD ? RULE_FUNC : kind == RULE_PROP ? RULE_CONST : kind, sig, ret, 1);
+}
+
 void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn, void *ctx)
 {
     Env e;
@@ -3375,6 +3523,22 @@ void sym_globals(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, SymFn fn
             if (s->owner < 0 && s->name[0] && s->kind != RULE_METHOD)
                 fn(ctx, s->name, s->kind, s->sig, s->ret, i == 0 ? 0 : 1);
         }
+    if (strcmp(syn_name(cur->syn), "Java") == 0) {
+        /* import static: the members it names are written without their class */
+        size_t y, lim = cur->buf.nlines < 300 ? cur->buf.nlines : 300;
+
+        for (y = 0; y < lim; y++) {
+            char fq[PM_PATH], cls[PM_NAME], mem[PM_NAME];
+            StaticCtx st;
+
+            if (!java_static_import(&cur->buf.lines[y], fq, sizeof fq, cls, sizeof cls, mem, sizeof mem))
+                continue;
+            st.fn = fn;
+            st.ctx = ctx;
+            st.only = mem;
+            env_members(&e, cls, static_cb, &st, 0);
+        }
+    }
     sc.fn = fn;
     sc.ctx = ctx;
     sc.member = 0;
@@ -3938,6 +4102,52 @@ static int guard_macro(const char *n)
     return l > 3 && strcmp(n + l - 3, "_H_") == 0;
 }
 
+static size_t path_hash(const char *s)
+{
+    size_t h = 2166136261u;
+
+    for (; *s; s++)
+        h = (h ^ (unsigned char)*s) * 16777619u;
+    return h;
+}
+
+/* Puts hdr[i] in the table by path, growing it to keep it at most half full. */
+static void hdr_index(SymCache *c, size_t i)
+{
+    size_t k;
+
+    if ((c->nhdr + 1) * 2 > c->hixcap) {
+        size_t old = c->hixcap, *ov = c->hix, j;
+
+        c->hixcap = c->hixcap ? c->hixcap * 2 : 256;
+        c->hix = xmalloc(c->hixcap * sizeof *c->hix);
+        memset(c->hix, 0, c->hixcap * sizeof *c->hix);
+        for (j = 0; j < old; j++)
+            if (ov[j]) {
+                for (k = path_hash(c->hdr[ov[j] - 1].path) & (c->hixcap - 1); c->hix[k]; k = (k + 1) & (c->hixcap - 1))
+                    ;
+                c->hix[k] = ov[j];
+            }
+        free(ov);
+    }
+    for (k = path_hash(c->hdr[i].path) & (c->hixcap - 1); c->hix[k]; k = (k + 1) & (c->hixcap - 1))
+        if (c->hix[k] == i + 1)
+            return;
+    c->hix[k] = i + 1;
+}
+
+static struct Hdr *hdr_find(SymCache *c, const char *path)
+{
+    size_t k;
+
+    if (!c->hixcap)
+        return NULL;
+    for (k = path_hash(path) & (c->hixcap - 1); c->hix[k]; k = (k + 1) & (c->hixcap - 1))
+        if (strcmp(c->hdr[c->hix[k] - 1].path, path) == 0)
+            return &c->hdr[c->hix[k] - 1];
+    return NULL;
+}
+
 /* The names of a header, read again when it changed; NULL if it cannot be read, or if there is
  * no time left to read it now (c->busy is set and the next call goes on). */
 static struct Hdr *hdr_get(SymCache *c, const char *real)
@@ -3951,11 +4161,7 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
     SymIndex *x = NULL;
     int js;
 
-    for (i = 0; i < c->nhdr; i++)
-        if (strcmp(c->hdr[i].path, real) == 0) {
-            h = &c->hdr[i];
-            break;
-        }
+    h = hdr_find(c, real);
     if (h && now - h->checked < 2)
         return h;
     if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
@@ -3982,10 +4188,14 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         syn_free(syn);
     }
     if (!h) {
-        c->hdr = xrealloc(c->hdr, (c->nhdr + 1) * sizeof *c->hdr);
+        if (c->nhdr == c->hdrcap) {
+            c->hdrcap = c->hdrcap ? c->hdrcap * 2 : 64;
+            c->hdr = xrealloc(c->hdr, c->hdrcap * sizeof *c->hdr);
+        }
         h = &c->hdr[c->nhdr++];
         memset(h, 0, sizeof *h);
         h->path = xstrdup(real);
+        hdr_index(c, c->nhdr - 1);
     } else {
         for (i = 0; i < h->n; i++) {
             free(h->v[i].name);
@@ -4492,6 +4702,363 @@ static void rust_project(SymCache *c, const char *self, HdrFn fn, void *ctx)
     rust_emit(&w, lib, "");
 }
 
+/* The text of a small file (at most 256 KB), NUL-terminated; NULL if it cannot be read. */
+static char *read_small(const char *path)
+{
+    FILE *f = fopen(path, "r");
+    char *t;
+    size_t n;
+
+    if (!f)
+        return NULL;
+    t = xmalloc(256 * 1024 + 1);
+    n = fread(t, 1, 256 * 1024, f);
+    fclose(f);
+    t[n] = '\0';
+    return t;
+}
+
+/* A module name as both build tools may write it: lower case, without - _ . (my-lib, myLib). */
+static void jm_norm(const char *s, size_t n, SBuf *out)
+{
+    size_t i;
+
+    for (i = 0; i < n; i++)
+        if (s[i] != '-' && s[i] != '_' && s[i] != '.' && s[i] != ' ' && s[i] != '\t')
+            sbuf_addf(out, "%c", tolower((unsigned char)s[i]));
+}
+
+/* Cuts the regions <open>...</close> out of t (in place). */
+static void cut_regions(char *t, const char *open, const char *close)
+{
+    char *a, *z;
+    size_t cl = strlen(close);
+
+    while ((a = strstr(t, open)) != NULL) {
+        if (!(z = strstr(a, close))) {
+            *a = '\0';
+            return;
+        }
+        memmove(a, z + cl, strlen(z + cl) + 1);
+    }
+}
+
+/* The text between <tag> and </tag> after p (up to end), "" if none: into out. */
+static char *xml_value(const char *p, const char *end, const char *tag, char *out, size_t n)
+{
+    char open[40], close[40];
+    const char *a, *z;
+
+    snprintf(open, sizeof open, "<%s>", tag);
+    snprintf(close, sizeof close, "</%s>", tag);
+    out[0] = '\0';
+    a = strstr(p, open);
+    if (!a || (end && a > end))
+        return out;
+    a += strlen(open);
+    z = strstr(a, close);
+    if (z && (!end || z <= end))
+        put(out, n, a, (size_t)(z - a));
+    return out;
+}
+
+/* Maven: the module's name (its artifactId), its parent's, and the artifactIds of its
+ * dependencies, those of scope test apart. <dependencyManagement> only pins versions and the
+ * plugins of <build> have dependencies of their own: neither counts. */
+static void jm_maven(struct JMod *m, char *t, SBuf *deps, SBuf *tdeps)
+{
+    char *par, *pe, *d, v[PM_NAME];
+
+    cut_regions(t, "<!--", "-->");
+    cut_regions(t, "<dependencyManagement>", "</dependencyManagement>");
+    cut_regions(t, "<build>", "</build>");
+    par = strstr(t, "<parent>");
+    pe = par ? strstr(par, "</parent>") : NULL;
+    m->parent = xstrdup(par && pe ? xml_value(par, pe, "artifactId", v, sizeof v) : "");
+    if (par && pe)
+        memset(par, ' ', (size_t)(pe + 9 - par));
+    {
+        SBuf nm = SBUF_INIT;
+
+        xml_value(t, NULL, "artifactId", v, sizeof v);
+        jm_norm(v, strlen(v), &nm);
+        sbuf_add(&nm, "", 1);
+        m->name = xstrdup(nm.p);
+        sbuf_free(&nm);
+    }
+    for (d = strstr(t, "<dependency>"); d; d = strstr(d + 1, "<dependency>")) {
+        char *de = strstr(d, "</dependency>"), scope[32];
+
+        if (!de)
+            break;
+        xml_value(d, de, "artifactId", v, sizeof v);
+        xml_value(d, de, "scope", scope, sizeof scope);
+        if (!v[0])
+            continue;
+        jm_norm(v, strlen(v), strcmp(scope, "test") == 0 ? tdeps : deps);
+        sbuf_adds(strcmp(scope, "test") == 0 ? tdeps : deps, " ");
+    }
+}
+
+/* Gradle: the projects a build file depends on, written project(':core'), project(":libs:core"),
+ * project(path: ':core') or with the accessors projects.core / projects.libs.myLib; those of a
+ * test configuration (testImplementation...) apart. */
+static void jm_gradle(char *t, SBuf *deps, SBuf *tdeps)
+{
+    char *line = t;
+
+    while (line && *line) {
+        char *nl = strchr(line, '\n'), *p, *cm;
+        int test;
+
+        if (nl)
+            *nl = '\0';
+        if ((cm = strstr(line, "//")) != NULL)
+            *cm = '\0';
+        for (p = line; *p == ' ' || *p == '\t'; p++)
+            ;
+        test = strncmp(p, "test", 4) == 0 || strncmp(p, "androidTest", 11) == 0;
+        for (p = line; (p = strstr(p, "project(")) != NULL; p += 8) {
+            char *q = p + 8, *z, *b;
+
+            if (strncmp(q, "path", 4) == 0)         /* project(path: ':core') */
+                for (q += 4; *q == ' ' || *q == ':' || *q == '='; q++)
+                    ;
+            if (*q != '\'' && *q != '"')
+                continue;
+            if (!(z = strchr(q + 1, *q)))
+                break;
+            for (b = z; b > q + 1 && b[-1] != ':'; b--)
+                ;
+            jm_norm(b, (size_t)(z - b), test ? tdeps : deps);
+            sbuf_adds(test ? tdeps : deps, " ");
+        }
+        for (p = line; (p = strstr(p, "projects.")) != NULL; p += 9) {
+            char *b = p + 9, *z = b, *last = b;
+
+            if (p > line && (is_idc((unsigned char)p[-1]) || p[-1] == '.'))
+                continue;
+            while (is_idc((unsigned char)*z) || (*z == '.' && is_idc((unsigned char)z[1]))) {
+                if (*z == '.')
+                    last = z + 1;
+                z++;
+            }
+            if (z > b) {
+                jm_norm(last, (size_t)(z - last), test ? tdeps : deps);
+                sbuf_adds(test ? tdeps : deps, " ");
+            }
+        }
+        line = nl ? nl + 1 : NULL;
+    }
+}
+
+/* Gradle's settings: the projects whose folder is not their name (project(':core').projectDir =
+ * file('libs/engine'), File(rootDir, "libs/engine")), as "libs/engine/" -> "core" pairs in map
+ * (" dir=name " entries). */
+static void jm_settings(SymCache *c, SBuf *map)
+{
+    static const char *const names[] = { "settings.gradle", "settings.gradle.kts" };
+    size_t k;
+
+    for (k = 0; k < 2; k++) {
+        char path[PATH_MAX], *t, *p;
+
+        rooted(c, path, sizeof path, names[k]);
+        if (!(t = read_small(path)))
+            continue;
+        for (p = strstr(t, "project("); p; p = strstr(p + 8, "project(")) {
+            char *q = p + 8, *z, *b, *dir, *dz, *eol;
+
+            if (*q != '\'' && *q != '"')
+                continue;
+            if (!(z = strchr(q + 1, *q)))
+                break;
+            eol = strchr(z, '\n');
+            dir = strstr(z, ".projectDir");
+            if (!dir || (eol && dir > eol))
+                continue;
+            /* the last string of the line: the folder, relative to the root */
+            for (dz = eol ? eol : z + strlen(z); dz > dir && *dz != '\'' && *dz != '"'; dz--)
+                ;
+            for (b = dz - 1; b > dir && *b != *dz; b--)
+                ;
+            if (dz <= dir || b <= dir)
+                continue;
+            b++;
+            while (b < dz && (*b == '.' || *b == '/') && (b[0] != '.' || b[1] == '/'))
+                b++;                        /* ./libs/engine */
+            sbuf_adds(map, " ");
+            sbuf_add(map, b, (size_t)(dz - b));
+            if (dz > b && dz[-1] != '/')
+                sbuf_adds(map, "/");
+            sbuf_adds(map, "=");
+            {
+                char *seg;
+
+                for (seg = z; seg > q + 1 && seg[-1] != ':'; seg--)
+                    ;
+                jm_norm(seg, (size_t)(z - seg), map);
+            }
+            sbuf_adds(map, " ");
+        }
+        free(t);
+    }
+    sbuf_add(map, "", 1);
+}
+
+/* Java: the modules of a Maven or Gradle build (the folders of pom.xml, build.gradle), with their
+ * names and the modules they depend on (" core base "), normalised by jm_norm. */
+static void java_modules(SymCache *c)
+{
+    size_t i;
+    SBuf map = SBUF_INIT;
+
+    if (c->jm_done)
+        return;
+    c->jm_done = 1;
+    jm_settings(c, &map);
+    for (i = 0; i < c->nfiles && c->njm < 200; i++) {
+        const char *rel = c->files[i], *base = strrchr(rel, '/');
+        char path[PATH_MAX], *t;
+        SBuf deps = SBUF_INIT, tdeps = SBUF_INIT;
+        struct JMod *m;
+        int gradle;
+
+        base = base ? base + 1 : rel;
+        gradle = strcmp(base, "build.gradle") == 0 || strcmp(base, "build.gradle.kts") == 0;
+        if (!gradle && strcmp(base, "pom.xml") != 0)
+            continue;
+        rooted(c, path, sizeof path, rel);
+        if (!(t = read_small(path)))
+            continue;
+        c->jm = xrealloc(c->jm, (c->njm + 1) * sizeof *c->jm);
+        m = &c->jm[c->njm++];
+        memset(m, 0, sizeof *m);
+        m->dir = xstrndup(rel, (size_t)(base - rel));          /* "core/" or "" */
+        m->gradle = gradle;
+        sbuf_adds(&deps, " ");
+        sbuf_adds(&tdeps, " ");
+        if (gradle) {
+            /* a Gradle project is named after its folder */
+            const char *d = m->dir, *e = d + strlen(d), *b;
+            SBuf nm = SBUF_INIT;
+
+            if (e > d)
+                e--;
+            for (b = e; b > d && b[-1] != '/'; b--)
+                ;
+            {
+                /* a folder settings.gradle gives another name */
+                char key[PATH_MAX + 4];
+                const char *hit;
+
+                snprintf(key, sizeof key, " %s=", m->dir);
+                if (m->dir[0] && (hit = strstr(map.p, key)) != NULL) {
+                    const char *v = hit + strlen(key);
+
+                    sbuf_add(&nm, v, strcspn(v, " "));
+                } else {
+                    jm_norm(b, (size_t)(e - b), &nm);
+                }
+            }
+            sbuf_add(&nm, "", 1);
+            m->name = xstrdup(nm.p);
+            m->parent = xstrdup("");
+            sbuf_free(&nm);
+            jm_gradle(t, &deps, &tdeps);
+        } else {
+            jm_maven(m, t, &deps, &tdeps);
+        }
+        sbuf_add(&deps, "", 1);
+        sbuf_add(&tdeps, "", 1);
+        m->deps = xstrdup(deps.p);
+        m->tdeps = xstrdup(tdeps.p);
+        sbuf_free(&deps);
+        sbuf_free(&tdeps);
+        free(t);
+    }
+    sbuf_free(&map);
+}
+
+/* The module of a file of the project: the deepest one whose folder holds it; -1 if none. */
+static long java_module_of(const SymCache *c, const char *rel)
+{
+    size_t i, best_len = 0;
+    long best = -1;
+
+    for (i = 0; i < c->njm; i++) {
+        size_t dl = strlen(c->jm[i].dir);
+
+        if (strncmp(rel, c->jm[i].dir, dl) == 0 && (best < 0 || dl > best_len)) {
+            best = (long)i;
+            best_len = dl;
+        }
+    }
+    return best;
+}
+
+/* Module k depends on the module called want (" name "): through its own dependencies (those of
+ * scope test too in a test), its Maven parents' ones, or (Gradle) the root build's, which apply
+ * to every project. */
+static int jm_depends(const SymCache *c, size_t k, const char *want, int test)
+{
+    size_t depth, i;
+    long cur = (long)k;
+
+    for (depth = 0; cur >= 0 && depth < 8; depth++) {
+        const struct JMod *m = &c->jm[cur];
+        long next = -1;
+
+        if (strstr(m->deps, want) || (test && strstr(m->tdeps, want)))
+            return 1;
+        if (m->parent[0]) {
+            SBuf pn = SBUF_INIT;
+
+            jm_norm(m->parent, strlen(m->parent), &pn);
+            sbuf_add(&pn, "", 1);
+            for (i = 0; i < c->njm; i++)
+                if ((long)i != cur && !c->jm[i].gradle && strcmp(c->jm[i].name, pn.p) == 0)
+                    next = (long)i;
+            sbuf_free(&pn);
+        }
+        cur = next;
+    }
+    if (c->jm[k].gradle)
+        for (i = 0; i < c->njm; i++)
+            if (c->jm[i].gradle && !c->jm[i].dir[0] && i != k &&
+                (strstr(c->jm[i].deps, want) || (test && strstr(c->jm[i].tdeps, want))))
+                return 1;
+    return 0;
+}
+
+/* Marks the modules that module m reaches through its dependencies (and itself). */
+static void java_reach(SymCache *c, long m, int test)
+{
+    size_t i, changed = 1;
+
+    for (i = 0; i < c->njm; i++)
+        c->jm[i].ok = (long)i == m;
+    while (changed) {
+        changed = 0;
+        for (i = 0; i < c->njm; i++) {
+            size_t k;
+            char want[PM_NAME + 2];
+
+            if (c->jm[i].ok || !c->jm[i].name[0])
+                continue;
+            snprintf(want, sizeof want, " %s ", c->jm[i].name);
+            for (k = 0; k < c->njm; k++)
+                if (c->jm[k].ok && jm_depends(c, k, want, test && (long)k == m)) {
+                    c->jm[i].ok = 1;
+                    changed = 1;
+                    break;
+                }
+        }
+    }
+}
+
+#define JAVA_FILES_MAX 4000             /* Java files of the project looked at (read in the time budget) */
+
 /* Java: the public types of the other packages of the project, with "com.acme.util.TextUtils"
  * for their import; those of cur's own package need none (they come through env_build). */
 static void java_project(SymCache *c, Doc *cur, Env *e, HdrFn fn, void *ctx)
@@ -4501,22 +5068,40 @@ static void java_project(SymCache *c, Doc *cur, Env *e, HdrFn fn, void *ctx)
 
     int in_test = cur->buf.path && strstr(cur->buf.path, "src/test/") != NULL;
 
+    long mine = -1;
+
     java_package(&cur->buf, pkg, sizeof pkg);
     if (!ensure_files(c))
         return;
-    for (i = 0; i < c->nfiles && seen < HDR_MAX; i++) {
+    /* a build of several modules: only those the file's module depends on */
+    java_modules(c);
+    if (c->njm > 1 && e->v[0]->key && strncmp(e->v[0]->key, c->root, strlen(c->root)) == 0) {
+        const char *rel = e->v[0]->key + strlen(c->root);
+
+        while (*rel == '/')
+            rel++;
+        if ((mine = java_module_of(c, rel)) >= 0)
+            java_reach(c, mine, in_test);
+    }
+    for (i = 0; i < c->nfiles && seen < JAVA_FILES_MAX; i++) {
         struct Hdr *h;
-        char *real;
+        const char *real;
 
         if (strcmp(ext_of(c->files[i]), "java") != 0)
             continue;
         /* Maven and Gradle's tests: only for another test */
         if (!in_test && (strncmp(c->files[i], "src/test/", 9) == 0 || strstr(c->files[i], "/src/test/")))
             continue;
+        if (mine >= 0) {
+            long m = java_module_of(c, c->files[i]);
+
+            if (m >= 0 && !c->jm[m].ok)
+                continue;
+        }
         seen++;
+        /* the root is a real path and the walk enters no linked folder: no realpath for each file */
         rooted(c, path, sizeof path, c->files[i]);
-        if (!(real = realpath(path, NULL)))
-            continue;
+        real = path;
         h = e->v[0]->key && strcmp(e->v[0]->key, real) == 0 ? NULL : hdr_get(c, real);
         for (j = 0; h && j < h->n; j++) {
             if (!h->v[j].ns || strcmp(h->v[j].ns, pkg) == 0)
@@ -4524,7 +5109,6 @@ static void java_project(SymCache *c, Doc *cur, Env *e, HdrFn fn, void *ctx)
             snprintf(spec, sizeof spec, "%s.%s", h->v[j].ns, h->v[j].name);
             fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, spec);
         }
-        free(real);
     }
 }
 

@@ -5386,6 +5386,259 @@ static void test_java(void)
     rm_rf(dir);
 }
 
+/* Java: the constants of an enum, the members an import static brings, and in a build of
+ * several modules only the classes of the modules the file's one depends on. */
+static void test_java_more(void)
+{
+    char dir[64], sub[200];
+    static const char *const dirs[] = {
+        "app", "app/src", "app/src/main", "app/src/main/java", "app/src/main/java/app",
+        "core", "core/src", "core/src/main", "core/src/main/java", "core/src/main/java/core",
+        "base", "base/src", "base/src/main", "base/src/main/java", "base/src/main/java/base",
+        "extra", "extra/src", "extra/src/main", "extra/src/main/java", "extra/src/main/java/extra"
+    };
+    size_t i;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof dirs / sizeof dirs[0]; i++) {
+        snprintf(sub, sizeof sub, "%s/%s", dir, dirs[i]);
+        mkdir(sub, 0755);
+    }
+    put_file(dir, "settings.gradle", "include 'app', 'core', 'base', 'extra'\n");
+    put_file(dir, "app/build.gradle", "dependencies {\n    implementation project(':core')\n}\n");
+    put_file(dir, "core/build.gradle", "dependencies {\n    api project(\":base\")\n}\n");
+    put_file(dir, "base/build.gradle", "\n");
+    put_file(dir, "extra/build.gradle", "\n");
+    put_file(dir, "core/src/main/java/core/Engine.java", "package core;\n\npublic class Engine {\n"
+             "    public static int powerOf(int n) {\n        return n;\n    }\n}\n");
+    put_file(dir, "base/src/main/java/base/Basement.java", "package base;\n\npublic class Basement {\n}\n");
+    put_file(dir, "extra/src/main/java/extra/Gadget.java", "package extra;\n\npublic class Gadget {\n}\n");
+    put_file(dir, "app/src/main/java/app/Color.java",
+             "package app;\n\npublic enum Color {\n    RED(\"r\"),\n    // a comment\n    GREEN(\"g\") {\n        void f() {}\n    },\n"
+             "    BLUE_SKY(\"b\");\n\n    private final String code;\n\n    Color(String code) {\n        this.code = code;\n    }\n}\n");
+    {
+        static const char *m = "package app;\n\nimport static java.lang.Math.max;\nimport static core.Engine.*;\n\n"
+                                "public class M {\n    void f() {\n        \n    }\n}\n";
+
+        /* the enum's constants after its name */
+        php_case(dir, "app/src/main/java/app/M.java", m, "Color.GRE", 7, "        Color.GREEN", 0);
+        php_case(dir, "app/src/main/java/app/M.java", m, "Color.BLUE_S", 7, "        Color.BLUE_SKY", 0);
+        /* import static: a member of the library, every member of a class of the project */
+        php_case(dir, "app/src/main/java/app/M.java", m, "ma", 7, "        max(", 0);
+        php_case(dir, "app/src/main/java/app/M.java", m, "powerO", 7, "        powerOf(", 0);
+        /* modules: core and, through it, base; not extra */
+        php_case(dir, "app/src/main/java/app/M.java", m, "Engin", 7, "import static core.Engine.*;\n\nimport core.Engine;\n", 1);
+        php_case(dir, "app/src/main/java/app/M.java", m, "Basemen", 7, "import base.Basement;\n", 1);
+        php_case(dir, "app/src/main/java/app/M.java", m, "Gadge", 7, "import static core.Engine.*;\n\npublic class M", 0);
+    }
+    rm_rf(dir);
+
+    /* Maven: the artifactIds of the module's dependencies */
+    {
+        char md[64];
+        static const char *const mdirs[] = {
+            "web", "web/src", "web/src/main", "web/src/main/java", "web/src/main/java/web",
+            "model", "model/src", "model/src/main", "model/src/main/java", "model/src/main/java/model",
+            "tools", "tools/src", "tools/src/main", "tools/src/main/java", "tools/src/main/java/tools"
+        };
+
+        CHECK(make_dir(md, sizeof md) != NULL);
+        for (i = 0; i < sizeof mdirs / sizeof mdirs[0]; i++) {
+            snprintf(sub, sizeof sub, "%s/%s", md, mdirs[i]);
+            mkdir(sub, 0755);
+        }
+        put_file(md, "pom.xml", "<project>\n  <artifactId>parent</artifactId>\n  <modules>\n    <module>web</module>\n  </modules>\n</project>\n");
+        put_file(md, "web/pom.xml", "<project>\n  <parent>\n    <artifactId>parent</artifactId>\n  </parent>\n"
+                                     "  <artifactId>shop-web</artifactId>\n  <dependencies>\n    <dependency>\n"
+                                     "      <artifactId>shop-model</artifactId>\n    </dependency>\n  </dependencies>\n</project>\n");
+        put_file(md, "model/pom.xml", "<project>\n  <artifactId>shop-model</artifactId>\n</project>\n");
+        put_file(md, "tools/pom.xml", "<project>\n  <artifactId>shop-tools</artifactId>\n</project>\n");
+        put_file(md, "model/src/main/java/model/Product.java", "package model;\n\npublic class Product {\n}\n");
+        put_file(md, "tools/src/main/java/tools/Toolkit.java", "package tools;\n\npublic class Toolkit {\n}\n");
+        php_case(md, "web/src/main/java/web/W.java", "package web;\n\npublic class W {\n    void f() {\n        \n    }\n}\n",
+                 "Produc", 4, "package web;\n\nimport model.Product;\n\npublic class W", 1);
+        php_case(md, "web/src/main/java/web/W.java", "package web;\n\npublic class W {\n    void f() {\n        \n    }\n}\n",
+                 "Toolki", 4, "package web;\n\npublic class W", 0);
+        rm_rf(md);
+    }
+}
+
+/* Java builds: the forms of a dependency between modules. Gradle: project accessors
+ * (projects.myLib for my-lib), project(path: ...), the root's subprojects { }, test
+ * configurations; Maven: the parent's dependencies, not <dependencyManagement> nor the plugins'
+ * ones, scope test only from a test. */
+/* Creates root/rel and the folders above it. */
+static void mkdirs(const char *root, const char *rel)
+{
+    char d[400];
+    size_t k, n;
+
+    n = (size_t)snprintf(d, sizeof d, "%s/%s", root, rel);
+    for (k = strlen(root) + 1; k <= n && k < sizeof d; k++)
+        if (d[k] == '/' || d[k] == '\0') {
+            char ch = d[k];
+
+            d[k] = '\0';
+            mkdir(d, 0755);
+            d[k] = ch;
+        }
+}
+
+/* A module of a Java build with, if cls, a public class in package pkg (main or test sources). */
+static void jmod(const char *root, const char *mod, const char *pkg, const char *cls, int test)
+{
+    char rel[300], body[200];
+
+    snprintf(rel, sizeof rel, "%s/src/%s/java/%s", mod, test ? "test" : "main", pkg);
+    mkdirs(root, rel);
+    if (cls) {
+        snprintf(rel, sizeof rel, "%s/src/%s/java/%s/%s.java", mod, test ? "test" : "main", pkg, cls);
+        snprintf(body, sizeof body, "package %s;\n\npublic class %s {\n}\n", pkg, cls);
+        put_file(root, rel, body);
+    }
+}
+
+static void test_java_builds(void)
+{
+    char dir[64];
+    static const char *w = "package app;\n\npublic class W {\n    void f() {\n        \n    }\n}\n";
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    jmod(dir, "app", "app", NULL, 0);
+    jmod(dir, "app", "app", NULL, 1);
+    jmod(dir, "my-lib", "mylib", "LibThing", 0);
+    jmod(dir, "pathdep", "pathdep", "PathThing", 0);
+    jmod(dir, "common", "common", "CommonThing", 0);
+    jmod(dir, "testkit", "testkit", "KitThing", 0);
+    jmod(dir, "other", "other", "OtherThing", 0);
+    put_file(dir, "settings.gradle", "include 'app', 'my-lib', 'pathdep', 'common', 'testkit', 'other'\n");
+    put_file(dir, "build.gradle", "subprojects {\n    dependencies {\n        implementation project(':common')\n    }\n}\n");
+    put_file(dir, "app/build.gradle", "dependencies {\n    implementation(projects.myLib)\n"
+                                      "    implementation project(path: ':pathdep')\n    implementation libs.guava\n"
+                                      "    testImplementation project(':testkit')\n    // implementation project(':other')\n}\n");
+    put_file(dir, "my-lib/build.gradle", "\n");
+    put_file(dir, "pathdep/build.gradle", "\n");
+    put_file(dir, "common/build.gradle", "\n");
+    put_file(dir, "testkit/build.gradle", "\n");
+    put_file(dir, "other/build.gradle", "\n");
+    php_case(dir, "app/src/main/java/app/W.java", w, "LibThin", 4, "import mylib.LibThing;\n", 1);
+    php_case(dir, "app/src/main/java/app/W.java", w, "PathThin", 4, "import pathdep.PathThing;\n", 1);
+    php_case(dir, "app/src/main/java/app/W.java", w, "CommonThin", 4, "import common.CommonThing;\n", 1);
+    php_case(dir, "app/src/main/java/app/W.java", w, "KitThin", 4, "package app;\n\npublic class W", 0);
+    php_case(dir, "app/src/test/java/app/W.java", w, "KitThin", 4, "import testkit.KitThing;\n", 1);
+    php_case(dir, "app/src/main/java/app/W.java", w, "OtherThin", 4, "package app;\n\npublic class W", 0);
+    rm_rf(dir);
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    jmod(dir, "web", "web", NULL, 0);
+    jmod(dir, "web", "web", NULL, 1);
+    jmod(dir, "common", "common", "CommonThing", 0);
+    jmod(dir, "tools", "tools", "ToolThing", 0);
+    jmod(dir, "plug", "plug", "PlugThing", 0);
+    jmod(dir, "fixtures", "fixtures", "FixThing", 0);
+    put_file(dir, "pom.xml", "<project>\n  <artifactId>shop-parent</artifactId>\n  <dependencies>\n    <dependency>\n"
+                             "      <artifactId>shop-common</artifactId>\n    </dependency>\n  </dependencies>\n"
+                             "  <dependencyManagement>\n    <dependencies>\n      <dependency>\n"
+                             "        <artifactId>shop-tools</artifactId>\n      </dependency>\n    </dependencies>\n"
+                             "  </dependencyManagement>\n</project>\n");
+    put_file(dir, "web/pom.xml", "<project>\n  <parent>\n    <artifactId>shop-parent</artifactId>\n  </parent>\n"
+                                 "  <artifactId>shop-web</artifactId>\n  <dependencies>\n    <dependency>\n"
+                                 "      <artifactId>shop-fixtures</artifactId>\n      <scope>test</scope>\n    </dependency>\n"
+                                 "    <!-- <dependency><artifactId>shop-tools</artifactId></dependency> -->\n"
+                                 "  </dependencies>\n  <build>\n    <plugins>\n      <plugin>\n        <dependencies>\n"
+                                 "          <dependency>\n            <artifactId>shop-plug</artifactId>\n"
+                                 "          </dependency>\n        </dependencies>\n      </plugin>\n    </plugins>\n"
+                                 "  </build>\n</project>\n");
+    put_file(dir, "common/pom.xml", "<project>\n  <artifactId>shop-common</artifactId>\n</project>\n");
+    put_file(dir, "tools/pom.xml", "<project>\n  <artifactId>shop-tools</artifactId>\n</project>\n");
+    put_file(dir, "plug/pom.xml", "<project>\n  <artifactId>shop-plug</artifactId>\n</project>\n");
+    put_file(dir, "fixtures/pom.xml", "<project>\n  <artifactId>shop-fixtures</artifactId>\n</project>\n");
+    {
+        static const char *v = "package web;\n\npublic class V {\n    void f() {\n        \n    }\n}\n";
+
+        php_case(dir, "web/src/main/java/web/V.java", v, "CommonThin", 4, "import common.CommonThing;\n", 1);
+        php_case(dir, "web/src/main/java/web/V.java", v, "ToolThin", 4, "package web;\n\npublic class V", 0);
+        php_case(dir, "web/src/main/java/web/V.java", v, "PlugThin", 4, "package web;\n\npublic class V", 0);
+        php_case(dir, "web/src/main/java/web/V.java", v, "FixThin", 4, "package web;\n\npublic class V", 0);
+        php_case(dir, "web/src/test/java/web/V.java", v, "FixThin", 4, "import fixtures.FixThing;\n", 1);
+    }
+    rm_rf(dir);
+}
+
+static int hdr_seen;
+static const char *hdr_want;
+
+static void hdr_find_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret, const char *spec)
+{
+    (void)ctx;
+    (void)kind;
+    (void)sig;
+    (void)ret;
+    (void)spec;
+    if (strcmp(name, hdr_want) == 0)
+        hdr_seen = 1;
+}
+
+/* Gradle projects whose folder is not their name (settings.gradle's projectDir); a module of
+ * many classes is read whole. */
+static void test_java_settings_and_size(void)
+{
+    char dir[64], rel[200], body[160], path[256], err[128];
+    static const char *w = "package app;\n\npublic class W {\n    void f() {\n        \n    }\n}\n";
+    int i;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    jmod(dir, "app", "app", NULL, 0);
+    jmod(dir, "libs/engine-impl", "engine", "Motor", 0);
+    jmod(dir, "libs/spare", "spare", "SparePart", 0);
+    put_file(dir, "settings.gradle", "include ':app', ':core', ':spare'\n"
+                                     "project(':core').projectDir = file('libs/engine-impl')\n"
+                                     "project(':spare').projectDir = new File(rootDir, './libs/spare')\n");
+    put_file(dir, "app/build.gradle", "dependencies {\n    implementation project(':core')\n}\n");
+    put_file(dir, "libs/engine-impl/build.gradle", "\n");
+    put_file(dir, "libs/spare/build.gradle", "\n");
+    php_case(dir, "app/src/main/java/app/W.java", w, "Moto", 4, "import engine.Motor;\n", 1);
+    php_case(dir, "app/src/main/java/app/W.java", w, "SparePar", 4, "package app;\n\npublic class W", 0);
+    put_file(dir, "settings.gradle", "");
+    put_file(dir, "settings.gradle.kts", "include(\":app\", \":core\")\nproject(\":core\").projectDir = file(\"libs/engine-impl\")\n");
+    php_case(dir, "app/src/main/java/app/W.java", w, "Moto", 4, "import engine.Motor;\n", 1);
+    rm_rf(dir);
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    jmod(dir, "app", "app", NULL, 0);
+    jmod(dir, "big", "big", NULL, 0);
+    put_file(dir, "settings.gradle", "include 'app', 'big'\n");
+    put_file(dir, "app/build.gradle", "dependencies {\n    implementation project(':big')\n}\n");
+    put_file(dir, "big/build.gradle", "\n");
+    for (i = 0; i < 900; i++) {
+        snprintf(rel, sizeof rel, "big/src/main/java/big/Big%d.java", i);
+        snprintf(body, sizeof body, "package big;\n\npublic class Big%d {\n}\n", i);
+        put_file(dir, rel, body);
+    }
+    put_file(dir, "app/src/main/java/app/W.java", w);
+    snprintf(path, sizeof path, "%s/app/src/main/java/app/W.java", dir);
+    {
+        Doc d;
+        Doc *docs[1];
+        SymCache *c = sym_cache_new();
+        static const char *const want[] = { "Big0", "Big450", "Big899" };
+        size_t k;
+
+        memset(&d, 0, sizeof d);
+        CHECK(doc_load(&d, path, err, sizeof err) == 0);
+        docs[0] = &d;
+        for (k = 0; k < 3; k++) {
+            hdr_seen = 0;
+            hdr_want = want[k];
+            sym_project_symbols(c, docs, 1, &d, hdr_find_cb, NULL);
+            CHECK(hdr_seen);
+        }
+        doc_release(&d);
+        sym_cache_free(c);
+    }
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5941,6 +6194,9 @@ int main(void)
     test_php_facades();
     test_go_rust();
     test_java();
+    test_java_more();
+    test_java_builds();
+    test_java_settings_and_size();
     test_config_merge();
     test_snippets();
     test_cursors();
