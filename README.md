@@ -27,10 +27,12 @@ definizioni, tutto interno: non serve alcun language server.
 
 ## Installazione
 
-Servono un compilatore C (`gcc` o `clang`) e `make`. Nient'altro.
+Servono un compilatore C (`gcc` o `clang`) e `make`. Per il binario statico, quello predefinito,
+anche musl (`apt install musl-tools`, `dnf install musl-gcc`, `pacman -S musl`); senza musl `make`
+compila un binario dinamico e lo dice.
 
 ```
-make                  # build ottimizzata: ./xted
+make                  # ./xted: statico con musl-gcc (un solo file, gira su ogni Linux), o dinamico
 make install          # in /usr/local/bin: xted e il collegamento xt
 make install PREFIX=$HOME/.local        # senza permessi di amministratore
 man xted                                 # la pagina del manuale (inglese e italiano)
@@ -44,8 +46,10 @@ del manuale (`man/xted.1` in inglese, `man/it/xted.1` in italiano, in `$MANDIR`,
 Altre modalità di compilazione:
 
 ```
-make STATIC=1 CC=musl-gcc    # binario statico e piccolo (-Os)
-make SAN=1                   # AddressSanitizer e UBSan, per lo sviluppo
+make DYNAMIC=1               # dinamico, col cc del sistema (pacchetti, sviluppo); -O2
+make STATIC=1                # statico anche con un altro CC (make STATIC=1 CC=clang)
+make CC=clang                # un compilatore indicato si usa così com'è (dinamico, senza STATIC=1)
+make SAN=1                   # AddressSanitizer e UBSan, dinamico con gcc, per lo sviluppo
 make test                    # test automatici
 make smoke                   # prove sull'editor in un vero pseudo-terminale (python3)
 make clean

@@ -92,9 +92,11 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 ## Comandi
 
 ```
-make                 # build ottimizzata (./xted)
-make STATIC=1        # link statico (oggetti in build/static: la dimensione misurata è quella vera)
-make SAN=1           # build con AddressSanitizer e UBSan (oggetti in build/san)
+make                 # ./xted statico con musl-gcc (-Os, oggetti in build/static: la dimensione
+                     # misurata è quella vera); senza musl dinamico col cc del sistema, con un avviso
+make DYNAMIC=1       # dinamico (-O2, oggetti in build); un CC indicato dà anche lui il dinamico
+make STATIC=1        # statico anche con un altro CC
+make SAN=1           # build con AddressSanitizer e UBSan, dinamica con gcc (oggetti in build/san)
 make test            # test automatici
 make smoke           # l'editor su un vero pseudo-terminale (tests/smoke, serve python3)
 make clean

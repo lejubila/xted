@@ -1,24 +1,45 @@
-CC       ?= gcc
-CFLAGS   ?= -O2
-LDFLAGS  ?=
+# The modes (each compiles into its own folder, so that objects of different flags never mix):
+#   make            static with musl-gcc, when it is installed: one binary that runs on any Linux
+#                   (SPEC: under 560 KB); without musl, dynamic with the system's cc, with a note
+#   make DYNAMIC=1  dynamic, with the system's cc (or the CC given): for packages, for development
+#   make STATIC=1   static even with another CC (CC=musl-gcc is the default when installed)
+#   make SAN=1      AddressSanitizer + UBSan, dynamic with gcc (the sanitizers need glibc)
+# A CC given on the command line is used as it is (dynamic, unless STATIC=1).
+LDFLAGS ?=
+MUSL    := $(shell command -v musl-gcc 2>/dev/null)
 
-# make STATIC=1  -> statically linked binary (e.g. CC=musl-gcc)
-# make SAN=1     -> AddressSanitizer + UBSan build, for development
-# Every mode compiles into its own folder: objects of different flags never mix, and a size
-# measured with STATIC=1 is the size of a static build.
-BUILD    = build
 ifdef SAN
+MODE     = san
+else ifdef DYNAMIC
+MODE     = dynamic
+else ifdef STATIC
+MODE     = static
+else ifneq ($(origin CC),default)
+MODE     = dynamic
+else ifneq ($(MUSL),)
+MODE     = static
+else
+MODE     = dynamic
+NO_MUSL  = 1
+endif
+
+ifeq ($(MODE),san)
+ifeq ($(origin CC),default)
+CC       = gcc
+endif
 CFLAGS   = -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address,undefined
 BUILD    = build/san
+else ifeq ($(MODE),static)
+ifeq ($(origin CC),default)
+CC       = $(if $(MUSL),musl-gcc,cc)
 endif
-ifdef STATIC
-BUILD    = build/static
+CFLAGS  ?= -Os
 LDFLAGS += -static
-# a static binary is meant to be small (SPEC: under 560 KB): -Os unless CFLAGS is given
-ifeq ($(origin CFLAGS),file)
-CFLAGS = -Os
-endif
+BUILD    = build/static
+else
+CFLAGS  ?= -O2
+BUILD    = build
 endif
 
 PROG     = xted
@@ -39,7 +60,7 @@ OBJ      = $(LIBSRC:src/%.c=$(BUILD)/%.o) $(BUILD)/main.o
 all: $(PROG)
 
 # ./xted is the program of the mode just built: copied each time, so that switching mode (make,
-# make STATIC=1, make SAN=1) never leaves the binary of another one
+# make DYNAMIC=1, make SAN=1) never leaves the binary of another one
 $(PROG): $(BUILD)/$(PROG)
 	cp $< $@
 
@@ -47,6 +68,10 @@ $(BUILD)/$(PROG): $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LINK)
 ifndef SAN
 	strip -s $@
+endif
+ifdef NO_MUSL
+	@echo "xted: built dynamic, musl-gcc was not found. For the static binary install musl"
+	@echo "      (apt install musl-tools, dnf install musl-gcc, pacman -S musl) and run make again."
 endif
 
 $(BUILD)/%.o: src/%.c
