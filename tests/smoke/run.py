@@ -337,6 +337,22 @@ def dotenv_file():
 
 
 @scenario
+def palette_colors():
+    b = Box()
+    b.write("a.c", "int main(void) { return 0; }\n")
+    r = b.run(["a.c"])
+    r.type(alt("x"), "Colors", 0.3)
+    t = r.screen().text()
+    check("Alt+X has Colors with what auto found", "Colors" in t and "auto (256)" in t, t[-800:])
+    r.type(ENTER, 0.3)
+    t = r.screen().text()
+    check("Enter switches to truecolor at once", "truecolor" in t and b"\x1b[38;2;" in r.out[-6000:], t[-800:])
+    r.type(ESC)
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

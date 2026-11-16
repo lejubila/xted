@@ -35,7 +35,7 @@ typedef struct {
 } SaveDest;
 
 /* Settings changed with a command in this session that are not tied to a document. */
-enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8, PEND_LANG = 16 };
+enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8, PEND_LANG = 16, PEND_COLORS = 32 };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -161,6 +161,7 @@ typedef struct Editor {
     size_t theme_idx;
     const Theme *theme;
     int color_depth;
+    int colors_mode;        /* COLOR_* chosen in the palette or the configuration, -1 for auto */
     int match_on;           /* the bracket at/before the cursor has a partner */
     size_t by, bx, my, mx;  /* that bracket and its partner */
 
@@ -256,6 +257,9 @@ void editor_cmd_prev_win(Editor *e);
 void editor_cmd_toggle_tree(Editor *e);
 void editor_cmd_match(Editor *e);
 void editor_cmd_theme(Editor *e);
+void editor_cmd_colors(Editor *e);
+/* The colour mode for the palette: "auto (256)", "truecolor", "256", "16", "none". */
+void editor_colors_label(const Editor *e, char *out, size_t n);
 void editor_cmd_indent_tabs(Editor *e);
 void editor_cmd_indent_spaces2(Editor *e);
 void editor_cmd_indent_spaces4(Editor *e);

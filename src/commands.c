@@ -96,6 +96,7 @@ const Command commands[] = {
     { "indent_spaces_8", N_("Indentation: 8 spaces"), "", editor_cmd_indent_spaces8, 0, 0, G_SETTINGS, ST_SP8 },
     { "indent_detect", N_("Detect indentation style"), "", editor_cmd_indent_detect, 0, 0, G_SETTINGS, ST_NONE },
     { "theme", N_("Change theme"), "alt+t", editor_cmd_theme, 0, 0, G_SETTINGS, ST_THEME },
+    { "colors", N_("Colors"), "", editor_cmd_colors, 0, 0, G_SETTINGS, ST_COLORS },
     { "language", N_("Language"), "", editor_cmd_language, 0, 0, G_SETTINGS, ST_LANG },
     { "save_settings", N_("Save settings…"), "", editor_cmd_save_settings, 0, 0, G_SETTINGS, ST_NONE },
 };
@@ -145,6 +146,9 @@ int command_state(const Editor *e, int idx, char *val, size_t n)
         return 2;
     case ST_LANG:
         snprintf(val, n, "%s", i18n_name());
+        return 2;
+    case ST_COLORS:
+        editor_colors_label(e, val, n);
         return 2;
     default:
         val[0] = '\0';

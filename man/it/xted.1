@@ -221,8 +221,9 @@ su un'azione la esegue e chiude la palette; su un'impostazione la cambia e lasci
 aperta.
 .PP
 Le impostazioni sono: mouse, autosuggest, coppie automatiche di parentesi e virgolette,
-indicatori Git, appunti di sistema, indentazione (tabulatore, 2, 4 o 8 spazi), tema e lingua (con
-il file del catalogo in uso).
+indicatori Git, appunti di sistema, indentazione (tabulatore, 2, 4 o 8 spazi), tema, colori (auto,
+con quello che ha scelto, come «auto (256)», truecolor, 256, 16 o nessuno) e lingua (con il file del
+catalogo in uso).
 .B Salva le impostazioni...\&
 scrive le scelte in un file di configurazione.
 .SH CONFIGURAZIONE
@@ -265,6 +266,11 @@ o un tema tuo (anche
 .BR mouse ", " git ", " clipboard
 .BR on " oppure " off .
 L'impostazione clipboard invia le copie anche agli appunti di sistema (OSC 52).
+.TP
+.B colors
+.BR auto " (predefinito: da " COLORTERM " e " TERM "; la famiglia xterm, PuTTY compreso, ha 256 colori), "
+.BR truecolor ", " 256 ", " 16 " oppure " none .
+In SSH COLORTERM arriva di rado: con truecolor si hanno i colori a 24 bit.
 .TP
 .B language
 .BR auto " (dall'ambiente), " en ", " it

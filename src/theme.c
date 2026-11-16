@@ -95,17 +95,45 @@ int theme_by_name(const char *name)
     return -1;
 }
 
+/* TERM is one of the names in list (blank separated), or starts with one followed by "-". */
+static int term_is(const char *t, const char *list)
+{
+    size_t tl = strlen(t);
+
+    while (*list) {
+        size_t n = strcspn(list, " ");
+
+        if (n && tl >= n && memcmp(t, list, n) == 0 && (tl == n || t[n] == '-'))
+            return 1;
+        list += n;
+        while (*list == ' ')
+            list++;
+    }
+    return 0;
+}
+
 int theme_detect_depth(void)
 {
     const char *nc = getenv("NO_COLOR"), *ct = getenv("COLORTERM"), *t = getenv("TERM");
+    const char *wt = getenv("WT_SESSION");
+    size_t tl;
 
     if (nc && nc[0])
         return COLOR_NONE;
     if (ct && (strstr(ct, "truecolor") || strstr(ct, "24bit")))
         return COLOR_TRUE;
-    if (!t || strcmp(t, "dumb") == 0)
+    if (!t || !t[0] || strcmp(t, "dumb") == 0)
         return COLOR_NONE;
+    tl = strlen(t);
+    /* terminals known to show any colour (Windows Terminal says so with WT_SESSION) */
+    if ((tl > 7 && strcmp(t + tl - 7, "-direct") == 0) || (wt && wt[0]) ||
+        term_is(t, "xterm-kitty xterm-ghostty alacritty foot wezterm contour"))
+        return COLOR_TRUE;
     if (strstr(t, "256"))
+        return COLOR_256;
+    /* the xterm family shows 256 colours even when TERM does not say it: PuTTY and KiTTY send
+     * "xterm" over SSH, and COLORTERM does not travel with it */
+    if (term_is(t, "xterm putty screen tmux rxvt konsole gnome vte st kitty mintty iterm"))
         return COLOR_256;
     return COLOR_16;
 }

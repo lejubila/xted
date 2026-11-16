@@ -398,7 +398,8 @@ comando, in colonne allineate.
 - Riaprendo la palette la selezione torna sull'ultimo comando usato.
 
 Impostazioni disponibili dalla palette: mouse, autosuggest, coppie automatiche, indicatori
-Git, appunti di sistema, indentazione (tabulatore, 2, 4, 8 spazi), tema, «Rileva lo stile di
+Git, appunti di sistema, indentazione (tabulatore, 2, 4, 8 spazi), tema, colori (auto, che mostra
+anche cosa ha scelto, per esempio «auto (256)», truecolor, 256, 16, nessuno), «Rileva lo stile di
 indentazione», e **«Salva le impostazioni…»**, che scrive le scelte fatte nei file di
 configurazione (vedi sotto). Altri comandi senza scorciatoia: «Pareggia i pannelli»,
 «Duplica riga sopra», «Piega tutto», «Espandi tutto», «Converti l'indentazione in spazi /
@@ -417,6 +418,17 @@ L'editor funziona senza alcun file di configurazione. Se vuoi cambiare qualcosa,
 └── lang/           cataloghi di traduzione (un file per lingua)
 ```
 
+### I colori del terminale
+
+Con `colors = auto` (predefinito) xted sceglie da `COLORTERM` e `TERM`: `COLORTERM=truecolor` o un
+terminale noto (kitty, Alacritty, foot, WezTerm, Windows Terminal, `TERM=*-direct`) → 24 bit; `TERM`
+della famiglia xterm (`xterm`, `putty`, `screen`, `tmux`, `rxvt`, …) → 256 colori, anche senza
+`256color` nel nome; le console come `linux` o `vt100` → 16. In SSH `COLORTERM` di solito non arriva:
+con PuTTY o KiTTY (che mandano `TERM=xterm`) si hanno quindi 256 colori; per i 24 bit, che PuTTY
+gestisce dalla versione 0.71, basta scegliere «Colori» nella palette (`Alt+X`) e salvarlo, o scrivere
+`colors = truecolor` nel file `config` sul server, oppure
+`SendEnv COLORTERM` nel client e `AcceptEnv COLORTERM` in `sshd_config`.
+
 ### Il file `config`
 
 Righe `chiave = valore`, commenti con `#`. Le chiavi prima della prima sezione valgono per
@@ -430,6 +442,7 @@ language = auto           # auto (da LC_ALL, LC_MESSAGES, LANG), en, it, o un co
 mouse = on
 git = on
 clipboard = on            # copie anche negli appunti di sistema (OSC 52)
+colors = auto             # auto | truecolor | 256 | 16 | none
 
 # valori per tutti i linguaggi
 tab_width = 8

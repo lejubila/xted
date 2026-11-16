@@ -220,6 +220,7 @@ void editor_init(Editor *e)
     e->sidebar_cols = SIDEBAR_W;
     e->theme = theme_get(0);
     e->color_depth = theme_detect_depth();
+    e->colors_mode = -1;
     e->render = render_create();
     keymap_init(&e->km);
     config_init(&e->cfg);
@@ -393,6 +394,10 @@ void editor_load_config(Editor *e)
         e->clipboard_osc52 = e->cfg.clipboard;
     if (e->cfg.mouse >= 0)
         e->mouse_on = e->cfg.mouse;
+    if (e->cfg.colors >= 0) {
+        e->colors_mode = e->cfg.colors;
+        e->color_depth = e->cfg.colors;
+    }
     if (e->cfg.theme[0]) {
         int t = theme_by_name(e->cfg.theme);
 
@@ -2782,6 +2787,37 @@ void editor_cmd_theme(Editor *e)
     editor_set_msg(e, MSG_TTL_MS, tr("Theme: %s"), e->theme->name);
 }
 
+static const char *colors_name(int mode)
+{
+    return mode == COLOR_TRUE ? "truecolor" : mode == COLOR_256 ? "256" : mode == COLOR_16 ? "16" :
+           mode == COLOR_NONE ? "none" : "auto";
+}
+
+void editor_colors_label(const Editor *e, char *out, size_t n)
+{
+    if (e->colors_mode < 0)
+        snprintf(out, n, "%s (%s)", tr("auto"), e->color_depth == COLOR_NONE ? tr("none") : colors_name(e->color_depth));
+    else
+        snprintf(out, n, "%s", e->colors_mode == COLOR_NONE ? tr("none") : colors_name(e->colors_mode));
+}
+
+/* auto -> truecolor -> 256 -> 16 -> none -> auto: what the terminal is told to show. */
+void editor_cmd_colors(Editor *e)
+{
+    static const int order[] = { -1, COLOR_TRUE, COLOR_256, COLOR_16, COLOR_NONE };
+    size_t i, n = sizeof order / sizeof order[0];
+    char lab[64];
+
+    for (i = 0; i < n && order[i] != e->colors_mode; i++)
+        ;
+    e->colors_mode = order[(i + 1) % n];
+    e->color_depth = e->colors_mode < 0 ? theme_detect_depth() : e->colors_mode;
+    e->pend |= PEND_COLORS;
+    render_invalidate(e->render);
+    editor_colors_label(e, lab, sizeof lab);
+    editor_set_msg(e, MSG_TTL_MS, tr("Colors: %s"), lab);
+}
+
 void editor_cmd_redraw(Editor *e)
 {
     render_invalidate(e->render);
@@ -3092,6 +3128,13 @@ static void project_globals(Editor *e, int live)
         if (live)
             e->mouse_on = c.mouse;
     }
+    if (c.colors >= 0) {
+        e->cfg.colors = c.colors;
+        if (live) {
+            e->colors_mode = c.colors;
+            e->color_depth = c.colors;
+        }
+    }
     if (c.git >= 0) {
         int changed = c.git != (e->cfg.git != 0);
 
@@ -3144,7 +3187,7 @@ typedef struct {
 } OtherLang;
 
 typedef struct {
-    CfgPair lp[6], gp[5];
+    CfgPair lp[6], gp[6];
     char val[6][16];
     size_t nl, ng;
     unsigned mask;
@@ -3208,6 +3251,10 @@ static void pending_get(const Editor *e, Pending *p)
     if (e->pend & PEND_LANG) {
         p->gp[p->ng].key = "language";
         p->gp[p->ng++].value = i18n_code();
+    }
+    if (e->pend & PEND_COLORS) {
+        p->gp[p->ng].key = "colors";
+        p->gp[p->ng++].value = colors_name(e->colors_mode);
     }
     for (i = 0; i < e->ndocs && p->nmore < 6; i++) {
         Doc *o = e->docs[i];
@@ -3306,7 +3353,7 @@ static int proj_sets_globals(const Editor *e, const Pending *p)
 
         if ((strcmp(k, "theme") == 0 && c.theme[0]) || (strcmp(k, "mouse") == 0 && c.mouse >= 0) ||
             (strcmp(k, "git") == 0 && c.git >= 0) || (strcmp(k, "clipboard") == 0 && c.clipboard >= 0) ||
-            (strcmp(k, "language") == 0 && c.language[0]))
+            (strcmp(k, "language") == 0 && c.language[0]) || (strcmp(k, "colors") == 0 && c.colors >= 0))
             r = 1;
     }
     config_free(&c);

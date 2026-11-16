@@ -222,8 +222,8 @@ on an action runs it and closes the palette; on a setting it changes it and leav
 open.
 .PP
 The settings are: mouse, autosuggest, automatic pairs of brackets and quotes, Git markers,
-system clipboard, indentation (tab, 2, 4 or 8 spaces), theme and language (with the catalog file
-in use).
+system clipboard, indentation (tab, 2, 4 or 8 spaces), theme, colors (auto, shown with what it
+found, as in "auto (256)", truecolor, 256, 16 or none) and language (with the catalog file in use).
 .B Save settings...\&
 writes the choices into a configuration file.
 .SH CONFIGURATION
@@ -265,6 +265,11 @@ or a theme of your own.
 .BR mouse ", " git ", " clipboard
 .BR on " or " off .
 The clipboard setting also sends the copies to the system clipboard (OSC 52).
+.TP
+.B colors
+.BR auto " (default: from " COLORTERM " and " TERM "; the xterm family, PuTTY included, gets 256), "
+.BR truecolor ", " 256 ", " 16 " or " none .
+Over SSH COLORTERM rarely arrives: set truecolor here for 24-bit colour.
 .TP
 .B language
 .BR auto " (from the environment), " en ", " it

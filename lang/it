@@ -305,3 +305,7 @@ xted: unknown option: %s\n	xted: opzione sconosciuta: %s\n
 «%s» has unsaved changes. Save? (y = yes, n = no%s, Esc = cancel)	«%s» ha modifiche non salvate. Salvare? (s = sì, n = no%s, Esc = annulla)
 «%s» is no longer where the tags file says	«%s» non si trova più dove dice il file tags
 «%s» no longer exists on disk	«%s» non esiste più su disco
+Colors	Colori
+Colors: %s	Colori: %s
+auto	auto
+none	nessuno

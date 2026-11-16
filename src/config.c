@@ -26,6 +26,7 @@ void config_init(Config *c)
     c->clipboard = -1;
     c->git = -1;
     c->mouse = -1;
+    c->colors = -1;
 }
 
 void config_free(Config *c)
@@ -277,6 +278,23 @@ int config_parse(Config *c, const char *text, size_t n)
                         r = -2;
                     else
                         snprintf(c->language, sizeof c->language, "%s", lv);
+                    if (r != -2)
+                        r = 0;
+                } else if (!strcmp(key, "colors")) {
+                    /* how many colours the terminal shows: auto (from TERM and COLORTERM),
+                     * truecolor, 256, 16 or none */
+                    if (!strcmp(lv, "auto"))
+                        c->colors = -1;
+                    else if (!strcmp(lv, "truecolor") || !strcmp(lv, "24bit") || !strcmp(lv, "24"))
+                        c->colors = 24;
+                    else if (!strcmp(lv, "256"))
+                        c->colors = 256;
+                    else if (!strcmp(lv, "16") || !strcmp(lv, "8"))
+                        c->colors = 16;
+                    else if (!strcmp(lv, "none") || !strcmp(lv, "off") || !strcmp(lv, "0"))
+                        c->colors = 0;
+                    else
+                        r = -2;
                     if (r != -2)
                         r = 0;
                 } else if (!strcmp(key, "clipboard") || !strcmp(key, "git") ||

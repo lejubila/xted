@@ -5861,6 +5861,141 @@ static void test_env_suggest(void)
     rm_rf(dir);
 }
 
+/* How many colours: from COLORTERM, TERM (PuTTY and KiTTY send "xterm" over SSH: 256) and
+ * WT_SESSION; "colors =" in the configuration forces it. */
+static void test_color_depth(void)
+{
+    static const struct { const char *term, *colorterm, *wt; int want; } t[] = {
+        { "xterm", NULL, NULL, COLOR_256 }, { "putty", NULL, NULL, COLOR_256 },
+        { "xterm-256color", NULL, NULL, COLOR_256 }, { "screen", NULL, NULL, COLOR_256 },
+        { "tmux-256color", NULL, NULL, COLOR_256 }, { "rxvt-unicode", NULL, NULL, COLOR_256 },
+        { "xterm", "truecolor", NULL, COLOR_TRUE }, { "xterm-direct", NULL, NULL, COLOR_TRUE },
+        { "xterm-kitty", NULL, NULL, COLOR_TRUE }, { "alacritty", NULL, NULL, COLOR_TRUE },
+        { "xterm-256color", NULL, "1234", COLOR_TRUE }, { "linux", NULL, NULL, COLOR_16 },
+        { "vt100", NULL, NULL, COLOR_16 }, { "dumb", NULL, NULL, COLOR_NONE },
+        { "xtermx", NULL, NULL, COLOR_16 },
+    };
+    char *keep_t = getenv("TERM") ? xstrdup(getenv("TERM")) : NULL;
+    char *keep_c = getenv("COLORTERM") ? xstrdup(getenv("COLORTERM")) : NULL;
+    char *keep_w = getenv("WT_SESSION") ? xstrdup(getenv("WT_SESSION")) : NULL;
+    char *keep_n = getenv("NO_COLOR") ? xstrdup(getenv("NO_COLOR")) : NULL;
+    size_t i;
+    Config c;
+    static const char *text = "colors = truecolor\n";
+
+    unsetenv("NO_COLOR");
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        setenv("TERM", t[i].term, 1);
+        if (t[i].colorterm)
+            setenv("COLORTERM", t[i].colorterm, 1);
+        else
+            unsetenv("COLORTERM");
+        if (t[i].wt)
+            setenv("WT_SESSION", t[i].wt, 1);
+        else
+            unsetenv("WT_SESSION");
+        if (theme_detect_depth() != t[i].want)
+            fprintf(stderr, "TERM=%s: %d, want %d\n", t[i].term, theme_detect_depth(), t[i].want);
+        CHECK(theme_detect_depth() == t[i].want);
+    }
+    config_init(&c);
+    CHECK(c.colors == -1);
+    config_parse(&c, text, strlen(text));
+    CHECK(c.colors == COLOR_TRUE && c.nerrors == 0);
+    config_parse(&c, "colors = 16\n", 12);
+    CHECK(c.colors == COLOR_16);
+    config_parse(&c, "colors = auto\n", 14);
+    CHECK(c.colors == -1);
+    config_parse(&c, "colors = many\n", 14);
+    CHECK(c.nerrors == 1);
+    config_free(&c);
+    if (keep_t) setenv("TERM", keep_t, 1); else unsetenv("TERM");
+    if (keep_c) setenv("COLORTERM", keep_c, 1); else unsetenv("COLORTERM");
+    if (keep_w) setenv("WT_SESSION", keep_w, 1); else unsetenv("WT_SESSION");
+    if (keep_n) setenv("NO_COLOR", keep_n, 1);
+    free(keep_t);
+    free(keep_c);
+    free(keep_w);
+    free(keep_n);
+}
+
+/* The palette's Colors: auto shows what the terminal was found to show; each choice changes the
+ * colours at once and is saved like the other settings. */
+static void test_palette_colors(void)
+{
+    char dir[64], cfg[200], path[260], err[200], lab[64], *old = getenv("XDG_CONFIG_HOME");
+    char *keep_t = getenv("TERM") ? xstrdup(getenv("TERM")) : NULL;
+    char *keep_c = getenv("COLORTERM") ? xstrdup(getenv("COLORTERM")) : NULL;
+    char saved[200] = "";
+    Editor e;
+    Doc *a;
+    const char *t;
+    size_t i;
+    int idx = -1;
+
+    if (old)
+        snprintf(saved, sizeof saved, "%s", old);
+    setenv("TERM", "xterm", 1);
+    unsetenv("COLORTERM");
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    put_file(dir, "a.txt", "x\n");
+    snprintf(cfg, sizeof cfg, "%s/cfg", dir);
+    setenv("XDG_CONFIG_HOME", cfg, 1);
+    editor_init(&e);
+    editor_load_config(&e);
+    snprintf(path, sizeof path, "%s/a.txt", dir);
+    a = editor_open_doc(&e, path, err, sizeof err);
+    CHECK(a != NULL);
+    editor_activate(&e, a);
+    for (i = 0; i < ncommands; i++)
+        if (strcmp(commands[i].id, "colors") == 0)
+            idx = (int)i;
+    CHECK(idx >= 0);
+    CHECK(e.colors_mode == -1 && e.color_depth == COLOR_256);
+    CHECK(command_state(&e, idx, lab, sizeof lab) == 2 && strcmp(lab, "auto (256)") == 0);
+    editor_cmd_colors(&e);
+    CHECK(e.colors_mode == COLOR_TRUE && e.color_depth == COLOR_TRUE);
+    command_state(&e, idx, lab, sizeof lab);
+    CHECK(strcmp(lab, "truecolor") == 0);
+    editor_cmd_colors(&e);
+    CHECK(e.color_depth == COLOR_256);
+    editor_cmd_colors(&e);
+    CHECK(e.color_depth == COLOR_16);
+    editor_cmd_colors(&e);
+    CHECK(e.color_depth == COLOR_NONE);
+    command_state(&e, idx, lab, sizeof lab);
+    CHECK(strcmp(lab, "none") == 0);
+    editor_cmd_colors(&e);
+    CHECK(e.colors_mode == -1 && e.color_depth == COLOR_256);
+    editor_cmd_colors(&e);                      /* truecolor, then saved for the user */
+    editor_cmd_save_settings(&e);
+    CHECK(e.picker.on && e.picker_kind == PK_SAVECFG);
+    for (i = 0; i < e.ndests; i++)
+        if (e.dests[i].kind == DEST_USER)
+            break;
+    CHECK(i < e.ndests);
+    picker_select_item(&e.picker, i);
+    kkey(&e, KEY_ENTER, 0);
+    snprintf(path, sizeof path, "%s/xted/config", cfg);
+    t = slurp_file(path);
+    CHECK(t && strstr(t, "colors = truecolor") != NULL);
+    editor_free(&e);
+    /* the next session starts with it */
+    editor_init(&e);
+    editor_load_config(&e);
+    CHECK(e.colors_mode == COLOR_TRUE && e.color_depth == COLOR_TRUE);
+    editor_free(&e);
+    if (saved[0])
+        setenv("XDG_CONFIG_HOME", saved, 1);
+    else
+        unsetenv("XDG_CONFIG_HOME");
+    if (keep_t) setenv("TERM", keep_t, 1); else unsetenv("TERM");
+    if (keep_c) setenv("COLORTERM", keep_c, 1); else unsetenv("COLORTERM");
+    free(keep_t);
+    free(keep_c);
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -6422,6 +6557,8 @@ int main(void)
     test_java_settings_and_size();
     test_csharp();
     test_env_suggest();
+    test_color_depth();
+    test_palette_colors();
     test_config_merge();
     test_snippets();
     test_cursors();

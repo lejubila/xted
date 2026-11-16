@@ -41,6 +41,7 @@ typedef struct {
     int clipboard;              /* copies also go to the system clipboard (OSC 52) */
     int git;                    /* Git indicators in the margin */
     int mouse;                  /* the terminal reports clicks and the wheel */
+    int colors;                 /* COLOR_* forced by "colors =", -1 for auto (from the terminal) */
     LangSection *lang;
     size_t nlang, langcap;
     KeyLine *keys;
