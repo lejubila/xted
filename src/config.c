@@ -27,6 +27,7 @@ void config_init(Config *c)
     c->git = -1;
     c->mouse = -1;
     c->colors = -1;
+    c->glyphs = -1;
 }
 
 void config_free(Config *c)
@@ -278,6 +279,19 @@ int config_parse(Config *c, const char *text, size_t n)
                         r = -2;
                     else
                         snprintf(c->language, sizeof c->language, "%s", lv);
+                    if (r != -2)
+                        r = 0;
+                } else if (!strcmp(key, "glyphs")) {
+                    /* the symbols drawn: unicode (▸ ▾ │ ●), windows (► ▼, which every
+                     * Windows console font has) or ascii (+ - | *), for fonts that lack them */
+                    if (!strcmp(lv, "unicode") || !strcmp(lv, "utf-8") || !strcmp(lv, "utf8"))
+                        c->glyphs = 0;
+                    else if (!strcmp(lv, "windows") || !strcmp(lv, "wgl4"))
+                        c->glyphs = 1;
+                    else if (!strcmp(lv, "ascii"))
+                        c->glyphs = 2;
+                    else
+                        r = -2;
                     if (r != -2)
                         r = 0;
                 } else if (!strcmp(key, "colors")) {

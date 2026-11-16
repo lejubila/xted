@@ -5908,6 +5908,15 @@ static void test_color_depth(void)
     CHECK(c.colors == -1);
     config_parse(&c, "colors = many\n", 14);
     CHECK(c.nerrors == 1);
+    CHECK(c.glyphs == -1);
+    config_parse(&c, "glyphs = ascii\n", 15);
+    CHECK(c.glyphs == 2);
+    config_parse(&c, "glyphs = windows\n", 17);
+    CHECK(c.glyphs == 1);
+    config_parse(&c, "glyphs = unicode\n", 17);
+    CHECK(c.glyphs == 0 && c.nerrors == 1);
+    config_parse(&c, "glyphs = fancy\n", 15);
+    CHECK(c.nerrors == 2);
     config_free(&c);
     if (keep_t) setenv("TERM", keep_t, 1); else unsetenv("TERM");
     if (keep_c) setenv("COLORTERM", keep_c, 1); else unsetenv("COLORTERM");
@@ -5968,6 +5977,11 @@ static void test_palette_colors(void)
     editor_cmd_colors(&e);
     CHECK(e.colors_mode == -1 && e.color_depth == COLOR_256);
     editor_cmd_colors(&e);                      /* truecolor, then saved for the user */
+    CHECK(e.glyphs == GLYPHS_UNICODE);
+    editor_cmd_glyphs(&e);
+    CHECK(e.glyphs == GLYPHS_WINDOWS);
+    editor_cmd_glyphs(&e);                      /* ascii, saved with it */
+    CHECK(e.glyphs == GLYPHS_ASCII);
     editor_cmd_save_settings(&e);
     CHECK(e.picker.on && e.picker_kind == PK_SAVECFG);
     for (i = 0; i < e.ndests; i++)
@@ -5978,12 +5992,12 @@ static void test_palette_colors(void)
     kkey(&e, KEY_ENTER, 0);
     snprintf(path, sizeof path, "%s/xted/config", cfg);
     t = slurp_file(path);
-    CHECK(t && strstr(t, "colors = truecolor") != NULL);
+    CHECK(t && strstr(t, "colors = truecolor") != NULL && strstr(t, "glyphs = ascii") != NULL);
     editor_free(&e);
     /* the next session starts with it */
     editor_init(&e);
     editor_load_config(&e);
-    CHECK(e.colors_mode == COLOR_TRUE && e.color_depth == COLOR_TRUE);
+    CHECK(e.colors_mode == COLOR_TRUE && e.color_depth == COLOR_TRUE && e.glyphs == GLYPHS_ASCII);
     editor_free(&e);
     if (saved[0])
         setenv("XDG_CONFIG_HOME", saved, 1);

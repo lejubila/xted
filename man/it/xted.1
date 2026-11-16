@@ -222,8 +222,8 @@ aperta.
 .PP
 Le impostazioni sono: mouse, autosuggest, coppie automatiche di parentesi e virgolette,
 indicatori Git, appunti di sistema, indentazione (tabulatore, 2, 4 o 8 spazi), tema, colori (auto,
-con quello che ha scelto, come «auto (256)», truecolor, 256, 16 o nessuno) e lingua (con il file del
-catalogo in uso).
+con quello che ha scelto, come «auto (256)», truecolor, 256, 16 o nessuno), caratteri grafici
+(unicode, windows o ascii) e lingua (con il file del catalogo in uso).
 .B Salva le impostazioni...\&
 scrive le scelte in un file di configurazione.
 .SH CONFIGURAZIONE
@@ -271,6 +271,12 @@ L'impostazione clipboard invia le copie anche agli appunti di sistema (OSC 52).
 .BR auto " (predefinito: da " COLORTERM " e " TERM "; la famiglia xterm, PuTTY compreso, ha 256 colori), "
 .BR truecolor ", " 256 ", " 16 " oppure " none .
 In SSH COLORTERM arriva di rado: con truecolor si hanno i colori a 24 bit.
+.TP
+.B glyphs
+.BR unicode " (predefinito), " windows " oppure " ascii :
+windows disegna le cartelle del browser dei file coi triangoli che tutti i font della console di
+Windows hanno (per PuTTY), ascii disegna + \- | * al posto dei triangoli, dei bordi dei pannelli e
+dei pallini.
 .TP
 .B language
 .BR auto " (dall'ambiente), " en ", " it

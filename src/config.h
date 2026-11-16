@@ -42,6 +42,7 @@ typedef struct {
     int git;                    /* Git indicators in the margin */
     int mouse;                  /* the terminal reports clicks and the wheel */
     int colors;                 /* COLOR_* forced by "colors =", -1 for auto (from the terminal) */
+    int glyphs;                 /* "glyphs =": 0 unicode, 1 windows, 2 ascii, -1 when not set */
     LangSection *lang;
     size_t nlang, langcap;
     KeyLine *keys;

@@ -35,7 +35,12 @@ typedef struct {
 } SaveDest;
 
 /* Settings changed with a command in this session that are not tied to a document. */
-enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8, PEND_LANG = 16, PEND_COLORS = 32 };
+/* unicode: ▸ ▾ │ ●; windows: ► ▼ in their place, the ones every Windows console font has (WGL4);
+ * ascii: + - | * o */
+enum { GLYPHS_UNICODE = 0, GLYPHS_WINDOWS = 1, GLYPHS_ASCII = 2 };
+
+enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8, PEND_LANG = 16, PEND_COLORS = 32,
+       PEND_GLYPHS = 64 };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -162,6 +167,7 @@ typedef struct Editor {
     const Theme *theme;
     int color_depth;
     int colors_mode;        /* COLOR_* chosen in the palette or the configuration, -1 for auto */
+    int glyphs;             /* GLYPHS_*: the symbols of the file browser, the borders, the palette */
     int match_on;           /* the bracket at/before the cursor has a partner */
     size_t by, bx, my, mx;  /* that bracket and its partner */
 
@@ -258,6 +264,9 @@ void editor_cmd_toggle_tree(Editor *e);
 void editor_cmd_match(Editor *e);
 void editor_cmd_theme(Editor *e);
 void editor_cmd_colors(Editor *e);
+void editor_cmd_glyphs(Editor *e);
+/* "unicode", "windows" or "ascii". */
+const char *editor_glyphs_name(int g);
 /* The colour mode for the palette: "auto (256)", "truecolor", "256", "16", "none". */
 void editor_colors_label(const Editor *e, char *out, size_t n);
 void editor_cmd_indent_tabs(Editor *e);

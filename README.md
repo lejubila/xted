@@ -399,7 +399,8 @@ comando, in colonne allineate.
 
 Impostazioni disponibili dalla palette: mouse, autosuggest, coppie automatiche, indicatori
 Git, appunti di sistema, indentazione (tabulatore, 2, 4, 8 spazi), tema, colori (auto, che mostra
-anche cosa ha scelto, per esempio «auto (256)», truecolor, 256, 16, nessuno), «Rileva lo stile di
+anche cosa ha scelto, per esempio «auto (256)», truecolor, 256, 16, nessuno), caratteri grafici
+(unicode, windows o ascii), «Rileva lo stile di
 indentazione», e **«Salva le impostazioni…»**, che scrive le scelte fatte nei file di
 configurazione (vedi sotto). Altri comandi senza scorciatoia: «Pareggia i pannelli»,
 «Duplica riga sopra», «Piega tutto», «Espandi tutto», «Converti l'indentazione in spazi /
@@ -429,6 +430,14 @@ gestisce dalla versione 0.71, basta scegliere «Colori» nella palette (`Alt+X`)
 `colors = truecolor` nel file `config` sul server, oppure
 `SendEnv COLORTERM` nel client e `AcceptEnv COLORTERM` in `sshd_config`.
 
+I simboli che xted disegna (`▸` `▾` per le cartelle del browser dei file, `│` tra i pannelli, `●` `○`
+nella palette) si scelgono con «Caratteri grafici» nella palette o con `glyphs` nel file `config`:
+`unicode` (predefinito) quelli appena detti; `windows` `►` `▼` per le cartelle, che tutti i font di
+Windows hanno (WGL4), per PuTTY o KiTTY con un font che non ha `▸` `▾` (compaiono come quadratini);
+`ascii` `+` `-` `|` `*` `o`. Se con PuTTY i separatori sembrano tratteggiati è il font della sessione
+(Window → Appearance → Font): Consolas, Cascadia Mono o DejaVu Sans Mono li disegnano interi, e
+Window → Translation deve essere UTF-8.
+
 I tasti con Alt e Ctrl si riconoscono nelle forme di xterm (`ESC [1;3C`), di PuTTY (Alt+freccia come
 `ESC ESC [ C`, Ctrl+freccia come `ESC O C`: xted tiene i tasti cursore in modalità normale) e di
 rxvt (`ESC O c`, `ESC [ c`).
@@ -447,6 +456,7 @@ mouse = on
 git = on
 clipboard = on            # copie anche negli appunti di sistema (OSC 52)
 colors = auto             # auto | truecolor | 256 | 16 | none
+glyphs = unicode          # unicode (▸ ▾ │) | windows (► ▼, in tutti i font di Windows) | ascii (+ - |)
 
 # valori per tutti i linguaggi
 tab_width = 8

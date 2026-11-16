@@ -771,7 +771,10 @@ static void sidebar_row(SBuf *o, const Editor *e, int y)
         spaces(o, ind);
         used = ind;
         if (used + 2 <= w) {
-            sbuf_adds(o, en->is_dir ? (en->open ? "\xe2\x96\xbe " : "\xe2\x96\xb8 ") : "  ");
+            /* unicode ▸ ▾; windows ► ▼, which every Windows console font has (WGL4); ascii + - */
+            sbuf_adds(o, !en->is_dir ? "  " : e->glyphs == GLYPHS_ASCII ? (en->open ? "- " : "+ ")
+                         : e->glyphs == GLYPHS_WINDOWS ? (en->open ? "\xe2\x96\xbc " : "\xe2\x96\xba ")
+                                                       : (en->open ? "\xe2\x96\xbe " : "\xe2\x96\xb8 "));
             used += 2;
         }
         used += fit_cols(o, en->name, strlen(en->name), w - used);
@@ -937,9 +940,9 @@ static void palette_row(SBuf *o, const Editor *e, const char *it, int sel, size_
     if (it[0] == '1') {
         if (color)
             theme_fg(o, e->color_depth, e->theme->cls[SC_KEYWORD]);
-        sbuf_adds(o, "\xe2\x97\x8f ");
+        sbuf_adds(o, e->glyphs == GLYPHS_ASCII ? "* " : "\xe2\x97\x8f ");
     } else if (it[0] == '0') {
-        sbuf_adds(o, "\xe2\x97\x8b ");
+        sbuf_adds(o, e->glyphs == GLYPHS_ASCII ? "o " : "\xe2\x97\x8b ");
     } else {
         sbuf_adds(o, "  ");
     }
@@ -1197,7 +1200,7 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
         sidebar_row(o, e, y - e->text_y);
         x = e->sidebar_w;
         if (x < e->cols) {
-            sbuf_adds(o, "\x1b[2m\xe2\x94\x82\x1b[22m");
+            sbuf_adds(o, e->glyphs == GLYPHS_ASCII ? "\x1b[2m|\x1b[22m" : "\x1b[2m\xe2\x94\x82\x1b[22m");
             x++;
         }
     }
@@ -1205,7 +1208,7 @@ static void pane_row(SBuf *o, const Editor *e, Win *const *wins, size_t nwins, i
         const Win *w = win_at(wins, nwins, x, y);
 
         if (!w) {
-            sbuf_adds(o, "\x1b[2m\xe2\x94\x82\x1b[22m");
+            sbuf_adds(o, e->glyphs == GLYPHS_ASCII ? "\x1b[2m|\x1b[22m" : "\x1b[2m\xe2\x94\x82\x1b[22m");
             x++;
             continue;
         }

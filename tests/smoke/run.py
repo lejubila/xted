@@ -392,6 +392,28 @@ def alt_arrows_putty():
 
 
 @scenario
+def glyphs_ascii():
+    b = Box()
+    b.write("src/main.c", "int main(void) { return 0; }\n")
+    b.write("docs/a.txt", "x\n")
+    r = b.run(["src/main.c"])
+    r.type(ctrl("b"), 0.4)
+    t = r.screen().text()
+    check("the file browser marks folders with \u25b8 and draws a \u2502 border (unicode, the default)",
+          "\u25b8 docs" in t and "\u2502" in t, t[:600])
+    r.type(ESC, alt("x"), "Glyphs", 0.3, ENTER, 0.3, ESC, 0.3)
+    t = r.screen().text()
+    check("Glyphs: windows draws \u25ba, which every Windows font has", "\u25ba docs" in t and "\u2502" in t
+          and "\u25b8" not in t, t[:600])
+    r.type(alt("x"), "Glyphs", 0.3, ENTER, 0.3, ESC, 0.3)
+    t = r.screen().text()
+    check("Glyphs: ascii draws + and | in their place", "+ docs" in t and "|" in t and "\u2502" not in t
+          and "\u25ba" not in t, t[:600])
+    r.type(ctrl("q"), 0.3)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

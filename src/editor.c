@@ -398,6 +398,8 @@ void editor_load_config(Editor *e)
         e->colors_mode = e->cfg.colors;
         e->color_depth = e->cfg.colors;
     }
+    if (e->cfg.glyphs >= 0)
+        e->glyphs = e->cfg.glyphs;
     if (e->cfg.theme[0]) {
         int t = theme_by_name(e->cfg.theme);
 
@@ -2818,6 +2820,21 @@ void editor_cmd_colors(Editor *e)
     editor_set_msg(e, MSG_TTL_MS, tr("Colors: %s"), lab);
 }
 
+const char *editor_glyphs_name(int g)
+{
+    return g == GLYPHS_ASCII ? "ascii" : g == GLYPHS_WINDOWS ? "windows" : "unicode";
+}
+
+/* The symbols of the file browser, the pane borders and the palette: unicode -> windows ->
+ * ascii -> unicode. */
+void editor_cmd_glyphs(Editor *e)
+{
+    e->glyphs = (e->glyphs + 1) % 3;
+    e->pend |= PEND_GLYPHS;
+    render_invalidate(e->render);
+    editor_set_msg(e, MSG_TTL_MS, tr("Glyphs: %s"), editor_glyphs_name(e->glyphs));
+}
+
 void editor_cmd_redraw(Editor *e)
 {
     render_invalidate(e->render);
@@ -2886,7 +2903,7 @@ static void palette_open(Editor *e, const char *query)
         g = commands[i].group;
         if (g != last) {
             snprintf(item, sizeof item, "%c%s%s%s", PICKER_HEAD,
-                     g == G_SETTINGS ? "" : tr("Actions"), g == G_SETTINGS ? "" : " \xc2\xb7 ",
+                     g == G_SETTINGS ? "" : tr("Actions"), g == G_SETTINGS ? "" : e->glyphs == GLYPHS_ASCII ? " - " : " \xc2\xb7 ",
                      tr(command_groups[g]));
             picker_add(&e->picker, item);
             e->pal[k++] = 0;
@@ -3135,6 +3152,11 @@ static void project_globals(Editor *e, int live)
             e->color_depth = c.colors;
         }
     }
+    if (c.glyphs >= 0) {
+        e->cfg.glyphs = c.glyphs;
+        if (live)
+            e->glyphs = c.glyphs;
+    }
     if (c.git >= 0) {
         int changed = c.git != (e->cfg.git != 0);
 
@@ -3187,7 +3209,7 @@ typedef struct {
 } OtherLang;
 
 typedef struct {
-    CfgPair lp[6], gp[6];
+    CfgPair lp[6], gp[7];
     char val[6][16];
     size_t nl, ng;
     unsigned mask;
@@ -3255,6 +3277,10 @@ static void pending_get(const Editor *e, Pending *p)
     if (e->pend & PEND_COLORS) {
         p->gp[p->ng].key = "colors";
         p->gp[p->ng++].value = colors_name(e->colors_mode);
+    }
+    if (e->pend & PEND_GLYPHS) {
+        p->gp[p->ng].key = "glyphs";
+        p->gp[p->ng++].value = editor_glyphs_name(e->glyphs);
     }
     for (i = 0; i < e->ndocs && p->nmore < 6; i++) {
         Doc *o = e->docs[i];
@@ -3353,7 +3379,8 @@ static int proj_sets_globals(const Editor *e, const Pending *p)
 
         if ((strcmp(k, "theme") == 0 && c.theme[0]) || (strcmp(k, "mouse") == 0 && c.mouse >= 0) ||
             (strcmp(k, "git") == 0 && c.git >= 0) || (strcmp(k, "clipboard") == 0 && c.clipboard >= 0) ||
-            (strcmp(k, "language") == 0 && c.language[0]) || (strcmp(k, "colors") == 0 && c.colors >= 0))
+            (strcmp(k, "language") == 0 && c.language[0]) || (strcmp(k, "colors") == 0 && c.colors >= 0) ||
+            (strcmp(k, "glyphs") == 0 && c.glyphs >= 0))
             r = 1;
     }
     config_free(&c);
