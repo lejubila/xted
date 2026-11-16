@@ -1,4 +1,6 @@
 #include "render.h"
+#include "keymap.h"
+#include "commands.h"
 #include "i18n.h"
 #include "doc.h"
 #include "edit.h"
@@ -8,6 +10,7 @@
 #include "term.h"
 #include "theme.h"
 #include "utf8.h"
+#include "version.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -368,6 +371,46 @@ static void emit_gutter(SBuf *o, const Editor *e, int mark, int colors)
 }
 
 /* One line of a pane's text, exactly w->w cells wide (the Git margin included). */
+/* The start screen's line for row r of a window of h text rows, "" for none: the name and the
+ * version, what it is, the credits and the keys to begin with, centred above the middle. */
+static int intro_line(const Editor *e, int r, int h, char *out, size_t n)
+{
+    static const struct { const char *id, *what; } k[] = {
+        { "help", N_("help") }, { "palette", N_("commands") }, { "open", N_("open") },
+        { "quick_open", N_("find a file") },
+    };
+    int top = (h - 6) / 2, i = r - top;
+
+    out[0] = '\0';
+    if (h < 8 || i < 0 || i > 5)
+        return 0;
+    if (i == 0)
+        snprintf(out, n, "xted %s", XTED_VERSION);
+    else if (i == 1)
+        snprintf(out, n, "%s", tr("a text editor for the terminal"));
+    else if (i == 3)
+        snprintf(out, n, tr("Copyright (C) %s %s, %s license"), XTED_YEAR, XTED_AUTHOR, XTED_LICENSE);
+    else if (i == 5) {
+        size_t j, len = 0;
+
+        for (j = 0; j < sizeof k / sizeof k[0]; j++) {
+            char key[64];
+            int cmd = command_by_id(k[j].id);
+
+            if (cmd < 0)
+                continue;
+            keymap_label(&e->km, cmd, key, sizeof key);
+            if (!key[0])
+                continue;
+            key[strcspn(key, ",")] = '\0';
+            len += (size_t)snprintf(out + len, n - len, "%s%s %s", len ? "   " : "", key, tr(k[j].what));
+            if (len >= n)
+                break;
+        }
+    }
+    return i == 0 ? 2 : 1;
+}
+
 static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int active,
                      const Ovl *ov)
 {
@@ -402,8 +445,26 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
                 theme_bg(o, e->color_depth, e->theme->bg);
             spaces(o, tw - (ov->c1 - v->coloff));
         } else {
+            char t[200];
+            int kind = 0;
+            size_t lw;
+
+            /* the start screen, in the empty document xted opens with nothing to show */
+            if (e->intro && d == e->doc && !d->buf.path && d->buf.nlines == 1 && d->buf.lines[0].len == 0)
+                kind = intro_line(e, (int)(y - v->rowoff), w->h - 1, t, sizeof t);
+            lw = kind ? utf8_cols(t, strlen(t), strlen(t), 8) : 0;
             sbuf_adds(o, "\x1b[2m~\x1b[22m");
-            spaces(o, tw - 1);
+            if (kind && lw > 0 && lw + 2 < tw) {
+                size_t pad = (tw - lw) / 2;
+
+                spaces(o, pad - 1);
+                sbuf_adds(o, kind == 2 ? "\x1b[1m" : "\x1b[2m");
+                sbuf_adds(o, t);
+                sbuf_adds(o, kind == 2 ? "\x1b[22m" : "\x1b[22m");
+                spaces(o, tw - pad - lw);
+            } else {
+                spaces(o, tw - 1);
+            }
         }
         if (bg_row)
             sbuf_adds(o, "\x1b[0m");
@@ -850,6 +911,40 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
     return 0;
 }
 
+/* With no message, the message row lists the keys of the most used commands, as the keymap has
+ * them (a key rebound in the configuration shows as it is): as many as fit, by importance. */
+static void keys_row(SBuf *o, const Editor *e, size_t cols)
+{
+    static const struct { const char *id, *what; } k[] = {
+        { "save", N_("save") }, { "quit", N_("quit") }, { "palette", N_("commands") }, { "help", N_("help") },
+        { "find", N_("find") }, { "quick_open", N_("open") }, { "undo", N_("undo") },
+        { "buffers", N_("buffers") }, { "toggle_tree", N_("files") }, { "symbols", N_("symbols") },
+        { "goto_line", N_("line") },
+    };
+    size_t i, used = 0;
+
+    sbuf_adds(o, "\x1b[2m");
+    for (i = 0; i < sizeof k / sizeof k[0]; i++) {
+        char key[64], item[128];
+        int cmd = command_by_id(k[i].id);
+        size_t w;
+
+        if (cmd < 0)
+            continue;
+        keymap_label(&e->km, cmd, key, sizeof key);
+        if (!key[0])
+            continue;                   /* unbound */
+        key[strcspn(key, ",")] = '\0';  /* the first of its keys */
+        snprintf(item, sizeof item, "%s%s %s", used ? "  " : "", key, tr(k[i].what));
+        w = utf8_cols(item, strlen(item), strlen(item), 8);
+        if (used + w > cols)
+            break;
+        sbuf_adds(o, item);
+        used += w;
+    }
+    sbuf_adds(o, "\x1b[22m");
+}
+
 static void message_row(SBuf *o, const Editor *e, int *pcol)
 {
     size_t cols = (size_t)e->cols;
@@ -902,8 +997,10 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
                 return;
             }
         }
-    } else {
+    } else if (e->msg[0]) {
         fit_cols(o, e->msg, strlen(e->msg), cols);
+    } else {
+        keys_row(o, e, cols);
     }
     sbuf_adds(o, "\x1b[K");
 }

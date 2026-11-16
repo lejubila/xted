@@ -21,7 +21,8 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 
 | File | Responsabilità |
 |---|---|
-| `src/main.c` | Argomenti da riga di comando e avvio |
+| `src/main.c` | Argomenti da riga di comando (`--version`) e avvio (la schermata iniziale: `Editor.intro`) |
+| `src/version.h` | Versione e crediti (`XTED_VERSION`, anno, autore, licenza): `--version`, guida F1, «Informazioni su xted», schermata iniziale |
 | `src/term.[ch]` | Raw mode, alternate screen, segnali, `poll()`, decodifica dei tasti |
 | `src/buffer.[ch]` | Testo (indipendente dalla UI), caricamento e salvataggio, primitive di modifica, helper multi-riga, undo/redo |
 | `src/undo.[ch]` | Log delle operazioni e gruppi di undo; non conosce `Buffer` |

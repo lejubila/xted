@@ -8,6 +8,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -414,6 +415,72 @@ def glyphs_ascii():
 
 
 @scenario
+def keys_row():
+    b = Box()
+    b.write("a.txt", "text\n")
+    r = b.run(["a.txt"], cols=120)
+    last = lambda: r.screen().lines()[-1]
+    check("at start the message row lists the common keys", "Ctrl+S save" in last() and "F1 help" in last()
+          and "Alt+X commands" in last() and "Ctrl+F find" in last(), last())
+    time.sleep(5.6)                     # longer than a message lasts (r.type(n) stops when quiet)
+    r.wait(0.3)
+    check("they stay, with no time limit", "Ctrl+S save" in last(), last())
+    r.type(ctrl("s"), 0.3)
+    check("a message takes their place", "Ctrl+S save" not in last() and "written" in last(), last())
+    time.sleep(5.6)
+    r.wait(0.3)
+    check("and when it is gone they come back", "Ctrl+S save" in last(), last())
+    quit_(r)
+    r = b.run(["a.txt"], cols=50)
+    check("a narrow terminal shows the first ones that fit", "Ctrl+S save" in last() and "Ctrl+G" not in last()
+          and len(last().rstrip()) <= 50, last())
+    quit_(r)
+    b.close()
+
+
+@scenario
+def version_and_credits():
+    import subprocess
+    out = subprocess.run([EXE, "--version"], capture_output=True, text=True, env=dict(os.environ, LANG="C", LC_ALL=""))
+    check("xted --version prints the version and the credits",
+          out.returncode == 0 and out.stdout.startswith("xted 0.9.0\nCopyright (C) 2026 David Bigagli\nMIT license"),
+          out.stdout)
+    b = Box()
+    r = b.run([], cols=100)
+    t = r.screen().text()
+    check("with nothing to open the start screen shows name, version, credits and keys",
+          "xted 0.9.0" in t and "a text editor for the terminal" in t and "Copyright (C) 2026 David Bigagli" in t
+          and "F1 help" in t, t)
+    # the terminal reports the focus (ESC [ I) as soon as xted starts: that is no key
+    r.type("\x1b[I", 0.3, "\x1b[O", 0.2, "\x1b[I", 0.3)
+    check("the focus events the terminal sends leave the start screen", "xted 0.9.0" in r.screen().text(),
+          r.screen().text())
+    r.type("x", 0.3)
+    t = r.screen().text()
+    check("the first key takes it away", "xted 0.9.0" not in t and "Copyright" not in t, t)
+    r.type(alt("x"), "About", 0.3, ENTER, 0.3)
+    t = r.screen().text()
+    check("About xted shows the version and the credits in a page of its own",
+          "[About]" in t and "xted 0.9.0" in t and "MIT license" in t, t[:800])
+    r.type(ctrl("w"), ctrl("q"), 0.3, "n", 0.3)
+    b.write("a.txt", "x\n")
+    r = b.run(["a.txt"])
+    check("opening a file shows no start screen", "Copyright" not in r.screen().text())
+    quit_(r)
+    b.close()
+    b = Box()                           # no session to restore: the start screen again
+    r = b.run([], cols=100, env={"LANG": "it_IT.UTF-8"})
+    t = r.screen().text()
+    check("the start screen follows the language", "un editor di testo per il terminale" in t
+          and "licenza MIT" in t, t)
+    r.type(alt("x"), "Informazioni", 0.3, ENTER, 0.3)
+    t = r.screen().text()
+    check("Informazioni su xted in Italian", "Licenza MIT" in t, t[:800])
+    r.type(ctrl("w"), ctrl("q"), 0.3)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")
@@ -421,7 +488,7 @@ def help_page():
     r.type("\x1bOP")
     t = r.screen().text()
     check("F1 opens the help page with the commands and their keys",
-          "xted: help" in t and "Ctrl+S" in t and "Save" in t and "[Help]" in t, t[:600])
+          "xted 0.9.0: help" in t and "Copyright (C) 2026 David Bigagli, MIT license" in t and "Ctrl+S" in t and "Save" in t and "[Help]" in t, t[:600])
     r.type("x")
     check("the help page cannot be changed", "read-only" in r.screen().text())
     r.type(ctrl("w"))
@@ -431,7 +498,7 @@ def help_page():
     r = b.run(["a.txt"], rows=40, env={"LANG": "it_IT.UTF-8"})
     r.type("\x1bOP")
     t = r.screen().text()
-    check("the help page follows the language", "xted: guida" in t and "Salva" in t, t[:400])
+    check("the help page follows the language", "xted 0.9.0: guida" in t and "Salva" in t, t[:400])
     quit_(r)
     b.close()
 

@@ -1,5 +1,6 @@
 #include "config.h"
 #include "editor.h"
+#include "version.h"
 #include "i18n.h"
 #include "term.h"
 
@@ -14,6 +15,7 @@ static void usage(FILE *f)
 {
     fputs(tr("usage: xted [file[:line[:column]] ...]\n"
              "     xted -       reads the text from stdin\n"
+             "     xted -V      shows the version (also --version)\n"
              "configuration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n"), f);
 }
 
@@ -79,6 +81,13 @@ int main(int argc, char **argv)
             usage(stdout);
             return 0;
         }
+        if (strcmp(argv[i], "-V") == 0 || strcmp(argv[i], "--version") == 0) {
+            printf("xted %s\n", XTED_VERSION);
+            printf(tr("Copyright (C) %s %s\n"), XTED_YEAR, XTED_AUTHOR);
+            printf(tr("%s license: free to use, copy, change and distribute, keeping this notice.\n"),
+                   XTED_LICENSE);
+            return 0;
+        }
         if (argv[i][0] == '-' && argv[i][1] != '\0') {
             fprintf(stderr, tr("xted: unknown option: %s\n"), argv[i]);
             usage(stderr);
@@ -128,6 +137,8 @@ int main(int argc, char **argv)
         editor_activate(&e, first);
     else if (argc == 1)
         editor_restore_session(&e);
+    /* nothing to show: the start screen, until the first key */
+    e.intro = !e.doc->buf.path && !e.doc->scratch && e.doc->buf.nlines == 1 && e.doc->buf.lines[0].len == 0;
     editor_load_project(&e);
 
     if (term_init() < 0) {

@@ -13,6 +13,9 @@ xted, xt \- terminal text editor
 .br
 .B xted
 .B \-h
+.br
+.B xted
+.B \-V
 .SH DESCRIPTION
 .B xted
 is a text editor for the terminal, written in C99 with nothing but the POSIX C library: no
@@ -42,6 +45,13 @@ Open the file browser on that directory.
 .TP
 .BR \-h ", " \-\^\-help
 Print a short help and exit.
+.TP
+.BR \-V ", " \-\^\-version
+Print the version and the credits (author and license) and exit.
+The palette's
+.I About xted
+shows them too, as does the first line of the help page (F1) and the start screen that xted
+shows when it opens with nothing to edit.
 .PP
 Without arguments, the files that were open and the cursor positions of the last session in the
 current folder are restored.

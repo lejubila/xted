@@ -168,6 +168,7 @@ typedef struct Editor {
     int color_depth;
     int colors_mode;        /* COLOR_* chosen in the palette or the configuration, -1 for auto */
     int glyphs;             /* GLYPHS_*: the symbols of the file browser, the borders, the palette */
+    int intro;              /* the start screen (name, version, credits) until the first key */
     int match_on;           /* the bracket at/before the cursor has a partner */
     size_t by, bx, my, mx;  /* that bracket and its partner */
 
@@ -265,6 +266,7 @@ void editor_cmd_match(Editor *e);
 void editor_cmd_theme(Editor *e);
 void editor_cmd_colors(Editor *e);
 void editor_cmd_glyphs(Editor *e);
+void editor_cmd_about(Editor *e);
 /* "unicode", "windows" or "ascii". */
 const char *editor_glyphs_name(int g);
 /* The colour mode for the palette: "auto (256)", "truecolor", "256", "16", "none". */

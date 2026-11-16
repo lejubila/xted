@@ -83,6 +83,7 @@ const Command commands[] = {
     { "prev_error", N_("Previous error"), "shift+f8", c_prev_err, 0, 0, G_RUN, ST_NONE },
     { "git_refresh", N_("Refresh Git markers"), "", editor_cmd_git, 0, 0, G_RUN, ST_NONE },
     { "help", N_("Help"), "f1", editor_cmd_help, 0, 0, G_OTHER, ST_NONE },
+    { "about", N_("About xted"), "", editor_cmd_about, 0, 0, G_OTHER, ST_NONE },
     { "palette", N_("Command palette"), "alt+x", editor_cmd_palette, 0, 0, G_OTHER, ST_NONE },
     { "redraw", N_("Redraw screen"), "ctrl+l", editor_cmd_redraw, 0, 0, G_OTHER, ST_NONE },
     { "toggle_mouse", N_("Toggle mouse"), "", editor_cmd_toggle_mouse, 0, 0, G_SETTINGS, ST_MOUSE },

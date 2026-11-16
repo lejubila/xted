@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "version.h"
 #include "edit.h"
 #include "imports.h"
 #include "cfgsave.h"
@@ -2592,6 +2593,12 @@ static int handle_resize_key(Editor *e, Key k)
 
 static void handle_key(Editor *e, Key k)
 {
+    /* the start screen goes at the first key or click; the focus events leave it: many
+     * terminals report the focus as soon as xted asks for them, at start */
+    if (e->intro && k.code != KEY_FOCUS_IN && k.code != KEY_FOCUS_OUT && k.code != KEY_NONE) {
+        e->intro = 0;
+        render_invalidate(e->render);
+    }
     int cmd, mod, vertical;
     int alt = (k.mods & MOD_ALT) != 0, shift = (k.mods & MOD_SHIFT) != 0;
     if (k.code == KEY_MOUSE) {
@@ -3060,7 +3067,9 @@ void editor_cmd_help(Editor *e)
     }
     if (kw > 30)
         kw = 30;
-    sbuf_adds(&t, tr("xted: help\n\nF1 shows this page, Ctrl+W closes it, Ctrl+F searches in it. Every key can be\n"
+    sbuf_addf(&t, tr("xted %s: help\n"), XTED_VERSION);
+    sbuf_addf(&t, tr("Copyright (C) %s %s, %s license\n"), XTED_YEAR, XTED_AUTHOR, XTED_LICENSE);
+    sbuf_adds(&t, tr("\nF1 shows this page, Ctrl+W closes it, Ctrl+F searches in it. Every key can be\n"
                      "changed in the [keys] section of the configuration (see Files below).\n"));
     for (i = 0; i < ncommands; i++) {
         g = commands[i].group;
@@ -3102,6 +3111,52 @@ void editor_cmd_help(Editor *e)
     e->cy = e->cx = 0;
     e->rowoff = 0;
     render_invalidate(e->render);
+}
+
+/* A read-only page of its own (Ctrl+W closes it): the one called title, made again with text. */
+static void info_page(Editor *e, const char *title, const char *text)
+{
+    Doc *d = NULL;
+    size_t i, y = 0, x = 0;
+
+    for (i = 0; i < e->ndocs; i++)
+        if (e->docs[i]->scratch && e->docs[i]->title && strcmp(e->docs[i]->title, title) == 0)
+            d = e->docs[i];
+    if (!d) {
+        d = doc_new();
+        d->title = xstrdup(title);
+        d->scratch = 1;
+        d->readonly = 1;
+        if (e->ndocs == e->docs_cap) {
+            e->docs_cap = e->docs_cap ? e->docs_cap * 2 : 8;
+            e->docs = xrealloc(e->docs, e->docs_cap * sizeof *e->docs);
+        }
+        e->docs[e->ndocs++] = d;
+    }
+    if (d->buf.nlines > 1 || d->buf.lines[0].len > 0)
+        buf_delete_range(&d->buf, 0, 0, d->buf.nlines - 1, d->buf.lines[d->buf.nlines - 1].len);
+    buf_insert_text(&d->buf, &y, &x, text, strlen(text));
+    undo_free(&d->buf.undo);
+    d->buf.modified = 0;
+    editor_activate(e, d);
+    e->cy = e->cx = 0;
+    e->rowoff = 0;
+    render_invalidate(e->render);
+}
+
+void editor_cmd_about(Editor *e)
+{
+    SBuf t = SBUF_INIT;
+
+    sbuf_addf(&t, "xted %s\n\n", XTED_VERSION);
+    sbuf_adds(&t, tr("A text editor for the terminal, written in C99 with only the POSIX C library.\n\n"));
+    sbuf_addf(&t, tr("Copyright (C) %s %s\n"), XTED_YEAR, XTED_AUTHOR);
+    sbuf_addf(&t, tr("%s license: free to use, copy, change and distribute, keeping this notice.\n"),
+              XTED_LICENSE);
+    sbuf_adds(&t, tr("\nCtrl+W closes this page, F1 shows the help.\n"));
+    sbuf_add(&t, "", 1);
+    info_page(e, "[About]", t.p);
+    sbuf_free(&t);
 }
 
 void editor_cmd_language(Editor *e)
@@ -3604,8 +3659,6 @@ void editor_run(Editor *e)
 {
     resize(e);
     term_mouse(e->mouse_on);
-    if (!e->msg[0])
-        editor_set_msg(e, MSG_TTL_MS, tr("Ctrl+S save  Ctrl+Q quit  Alt+X commands"));
 
     while (!e->quit) {
         Key k;

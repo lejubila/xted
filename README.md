@@ -59,6 +59,7 @@ Il codice compila senza warning con `-Wall -Wextra -pedantic`.
 xted [file[:riga[:colonna]] ...]
 xted -                    legge il testo da stdin
 xted cartella             apre il browser dei file su quella cartella
+xted --version            mostra la versione e i crediti (anche -V)
 ```
 
 - `xted app.c:120` apre il file e porta il cursore alla riga 120 (`:120:5` anche la colonna).
@@ -66,6 +67,12 @@ xted cartella             apre il browser dei file su quella cartella
   quella cartella.
 - Più file diventano più buffer, mostrati in tab.
 - Per uscire: `Ctrl+Q` (chiede conferma se ci sono file non salvati).
+- Se non c'è nulla da riaprire compare una schermata iniziale con nome, versione, crediti e i
+  primi tasti da usare, che scompare al primo tasto.
+- Quando la riga dei messaggi in fondo è vuota mostra i tasti più usati (salva, esci, comandi,
+  guida, cerca, apri, annulla, buffer, file, simboli, riga; quanti ne entrano), con le
+  scorciatoie attuali anche se cambiate nella configurazione; un messaggio li sostituisce finché
+  dura.
 
 Il terminale viene sempre ripristinato all'uscita, anche su SIGTERM, SIGHUP o un arresto
 anomalo; l'editor usa lo schermo alternativo, quindi la schermata di prima torna com'era.
@@ -376,7 +383,7 @@ annulla, `Invio` conferma.
 
 | Tasto | Comando |
 |---|---|
-| `F1` | Guida: tutti i comandi con le scorciatoie attuali, i tasti delle liste e della ricerca, i file usati |
+| `F1` | Guida: versione e crediti, tutti i comandi con le scorciatoie attuali, i tasti delle liste e della ricerca, i file usati |
 | `Alt+X` | Command palette |
 | `Alt+T` | Cambia tema |
 | `Ctrl+L` | Ridisegna lo schermo |
@@ -605,6 +612,8 @@ salvataggio delle impostazioni, comandi e comportamento dell'editor senza termin
 
 ## Stato del progetto
 
+Versione 0.9.0 (`src/version.h`).
+
 Le fasi 1–9 della roadmap di `SPEC.md` sono completate: nucleo, editing, sintassi,
 multifile, ricerca, produttività, strumenti, configurazione e rifiniture. Resta fuori il
 client LSP (opzionale). La guida è sempre a portata di `F1`.
@@ -615,4 +624,5 @@ xted è distribuito con licenza **MIT**: puoi usarlo, modificarlo e ridistribuir
 anche in programmi chiusi, mantenendo l'avviso di copyright. Il testo completo è nel file
 [`LICENSE`](LICENSE).
 
-Copyright (c) 2026 David Bigagli.
+Copyright (c) 2026 David Bigagli. La versione attuale è la **0.9.0** (`xted --version`, «Informazioni su
+xted» nella palette, l'intestazione della guida `F1`).

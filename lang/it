@@ -60,7 +60,6 @@ Convert indentation to spaces	Converti l'indentazione in spazi
 Convert indentation to tabs	Converti l'indentazione in tabulatori
 Copied	Copiato
 Copy	Copia
-Ctrl+S save  Ctrl+Q quit  Alt+X commands	Ctrl+S salva  Ctrl+Q esci  Alt+X comandi
 Cursors and blocks	Cursori e blocchi
 Cut	Tagliato
 Definition	Definizione
@@ -296,10 +295,10 @@ unknown key «%s»%s	chiave sconosciuta «%s»%s
 unknown modifier «%s» (ctrl, alt, shift)	modificatore «%s» sconosciuto (ctrl, alt, shift)
 unknown theme «%s»	tema «%s» sconosciuto
 unknown theme «%s» in .xted	tema «%s» sconosciuto nel .xted
-usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\nconfiguration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\nconfigurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/, lang/\n
+usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\nconfiguration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\nconfigurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/, lang/\n
 xted: '-' needs the text on stdin (only once)\n	xted: '-' richiede il testo su stdin (una volta sola)\n
 xted: an interactive terminal is needed\n	xted: serve un terminale interattivo\n
-xted: help\n\nF1 shows this page, Ctrl+W closes it, Ctrl+F searches in it. Every key can be\nchanged in the [keys] section of the configuration (see Files below).\n	xted: guida\n\nF1 mostra questa pagina, Ctrl+W la chiude, Ctrl+F cerca al suo interno. Ogni tasto si\npuò cambiare nella sezione [keys] della configurazione (vedi File, in fondo).\n
+\nF1 shows this page, Ctrl+W closes it, Ctrl+F searches in it. Every key can be\nchanged in the [keys] section of the configuration (see Files below).\n	\nF1 mostra questa pagina, Ctrl+W la chiude, Ctrl+F cerca al suo interno. Ogni tasto si\npuò cambiare nella sezione [keys] della configurazione (vedi File, in fondo).\n
 xted: unknown option: %s\n	xted: opzione sconosciuta: %s\n
 «%s» changed on disk%s. Reload? (r = reload, i = ignore)	«%s» è cambiato su disco%s. Ricaricare? (r = ricarica, i = ignora)
 «%s» has unsaved changes. Save? (y = yes, n = no%s, Esc = cancel)	«%s» ha modifiche non salvate. Salvare? (s = sì, n = no%s, Esc = annulla)
@@ -311,3 +310,24 @@ auto	auto
 none	nessuno
 Glyphs	Caratteri grafici
 Glyphs: %s	Caratteri grafici: %s
+save	salva
+quit	esci
+commands	comandi
+help	guida
+find	cerca
+open	apri
+undo	annulla
+buffers	buffer
+files	file
+symbols	simboli
+line	riga
+About xted	Informazioni su xted
+xted %s: help\n	xted %s: guida\n
+Copyright (C) %s %s, %s license\n	Copyright (C) %s %s, licenza %s\n
+A text editor for the terminal, written in C99 with only the POSIX C library.\n\n	Un editor di testo per il terminale, scritto in C99 con la sola libreria C POSIX.\n\n
+Copyright (C) %s %s\n	Copyright (C) %s %s\n
+%s license: free to use, copy, change and distribute, keeping this notice.\n	Licenza %s: libero di usarlo, copiarlo, modificarlo e distribuirlo, mantenendo questa nota.\n
+\nCtrl+W closes this page, F1 shows the help.\n	\nCtrl+W chiude questa pagina, F1 mostra la guida.\n
+find a file	trova un file
+a text editor for the terminal	un editor di testo per il terminale
+Copyright (C) %s %s, %s license	Copyright (C) %s %s, licenza %s
