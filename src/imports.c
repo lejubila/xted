@@ -1430,3 +1430,84 @@ int imp_rust(Editor *e, const char *path)
     free(v);
     return 1;
 }
+
+
+/* ---- Java ----------------------------------------------------------------- */
+
+int imp_java(Editor *e, const char *fq)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 400 ? b->nlines : 400, y, pk = (size_t)-1, last_static = (size_t)-1;
+    size_t fql = strlen(fq), pl, seg = strcspn(fq, ".");
+    const char *dot = strrchr(fq, '.');
+    char line[300];
+    int grp = 0, gap = 0, any = 0, target = -1, last_grp = -1;
+    size_t ins = (size_t)-1, grp_end = (size_t)-1, last_end = (size_t)-1;
+
+    if (!dot)
+        return 0;
+    pl = (size_t)(dot - fq);                /* java.util */
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        const char *u;
+        size_t ul;
+
+        if (l->len == 0) {
+            gap = 1;
+            continue;
+        }
+        if (pk == (size_t)-1 && l->len > 8 && memcmp(l->s, "package ", 8) == 0) {
+            pk = y;
+            continue;
+        }
+        if (l->len > 14 && memcmp(l->s, "import static ", 14) == 0) {
+            last_static = y;
+            continue;
+        }
+        if (!(l->len > 7 && memcmp(l->s, "import ", 7) == 0)) {
+            if ((l->s[0] == '/' || l->s[0] == '*' || (l->len > 1 && l->s[0] == ' ' && l->s[1] == '*')))
+                continue;               /* comments before the code */
+            break;                      /* the class */
+        }
+        u = l->s + 7;
+        for (ul = l->len - 7; ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '); ul--)
+            ;
+        if ((ul == fql && memcmp(u, fq, fql) == 0) ||
+            (ul == pl + 2 && memcmp(u, fq, pl) == 0 && u[pl] == '.' && u[pl + 1] == '*'))
+            return 0;
+        /* a class of that name imported from another package: it is the one meant */
+        if (ul > fql - pl && u[ul - (fql - pl)] == '.' && memcmp(u + ul - (fql - pl) + 1, dot + 1, fql - pl - 1) == 0)
+            return 0;
+        if (gap && any)
+            grp++;
+        gap = 0;
+        any = 1;
+        last_grp = grp;
+        last_end = y;
+        /* the group whose imports start like fq (java., com.acme.) */
+        if ((target == -1 || target == grp) && strcspn(u, ".") == seg && memcmp(u, fq, seg) == 0) {
+            target = grp;
+            grp_end = y;
+            int c = memcmp(u, fq, ul < fql ? ul : fql);
+
+            if (ins == (size_t)-1 && (c > 0 || (c == 0 && ul > fql)))
+                ins = y;
+        }
+    }
+    snprintf(line, sizeof line, "import %s;\n", fq);
+    if (target != -1) {
+        insert_lines(e, ins != (size_t)-1 ? ins : grp_end + 1, line, 0, 0);
+        return 1;
+    }
+    if (last_grp != -1) {
+        /* no import like it: a group of its own after the others */
+        insert_lines(e, last_end + 1, line, 1, 0);
+        return 1;
+    }
+    if (last_static != (size_t)-1) {
+        insert_lines(e, last_static + 1, line, 1, 0);
+        return 1;
+    }
+    insert_block(e, pk != (size_t)-1 ? pk + 1 : 0, line);
+    return 1;
+}

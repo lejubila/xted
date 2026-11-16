@@ -118,6 +118,8 @@ static int qual_name(const char *s, size_t len, size_t *pi, size_t *qs, size_t *
         else if (i + 1 < len && s[i] == ':' && s[i + 1] == ':' && i + 2 < len &&
                  is_idc((unsigned char)s[i + 2]))
             i += 2;
+        else if (i + 1 < len && s[i] == '.' && is_idc((unsigned char)s[i + 1]))
+            i++;                        /* Java's java.util.List, Go's pkg.Type */
         else
             break;
     }
@@ -210,6 +212,9 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
                 }
                 if (i < len && s[i] == '<')
                     i = skip_angle(s, len, i);
+                /* Java's arrays: String[] args, int[][] m */
+                while (i + 1 < len && s[i] == '[' && s[i + 1] == ']')
+                    i += 2;
                 if (i + 1 < len && s[i] == '|' &&
                     (is_idc((unsigned char)s[i + 1]) || s[i + 1] == '\\' || s[i + 1] == '?'))
                     i++;
@@ -1058,8 +1063,8 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
 
 /* ---- cache -------------------------------------------------------------- */
 
-enum { LIB_PHP, LIB_C, LIB_CPP, LIB_PY, LIB_JS, LIB_GO, LIB_RUST, LIB_N };
-static const char *const lib_ids[LIB_N] = { "php", "c", "cpp", "py", "js", "go", "rust" };
+enum { LIB_PHP, LIB_C, LIB_CPP, LIB_PY, LIB_JS, LIB_GO, LIB_RUST, LIB_JAVA, LIB_N };
+static const char *const lib_ids[LIB_N] = { "php", "c", "cpp", "py", "js", "go", "rust", "java" };
 
 #define CACHE_MAX 48
 #define SET_MAX 40
@@ -1233,6 +1238,28 @@ static void set_root(SymCache *c, const char *key)
                 if (stat(probe_path, &st) == 0) {
                     snprintf(found, sizeof found, "%s", dir);
                     break;
+                }
+                if (dir[0] == '\0')
+                    break;
+            }
+        }
+        /* no repository: the folder of a Java build (settings.gradle or the outermost pom.xml
+         * or build.gradle: a multi-module project has one in each module) */
+        if (!found[0]) {
+            static const char *const marks[] = { "settings.gradle", "settings.gradle.kts", "pom.xml",
+                                                 "build.gradle", "build.gradle.kts" };
+
+            snprintf(dir, sizeof dir, "%s", key);
+            while ((sl = strrchr(dir, '/')) != NULL) {
+                size_t m;
+
+                *sl = '\0';
+                for (m = 0; m < sizeof marks / sizeof marks[0]; m++) {
+                    snprintf(probe_path, sizeof probe_path, "%s/%s", dir, marks[m]);
+                    if (stat(probe_path, &st) == 0) {
+                        snprintf(found, sizeof found, "%s", dir);
+                        break;
+                    }
                 }
                 if (dir[0] == '\0')
                     break;
@@ -1957,7 +1984,7 @@ static void go_package(const char *path, char *out, size_t n)
         if (strncmp(line, "package ", 8) == 0) {
             size_t e = 8;
 
-            while (line[e] && (isalnum((unsigned char)line[e]) || line[e] == '_'))
+            while (line[e] && (isalnum((unsigned char)line[e]) || line[e] == '_' || line[e] == '.'))
                 e++;
             put(out, n, line + 8, e - 8);
             break;
@@ -1965,9 +1992,9 @@ static void go_package(const char *path, char *out, size_t n)
     fclose(f);
 }
 
-/* Go: the other files of the folder of cur that belong to its package (tests only for a test
- * file), read again after two seconds. */
-static void go_siblings(SymCache *c, const Doc *cur)
+/* Go and Java: the other files (.go, .java) of the folder of cur that belong to its package (in
+ * Go tests only for a test file), read again after two seconds. */
+static void go_siblings(SymCache *c, const Doc *cur, const char *ext)
 {
     char dir[PATH_MAX], pkg[PM_NAME], *sl;
     DIR *d;
@@ -1991,7 +2018,7 @@ static void go_siblings(SymCache *c, const Doc *cur)
         if (l->len > 8 && strncmp(l->s, "package ", 8) == 0) {
             size_t e = 8;
 
-            while (e < l->len && (isalnum((unsigned char)l->s[e]) || l->s[e] == '_'))
+            while (e < l->len && (isalnum((unsigned char)l->s[e]) || l->s[e] == '_' || l->s[e] == '.'))
                 e++;
             put(pkg, sizeof pkg, l->s + 8, e - 8);
             break;
@@ -2011,7 +2038,9 @@ static void go_siblings(SymCache *c, const Doc *cur)
         size_t n = strlen(de->d_name);
         char path[PATH_MAX + 260], other[PM_NAME];
 
-        if (n < 4 || strcmp(de->d_name + n - 3, ".go") != 0 || de->d_name[0] == '.')
+        size_t el = strlen(ext);
+
+        if (n <= el || strcmp(de->d_name + n - el, ext) != 0 || de->d_name[0] == '.')
             continue;
         if (!test && n > 8 && strcmp(de->d_name + n - 8, "_test.go") == 0)
             continue;
@@ -2044,6 +2073,8 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
         e->lib[e->nlib++] = lib_get(c, LIB_GO);
     } else if (strcmp(lang, "Rust") == 0) {
         e->lib[e->nlib++] = lib_get(c, LIB_RUST);
+    } else if (strcmp(lang, "Java") == 0) {
+        e->lib[e->nlib++] = lib_get(c, LIB_JAVA);
     } else if (strcmp(lang, "C") == 0) {
         if (sym_is_cxx(cur))
             e->lib[e->nlib++] = lib_get(c, LIB_CPP);
@@ -2056,9 +2087,9 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
             env_add(e, index_of_doc(c, docs[i]), 1);
             others++;
         }
-    if (strcmp(lang, "Go") == 0) {
+    if (strcmp(lang, "Go") == 0 || strcmp(lang, "Java") == 0) {
         /* one package is one folder: its other files are visible without an import */
-        go_siblings(c, cur);
+        go_siblings(c, cur, lang[0] == 'G' ? ".go" : ".java");
         for (i = 0; i < c->ngsib; i++) {
             char *real = realpath(c->gsib[i], NULL);
 
@@ -3791,6 +3822,62 @@ static void rust_exports(const Buffer *b, struct Hdr *h)
     }
 }
 
+/* The public types a Java file declares at its top level (public class, interface, enum,
+ * record), each with the package of the file. */
+static void java_exports(const Buffer *b, struct Hdr *h)
+{
+    size_t y;
+    char pkg[PM_PATH] = "";
+
+    for (y = 0; y < b->nlines; y++) {
+        const char *s = b->lines[y].s;
+        size_t len = b->lines[y].len, i = 0, e;
+
+        if (len == 0 || s[0] == ' ' || s[0] == '\t')
+            continue;
+        if (js_word(s, len, &i, "package")) {
+            for (e = i; e < len && s[e] != ';' && s[e] != ' '; e++)
+                ;
+            put(pkg, sizeof pkg, s + i, e - i);
+            continue;
+        }
+        if (!js_word(s, len, &i, "public"))
+            continue;
+        while (js_word(s, len, &i, "abstract") || js_word(s, len, &i, "final") ||
+               js_word(s, len, &i, "sealed") || js_word(s, len, &i, "strictfp") || js_word(s, len, &i, "static"))
+            ;
+        if (js_word(s, len, &i, "class") || js_word(s, len, &i, "interface") || js_word(s, len, &i, "enum") ||
+            js_word(s, len, &i, "record")) {
+            e = js_ident(s, len, i);
+            if (e > i) {
+                hsym_add(h, s + i, e - i, RULE_CLASS, "", 0, 0);
+                if (pkg[0])
+                    h->v[h->n - 1].ns = xstrdup(pkg);
+            }
+        }
+    }
+}
+
+/* The package of a Java document ("com.acme.app"), "" for the default one. */
+static void java_package(const Buffer *b, char *out, size_t n)
+{
+    size_t y;
+
+    out[0] = '\0';
+    for (y = 0; y < b->nlines && y < 80; y++) {
+        const Line *l = &b->lines[y];
+
+        if (l->len > 8 && memcmp(l->s, "package ", 8) == 0) {
+            size_t e = 8;
+
+            while (e < l->len && l->s[e] != ';' && l->s[e] != ' ')
+                e++;
+            put(out, n, l->s + 8, e - 8);
+            return;
+        }
+    }
+}
+
 /* The dotted name under which a Python file is imported: the folders above it that are packages
  * (they have __init__.py) and its name; a package's __init__.py is the package. */
 static void py_module_name(const char *real, char *out, size_t n)
@@ -3874,7 +3961,7 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
     if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
         return h;
     js = is_js_module(real) ? 1 : strcmp(ext_of(real), "py") == 0 ? 2 : strcmp(ext_of(real), "php") == 0 ? 3 :
-         strcmp(ext_of(real), "rs") == 0 ? 4 : 0;
+         strcmp(ext_of(real), "rs") == 0 ? 4 : strcmp(ext_of(real), "java") == 0 ? 5 : 0;
     if (h && h->mtime == (long)st.st_mtime && h->size == (long)st.st_size) {
         h->checked = now;
         return h;
@@ -3918,6 +4005,8 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         php_exports(&b, h);
     else if (js == 4)
         rust_exports(&b, h);
+    else if (js == 5)
+        java_exports(&b, h);
     buf_free(&b);
     for (i = 0; x && i < x->n && h->n < HDR_SYMS; i++) {
         const Sym *s = &x->v[i];
@@ -4403,6 +4492,42 @@ static void rust_project(SymCache *c, const char *self, HdrFn fn, void *ctx)
     rust_emit(&w, lib, "");
 }
 
+/* Java: the public types of the other packages of the project, with "com.acme.util.TextUtils"
+ * for their import; those of cur's own package need none (they come through env_build). */
+static void java_project(SymCache *c, Doc *cur, Env *e, HdrFn fn, void *ctx)
+{
+    char pkg[PM_PATH], path[PATH_MAX], spec[PM_PATH + PM_NAME + 2];
+    size_t i, j, seen = 0;
+
+    int in_test = cur->buf.path && strstr(cur->buf.path, "src/test/") != NULL;
+
+    java_package(&cur->buf, pkg, sizeof pkg);
+    if (!ensure_files(c))
+        return;
+    for (i = 0; i < c->nfiles && seen < HDR_MAX; i++) {
+        struct Hdr *h;
+        char *real;
+
+        if (strcmp(ext_of(c->files[i]), "java") != 0)
+            continue;
+        /* Maven and Gradle's tests: only for another test */
+        if (!in_test && (strncmp(c->files[i], "src/test/", 9) == 0 || strstr(c->files[i], "/src/test/")))
+            continue;
+        seen++;
+        rooted(c, path, sizeof path, c->files[i]);
+        if (!(real = realpath(path, NULL)))
+            continue;
+        h = e->v[0]->key && strcmp(e->v[0]->key, real) == 0 ? NULL : hdr_get(c, real);
+        for (j = 0; h && j < h->n; j++) {
+            if (!h->v[j].ns || strcmp(h->v[j].ns, pkg) == 0)
+                continue;               /* the default package cannot be imported */
+            snprintf(spec, sizeof spec, "%s.%s", h->v[j].ns, h->v[j].name);
+            fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, spec);
+        }
+        free(real);
+    }
+}
+
 void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx)
 {
     Env e;
@@ -4411,15 +4536,19 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
     int cl = strcmp(lang, "C") == 0, js = strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0;
     int py = strcmp(lang, "Python") == 0;
     int php = strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0;
-    int rs = strcmp(lang, "Rust") == 0;
+    int rs = strcmp(lang, "Rust") == 0, jv = strcmp(lang, "Java") == 0;
 
-    if (!cur->buf.path || (!cl && !js && !py && !php && !rs))
+    if (!cur->buf.path || (!cl && !js && !py && !php && !rs && !jv))
         return;
     env_build(c, docs, ndocs, cur, &e);
     if (!e.v[0]->key)
         return;
     if (rs) {
         rust_project(c, e.v[0]->key, fn, ctx);
+        return;
+    }
+    if (jv) {
+        java_project(c, cur, &e, fn, ctx);
         return;
     }
     if (php) {

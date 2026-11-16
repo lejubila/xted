@@ -130,6 +130,9 @@ StdLib *std_open(const char *id)
     } else if (strcmp(id, "rust") == 0) {
         z = std_rust;
         zn = sizeof std_rust;
+    } else if (strcmp(id, "java") == 0) {
+        z = std_java;
+        zn = sizeof std_java;
     } else {
         return NULL;
     }

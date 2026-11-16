@@ -2101,7 +2101,8 @@ typedef struct {
                                4 JS/TS default import, 5 JS/TS named import, 6 C local include,
                                7 Python import from a module of the project,
                                8 PHP use of the class before ::, 9 PHP require_once,
-                               10 PHP use function / use const, 11 Go import, 12 Rust use */
+                               10 PHP use function / use const, 11 Go import, 12 Rust use,
+                               13 Java import */
     char mod[256];          /* the header, or the module */
     char name[64];          /* the imported name (from-import) */
 } Needs;
@@ -2156,6 +2157,12 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
         nd->kind = def ? 4 : 5;
         snprintf(nd->mod, sizeof nd->mod, "%s", c->inc + def);
         snprintf(nd->name, sizeof nd->name, "%s", c->text);
+        return;
+    }
+    if (c->inc && strcmp(lang, "Java") == 0) {
+        /* a public type of another package of the project */
+        nd->kind = 13;
+        snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
         return;
     }
     if (c->inc && strcmp(lang, "Rust") == 0) {
@@ -2216,6 +2223,35 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
     }
     if (!c->std)
         return;
+    if (strcmp(lang, "Java") == 0) {
+        StdLib *l = std_open("java");
+        const char *h = NULL;
+
+        if (!l)
+            return;
+        /* Collections.sort: the class before the dot; else the class itself (ArrayList) */
+        if (qualified) {
+            size_t s = e->comp.x - 1, n;
+            char q[64];
+
+            while (s > 0 && (isalnum((unsigned char)ln->s[s - 1]) || ln->s[s - 1] == '_'))
+                s--;
+            n = e->comp.x - 1 - s;
+            if (n > 0 && n < sizeof q && (s == 0 || ln->s[s - 1] != '.') && isupper((unsigned char)ln->s[s])) {
+                memcpy(q, ln->s + s, n);
+                q[n] = '\0';
+                h = std_header(l, q, n, &hl, 1);
+            }
+        } else if (c->kind == CAND_CLASS) {
+            h = std_header(l, c->text, strlen(c->text), &hl, 1);
+        }
+        if (h && hl > 0 && hl < sizeof nd->mod) {
+            nd->kind = 13;
+            snprintf(nd->mod, sizeof nd->mod, "%.*s", (int)hl, h);
+        }
+        std_close(l);
+        return;
+    }
     if (strcmp(lang, "Go") == 0 || strcmp(lang, "Rust") == 0) {
         int go = lang[0] == 'G';
         StdLib *l = std_open(go ? "go" : "rust");
@@ -2380,6 +2416,9 @@ static void complete_accept(Editor *e)
         } else if (nd.kind == 12) {
             added = imp_rust(e, nd.mod);
             snprintf(what, sizeof what, "use %s;", nd.mod);
+        } else if (nd.kind == 13) {
+            added = imp_java(e, nd.mod);
+            snprintf(what, sizeof what, "import %s;", nd.mod);
         } else if (nd.kind == 9) {
             added = imp_php_require(e, nd.mod);
             snprintf(what, sizeof what, "require_once __DIR__ . '/%s';", nd.mod);

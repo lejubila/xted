@@ -263,6 +263,32 @@ def go_and_rust():
 
 
 @scenario
+def java_imports():
+    b = Box()
+    b.write("pom.xml", "<project/>\n")
+    b.write("src/main/java/com/acme/util/TextUtils.java",
+            "package com.acme.util;\n\npublic class TextUtils {\n    public static String shout(String s) {\n"
+            "        return s;\n    }\n}\n")
+    b.write("src/main/java/com/acme/app/Main.java",
+            "package com.acme.app;\n\nimport java.util.Map;\n\npublic class Main {\n    void f() {\n        \n    }\n}\n")
+    r = b.run(["src/main/java/com/acme/app/Main.java"])
+    r.type(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, END, "Collections.so", 0.4, ENTER, ctrl("s"))
+    check("Java: Collections.sort adds import java.util.Collections; in order",
+          "import java.util.Collections;\nimport java.util.Map;\n" in b.read("src/main/java/com/acme/app/Main.java"),
+          b.read("src/main/java/com/acme/app/Main.java"))
+    quit_(r, discard=True)
+    b.write("src/main/java/com/acme/app/Main.java",
+            "package com.acme.app;\n\nimport java.util.Map;\n\npublic class Main {\n    void f() {\n        \n    }\n}\n")
+    r = b.run(["src/main/java/com/acme/app/Main.java"])
+    r.type(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, END, "TextUt", 0.4, ENTER, ctrl("s"))
+    check("Java: a class of another package adds its import in a group of its own",
+          "import java.util.Map;\n\nimport com.acme.util.TextUtils;\n\npublic class Main" in
+          b.read("src/main/java/com/acme/app/Main.java"), b.read("src/main/java/com/acme/app/Main.java"))
+    quit_(r, discard=True)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

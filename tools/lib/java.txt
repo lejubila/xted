@@ -1,0 +1,716 @@
+// Java standard library: the most used classes of java.lang, java.util, java.io, java.nio.file,
+// java.time and a few more. Curated. A section with a line "@java.util.ArrayList" is not in
+// java.lang: accepting it, or a member after "ArrayList.", adds "import java.util.ArrayList;".
+// Return types are plain class names, so that a chain (list.stream().map(...).) can be followed.
+#Object
+equals(Object obj)>boolean
+hashCode()>int
+toString()>String
+getClass()>Class
+#String
+length()>int
+isEmpty()>boolean
+isBlank()>boolean
+charAt(int index)>char
+substring(int beginIndex, int endIndex)>String
+indexOf(String str)>int
+lastIndexOf(String str)>int
+contains(CharSequence s)>boolean
+startsWith(String prefix)>boolean
+endsWith(String suffix)>boolean
+equals(Object obj)>boolean
+equalsIgnoreCase(String other)>boolean
+compareTo(String other)>int
+toLowerCase()>String
+toUpperCase()>String
+trim()>String
+strip()>String
+replace(CharSequence target, CharSequence replacement)>String
+replaceAll(String regex, String replacement)>String
+split(String regex)>String[]
+toCharArray()>char[]
+chars()>IntStream
+lines()>Stream
+repeat(int count)>String
+matches(String regex)>boolean
+getBytes()>byte[]
+formatted(Object... args)>String
+format(String format, Object... args)>String
+valueOf(Object obj)>String
+join(CharSequence delimiter, CharSequence... elements)>String
+#StringBuilder
+append(Object obj)>StringBuilder
+insert(int offset, Object obj)>StringBuilder
+delete(int start, int end)>StringBuilder
+deleteCharAt(int index)>StringBuilder
+reverse()>StringBuilder
+setLength(int newLength)>void
+length()>int
+charAt(int index)>char
+indexOf(String str)>int
+toString()>String
+#Math
+abs(int a)>int
+max(int a, int b)>int
+min(int a, int b)>int
+pow(double a, double b)>double
+sqrt(double a)>double
+floor(double a)>double
+ceil(double a)>double
+round(double a)>long
+random()>double
+floorDiv(int x, int y)>int
+floorMod(int x, int y)>int
+log(double a)>double
+sin(double a)>double
+cos(double a)>double
+PI:double
+E:double
+#Integer
+parseInt(String s)>int
+valueOf(int i)>Integer
+toString(int i)>String
+compare(int x, int y)>int
+intValue()>int
+toBinaryString(int i)>String
+toHexString(int i)>String
+MAX_VALUE:int
+MIN_VALUE:int
+#Long
+parseLong(String s)>long
+valueOf(long l)>Long
+toString(long l)>String
+compare(long x, long y)>int
+longValue()>long
+MAX_VALUE:long
+MIN_VALUE:long
+#Double
+parseDouble(String s)>double
+valueOf(double d)>Double
+toString(double d)>String
+compare(double a, double b)>int
+isNaN(double v)>boolean
+doubleValue()>double
+MAX_VALUE:double
+MIN_VALUE:double
+#Boolean
+parseBoolean(String s)>boolean
+valueOf(boolean b)>Boolean
+booleanValue()>boolean
+TRUE:Boolean
+FALSE:Boolean
+#Character
+isDigit(char ch)>boolean
+isLetter(char ch)>boolean
+isLetterOrDigit(char ch)>boolean
+isWhitespace(char ch)>boolean
+isUpperCase(char ch)>boolean
+isLowerCase(char ch)>boolean
+toUpperCase(char ch)>char
+toLowerCase(char ch)>char
+getNumericValue(char ch)>int
+#System
+out:PrintStream
+err:PrintStream
+in:InputStream
+currentTimeMillis()>long
+nanoTime()>long
+exit(int status)>void
+getenv(String name)>String
+getProperty(String key)>String
+arraycopy(Object src, int srcPos, Object dest, int destPos, int length)>void
+lineSeparator()>String
+#Thread
+start()>void
+join()>void
+interrupt()>void
+isAlive()>boolean
+getName()>String
+sleep(long millis)>void
+currentThread()>Thread
+#Runnable
+run()>void
+#Iterable
+iterator()>Iterator
+forEach(Consumer action)>void
+#Comparable
+compareTo(T o)>int
+#Throwable
+getMessage()>String
+getCause()>Throwable
+printStackTrace()>void
+getStackTrace()>StackTraceElement[]
+addSuppressed(Throwable exception)>void
+#Exception:Throwable
+#RuntimeException:Exception
+#IllegalArgumentException:RuntimeException
+#IllegalStateException:RuntimeException
+#NullPointerException:RuntimeException
+#IndexOutOfBoundsException:RuntimeException
+#UnsupportedOperationException:RuntimeException
+#NumberFormatException:IllegalArgumentException
+#InterruptedException:Exception
+#PrintStream
+@java.io.PrintStream
+println(Object x)>void
+print(Object x)>void
+printf(String format, Object... args)>PrintStream
+flush()>void
+close()>void
+#Collection:Iterable
+@java.util.Collection
+size()>int
+isEmpty()>boolean
+contains(Object o)>boolean
+add(E e)>boolean
+remove(Object o)>boolean
+addAll(Collection c)>boolean
+removeAll(Collection c)>boolean
+removeIf(Predicate filter)>boolean
+clear()>void
+stream()>Stream
+toArray()>Object[]
+#List:Collection
+@java.util.List
+get(int index)>E
+set(int index, E element)>E
+add(int index, E element)>void
+remove(int index)>E
+indexOf(Object o)>int
+lastIndexOf(Object o)>int
+subList(int fromIndex, int toIndex)>List
+sort(Comparator c)>void
+replaceAll(UnaryOperator operator)>void
+of(E... elements)>List
+copyOf(Collection coll)>List
+#ArrayList:List
+@java.util.ArrayList
+ensureCapacity(int minCapacity)>void
+trimToSize()>void
+#LinkedList:List
+@java.util.LinkedList
+addFirst(E e)>void
+addLast(E e)>void
+getFirst()>E
+getLast()>E
+removeFirst()>E
+removeLast()>E
+peek()>E
+poll()>E
+push(E e)>void
+pop()>E
+#Map
+@java.util.Map
+size()>int
+isEmpty()>boolean
+get(Object key)>V
+getOrDefault(Object key, V defaultValue)>V
+put(K key, V value)>V
+putIfAbsent(K key, V value)>V
+putAll(Map m)>void
+remove(Object key)>V
+containsKey(Object key)>boolean
+containsValue(Object value)>boolean
+keySet()>Set
+values()>Collection
+entrySet()>Set
+forEach(BiConsumer action)>void
+computeIfAbsent(K key, Function mappingFunction)>V
+computeIfPresent(K key, BiFunction remappingFunction)>V
+compute(K key, BiFunction remappingFunction)>V
+merge(K key, V value, BiFunction remappingFunction)>V
+clear()>void
+of(K k1, V v1)>Map
+entry(K k, V v)>Entry
+copyOf(Map map)>Map
+#HashMap:Map
+@java.util.HashMap
+#LinkedHashMap:HashMap
+@java.util.LinkedHashMap
+#TreeMap:Map
+@java.util.TreeMap
+firstKey()>K
+lastKey()>K
+headMap(K toKey)>SortedMap
+tailMap(K fromKey)>SortedMap
+floorKey(K key)>K
+ceilingKey(K key)>K
+#Entry
+getKey()>K
+getValue()>V
+setValue(V value)>V
+#Set:Collection
+@java.util.Set
+of(E... elements)>Set
+copyOf(Collection coll)>Set
+#HashSet:Set
+@java.util.HashSet
+#LinkedHashSet:HashSet
+@java.util.LinkedHashSet
+#TreeSet:Set
+@java.util.TreeSet
+first()>E
+last()>E
+floor(E e)>E
+ceiling(E e)>E
+#Queue:Collection
+@java.util.Queue
+offer(E e)>boolean
+poll()>E
+peek()>E
+element()>E
+#Deque:Queue
+@java.util.Deque
+addFirst(E e)>void
+addLast(E e)>void
+offerFirst(E e)>boolean
+offerLast(E e)>boolean
+pollFirst()>E
+pollLast()>E
+peekFirst()>E
+peekLast()>E
+push(E e)>void
+pop()>E
+#ArrayDeque:Deque
+@java.util.ArrayDeque
+#PriorityQueue:Queue
+@java.util.PriorityQueue
+#Iterator
+@java.util.Iterator
+hasNext()>boolean
+next()>E
+remove()>void
+#Collections
+@java.util.Collections
+sort(List list)>void
+reverse(List list)>void
+shuffle(List list)>void
+max(Collection coll)>T
+min(Collection coll)>T
+unmodifiableList(List list)>List
+unmodifiableMap(Map m)>Map
+unmodifiableSet(Set s)>Set
+emptyList()>List
+emptyMap()>Map
+emptySet()>Set
+singletonList(T o)>List
+synchronizedList(List list)>List
+frequency(Collection c, Object o)>int
+addAll(Collection c, T... elements)>boolean
+#Arrays
+@java.util.Arrays
+asList(T... a)>List
+sort(Object[] a)>void
+fill(Object[] a, Object val)>void
+copyOf(T[] original, int newLength)>T[]
+copyOfRange(T[] original, int from, int to)>T[]
+toString(Object[] a)>String
+equals(Object[] a, Object[] a2)>boolean
+stream(T[] array)>Stream
+binarySearch(Object[] a, Object key)>int
+#Objects
+@java.util.Objects
+equals(Object a, Object b)>boolean
+hash(Object... values)>int
+hashCode(Object o)>int
+isNull(Object obj)>boolean
+nonNull(Object obj)>boolean
+requireNonNull(T obj, String message)>T
+requireNonNullElse(T obj, T defaultObj)>T
+toString(Object o)>String
+#Optional
+@java.util.Optional
+of(T value)>Optional
+ofNullable(T value)>Optional
+empty()>Optional
+isPresent()>boolean
+isEmpty()>boolean
+get()>T
+orElse(T other)>T
+orElseGet(Supplier supplier)>T
+orElseThrow()>T
+ifPresent(Consumer action)>void
+map(Function mapper)>Optional
+flatMap(Function mapper)>Optional
+filter(Predicate predicate)>Optional
+#Scanner
+@java.util.Scanner
+nextLine()>String
+next()>String
+nextInt()>int
+nextLong()>long
+nextDouble()>double
+hasNext()>boolean
+hasNextLine()>boolean
+hasNextInt()>boolean
+close()>void
+#Random
+@java.util.Random
+nextInt(int bound)>int
+nextLong()>long
+nextDouble()>double
+nextBoolean()>boolean
+ints(long streamSize)>IntStream
+#UUID
+@java.util.UUID
+randomUUID()>UUID
+fromString(String name)>UUID
+toString()>String
+#StringJoiner
+@java.util.StringJoiner
+add(CharSequence newElement)>StringJoiner
+setEmptyValue(CharSequence emptyValue)>StringJoiner
+toString()>String
+#Comparator
+@java.util.Comparator
+compare(T o1, T o2)>int
+reversed()>Comparator
+thenComparing(Comparator other)>Comparator
+comparing(Function keyExtractor)>Comparator
+comparingInt(ToIntFunction keyExtractor)>Comparator
+naturalOrder()>Comparator
+reverseOrder()>Comparator
+#Locale
+@java.util.Locale
+getDefault()>Locale
+ROOT:Locale
+US:Locale
+ITALY:Locale
+#Stream
+@java.util.stream.Stream
+filter(Predicate predicate)>Stream
+map(Function mapper)>Stream
+flatMap(Function mapper)>Stream
+mapToInt(ToIntFunction mapper)>IntStream
+distinct()>Stream
+sorted(Comparator comparator)>Stream
+limit(long maxSize)>Stream
+skip(long n)>Stream
+peek(Consumer action)>Stream
+forEach(Consumer action)>void
+collect(Collector collector)>R
+toList()>List
+reduce(T identity, BinaryOperator accumulator)>T
+count()>long
+anyMatch(Predicate predicate)>boolean
+allMatch(Predicate predicate)>boolean
+noneMatch(Predicate predicate)>boolean
+findFirst()>Optional
+findAny()>Optional
+min(Comparator comparator)>Optional
+max(Comparator comparator)>Optional
+of(T... values)>Stream
+empty()>Stream
+iterate(T seed, UnaryOperator f)>Stream
+generate(Supplier s)>Stream
+concat(Stream a, Stream b)>Stream
+#IntStream
+@java.util.stream.IntStream
+range(int startInclusive, int endExclusive)>IntStream
+rangeClosed(int startInclusive, int endInclusive)>IntStream
+of(int... values)>IntStream
+map(IntUnaryOperator mapper)>IntStream
+filter(IntPredicate predicate)>IntStream
+mapToObj(IntFunction mapper)>Stream
+boxed()>Stream
+sum()>int
+average()>OptionalDouble
+max()>OptionalInt
+min()>OptionalInt
+count()>long
+toArray()>int[]
+forEach(IntConsumer action)>void
+#Collectors
+@java.util.stream.Collectors
+toList()>Collector
+toSet()>Collector
+toMap(Function keyMapper, Function valueMapper)>Collector
+joining(CharSequence delimiter)>Collector
+groupingBy(Function classifier)>Collector
+partitioningBy(Predicate predicate)>Collector
+counting()>Collector
+summingInt(ToIntFunction mapper)>Collector
+averagingDouble(ToDoubleFunction mapper)>Collector
+mapping(Function mapper, Collector downstream)>Collector
+#Function
+@java.util.function.Function
+apply(T t)>R
+andThen(Function after)>Function
+compose(Function before)>Function
+identity()>Function
+#BiFunction
+@java.util.function.BiFunction
+apply(T t, U u)>R
+#Supplier
+@java.util.function.Supplier
+get()>T
+#Consumer
+@java.util.function.Consumer
+accept(T t)>void
+andThen(Consumer after)>Consumer
+#BiConsumer
+@java.util.function.BiConsumer
+accept(T t, U u)>void
+#Predicate
+@java.util.function.Predicate
+test(T t)>boolean
+and(Predicate other)>Predicate
+or(Predicate other)>Predicate
+negate()>Predicate
+not(Predicate target)>Predicate
+#UnaryOperator:Function
+@java.util.function.UnaryOperator
+#BinaryOperator:BiFunction
+@java.util.function.BinaryOperator
+#ExecutorService
+@java.util.concurrent.ExecutorService
+submit(Callable task)>Future
+execute(Runnable command)>void
+invokeAll(Collection tasks)>List
+shutdown()>void
+shutdownNow()>List
+awaitTermination(long timeout, TimeUnit unit)>boolean
+isShutdown()>boolean
+close()>void
+#Executors
+@java.util.concurrent.Executors
+newFixedThreadPool(int nThreads)>ExecutorService
+newCachedThreadPool()>ExecutorService
+newSingleThreadExecutor()>ExecutorService
+newVirtualThreadPerTaskExecutor()>ExecutorService
+newScheduledThreadPool(int corePoolSize)>ScheduledExecutorService
+#Future
+@java.util.concurrent.Future
+get()>V
+cancel(boolean mayInterruptIfRunning)>boolean
+isDone()>boolean
+isCancelled()>boolean
+#Callable
+@java.util.concurrent.Callable
+call()>V
+#CompletableFuture
+@java.util.concurrent.CompletableFuture
+supplyAsync(Supplier supplier)>CompletableFuture
+runAsync(Runnable runnable)>CompletableFuture
+completedFuture(U value)>CompletableFuture
+allOf(CompletableFuture... cfs)>CompletableFuture
+thenApply(Function fn)>CompletableFuture
+thenAccept(Consumer action)>CompletableFuture
+thenCompose(Function fn)>CompletableFuture
+thenCombine(CompletionStage other, BiFunction fn)>CompletableFuture
+exceptionally(Function fn)>CompletableFuture
+join()>T
+get()>T
+complete(T value)>boolean
+#ConcurrentHashMap:Map
+@java.util.concurrent.ConcurrentHashMap
+#TimeUnit
+@java.util.concurrent.TimeUnit
+SECONDS:TimeUnit
+MILLISECONDS:TimeUnit
+MINUTES:TimeUnit
+sleep(long timeout)>void
+toMillis(long duration)>long
+#AtomicInteger
+@java.util.concurrent.atomic.AtomicInteger
+get()>int
+set(int newValue)>void
+incrementAndGet()>int
+getAndIncrement()>int
+decrementAndGet()>int
+addAndGet(int delta)>int
+compareAndSet(int expectedValue, int newValue)>boolean
+#File
+@java.io.File
+exists()>boolean
+isDirectory()>boolean
+isFile()>boolean
+getName()>String
+getPath()>String
+getAbsolutePath()>String
+getParent()>String
+length()>long
+delete()>boolean
+mkdirs()>boolean
+listFiles()>File[]
+toPath()>Path
+#IOException:Exception
+@java.io.IOException
+#UncheckedIOException:RuntimeException
+@java.io.UncheckedIOException
+#BufferedReader
+@java.io.BufferedReader
+readLine()>String
+lines()>Stream
+read()>int
+ready()>boolean
+close()>void
+#InputStreamReader
+@java.io.InputStreamReader
+read()>int
+close()>void
+#FileReader
+@java.io.FileReader
+read()>int
+close()>void
+#BufferedWriter
+@java.io.BufferedWriter
+write(String str)>void
+newLine()>void
+flush()>void
+close()>void
+#FileWriter
+@java.io.FileWriter
+write(String str)>void
+flush()>void
+close()>void
+#PrintWriter
+@java.io.PrintWriter
+println(Object x)>void
+print(Object x)>void
+printf(String format, Object... args)>PrintWriter
+flush()>void
+close()>void
+#InputStream
+@java.io.InputStream
+read()>int
+readAllBytes()>byte[]
+transferTo(OutputStream out)>long
+close()>void
+#OutputStream
+@java.io.OutputStream
+write(byte[] b)>void
+flush()>void
+close()>void
+#Files
+@java.nio.file.Files
+readString(Path path)>String
+readAllLines(Path path)>List
+readAllBytes(Path path)>byte[]
+writeString(Path path, CharSequence csq, OpenOption... options)>Path
+write(Path path, byte[] bytes, OpenOption... options)>Path
+lines(Path path)>Stream
+list(Path dir)>Stream
+walk(Path start, FileVisitOption... options)>Stream
+exists(Path path, LinkOption... options)>boolean
+isDirectory(Path path, LinkOption... options)>boolean
+isRegularFile(Path path, LinkOption... options)>boolean
+createDirectories(Path dir, FileAttribute... attrs)>Path
+createFile(Path path, FileAttribute... attrs)>Path
+createTempFile(String prefix, String suffix, FileAttribute... attrs)>Path
+delete(Path path)>void
+deleteIfExists(Path path)>boolean
+copy(Path source, Path target, CopyOption... options)>Path
+move(Path source, Path target, CopyOption... options)>Path
+size(Path path)>long
+newBufferedReader(Path path)>BufferedReader
+newBufferedWriter(Path path, OpenOption... options)>BufferedWriter
+#Path
+@java.nio.file.Path
+of(String first, String... more)>Path
+resolve(String other)>Path
+getParent()>Path
+getFileName()>Path
+toAbsolutePath()>Path
+normalize()>Path
+relativize(Path other)>Path
+startsWith(String other)>boolean
+toFile()>File
+toString()>String
+#Paths
+@java.nio.file.Paths
+get(String first, String... more)>Path
+#StandardCharsets
+@java.nio.charset.StandardCharsets
+UTF_8:Charset
+US_ASCII:Charset
+ISO_8859_1:Charset
+#LocalDate
+@java.time.LocalDate
+now()>LocalDate
+of(int year, int month, int dayOfMonth)>LocalDate
+parse(CharSequence text)>LocalDate
+plusDays(long daysToAdd)>LocalDate
+minusDays(long daysToSubtract)>LocalDate
+plusMonths(long monthsToAdd)>LocalDate
+getYear()>int
+getMonthValue()>int
+getDayOfMonth()>int
+getDayOfWeek()>DayOfWeek
+isBefore(ChronoLocalDate other)>boolean
+isAfter(ChronoLocalDate other)>boolean
+format(DateTimeFormatter formatter)>String
+atStartOfDay()>LocalDateTime
+#LocalDateTime
+@java.time.LocalDateTime
+now()>LocalDateTime
+of(int year, int month, int dayOfMonth, int hour, int minute)>LocalDateTime
+parse(CharSequence text)>LocalDateTime
+plusHours(long hours)>LocalDateTime
+plusMinutes(long minutes)>LocalDateTime
+toLocalDate()>LocalDate
+getHour()>int
+getMinute()>int
+isBefore(ChronoLocalDateTime other)>boolean
+isAfter(ChronoLocalDateTime other)>boolean
+format(DateTimeFormatter formatter)>String
+#Instant
+@java.time.Instant
+now()>Instant
+ofEpochMilli(long epochMilli)>Instant
+toEpochMilli()>long
+plus(Duration amountToAdd)>Instant
+isBefore(Instant otherInstant)>boolean
+#Duration
+@java.time.Duration
+ofSeconds(long seconds)>Duration
+ofMillis(long millis)>Duration
+ofMinutes(long minutes)>Duration
+between(Temporal startInclusive, Temporal endExclusive)>Duration
+toMillis()>long
+getSeconds()>long
+plus(Duration duration)>Duration
+#DateTimeFormatter
+@java.time.format.DateTimeFormatter
+ofPattern(String pattern)>DateTimeFormatter
+format(TemporalAccessor temporal)>String
+ISO_LOCAL_DATE:DateTimeFormatter
+ISO_LOCAL_DATE_TIME:DateTimeFormatter
+#BigDecimal
+@java.math.BigDecimal
+valueOf(double val)>BigDecimal
+add(BigDecimal augend)>BigDecimal
+subtract(BigDecimal subtrahend)>BigDecimal
+multiply(BigDecimal multiplicand)>BigDecimal
+divide(BigDecimal divisor, RoundingMode roundingMode)>BigDecimal
+setScale(int newScale, RoundingMode roundingMode)>BigDecimal
+compareTo(BigDecimal val)>int
+doubleValue()>double
+toPlainString()>String
+ZERO:BigDecimal
+ONE:BigDecimal
+#BigInteger
+@java.math.BigInteger
+valueOf(long val)>BigInteger
+add(BigInteger val)>BigInteger
+multiply(BigInteger val)>BigInteger
+mod(BigInteger m)>BigInteger
+pow(int exponent)>BigInteger
+compareTo(BigInteger val)>int
+ZERO:BigInteger
+ONE:BigInteger
+#Pattern
+@java.util.regex.Pattern
+compile(String regex)>Pattern
+matcher(CharSequence input)>Matcher
+matches(String regex, CharSequence input)>boolean
+split(CharSequence input)>String[]
+pattern()>String
+#Matcher
+@java.util.regex.Matcher
+matches()>boolean
+find()>boolean
+group(int group)>String
+start()>int
+end()>int
+replaceAll(String replacement)>String

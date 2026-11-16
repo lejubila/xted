@@ -144,7 +144,7 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   estensione, nome del file e shebang. Costrutti multiriga (commenti, stringhe, heredoc) e
   linguaggi incorporati (JS e CSS in HTML, HTML in PHP) sono gestiti.
 - **Autosuggest**: popup con membri dopo `->`, `::` e `.`, simboli del file, dei file inclusi
-  e della libreria standard (PHP, C, C++, Python, JavaScript/TypeScript, Go, Rust), parole degli altri
+  e della libreria standard (PHP, C, C++, Python, JavaScript/TypeScript, Go, Rust, Java), parole degli altri
   buffer, parole chiave e snippet. Ogni riga mostra la firma completa con i parametri e una
   lettera per il tipo (`f` funzione, `c` classe, `m` metodo, `p` attributo, `k` costante,
   `v` variabile locale). Dentro una chiamata hanno la precedenza le variabili locali e i
@@ -181,6 +181,14 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     (`use bat::{`↵`config::Config,`↵`line_range::LineRange,`↵…`};`); gli attributi `#[cfg(…)]` restano col
     loro `use`, e un nome già presente in graffe annidate (`use crate::{app::App, …}`) non si aggiunge di
     nuovo. Senza `use`, si scrive dopo le `mod …;`.
+  - In Java, scegliendo una classe fuori da `java.lang` (`ArrayList`, `Collections.sort`, `Files.readString`)
+    si aggiunge `import java.util.ArrayList;` in ordine nel gruppo degli import che cominciano allo stesso
+    modo (`java.`, `org.`, `com.`), oppure in un gruppo nuovo dopo gli altri o dopo `package`; un
+    `import java.util.*;` o una classe con lo stesso nome importata da un altro package contano già.
+    Le classi dello stesso package (la stessa cartella) si vedono senza import; le classi pubbliche
+    degli altri package del progetto si propongono con il loro import (`com.acme.util.TextUtils`), quelle
+    di `src/test/` solo dai test. La radice del progetto è il repository Git o, senza, la cartella di
+    `settings.gradle`, `pom.xml` o `build.gradle` più esterna.
   - In PHP, scegliendo un metodo o una costante dopo `Nome::` (`Route::get`, `User::find`) si aggiunge
     `use` della classe se manca (alias di `config/app.php`, poi le classi del progetto e di `vendor`).
     Con Composer, le funzioni e costanti dei file di `"autoload": {"files"}` vengono proposte, e per

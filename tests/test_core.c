@@ -5302,6 +5302,90 @@ static void test_go_rust(void)
     rm_rf(dir);
 }
 
+/* Java: the index (classes, methods with their type, constructors, fields), the standard
+ * library after a typed variable or a class, the same package without import, the other packages
+ * and the library with their import in order. */
+static void test_java(void)
+{
+    char dir[64], sub[200], path[256], err[128];
+    static const char *const dirs[] = { "src", "src/main", "src/main/java", "src/main/java/com",
+                                        "src/main/java/com/acme", "src/main/java/com/acme/app",
+                                        "src/main/java/com/acme/util", "src/test", "src/test/java",
+                                        "src/test/java/com", "src/test/java/com/acme",
+                                        "src/test/java/com/acme/util" };
+    size_t i, y, sep;
+    Doc d;
+    SymCache *c;
+    Doc *docs[1];
+    static Got g;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    for (i = 0; i < sizeof dirs / sizeof dirs[0]; i++) {
+        snprintf(sub, sizeof sub, "%s/%s", dir, dirs[i]);
+        mkdir(sub, 0755);
+    }
+    put_file(dir, "pom.xml", "<project/>\n");
+    put_file(dir, "src/main/java/com/acme/util/TextUtils.java",
+             "package com.acme.util;\n\npublic final class TextUtils {\n    public static String shout(String s) {\n"
+             "        return s;\n    }\n}\n");
+    put_file(dir, "src/test/java/com/acme/util/TextUtilsTest.java",
+             "package com.acme.util;\n\npublic class TextUtilsTest {\n}\n");
+    put_file(dir, "src/main/java/com/acme/app/Helper.java",
+             "package com.acme.app;\n\npublic class Helper {\n    public int helpMe(int n) {\n        return n;\n    }\n}\n");
+    put_file(dir, "src/main/java/com/acme/app/Order.java",
+             "package com.acme.app;\n\nimport java.util.List;\n\npublic class Order {\n    private final String id;\n"
+             "    private List<String> tags;\n\n    public Order(String id) {\n        this.id = id;\n    }\n\n"
+             "    public static <T> List<T> wrap(T x) {\n        return null;\n    }\n\n"
+             "    public String[] parts(int n) {\n        return null;\n    }\n\n    void run() {\n"
+             "        Helper h = new Helper();\n        h.\n        tags.stream().filter(null).\n        System.out.\n    }\n}\n");
+    snprintf(path, sizeof path, "%s/src/main/java/com/acme/app/Order.java", dir);
+    c = sym_cache_new();
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    out_text[0] = '\0';
+    sym_outline(c, &d, out_cb, NULL);
+    CHECK(strstr(out_text, "Order()") && strstr(out_text, "Order.Order(String id)") &&
+          strstr(out_text, "Order.wrap(T x)") && strstr(out_text, "Order.parts(int n)") && strstr(out_text, "Order.run()"));
+    docs[0] = &d;
+    for (y = 22; y <= 24; y++) {
+        sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+        CHECK(sep != (size_t)-1);
+        if (sep == (size_t)-1)
+            continue;
+        memset(&g, 0, sizeof g);
+        CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+        CHECK(y == 22 ? has_sym(&g, "helpMe") : y == 23 ? has_sym(&g, "map") && has_sym(&g, "collect")
+                                                       : has_sym(&g, "println"));
+    }
+    doc_release(&d);
+    sym_cache_free(c);
+
+    /* the imports */
+    {
+        static const char *m = "package com.acme.app;\n\nimport java.util.List;\nimport java.util.Map;\n\npublic class M {\n"
+                               "    void f() {\n        \n    }\n}\n";
+
+        php_case(dir, "src/main/java/com/acme/app/M.java", m, "Collections.so", 7,
+                 "import java.util.Collections;\nimport java.util.List;\nimport java.util.Map;\n", 1);
+        php_case(dir, "src/main/java/com/acme/app/M.java", m, "Files.readStr", 7,
+                 "import java.nio.file.Files;\nimport java.util.List;\n", 1);
+        php_case(dir, "src/main/java/com/acme/app/M.java", m, "TextUt", 7,
+                 "import java.util.Map;\n\nimport com.acme.util.TextUtils;\n\npublic class M", 1);
+        php_case(dir, "src/main/java/com/acme/app/M.java", m, "List.o", 7, "import java.util.Map;\n\npublic class M", 0);
+        php_case(dir, "src/main/java/com/acme/app/M.java", m, "Helpe", 7, "import java.util.Map;\n\npublic class M", 0);
+        php_case(dir, "src/main/java/com/acme/app/M.java", m, "TextUtilsTe", 7, "import java.util.Map;\n\npublic class M", 0);
+        php_case(dir, "src/main/java/com/acme/app/N.java", "package com.acme.app;\n\npublic class N {\n    void f() {\n        \n    }\n}\n",
+                 "ArrayLi", 4, "package com.acme.app;\n\nimport java.util.ArrayList;\n\npublic class N", 1);
+        php_case(dir, "src/main/java/com/acme/app/N.java",
+                 "package com.acme.app;\n\nimport java.util.*;\n\npublic class N {\n    void f() {\n        \n    }\n}\n",
+                 "ArrayLi", 6, "import java.util.*;\n\npublic class N", 0);
+        php_case(dir, "src/main/java/com/acme/app/N.java",
+                 "package com.acme.app;\n\nimport com.other.List;\n\npublic class N {\n    void f() {\n        \n    }\n}\n",
+                 "List.o", 6, "import com.other.List;\n\npublic class N", 0);
+    }
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -5856,6 +5940,7 @@ int main(void)
     test_sym_cache_pressure();
     test_php_facades();
     test_go_rust();
+    test_java();
     test_config_merge();
     test_snippets();
     test_cursors();

@@ -42,5 +42,9 @@ int imp_go(Editor *e, const char *path);
 /* Rust: use std::collections::HashMap; among the uses, in order; with none, past the //! comments
  * and the #![...] attributes at the top. A use std::collections::{HashMap, ...} counts. */
 int imp_rust(Editor *e, const char *path);
+/* Java: import java.util.List; among the imports, in order in the group of the same first
+ * segment (java, javax, com, ...), else in the last group; an import of the whole package
+ * (java.util.*) counts. With none, after the package line. */
+int imp_java(Editor *e, const char *fq);
 
 #endif

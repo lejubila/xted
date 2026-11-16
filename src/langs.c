@@ -598,6 +598,19 @@ static const char *const lang_java[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^~?:",
+    "member .",
+    "decl class public|protected|private|abstract|final|static|sealed|strictfp* class|interface|enum|record @ <> extends %",
+    "decl class public|protected|private|abstract|final|static|sealed|strictfp* class|interface|enum|record @",
+    "decl func public|protected|private|static|final|abstract|synchronized|native|default|strictfp* <> % @ ( ^",
+    "decl method public|protected|private* @ ( ^",
+    "decl prop public|protected|private|static|final|transient|volatile* % @ =;|=|,",
+    "include import static %",
+    "include import %",
+    "include new %",
+    "attr this . @ =",
+    "bind var @ = new %",
+    "bind var @ = % (",
+    "bind final? % @ =;|=|:|,|)",
     NULL
 };
 
