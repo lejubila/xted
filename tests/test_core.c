@@ -1195,6 +1195,9 @@ static void test_syntax_detect_langs(void)
         { "Makefile", "", "Makefile" }, { "rules.mk", "", "Makefile" },
         { "Dockerfile", "", "Dockerfile" }, { "a.patch", "", "Diff" },
         { "a.txt", "// xted: ft=typescript\n", "TypeScript" },
+        { ".env", "", "Dotenv" }, { "app/.env.local", "", "Dotenv" }, { ".env.example", "", "Dotenv" },
+        { ".env.production", "", "Dotenv" }, { "prod.env", "", "Dotenv" }, { ".flaskenv", "", "Dotenv" },
+        { ".environment", "", "-" },
     };
     size_t i;
 
@@ -5747,6 +5750,117 @@ static void test_csharp(void)
     rm_rf(dir);
 }
 
+/* .env: the names before "=" (also after export), comments only at the start of a line (a "#"
+ * in a value is part of it), quoted values over more lines, ${VAR} and $VAR; the names are the
+ * file's outline. */
+static void test_dotenv(void)
+{
+    Buffer b;
+    Syntax *s;
+    uint16_t st = 0;
+    size_t y = 0, x = 0;
+    static const char *text = "# db\nAPP_NAME=\"My App\"\nexport PATH=$HOME:${X}\nDEBUG=true\nURL=a#b\n"
+                              "MULTI=\"one\ntwo\"\n  PORT = 5432\n";
+
+    buf_init(&b);
+    b.path = xstrdup(".env");
+    s = syn_detect(&b);
+    CHECK(s != NULL);
+    if (!s) {
+        buf_free(&b);
+        return;
+    }
+    CLS(s, st, "# db", "cccc");
+    CLS(s, st, "APP_NAME=\"My App\"", "vvvvvvvvossssssss");
+    CLS(s, st, "export PATH=$HOME:${X}", "kkkkkk.vvvvovvvvv.vvvv");
+    CLS(s, st, "DEBUG=true", "vvvvvoCCCC");
+    CLS(s, st, "URL=a#b", "vvvo...");
+    CLS(s, st, "MULTI=\"one", "vvvvvossss");
+    CLS(s, st, "two\"", "ssss");
+    CLS(s, st, "  PORT = 5432", "..vvvv.o.nnnn");
+    CLS(s, st, "x y=1", "...on");
+    syn_free(s);
+    buf_insert_text(&b, &y, &x, text, strlen(text));
+    {
+        Doc d;
+        SymCache *c = sym_cache_new();
+
+        memset(&d, 0, sizeof d);
+        d.buf = b;
+        d.syn = syn_detect(&d.buf);
+        out_text[0] = '\0';
+        sym_outline(c, &d, out_cb, NULL);
+        CHECK(strstr(out_text, "APP_NAME") && strstr(out_text, "PATH") && strstr(out_text, "DEBUG") &&
+              strstr(out_text, "PORT"));
+        syn_free(d.syn);
+        sym_cache_free(c);
+    }
+    buf_free(&b);
+}
+
+/* The names of the project's .env variables where a program reads them, in each language;
+ * nowhere else. */
+static void test_env_suggest(void)
+{
+    char dir[64];
+    static const struct { const char *file, *text, *typed, *want; size_t cy; } t[] = {
+        { "app/a.php", "<?php\n$x = 1;\n", "env('APP_N", "env('APP_NAME')", 1 },
+        { "app/a.php", "<?php\n$x = 1;\n", "getenv(\"DB_P", "getenv(\"DB_PORT\")", 1 },
+        { "app/a.php", "<?php\n$x = 1;\n", "$_ENV['LOCAL_O", "$_ENV['LOCAL_ONLY']", 1 },
+        { "app/a.js", "let x = 1;\n", "process.env.APP_N", "process.env.APP_NAME", 0 },
+        { "app/a.js", "let x = 1;\n", "import.meta.env.DB_P", "import.meta.env.DB_PORT", 0 },
+        { "app/a.py", "x = 1\n", "os.getenv('APP_N", "os.getenv('APP_NAME')", 0 },
+        { "app/a.py", "x = 1\n", "os.environ['DB_P", "os.environ['DB_PORT']", 0 },
+        { "app/a.go", "package main\n\n", "os.Getenv(\"APP_N", "os.Getenv(\"APP_NAME\")", 1 },
+        { "app/a.rs", "fn main() {}\n", "env::var(\"APP_N", "env::var(\"APP_NAME\")", 0 },
+        { "app/A.java", "class A {}\n", "System.getenv(\"APP_N", "System.getenv(\"APP_NAME\")", 0 },
+        { "app/a.cs", "class A {}\n", "Environment.GetEnvironmentVariable(\"APP_N",
+          "Environment.GetEnvironmentVariable(\"APP_NAME\")", 0 },
+        { "app/a.c", "int x;\n", "getenv(\"APP_N", "getenv(\"APP_NAME\")", 0 },
+        { "app/a.rb", "x = 1\n\n", "ENV['APP_N", "ENV['APP_NAME']", 1 },
+        { "app/a.sh", "x=1\n", "echo $APP_N", "echo $APP_NAME", 0 },
+        { "app/a.sh", "x=1\n", "echo ${DB_P", "echo ${DB_PORT}", 0 },
+        { "app/sub/b.php", "<?php\n$x = 1;\n", "env('SUB_O", "env('SUB_ONLY')", 1 },
+        { "app/sub/b.php", "<?php\n$x = 1;\n", "env('APP_N", "env('APP_NAME')", 1 },
+    };
+    size_t i;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    mkdirs(dir, ".git");
+    mkdirs(dir, "app/sub");
+    put_file(dir, "app/.env", "# settings\nAPP_NAME=\"My App\"\nexport DB_PORT=5432\nSECRET=x#y\n");
+    put_file(dir, "app/.env.local", "LOCAL_ONLY=1\nAPP_NAME=override\n");
+    put_file(dir, "app/sub/.env", "SUB_ONLY=1\n");
+    put_file(dir, "app/.env.php", "<?php OTHER_THING=1\n");
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        char text[200];
+
+        snprintf(text, sizeof text, "%s", t[i].text);
+        php_case(dir, t[i].file, text, t[i].typed, t[i].cy, t[i].want, 0);
+    }
+    /* a string that no call reads as a variable stays a plain word */
+    {
+        Doc *d;
+        Editor e;
+        char path[256], err[128];
+        const char *q;
+
+        put_file(dir, "app/c.php", "<?php\n$x = 1;\n");
+        snprintf(path, sizeof path, "%s/app/c.php", dir);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        e.cy = 1;
+        e.cx = e.buf->lines[1].len;
+        for (q = "echo('APP_N"; *q; q++)
+            kkey(&e, (uint32_t)(unsigned char)*q, 0);
+        CHECK(!e.comp.on);
+        editor_free(&e);
+    }
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -6253,6 +6367,7 @@ int main(void)
     test_syntax_langs();
     test_syntax_embed();
     test_syntax_detect_langs();
+    test_dotenv();
     test_syntax_incremental();
     test_syntax_brackets();
     test_theme();
@@ -6306,6 +6421,7 @@ int main(void)
     test_java_builds();
     test_java_settings_and_size();
     test_csharp();
+    test_env_suggest();
     test_config_merge();
     test_snippets();
     test_cursors();

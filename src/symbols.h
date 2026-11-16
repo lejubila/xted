@@ -166,4 +166,11 @@ typedef void (*OutlineFn)(void *ctx, int kind, const char *name, const char *sig
                           size_t x);
 int sym_outline(SymCache *c, Doc *cur, OutlineFn fn, void *ctx);
 
+/* ---- environment variables -------------------------------------------- */
+
+/* The names the .env files define (.env, .env.local, .env.example ...) in the folder of cur and
+ * in those above it up to the project's root, nearest first, each once with its file's name. */
+typedef void (*EnvFn)(void *ctx, const char *name, const char *file);
+void sym_env_keys(SymCache *c, Doc *cur, EnvFn fn, void *ctx);
+
 #endif

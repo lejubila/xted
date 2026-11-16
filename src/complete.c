@@ -236,6 +236,58 @@ static void class_cb(void *ctx, const char *fq, int rank)
     }
 }
 
+/* True if the word at start of line l is the name of an environment variable being read:
+ * env('APP_|, os.getenv("|, process.env.|, ENV['|, a shell's $| or ${|. */
+static int env_context(const Doc *cur, const Line *l, size_t start)
+{
+    /* the calls whose first argument (a string) is a variable's name */
+    static const char *const calls[] = {
+        "env(", "getenv(", "$_ENV[", "$_SERVER[", "Env::get(", "environ[", "environ.get(",
+        "Getenv(", "LookupEnv(", "env::var(", "env::var_os(", "env!(", "option_env!(",
+        "GetEnvironmentVariable(", "ENV[", "ENV.fetch(", "process.env[", "Deno.env.get(", NULL
+    };
+    static const char *const members[] = { "process.env.", "import.meta.env.", "Bun.env.", NULL };
+    const char *lang = cur->syn ? syn_name(cur->syn) : "", *s = l->s;
+    size_t k, j;
+    char q;
+
+    if (strcmp(lang, "Shell") == 0 || strcmp(lang, "Dotenv") == 0 || strcmp(lang, "Dockerfile") == 0)
+        return (start > 0 && s[start - 1] == '$') ||
+               (start > 1 && s[start - 1] == '{' && s[start - 2] == '$');
+    for (k = 0; members[k]; k++) {
+        size_t ml = strlen(members[k]);
+
+        if (start >= ml && memcmp(s + start - ml, members[k], ml) == 0 &&
+            (start == ml || !(isalnum((unsigned char)s[start - ml - 1]) || s[start - ml - 1] == '_')))
+            return 1;
+    }
+    if (start == 0)
+        return 0;
+    q = s[start - 1];
+    if (q != '\'' && q != '"' && q != '`')
+        return 0;
+    for (j = start - 1; j > 0 && s[j - 1] == ' '; j--)
+        ;
+    for (k = 0; calls[k]; k++) {
+        size_t cl = strlen(calls[k]);
+
+        if (j >= cl && memcmp(s + j - cl, calls[k], cl) == 0 &&
+            (j == cl || !isalnum((unsigned char)calls[k][0]) ||
+             !(isalnum((unsigned char)s[j - cl - 1]) || s[j - cl - 1] == '_')))
+            return 1;
+    }
+    return 0;
+}
+
+static void env_cb(void *ctx, const char *name, const char *file)
+{
+    char sig[200];
+
+    /* the popup shows the signature in place of the name: the name and where it comes from */
+    snprintf(sig, sizeof sig, "%.120s  %.60s", name, file);
+    consider_sig(ctx, name, strlen(name), CAND_CONST, 0, sig);
+}
+
 /* True if the word at [start, x) of a PHP line follows `use` (maybe qualified: use A\B\C);
  * *qs is where the qualified name begins. */
 static int use_context(const Buffer *b, size_t y, size_t start, size_t *qs)
@@ -343,11 +395,13 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
     Gather g;
     const Buffer *b = &cur->buf;
     size_t start, plen, i, budget = COMPLETE_SCAN_LINES, d, take, sep = (size_t)-1, qs = 0;
-    int php = cur->syn && strncmp(syn_name(cur->syn), "PHP", 3) == 0, use_ctx = 0;
+    int php = cur->syn && strncmp(syn_name(cur->syn), "PHP", 3) == 0, use_ctx = 0, env_ctx = 0;
 
     complete_close(c);
     plen = complete_prefix(b, y, x, &start);
-    if (php && use_context(b, y, start, &qs)) {
+    if (env_context(cur, &b->lines[y], start)) {
+        env_ctx = 1;                    /* only the .env variables make sense, from no letter on */
+    } else if (php && use_context(b, y, start, &qs)) {
         use_ctx = 1;
         start = qs;
         plen = x - qs;
@@ -355,7 +409,7 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
         sep = sym_member_at(cur->syn, b, y, start);
     }
     if (plen >= sizeof g.prefix ||
-        (!use_ctx && sep == (size_t)-1 &&
+        (!use_ctx && !env_ctx && sep == (size_t)-1 &&
          plen < (c->min_prefix ? c->min_prefix : COMPLETE_MIN_PREFIX)))
         return 0;
     memset(&g, 0, sizeof g);
@@ -368,7 +422,12 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
     g.set = xmalloc(g.setsize * sizeof *g.set);
     memset(g.set, 0, g.setsize * sizeof *g.set);
 
-    if (use_ctx) {
+    if (env_ctx) {
+        if (!c->sc)
+            c->sc = sym_cache_new();
+        sym_env_keys(c->sc, cur, env_cb, &g);
+        budget = 0;
+    } else if (use_ctx) {
         if (!c->sc)
             c->sc = sym_cache_new();
         sym_budget(c->sc, COMPLETE_SCAN_MS);

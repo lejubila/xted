@@ -2533,7 +2533,10 @@ static void update_complete(Editor *e, Key k)
     int word = !(k.mods & (MOD_ALT | MOD_CTRL)) && is_printable(k.code) && cp_is_word(k.code);
     int bs = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == KEY_BACKSPACE || k.code == 8);
     /* the end of a member operator (-> :: .) opens the list of members: complete_open decides */
-    int op = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == '>' || k.code == ':' || k.code == '.' || k.code == '\\');
+    int op = !(k.mods & (MOD_ALT | MOD_CTRL)) && (k.code == '>' || k.code == ':' || k.code == '.' || k.code == '\\' ||
+                                                  /* env(' and $: the names of the .env variables */
+                                                  k.code == '\'' || k.code == '"' || k.code == '`' ||
+                                                  k.code == '$' || k.code == '{' || k.code == '[' || k.code == '(');
 
     /* keys already waiting (fast typing, a paste without bracketing) are not worth a scan each */
     if ((word || op || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&

@@ -6446,3 +6446,103 @@ int sym_outline(SymCache *c, Doc *cur, OutlineFn fn, void *ctx)
     free(rows);
     return (int)n;
 }
+
+
+/* ---- the variables of the project's .env files ------------------------------ */
+
+/* The names a .env file defines (NAME=..., export NAME=...), each reported once with the file. */
+static void env_file_keys(const char *path, const char *shown, EnvFn fn, void *ctx, SBuf *seen)
+{
+    FILE *f = fopen(path, "r");
+    char line[1024];
+
+    if (!f)
+        return;
+    while (fgets(line, sizeof line, f)) {
+        char *p = line, *e, want[PM_NAME + 2];
+
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (strncmp(p, "export ", 7) == 0)
+            for (p += 7; *p == ' ' || *p == '\t'; p++)
+                ;
+        for (e = p; is_idc((unsigned char)*e) || *e == '.' || *e == '-'; e++)
+            ;
+        if (e == p || (size_t)(e - p) >= PM_NAME || isdigit((unsigned char)*p))
+            continue;
+        while (*e == ' ' || *e == '\t')
+            e++;
+        if (*e != '=')
+            continue;
+        *strpbrk(p, " \t=") = '\0';
+        snprintf(want, sizeof want, " %.*s ", PM_NAME - 1, p);
+        if (seen->p && strstr(seen->p, want))
+            continue;
+        sbuf_adds(seen, want + 1);
+        sbuf_add(seen, "", 1);              /* kept NUL-terminated for strstr */
+        seen->len--;
+        fn(ctx, p, shown);
+    }
+    fclose(f);
+}
+
+void sym_env_keys(SymCache *c, Doc *cur, EnvFn fn, void *ctx)
+{
+    char dir[PATH_MAX], *sl;
+    const char *root;
+    SBuf seen = SBUF_INIT;
+    int up;
+
+    if (!cur->buf.path || !realpath(cur->buf.path, dir))
+        return;
+    set_root(c, dir);
+    root = c->root;
+    sbuf_adds(&seen, " ");
+    sbuf_add(&seen, "", 1);
+    seen.len--;
+    /* the folder of the file, then those above it up to the project's root */
+    for (up = 0; up < 12 && (sl = strrchr(dir, '/')) != NULL; up++) {
+        DIR *d;
+        struct dirent *de;
+        char *names[32];
+        size_t nn = 0, i;
+
+        *sl = '\0';
+        if ((d = opendir(dir[0] ? dir : "/")) != NULL) {
+            while ((de = readdir(d)) != NULL && nn < 32) {
+                const char *n = de->d_name;
+                size_t l = strlen(n);
+
+                /* .env, .env.local, .env.example ...; not a backup (.env.php, .env~) */
+                if (strncmp(n, ".env", 4) == 0 && (l == 4 || (n[4] == '.' && n[l - 1] != '~' &&
+                                                                strcmp(n + l - 4, ".php") != 0)))
+                    names[nn++] = xstrdup(n);
+            }
+            closedir(d);
+        }
+        /* .env first, then the others by name: the same order every time */
+        for (i = 0; i < nn; i++) {
+            size_t j, best = i;
+
+            for (j = i + 1; j < nn; j++)
+                if (strcmp(names[j], names[best]) < 0)
+                    best = j;
+            if (best != i) {
+                char *t = names[i];
+
+                names[i] = names[best];
+                names[best] = t;
+            }
+        }
+        for (i = 0; i < nn; i++) {
+            char path[PATH_MAX + 64];
+
+            snprintf(path, sizeof path, "%s/%s", dir, names[i]);
+            env_file_keys(path, names[i], fn, ctx, &seen);
+            free(names[i]);
+        }
+        if (!root[0] || strcmp(dir, root) == 0 || !dir[0])
+            break;
+    }
+    sbuf_free(&seen);
+}

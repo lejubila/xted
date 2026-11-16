@@ -45,14 +45,15 @@ struct Syntax {
     WordEnt *tab;           /* open addressing, size is a power of two; w == NULL: free */
     size_t tabsize;
     char *pool;             /* storage for the words */
-    int number, calls, sigil;
+    int number, calls, sigil, key;
     int nocase;             /* word lists ignore case */
     char *cmt, *cmt_end;    /* comment markers for the toggle command; cmt_end may be NULL */
     SynRule *rules;         /* symbol rules (decl/include/bind/attr), see langs.c */
     size_t nrules, rulecap;
     int indent_scope;       /* blocks are marked by indentation, not braces */
     char *seps;             /* member access operators, blank separated ("-> ::") */
-    uint8_t call_cls, sigil_cls;
+    uint8_t call_cls, sigil_cls, key_cls;
+    char key_sep;           /* key CLASS SEP: the name a line starts with, before SEP */
     uint8_t opch[256], idstart[256], idch[256];
     uint8_t *scratch;
     size_t scratch_cap;
@@ -364,6 +365,14 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                 PERR(tr("line %zu: sigil needs a class and a character"), lineno);
             s->sigil = (uint8_t)t[2].p[0];
             s->sigil_cls = (uint8_t)cl;
+        } else if (tok_is(t[0], "key")) {
+            int cl = nt > 2 ? class_by_name(t[1].p, t[1].n) : -1;
+
+            if (cl < 0 || t[2].n != 1)
+                PERR(tr("line %zu: key needs a class and a character"), lineno);
+            s->key = 1;
+            s->key_sep = t[2].p[0];
+            s->key_cls = (uint8_t)cl;
         } else if (tok_is(t[0], "operators")) {
             if (nt < 2)
                 PERR(tr("line %zu: operators needs characters"), lineno);
@@ -689,6 +698,26 @@ uint16_t syn_line(Syntax *s, uint16_t state_in, const char *text, size_t len, ui
     return line_impl(s, state_in, text, len, cls, 0);
 }
 
+/* key CLASS SEP: the word [i, j) starts the line (after blanks, or after "export ") and SEP
+ * follows it (after blanks): APP_KEY=..., export PATH=..., name: value. */
+static int is_key(const Syntax *s, const char *text, size_t len, size_t i, size_t j)
+{
+    size_t k = j, b = i;
+
+    while (k < len && (text[k] == ' ' || text[k] == '\t'))
+        k++;
+    if (k >= len || text[k] != s->key_sep)
+        return 0;
+    while (b > 0 && (text[b - 1] == ' ' || text[b - 1] == '\t'))
+        b--;
+    if (b >= 6 && memcmp(text + b - 6, "export", 6) == 0) {
+        b -= 6;
+        while (b > 0 && (text[b - 1] == ' ' || text[b - 1] == '\t'))
+            b--;
+    }
+    return b == 0;
+}
+
 static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t len,
                           uint8_t *cls, int depth)
 {
@@ -759,6 +788,8 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
             wc = lookup(s, text + i, j - i);
             if (wc < 0 && s->calls && j < len && text[j] == '(')
                 wc = s->call_cls;
+            if (s->key && is_key(s, text, len, i, j))
+                wc = s->key_cls;
             fill(cls, i, j, wc < 0 ? SC_NORMAL : (uint8_t)wc);
             i = j;
         } else if (s->number && (isdigit(c) || (c == '.' && i + 1 < len &&
@@ -935,6 +966,10 @@ static int def_has(const char *const *def, const char *key, const char *word, si
             e = p;
             while (*e && *e != ' ')
                 e++;
+            /* a word ending in "*" is a prefix: ".env.*" for .env.local, .env.production */
+            if (e > p && e[-1] == '*' && wn >= (size_t)(e - p - 1) && (size_t)(e - p) > 1 &&
+                memcmp(p, word, (size_t)(e - p - 1)) == 0)
+                return 1;
             if ((size_t)(e - p) == wn) {
                 size_t k;
 

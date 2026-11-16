@@ -12,6 +12,8 @@
  *   nocase                    word lists ignore case (SQL)
  *   calls CLASS               identifier followed by '(' gets CLASS
  *   sigil CLASS CHAR          CHAR followed by a name (shell $var, Python @decorator)
+ *   key CLASS CHAR            the name a line starts with (after blanks or "export"), when CHAR
+ *                             follows it: APP_KEY=... in a .env file
  *   operators CHARS           characters of class operator
  *   idchars CHARS             extra identifier characters
  *   embed LANG CLASS START END [open=TEXT] [peek]
@@ -459,6 +461,26 @@ static const char *const lang_yaml[] = {
     NULL
 };
 
+static const char *const lang_dotenv[] = {
+    "name Dotenv",
+    "comment #",
+    "ext env",
+    "file .env .env.* .flaskenv",
+    "alias dotenv env",
+    "words keyword export",
+    "words constant true false null",
+    "key variable =",
+    "region comment # $ bol",
+    "region variable ${ }",
+    "region string \" \" ml esc=\\",
+    "region string ' ' ml",
+    "sigil variable $",
+    "number",
+    "operators =",
+    "decl const export? @ =",
+    NULL
+};
+
 static const char *const lang_toml[] = {
     "name TOML",
     "comment #",
@@ -744,6 +766,7 @@ const LangDef lang_defs[] = {
     { "SQL", lang_sql },
     { "Go", lang_go },
     { "Rust", lang_rust },
+    { "Dotenv", lang_dotenv },
     { "Java", lang_java },
     { "C#", lang_csharp },
     { "Ruby", lang_ruby },

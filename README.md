@@ -140,8 +140,19 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
 
 - **Evidenziazione della sintassi** con un motore a regole: C/C++, Python, JavaScript,
   TypeScript, Shell, Markdown, PHP, HTML, PHP/HTML, XML, CSS, JSON, YAML, TOML, SQL, Go,
-  Rust, Java, C#, Ruby, Makefile, Dockerfile, Diff. Il linguaggio si riconosce da
-  estensione, nome del file e shebang. Costrutti multiriga (commenti, stringhe, heredoc) e
+  Rust, Java, C#, Ruby, Makefile, Dockerfile, Diff, Dotenv. Il linguaggio si riconosce da
+  estensione, nome del file e shebang. I file `.env`, `.env.local`, `.env.example`, `.env.production`
+  (ogni `.env.*`), `*.env` e `.flaskenv` sono Dotenv: nomi delle variabili colorati (anche dopo
+  `export`), commenti `#` a inizio riga (un `#` in un valore ne fa parte), valori tra virgolette anche
+  su più righe, `${VAR}` e `$VAR`; Ctrl+T elenca le variabili.
+- **Variabili d'ambiente nell'autosuggest**: dove un programma legge una variabile si propongono
+  quelle dei file `.env`, `.env.local`, `.env.example`, … della cartella del file e di quelle sopra
+  fino alla radice del progetto, ognuna col nome del file da cui viene (il valore non si mostra):
+  PHP `env('`, `getenv('`, `$_ENV['`, `$_SERVER['`, `Env::get('`; JavaScript/TypeScript `process.env.`,
+  `process.env['`, `import.meta.env.`, `Bun.env.`, `Deno.env.get('`; Python `os.environ['`,
+  `os.environ.get('`, `os.getenv('`; Go `os.Getenv("`, `os.LookupEnv("`; Rust `env::var("`, `env!("`;
+  Java `System.getenv("`; C# `Environment.GetEnvironmentVariable("`; C `getenv("`; Ruby `ENV['`,
+  `ENV.fetch('`; Shell, Dockerfile e gli stessi `.env` dopo `$` e `${`. Costrutti multiriga (commenti, stringhe, heredoc) e
   linguaggi incorporati (JS e CSS in HTML, HTML in PHP) sono gestiti.
 - **Autosuggest**: popup con membri dopo `->`, `::` e `.`, simboli del file, dei file inclusi
   e della libreria standard (PHP, C, C++, Python, JavaScript/TypeScript, Go, Rust, Java, C#), parole degli altri

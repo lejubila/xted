@@ -313,6 +313,30 @@ def csharp_usings():
 
 
 @scenario
+def dotenv_file():
+    b = Box()
+    b.write(".env.local", "# local settings\nAPP_NAME=\"My App\"\nDB_PORT=5432\nexport API_URL=http://x/#a\n")
+    r = b.run([".env.local"])
+    t = r.screen().text()
+    check(".env.local is a Dotenv file", "Dotenv" in t, t[-400:])
+    r.type(ctrl("t"), 0.3)
+    t = r.screen().text()
+    check("Ctrl+T lists its variables", "APP_NAME" in t and "DB_PORT" in t and "API_URL" in t, t[-600:])
+    r.type(ESC)
+    quit_(r)
+    b.write(".git/HEAD", "ref: refs/heads/main\n")
+    b.write("config.php", "<?php\n\n")
+    r = b.run(["config.php"])
+    r.type(DOWN, "$port = env('DB", 0.3, "_", 0.4)
+    t = r.screen().text()
+    check("env(' suggests the variables of .env with their file", "DB_PORT" in t and ".env.local" in t, t[-600:])
+    r.type(ENTER, ctrl("s"))
+    check("accepting writes the name", "env('DB_PORT')" in b.read("config.php"), b.read("config.php"))
+    quit_(r, discard=True)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

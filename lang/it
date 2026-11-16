@@ -269,6 +269,7 @@ line %zu: operators needs characters	riga %zu: operators richiede dei caratteri
 line %zu: region needs a class, a start and an end	riga %zu: region richiede classe, inizio e fine
 line %zu: scope needs indent or brace	riga %zu: scope richiede indent o brace
 line %zu: sigil needs a class and a character	riga %zu: sigil richiede classe e un carattere
+line %zu: key needs a class and a character	riga %zu: key richiede classe e un carattere
 line %zu: too many regions	riga %zu: troppe regioni
 line %zu: unknown class	riga %zu: classe sconosciuta
 line %zu: unknown directive	riga %zu: direttiva sconosciuta
