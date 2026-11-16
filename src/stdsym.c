@@ -133,6 +133,9 @@ StdLib *std_open(const char *id)
     } else if (strcmp(id, "java") == 0) {
         z = std_java;
         zn = sizeof std_java;
+    } else if (strcmp(id, "cs") == 0) {
+        z = std_cs;
+        zn = sizeof std_cs;
     } else {
         return NULL;
     }

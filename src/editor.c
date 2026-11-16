@@ -2102,7 +2102,7 @@ typedef struct {
                                7 Python import from a module of the project,
                                8 PHP use of the class before ::, 9 PHP require_once,
                                10 PHP use function / use const, 11 Go import, 12 Rust use,
-                               13 Java import */
+                               13 Java import, 14 C# using */
     char mod[256];          /* the header, or the module */
     char name[64];          /* the imported name (from-import) */
 } Needs;
@@ -2157,6 +2157,34 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
         nd->kind = def ? 4 : 5;
         snprintf(nd->mod, sizeof nd->mod, "%s", c->inc + def);
         snprintf(nd->name, sizeof nd->name, "%s", c->text);
+        return;
+    }
+    if (!c->inc && !c->std && qualified && e->comp.sc && (strcmp(lang, "C#") == 0 || strcmp(lang, "Java") == 0)) {
+        /* TextUtils.Shout: the class before the dot may be of another namespace or package */
+        size_t s = e->comp.x - 1, n;
+        char q[64];
+
+        while (s > 0 && (isalnum((unsigned char)ln->s[s - 1]) || ln->s[s - 1] == '_'))
+            s--;
+        n = e->comp.x - 1 - s;
+        if (n > 0 && n < sizeof q && (s == 0 || ln->s[s - 1] != '.') && isupper((unsigned char)ln->s[s])) {
+            memcpy(q, ln->s + s, n);
+            q[n] = '\0';
+            if (sym_project_class(e->comp.sc, (Doc *const *)e->docs, e->ndocs, e->doc, q, nd->mod, sizeof nd->mod)) {
+                nd->kind = lang[0] == 'C' ? 14 : 13;
+                if (nd->kind == 14 && sym_cs_using_known(e->comp.sc, e->doc, nd->mod))
+                    nd->kind = 0;
+            }
+        }
+        if (nd->kind)
+            return;
+    }
+    if (c->inc && strcmp(lang, "C#") == 0) {
+        /* a type of another namespace of the project */
+        if (!e->comp.sc || !sym_cs_using_known(e->comp.sc, e->doc, c->inc)) {
+            nd->kind = 14;
+            snprintf(nd->mod, sizeof nd->mod, "%s", c->inc);
+        }
         return;
     }
     if (c->inc && strcmp(lang, "Java") == 0) {
@@ -2223,8 +2251,9 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
     }
     if (!c->std)
         return;
-    if (strcmp(lang, "Java") == 0) {
-        StdLib *l = std_open("java");
+    if (strcmp(lang, "Java") == 0 || strcmp(lang, "C#") == 0) {
+        int cs = lang[0] == 'C';
+        StdLib *l = std_open(cs ? "cs" : "java");
         const char *h = NULL;
 
         if (!l)
@@ -2246,8 +2275,11 @@ static void needs_for(const Editor *e, const Cand *c, Needs *nd)
             h = std_header(l, c->text, strlen(c->text), &hl, 1);
         }
         if (h && hl > 0 && hl < sizeof nd->mod) {
-            nd->kind = 13;
+            nd->kind = cs ? 14 : 13;
             snprintf(nd->mod, sizeof nd->mod, "%.*s", (int)hl, h);
+            /* C#: a namespace the project already gives (implicit usings, global using) */
+            if (cs && e->comp.sc && sym_cs_using_known(e->comp.sc, e->doc, nd->mod))
+                nd->kind = 0;
         }
         std_close(l);
         return;
@@ -2419,6 +2451,9 @@ static void complete_accept(Editor *e)
         } else if (nd.kind == 13) {
             added = imp_java(e, nd.mod);
             snprintf(what, sizeof what, "import %s;", nd.mod);
+        } else if (nd.kind == 14) {
+            added = imp_csharp(e, nd.mod);
+            snprintf(what, sizeof what, "using %s;", nd.mod);
         } else if (nd.kind == 9) {
             added = imp_php_require(e, nd.mod);
             snprintf(what, sizeof what, "require_once __DIR__ . '/%s';", nd.mod);

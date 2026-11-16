@@ -289,6 +289,30 @@ def java_imports():
 
 
 @scenario
+def csharp_usings():
+    b = Box()
+    b.write("Acme.sln", "\n")
+    b.write("App/App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n"
+            "    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n</Project>\n")
+    src = "using System.Text;\n\nnamespace Acme.App;\n\npublic class P\n{\n    void F()\n    {\n        \n    }\n}\n"
+    b.write("App/P.cs", src)
+    r = b.run(["App/P.cs"])
+    r.type(DOWN * 8, END, "Regex.IsMat", 0.4, ENTER, ctrl("s"))
+    check("C#: Regex.IsMatch adds using System.Text.RegularExpressions; in order",
+          b.read("App/P.cs").startswith("using System.Text;\nusing System.Text.RegularExpressions;\n\nnamespace"),
+          b.read("App/P.cs"))
+    quit_(r, discard=True)
+    b.write("App/P.cs", src)
+    r = b.run(["App/P.cs"])
+    r.type(DOWN * 8, END, "File.ReadAllTe", 0.4, ENTER, ctrl("s"))
+    check("C#: File needs no using with the project's implicit usings",
+          b.read("App/P.cs").startswith("using System.Text;\n\nnamespace") and "File.ReadAllText(" in b.read("App/P.cs"),
+          b.read("App/P.cs"))
+    quit_(r, discard=True)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

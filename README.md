@@ -144,7 +144,7 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   estensione, nome del file e shebang. Costrutti multiriga (commenti, stringhe, heredoc) e
   linguaggi incorporati (JS e CSS in HTML, HTML in PHP) sono gestiti.
 - **Autosuggest**: popup con membri dopo `->`, `::` e `.`, simboli del file, dei file inclusi
-  e della libreria standard (PHP, C, C++, Python, JavaScript/TypeScript, Go, Rust, Java), parole degli altri
+  e della libreria standard (PHP, C, C++, Python, JavaScript/TypeScript, Go, Rust, Java, C#), parole degli altri
   buffer, parole chiave e snippet. Ogni riga mostra la firma completa con i parametri e una
   lettera per il tipo (`f` funzione, `c` classe, `m` metodo, `p` attributo, `k` costante,
   `v` variabile locale). Dentro una chiamata hanno la precedenza le variabili locali e i
@@ -198,6 +198,16 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
     cartella di `settings.gradle`, `pom.xml` o `build.gradle` più esterna. Dopo il nome di un enum si
     propongono le sue costanti (`Color.RED`); `import static java.lang.Math.max;` (o `Classe.*`) rende
     il membro suggeribile senza la classe.
+  - In C#, scegliendo un tipo (`Regex`, `Regex.IsMatch`, `StringBuilder`) si aggiunge `using
+    System.Text.RegularExpressions;` in ordine con i `System` per primi, nel blocco di `using` che ha già
+    lo stesso primo segmento (anche dentro `namespace X { }`, con la sua indentazione). Non si aggiunge
+    se il progetto lo dà già: gli using impliciti del `.csproj` o di `Directory.Build.props`
+    (`<ImplicitUsings>enable</ImplicitUsings>`: `System`, `System.IO`, `System.Linq`,
+    `System.Collections.Generic`, …), i suoi `<Using Include="…"/>`, i `global using` dei file
+    `*Using*.cs` del progetto, o il namespace del file e quelli che lo contengono. I tipi degli altri
+    namespace del progetto si propongono col loro `using`; da un altro progetto solo quelli `public` e
+    solo se raggiungibili coi `<ProjectReference>`. La radice è il repository Git o la cartella della
+    `.sln`. Le costanti degli `enum` sono loro membri.
   - In PHP, scegliendo un metodo o una costante dopo `Nome::` (`Route::get`, `User::find`) si aggiunge
     `use` della classe se manca (alias di `config/app.php`, poi le classi del progetto e di `vendor`).
     Con Composer, le funzioni e costanti dei file di `"autoload": {"files"}` vengono proposte, e per

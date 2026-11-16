@@ -1,0 +1,568 @@
+// C# / .NET base library: the most used types of System, System.Collections.Generic, System.Linq,
+// System.IO, System.Text and a few more. Curated. A section's line "@System.Collections.Generic"
+// is the namespace that accepting it, or a member after "List.", adds as "using ...;" (unless
+// the project's implicit usings or a global using give it). The LINQ methods are listed under
+// IEnumerable, where they are written.
+#Object
+@System
+Equals(object obj)>bool
+GetHashCode()>int
+GetType()>Type
+ToString()>string
+#String
+@System
+Length:int
+Contains(string value)>bool
+StartsWith(string value)>bool
+EndsWith(string value)>bool
+IndexOf(string value)>int
+LastIndexOf(string value)>int
+Substring(int startIndex, int length)>string
+Replace(string oldValue, string newValue)>string
+Split(char separator)>string[]
+Trim()>string
+TrimStart()>string
+TrimEnd()>string
+ToLower()>string
+ToUpper()>string
+ToLowerInvariant()>string
+ToUpperInvariant()>string
+PadLeft(int totalWidth)>string
+PadRight(int totalWidth)>string
+Insert(int startIndex, string value)>string
+Remove(int startIndex, int count)>string
+ToCharArray()>char[]
+Equals(string value, StringComparison comparisonType)>bool
+CompareTo(string strB)>int
+Format(string format, params object[] args)>string
+Join(string separator, IEnumerable values)>string
+Concat(params string[] values)>string
+IsNullOrEmpty(string value)>bool
+IsNullOrWhiteSpace(string value)>bool
+Compare(string strA, string strB)>int
+Empty:string
+#string:String
+#Console
+@System
+WriteLine(object value)>void
+Write(object value)>void
+ReadLine()>string
+ReadKey()>ConsoleKeyInfo
+Clear()>void
+ForegroundColor:ConsoleColor
+BackgroundColor:ConsoleColor
+Out:TextWriter
+Error:TextWriter
+#Math
+@System
+Abs(double value)>double
+Max(double val1, double val2)>double
+Min(double val1, double val2)>double
+Pow(double x, double y)>double
+Sqrt(double d)>double
+Floor(double d)>double
+Ceiling(double d)>double
+Round(double a, int digits)>double
+Clamp(double value, double min, double max)>double
+Sin(double a)>double
+Cos(double a)>double
+Log(double a)>double
+PI:double
+E:double
+#Convert
+@System
+ToInt32(object value)>int
+ToInt64(object value)>long
+ToDouble(object value)>double
+ToDecimal(object value)>decimal
+ToBoolean(object value)>bool
+ToString(object value)>string
+ToBase64String(byte[] inArray)>string
+FromBase64String(string s)>byte[]
+#Int32
+@System
+Parse(string s)>int
+TryParse(string s, out int result)>bool
+MaxValue:int
+MinValue:int
+#int:Int32
+#Int64
+@System
+Parse(string s)>long
+TryParse(string s, out long result)>bool
+MaxValue:long
+MinValue:long
+#long:Int64
+#Double
+@System
+Parse(string s)>double
+TryParse(string s, out double result)>bool
+IsNaN(double d)>bool
+MaxValue:double
+MinValue:double
+#double:Double
+#Decimal
+@System
+Parse(string s)>decimal
+TryParse(string s, out decimal result)>bool
+Round(decimal d, int decimals)>decimal
+#decimal:Decimal
+#Boolean
+@System
+Parse(string value)>bool
+TryParse(string value, out bool result)>bool
+#bool:Boolean
+#Char
+@System
+IsDigit(char c)>bool
+IsLetter(char c)>bool
+IsLetterOrDigit(char c)>bool
+IsWhiteSpace(char c)>bool
+IsUpper(char c)>bool
+IsLower(char c)>bool
+ToUpper(char c)>char
+ToLower(char c)>char
+#char:Char
+#DateTime
+@System
+Now:DateTime
+UtcNow:DateTime
+Today:DateTime
+Year:int
+Month:int
+Day:int
+Hour:int
+Minute:int
+Second:int
+DayOfWeek:DayOfWeek
+Date:DateTime
+AddDays(double value)>DateTime
+AddHours(double value)>DateTime
+AddMinutes(double value)>DateTime
+AddMonths(int months)>DateTime
+AddYears(int value)>DateTime
+Subtract(DateTime value)>TimeSpan
+ToString(string format)>string
+Parse(string s)>DateTime
+TryParse(string s, out DateTime result)>bool
+#DateTimeOffset
+@System
+Now:DateTimeOffset
+UtcNow:DateTimeOffset
+ToUnixTimeSeconds()>long
+FromUnixTimeSeconds(long seconds)>DateTimeOffset
+#TimeSpan
+@System
+FromSeconds(double value)>TimeSpan
+FromMilliseconds(double value)>TimeSpan
+FromMinutes(double value)>TimeSpan
+FromHours(double value)>TimeSpan
+FromDays(double value)>TimeSpan
+TotalSeconds:double
+TotalMilliseconds:double
+TotalMinutes:double
+Zero:TimeSpan
+#Guid
+@System
+NewGuid()>Guid
+Parse(string input)>Guid
+TryParse(string input, out Guid result)>bool
+Empty:Guid
+ToString()>string
+#Environment
+@System
+GetEnvironmentVariable(string variable)>string
+Exit(int exitCode)>void
+NewLine:string
+CurrentDirectory:string
+ProcessorCount:int
+MachineName:string
+GetCommandLineArgs()>string[]
+#Random
+@System
+Next(int maxValue)>int
+NextDouble()>double
+Shared:Random
+#Array
+@System
+Sort(Array array)>void
+Reverse(Array array)>void
+IndexOf(Array array, object value)>int
+Resize(ref T[] array, int newSize)>void
+Empty()>T[]
+Length:int
+#Exception
+@System
+Message:string
+InnerException:Exception
+StackTrace:string
+#ArgumentException:Exception
+@System
+#ArgumentNullException:ArgumentException
+@System
+ThrowIfNull(object argument)>void
+#ArgumentOutOfRangeException:ArgumentException
+@System
+#InvalidOperationException:Exception
+@System
+#NotImplementedException:Exception
+@System
+#NotSupportedException:Exception
+@System
+#NullReferenceException:Exception
+@System
+#Lazy
+@System
+Value:T
+IsValueCreated:bool
+#Nullable
+@System
+HasValue:bool
+Value:T
+GetValueOrDefault()>T
+#IEnumerable
+@System.Collections.Generic
+GetEnumerator()>IEnumerator
+Where(Func predicate)>IEnumerable
+Select(Func selector)>IEnumerable
+SelectMany(Func selector)>IEnumerable
+OrderBy(Func keySelector)>IOrderedEnumerable
+OrderByDescending(Func keySelector)>IOrderedEnumerable
+GroupBy(Func keySelector)>IEnumerable
+First()>T
+FirstOrDefault()>T
+Last()>T
+LastOrDefault()>T
+Single()>T
+SingleOrDefault()>T
+Any(Func predicate)>bool
+All(Func predicate)>bool
+Count()>int
+Sum(Func selector)>int
+Average(Func selector)>double
+Min()>T
+Max()>T
+Distinct()>IEnumerable
+Skip(int count)>IEnumerable
+Take(int count)>IEnumerable
+Concat(IEnumerable second)>IEnumerable
+Contains(T value)>bool
+Aggregate(Func func)>T
+Zip(IEnumerable second)>IEnumerable
+ToList()>List
+ToArray()>T[]
+ToDictionary(Func keySelector)>Dictionary
+ToHashSet()>HashSet
+#IOrderedEnumerable:IEnumerable
+@System.Linq
+ThenBy(Func keySelector)>IOrderedEnumerable
+ThenByDescending(Func keySelector)>IOrderedEnumerable
+#ICollection:IEnumerable
+@System.Collections.Generic
+Count:int
+Add(T item)>void
+Remove(T item)>bool
+Clear()>void
+Contains(T item)>bool
+#IList:ICollection
+@System.Collections.Generic
+IndexOf(T item)>int
+Insert(int index, T item)>void
+RemoveAt(int index)>void
+#List:IList
+@System.Collections.Generic
+AddRange(IEnumerable collection)>void
+InsertRange(int index, IEnumerable collection)>void
+RemoveAll(Predicate match)>int
+RemoveRange(int index, int count)>void
+Find(Predicate match)>T
+FindAll(Predicate match)>List
+FindIndex(Predicate match)>int
+Exists(Predicate match)>bool
+ForEach(Action action)>void
+Sort()>void
+Reverse()>void
+BinarySearch(T item)>int
+GetRange(int index, int count)>List
+Capacity:int
+#IDictionary:ICollection
+@System.Collections.Generic
+Keys:ICollection
+Values:ICollection
+ContainsKey(TKey key)>bool
+TryGetValue(TKey key, out TValue value)>bool
+Add(TKey key, TValue value)>void
+Remove(TKey key)>bool
+#Dictionary:IDictionary
+@System.Collections.Generic
+ContainsValue(TValue value)>bool
+TryAdd(TKey key, TValue value)>bool
+GetValueOrDefault(TKey key)>TValue
+#KeyValuePair
+@System.Collections.Generic
+Key:TKey
+Value:TValue
+#HashSet:ICollection
+@System.Collections.Generic
+UnionWith(IEnumerable other)>void
+IntersectWith(IEnumerable other)>void
+ExceptWith(IEnumerable other)>void
+IsSubsetOf(IEnumerable other)>bool
+Overlaps(IEnumerable other)>bool
+#Queue:IEnumerable
+@System.Collections.Generic
+Count:int
+Enqueue(T item)>void
+Dequeue()>T
+Peek()>T
+TryDequeue(out T result)>bool
+Clear()>void
+#Stack:IEnumerable
+@System.Collections.Generic
+Count:int
+Push(T item)>void
+Pop()>T
+Peek()>T
+TryPop(out T result)>bool
+Clear()>void
+#SortedDictionary:IDictionary
+@System.Collections.Generic
+#LinkedList:ICollection
+@System.Collections.Generic
+AddFirst(T value)>LinkedListNode
+AddLast(T value)>LinkedListNode
+RemoveFirst()>void
+RemoveLast()>void
+First:LinkedListNode
+Last:LinkedListNode
+#Enumerable
+@System.Linq
+Range(int start, int count)>IEnumerable
+Repeat(T element, int count)>IEnumerable
+Empty()>IEnumerable
+#ConcurrentDictionary:IDictionary
+@System.Collections.Concurrent
+GetOrAdd(TKey key, Func valueFactory)>TValue
+AddOrUpdate(TKey key, TValue addValue, Func updateValueFactory)>TValue
+TryRemove(TKey key, out TValue value)>bool
+#File
+@System.IO
+ReadAllText(string path)>string
+ReadAllLines(string path)>string[]
+ReadAllBytes(string path)>byte[]
+ReadAllTextAsync(string path)>Task
+ReadLines(string path)>IEnumerable
+WriteAllText(string path, string contents)>void
+WriteAllLines(string path, IEnumerable contents)>void
+WriteAllBytes(string path, byte[] bytes)>void
+WriteAllTextAsync(string path, string contents)>Task
+AppendAllText(string path, string contents)>void
+Exists(string path)>bool
+Delete(string path)>void
+Copy(string sourceFileName, string destFileName)>void
+Move(string sourceFileName, string destFileName)>void
+OpenRead(string path)>FileStream
+OpenWrite(string path)>FileStream
+#Directory
+@System.IO
+Exists(string path)>bool
+CreateDirectory(string path)>DirectoryInfo
+Delete(string path, bool recursive)>void
+GetFiles(string path, string searchPattern)>string[]
+GetDirectories(string path)>string[]
+EnumerateFiles(string path, string searchPattern)>IEnumerable
+GetCurrentDirectory()>string
+#Path
+@System.IO
+Combine(params string[] paths)>string
+GetFileName(string path)>string
+GetFileNameWithoutExtension(string path)>string
+GetExtension(string path)>string
+GetDirectoryName(string path)>string
+GetFullPath(string path)>string
+GetTempPath()>string
+GetTempFileName()>string
+ChangeExtension(string path, string extension)>string
+DirectorySeparatorChar:char
+#FileInfo
+@System.IO
+Name:string
+FullName:string
+Length:long
+Exists:bool
+Extension:string
+Directory:DirectoryInfo
+Delete()>void
+#DirectoryInfo
+@System.IO
+Name:string
+FullName:string
+Exists:bool
+GetFiles()>FileInfo[]
+GetDirectories()>DirectoryInfo[]
+Create()>void
+#StreamReader
+@System.IO
+ReadLine()>string
+ReadToEnd()>string
+ReadLineAsync()>Task
+ReadToEndAsync()>Task
+EndOfStream:bool
+Dispose()>void
+#StreamWriter
+@System.IO
+Write(string value)>void
+WriteLine(string value)>void
+WriteAsync(string value)>Task
+WriteLineAsync(string value)>Task
+Flush()>void
+Dispose()>void
+#Stream
+@System.IO
+Read(byte[] buffer, int offset, int count)>int
+Write(byte[] buffer, int offset, int count)>void
+CopyTo(Stream destination)>void
+CopyToAsync(Stream destination)>Task
+Seek(long offset, SeekOrigin origin)>long
+Length:long
+Position:long
+Dispose()>void
+#FileStream:Stream
+@System.IO
+#MemoryStream:Stream
+@System.IO
+ToArray()>byte[]
+#IOException:Exception
+@System.IO
+#StringBuilder
+@System.Text
+Append(object value)>StringBuilder
+AppendLine(string value)>StringBuilder
+AppendFormat(string format, params object[] args)>StringBuilder
+Insert(int index, string value)>StringBuilder
+Remove(int startIndex, int length)>StringBuilder
+Replace(string oldValue, string newValue)>StringBuilder
+Clear()>StringBuilder
+ToString()>string
+Length:int
+#Encoding
+@System.Text
+UTF8:Encoding
+ASCII:Encoding
+Unicode:Encoding
+GetBytes(string s)>byte[]
+GetString(byte[] bytes)>string
+#Regex
+@System.Text.RegularExpressions
+IsMatch(string input, string pattern)>bool
+Match(string input, string pattern)>Match
+Matches(string input, string pattern)>MatchCollection
+Replace(string input, string pattern, string replacement)>string
+Split(string input, string pattern)>string[]
+Escape(string str)>string
+#Match
+@System.Text.RegularExpressions
+Success:bool
+Value:string
+Groups:GroupCollection
+Index:int
+NextMatch()>Match
+#JsonSerializer
+@System.Text.Json
+Serialize(object value)>string
+Deserialize(string json)>T
+SerializeAsync(Stream utf8Json, object value)>Task
+DeserializeAsync(Stream utf8Json)>ValueTask
+#Task
+@System.Threading.Tasks
+Run(Func function)>Task
+Delay(int millisecondsDelay)>Task
+WhenAll(params Task[] tasks)>Task
+WhenAny(params Task[] tasks)>Task
+FromResult(T result)>Task
+CompletedTask:Task
+Wait()>void
+ContinueWith(Action continuationAction)>Task
+ConfigureAwait(bool continueOnCapturedContext)>ConfiguredTaskAwaitable
+Result:T
+IsCompleted:bool
+#ValueTask
+@System.Threading.Tasks
+AsTask()>Task
+Result:T
+#Parallel
+@System.Threading.Tasks
+For(int fromInclusive, int toExclusive, Action body)>ParallelLoopResult
+ForEach(IEnumerable source, Action body)>ParallelLoopResult
+ForEachAsync(IEnumerable source, Func body)>Task
+#Thread
+@System.Threading
+Sleep(int millisecondsTimeout)>void
+Start()>void
+Join()>void
+CurrentThread:Thread
+ManagedThreadId:int
+#CancellationToken
+@System.Threading
+IsCancellationRequested:bool
+ThrowIfCancellationRequested()>void
+None:CancellationToken
+#CancellationTokenSource
+@System.Threading
+Token:CancellationToken
+Cancel()>void
+CancelAfter(int millisecondsDelay)>void
+Dispose()>void
+#Interlocked
+@System.Threading
+Increment(ref int location)>int
+Decrement(ref int location)>int
+Exchange(ref int location1, int value)>int
+CompareExchange(ref int location1, int value, int comparand)>int
+#SemaphoreSlim
+@System.Threading
+WaitAsync()>Task
+Release()>int
+#HttpClient
+@System.Net.Http
+GetAsync(string requestUri)>Task
+GetStringAsync(string requestUri)>Task
+PostAsync(string requestUri, HttpContent content)>Task
+PutAsync(string requestUri, HttpContent content)>Task
+DeleteAsync(string requestUri)>Task
+SendAsync(HttpRequestMessage request)>Task
+BaseAddress:Uri
+DefaultRequestHeaders:HttpRequestHeaders
+Timeout:TimeSpan
+#HttpResponseMessage
+@System.Net.Http
+StatusCode:HttpStatusCode
+IsSuccessStatusCode:bool
+Content:HttpContent
+EnsureSuccessStatusCode()>HttpResponseMessage
+#Stopwatch
+@System.Diagnostics
+StartNew()>Stopwatch
+Start()>void
+Stop()>void
+Restart()>void
+Elapsed:TimeSpan
+ElapsedMilliseconds:long
+#Debug
+@System.Diagnostics
+WriteLine(string message)>void
+Assert(bool condition)>void
+#Process
+@System.Diagnostics
+Start(string fileName, string arguments)>Process
+GetCurrentProcess()>Process
+WaitForExit()>void
+Kill()>void
+ExitCode:int
+Id:int
+#CultureInfo
+@System.Globalization
+InvariantCulture:CultureInfo
+CurrentCulture:CultureInfo
+GetCultureInfo(string name)>CultureInfo
+Name:string

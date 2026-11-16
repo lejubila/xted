@@ -637,6 +637,18 @@ static const char *const lang_csharp[] = {
     "number",
     "calls function",
     "operators +-*/%=<>!&|^~?:",
+    "member .",
+    "decl ns namespace &",
+    "decl class public|private|protected|internal|static|abstract|sealed|partial|readonly|unsafe|file|ref* class|struct|interface|enum|record @ <> : %",
+    "decl class public|private|protected|internal|static|abstract|sealed|partial|readonly|unsafe|file|ref* class|struct|interface|enum|record @",
+    "decl func public|private|protected|internal|static|virtual|override|abstract|async|sealed|extern|unsafe|new|partial|readonly* <> % @ <> ( ^",
+    "decl method public|private|protected|internal|static* @ ( ^",
+    "decl prop public|private|protected|internal|static|virtual|override|abstract|required|readonly|new|const|volatile|event* % @ =;|=|{|,|=>",
+    "include new %",
+    "attr this . @ =",
+    "bind var @ = new %",
+    "bind var @ = % (",
+    "bind % @ =;|=|,|)",
     NULL
 };
 

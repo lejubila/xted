@@ -1127,7 +1127,7 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
         resolve_aliases(x, b, B.r, B.nr);
         facade_targets(x, b);
     }
-    if (B.nr > 0 && strcmp(syn_name(syn), "Java") == 0)
+    if (B.nr > 0 && (strcmp(syn_name(syn), "Java") == 0 || strcmp(syn_name(syn), "C#") == 0))
         java_enums(x, b);
     x->gen = b->gen;
     return x;
@@ -1135,8 +1135,8 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
 
 /* ---- cache -------------------------------------------------------------- */
 
-enum { LIB_PHP, LIB_C, LIB_CPP, LIB_PY, LIB_JS, LIB_GO, LIB_RUST, LIB_JAVA, LIB_N };
-static const char *const lib_ids[LIB_N] = { "php", "c", "cpp", "py", "js", "go", "rust", "java" };
+enum { LIB_PHP, LIB_C, LIB_CPP, LIB_PY, LIB_JS, LIB_GO, LIB_RUST, LIB_JAVA, LIB_CS, LIB_N };
+static const char *const lib_ids[LIB_N] = { "php", "c", "cpp", "py", "js", "go", "rust", "java", "cs" };
 
 #define CACHE_MAX 48
 #define SET_MAX 40
@@ -1189,6 +1189,10 @@ struct SymCache {
     struct JMod { char *dir, *name, *parent, *deps, *tdeps; int ok, gradle; } *jm;  /* Java: the build's modules */
     size_t njm;
     int jm_done;
+    struct CsProj { char *dir, *refs, *usings; int implicit, ok; } *csp;  /* C#: the .csproj files */
+    size_t ncsp;
+    int cs_done;
+    char *cs_glob;                  /* C#: the global usings of the project (" A B ") */
 };
 
 /* A header of the project, kept while its modification time is the same: only what a file that
@@ -1261,6 +1265,17 @@ static void free_project(SymCache *c)
     c->jm = NULL;
     c->njm = 0;
     c->jm_done = 0;
+    for (i = 0; i < c->ncsp; i++) {
+        free(c->csp[i].dir);
+        free(c->csp[i].refs);
+        free(c->csp[i].usings);
+    }
+    free(c->csp);
+    free(c->cs_glob);
+    c->csp = NULL;
+    c->cs_glob = NULL;
+    c->ncsp = 0;
+    c->cs_done = 0;
     files_scan_free(c->files_fs);
     files_scan_free(c->cl_fs);
     if (c->cl_file)
@@ -1354,6 +1369,34 @@ static void set_root(SymCache *c, const char *key)
                 }
                 if (dir[0] == '\0')
                     break;
+            }
+        }
+        /* no repository nor build: the folder of a .NET solution (.sln), else of a .csproj */
+        if (!found[0]) {
+            int pass;
+
+            for (pass = 0; pass < 2 && !found[0]; pass++) {
+                snprintf(dir, sizeof dir, "%s", key);
+                while (!found[0] && (sl = strrchr(dir, '/')) != NULL) {
+                    DIR *d;
+                    struct dirent *de;
+
+                    *sl = '\0';
+                    if ((d = opendir(dir[0] ? dir : "/")) != NULL) {
+                        while ((de = readdir(d)) != NULL) {
+                            size_t n = strlen(de->d_name);
+
+                            if ((pass == 0 && n > 4 && strcmp(de->d_name + n - 4, ".sln") == 0) ||
+                                (pass == 1 && n > 7 && strcmp(de->d_name + n - 7, ".csproj") == 0)) {
+                                snprintf(found, sizeof found, "%s", dir);
+                                break;
+                            }
+                        }
+                        closedir(d);
+                    }
+                    if (dir[0] == '\0')
+                        break;
+                }
             }
         }
     }
@@ -2061,6 +2104,29 @@ static void env_includes(SymCache *c, Env *e, size_t k)
     }
 }
 
+/* The clause kw ("package ", "namespace ") of a file, read from its first lines; "" if none. */
+static void file_clause(const char *path, const char *kw, char *out, size_t n)
+{
+    FILE *f = fopen(path, "r");
+    char line[256];
+    int k;
+    size_t kl = strlen(kw);
+
+    out[0] = '\0';
+    if (!f)
+        return;
+    for (k = 0; k < 60 && fgets(line, sizeof line, f); k++)
+        if (strncmp(line, kw, kl) == 0) {
+            size_t e = kl;
+
+            while (line[e] && (isalnum((unsigned char)line[e]) || line[e] == '_' || line[e] == '.'))
+                e++;
+            put(out, n, line + kl, e - kl);
+            break;
+        }
+    fclose(f);
+}
+
 /* The package clause of a Go file ("main"), read from its first lines; "" if none. */
 static void go_package(const char *path, char *out, size_t n)
 {
@@ -2083,10 +2149,11 @@ static void go_package(const char *path, char *out, size_t n)
     fclose(f);
 }
 
-/* Go and Java: the other files (.go, .java) of the folder of cur that belong to its package (in
- * Go tests only for a test file), read again after two seconds. */
+/* Go, Java and C#: the other files (.go, .java, .cs) of the folder of cur that belong to its
+ * package or namespace (in Go tests only for a test file), read again after two seconds. */
 static void go_siblings(SymCache *c, const Doc *cur, const char *ext)
 {
+    const char *kw = strcmp(ext, ".cs") == 0 ? "namespace " : "package ";
     char dir[PATH_MAX], pkg[PM_NAME], *sl;
     DIR *d;
     struct dirent *de;
@@ -2106,12 +2173,14 @@ static void go_siblings(SymCache *c, const Doc *cur, const char *ext)
     for (i = 0; i < cur->buf.nlines && i < 60; i++) {
         const Line *l = &cur->buf.lines[i];
 
-        if (l->len > 8 && strncmp(l->s, "package ", 8) == 0) {
-            size_t e = 8;
+        size_t kl = strlen(kw);
+
+        if (l->len > kl && strncmp(l->s, kw, kl) == 0) {
+            size_t e = kl;
 
             while (e < l->len && (isalnum((unsigned char)l->s[e]) || l->s[e] == '_' || l->s[e] == '.'))
                 e++;
-            put(pkg, sizeof pkg, l->s + 8, e - 8);
+            put(pkg, sizeof pkg, l->s + kl, e - kl);
             break;
         }
     }
@@ -2136,7 +2205,7 @@ static void go_siblings(SymCache *c, const Doc *cur, const char *ext)
         if (!test && n > 8 && strcmp(de->d_name + n - 8, "_test.go") == 0)
             continue;
         snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
-        go_package(path, other, sizeof other);
+        file_clause(path, kw, other, sizeof other);
         if (strcmp(other, pkg) != 0)
             continue;
         c->gsib = xrealloc(c->gsib, (c->ngsib + 1) * sizeof *c->gsib);
@@ -2168,6 +2237,8 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
         e->lib[e->nlib++] = lib_get(c, LIB_RUST);
     } else if (strcmp(lang, "Java") == 0) {
         e->lib[e->nlib++] = lib_get(c, LIB_JAVA);
+    } else if (strcmp(lang, "C#") == 0) {
+        e->lib[e->nlib++] = lib_get(c, LIB_CS);
     } else if (strcmp(lang, "C") == 0) {
         if (sym_is_cxx(cur))
             e->lib[e->nlib++] = lib_get(c, LIB_CPP);
@@ -2180,9 +2251,9 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
             env_add(e, index_of_doc(c, docs[i]), 1);
             others++;
         }
-    if (strcmp(lang, "Go") == 0 || strcmp(lang, "Java") == 0) {
+    if (strcmp(lang, "Go") == 0 || strcmp(lang, "Java") == 0 || strcmp(lang, "C#") == 0) {
         /* one package is one folder: its other files are visible without an import */
-        go_siblings(c, cur, lang[0] == 'G' ? ".go" : ".java");
+        go_siblings(c, cur, lang[0] == 'G' ? ".go" : lang[0] == 'J' ? ".java" : ".cs");
         for (i = 0; i < c->ngsib; i++) {
             char *real = realpath(c->gsib[i], NULL);
 
@@ -3168,6 +3239,32 @@ int sym_members(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y,
     resolve_chain(&e, cur, y, sep, t, sizeof t);
     if (t[0] && env_members(&e, t, fn, ctx, 0))
         return 1;
+    if (strcmp(syn_name(cur->syn), "C#") == 0 || strcmp(syn_name(cur->syn), "Java") == 0) {
+        /* a type not loaded yet (C# imports namespaces, not files; a Java class not imported yet)
+         * is looked for by its file (TextUtils.cs), from the type found or the word before the dot */
+        const char *ext = syn_name(cur->syn)[0] == 'C' ? "cs" : "java";
+        char w[PM_NAME], *f;
+        const Line *l = &cur->buf.lines[y];
+        size_t st = sep;
+
+        if (t[0]) {
+            put(w, sizeof w, t, strlen(t));
+        } else {
+            while (st > 0 && (isalnum((unsigned char)l->s[st - 1]) || l->s[st - 1] == '_'))
+                st--;
+            put(w, sizeof w, l->s + st, sep - st);
+        }
+        if (isupper((unsigned char)w[0]) && (f = find_class_file(c, w, ext)) != NULL) {
+            size_t k = e.n;
+
+            env_add(&e, index_of_path(c, f), 1);
+            free(f);
+            for (; k < e.n; k++)
+                env_includes(c, &e, k);
+            if (env_members(&e, w, fn, ctx, 0))
+                return 1;
+        }
+    }
     /* Go: a package of the module (store.Open), a plain word before the dot */
     if (!t[0] && strcmp(syn_name(cur->syn), "Go") == 0) {
         const Line *l = &cur->buf.lines[y];
@@ -4022,6 +4119,96 @@ static void java_exports(const Buffer *b, struct Hdr *h)
     }
 }
 
+/* The types a C# file declares in its namespaces (not nested in another type), each with its
+ * namespace; def is 1 for a public one (internal ones are seen only inside their project). */
+static void cs_exports(const Buffer *b, struct Hdr *h)
+{
+    size_t y;
+    char ns[PM_PATH] = "";
+    int depth = 0, ns_depth = 0, cmt = 0;
+
+    for (y = 0; y < b->nlines; y++) {
+        const char *s = b->lines[y].s;
+        size_t len = b->lines[y].len, i = 0, e, k;
+        int pub = 0, at = depth;
+
+        while (i < len && (s[i] == ' ' || s[i] == '\t'))
+            i++;
+        if (!cmt && js_word(s, len, &i, "namespace")) {
+            for (e = i; e < len && s[e] != ';' && s[e] != ' ' && s[e] != '{'; e++)
+                ;
+            put(ns, sizeof ns, s + i, e - i);
+            ns_depth = memchr(s + e, ';', len - e) ? depth : depth + 1;
+        } else if (!cmt && at == ns_depth) {
+            for (;;) {
+                if (js_word(s, len, &i, "public"))
+                    pub = 1;
+                else if (!(js_word(s, len, &i, "internal") || js_word(s, len, &i, "static") ||
+                           js_word(s, len, &i, "abstract") || js_word(s, len, &i, "sealed") ||
+                           js_word(s, len, &i, "partial") || js_word(s, len, &i, "readonly") ||
+                           js_word(s, len, &i, "unsafe") || js_word(s, len, &i, "ref")))
+                    break;
+            }
+            if (js_word(s, len, &i, "class") || js_word(s, len, &i, "struct") || js_word(s, len, &i, "interface") ||
+                js_word(s, len, &i, "enum") || js_word(s, len, &i, "record")) {
+                js_word(s, len, &i, "struct");          /* record struct */
+                js_word(s, len, &i, "class");           /* record class */
+                e = js_ident(s, len, i);
+                if (e > i) {
+                    hsym_add(h, s + i, e - i, RULE_CLASS, "", 0, pub);
+                    if (ns[0])
+                        h->v[h->n - 1].ns = xstrdup(ns);
+                }
+            }
+        }
+        /* the braces of the line, outside strings and comments */
+        for (k = 0; k < len; k++) {
+            if (cmt) {
+                if (s[k] == '*' && k + 1 < len && s[k + 1] == '/')
+                    cmt = 0, k++;
+                continue;
+            }
+            if (s[k] == '/' && k + 1 < len && s[k + 1] == '/')
+                break;
+            if (s[k] == '/' && k + 1 < len && s[k + 1] == '*') {
+                cmt = 1;
+                k++;
+            } else if (s[k] == '"' || s[k] == '\'') {
+                char q = s[k];
+
+                for (k++; k < len && s[k] != q; k++)
+                    if (s[k] == '\\')
+                        k++;
+            } else if (s[k] == '{') {
+                depth++;
+            } else if (s[k] == '}' && depth > 0) {
+                depth--;
+            }
+        }
+    }
+}
+
+/* The namespace of a C# document (the first namespace line), "" for the global one. */
+static void cs_namespace(const Buffer *b, char *out, size_t n)
+{
+    size_t y;
+
+    out[0] = '\0';
+    for (y = 0; y < b->nlines && y < 200; y++) {
+        const Line *l = &b->lines[y];
+        size_t i = y == 0 && l->len >= 3 && memcmp(l->s, "\xef\xbb\xbf", 3) == 0 ? 3 : 0, e;
+
+        while (i < l->len && (l->s[i] == ' ' || l->s[i] == '\t'))
+            i++;
+        if (l->len - i > 10 && memcmp(l->s + i, "namespace ", 10) == 0) {
+            for (e = i + 10; e < l->len && l->s[e] != ';' && l->s[e] != ' ' && l->s[e] != '{'; e++)
+                ;
+            put(out, n, l->s + i + 10, e - i - 10);
+            return;
+        }
+    }
+}
+
 /* The package of a Java document ("com.acme.app"), "" for the default one. */
 static void java_package(const Buffer *b, char *out, size_t n)
 {
@@ -4167,7 +4354,8 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
     if (stat(real, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > HDR_BYTES)
         return h;
     js = is_js_module(real) ? 1 : strcmp(ext_of(real), "py") == 0 ? 2 : strcmp(ext_of(real), "php") == 0 ? 3 :
-         strcmp(ext_of(real), "rs") == 0 ? 4 : strcmp(ext_of(real), "java") == 0 ? 5 : 0;
+         strcmp(ext_of(real), "rs") == 0 ? 4 : strcmp(ext_of(real), "java") == 0 ? 5 :
+         strcmp(ext_of(real), "cs") == 0 ? 6 : 0;
     if (h && h->mtime == (long)st.st_mtime && h->size == (long)st.st_size) {
         h->checked = now;
         return h;
@@ -4217,6 +4405,8 @@ static struct Hdr *hdr_get(SymCache *c, const char *real)
         rust_exports(&b, h);
     else if (js == 5)
         java_exports(&b, h);
+    else if (js == 6)
+        cs_exports(&b, h);
     buf_free(&b);
     for (i = 0; x && i < x->n && h->n < HDR_SYMS; i++) {
         const Sym *s = &x->v[i];
@@ -5112,6 +5302,373 @@ static void java_project(SymCache *c, Doc *cur, Env *e, HdrFn fn, void *ctx)
     }
 }
 
+/* "a/b/../c/" from the folder dir and a path written in a .csproj (..\\Core\\Core.csproj): the
+ * folder of that file, relative to the root, with a final "/". */
+static void cs_ref_dir(const char *dir, const char *inc, size_t il, char *out, size_t n)
+{
+    char t[PATH_MAX], *parts[128], *p;
+    size_t np = 0, i, o = 0;
+
+    snprintf(t, sizeof t, "%s%.*s", dir, (int)il, inc);
+    for (p = t; *p; p++)
+        if (*p == '\\')
+            *p = '/';
+    if ((p = strrchr(t, '/')) != NULL)
+        p[1] = '\0';                        /* the folder of the .csproj */
+    else
+        t[0] = '\0';
+    for (p = strtok(t, "/"); p && np < 128; p = strtok(NULL, "/")) {
+        if (strcmp(p, ".") == 0)
+            continue;
+        if (strcmp(p, "..") == 0) {
+            if (np)
+                np--;
+            continue;
+        }
+        parts[np++] = p;
+    }
+    out[0] = '\0';
+    for (i = 0; i < np && o + strlen(parts[i]) + 2 < n; i++)
+        o += (size_t)snprintf(out + o, n - o, "%s/", parts[i]);
+}
+
+/* The usings a .csproj or Directory.Build.props declares (<Using Include="Xunit" />, not those
+ * with Remove), appended to us as " Xunit ". */
+static void cs_item_usings(const char *t, SBuf *us)
+{
+    const char *p;
+
+    for (p = strstr(t, "<Using "); p; p = strstr(p + 1, "<Using ")) {
+        const char *a = strstr(p, "Include=\"");
+        const char *gt = strchr(p, '>'), *z;
+
+        if (!a || (gt && a > gt) || (z = strchr(a + 9, '"')) == NULL)
+            continue;
+        sbuf_add(us, a + 9, (size_t)(z - a - 9));
+        sbuf_adds(us, " ");
+    }
+}
+
+/* The global usings of a .cs file ("global using X;", not static nor aliases), appended to us. */
+static void cs_global_usings(const char *t, SBuf *us)
+{
+    const char *p;
+
+    for (p = strstr(t, "global using "); p; p = strstr(p + 13, "global using ")) {
+        const char *q = p + 13, *z = q;
+
+        if (strncmp(q, "static ", 7) == 0)
+            continue;
+        while (*z && *z != ';' && *z != ' ' && *z != '=')
+            z++;
+        if (*z == ';') {
+            sbuf_add(us, q, (size_t)(z - q));
+            sbuf_adds(us, " ");
+        }
+    }
+}
+
+static long cs_project_of(const SymCache *c, const char *rel);
+
+/* C#: the projects (.csproj) with their implicit usings, their usings (<Using Include>, those of
+ * the nearest Directory.Build.props above them, the global usings of their files whose name has
+ * "Using") and the folders of the projects they reference. */
+static void cs_projects(SymCache *c)
+{
+    size_t i, k;
+    struct { char *dir, *usings; int implicit; } *props = NULL;
+    size_t nprops = 0;
+
+    if (c->cs_done)
+        return;
+    c->cs_done = 1;
+    for (i = 0; i < c->nfiles; i++) {
+        const char *rel = c->files[i], *base = strrchr(rel, '/');
+        char path[PATH_MAX], *t, *p;
+        SBuf refs = SBUF_INIT, us = SBUF_INIT;
+        struct CsProj *m;
+
+        base = base ? base + 1 : rel;
+        if (strcmp(base, "Directory.Build.props") == 0 && nprops < 64) {
+            rooted(c, path, sizeof path, rel);
+            if ((t = read_small(path)) != NULL) {
+                sbuf_adds(&us, " ");
+                cs_item_usings(t, &us);
+                sbuf_add(&us, "", 1);
+                props = xrealloc(props, (nprops + 1) * sizeof *props);
+                props[nprops].dir = xstrndup(rel, (size_t)(base - rel));
+                props[nprops].usings = xstrdup(us.p);
+                props[nprops++].implicit = strstr(t, "<ImplicitUsings>enable") != NULL ||
+                                           strstr(t, "<ImplicitUsings>true") != NULL;
+                sbuf_free(&us);
+                free(t);
+            }
+            continue;
+        }
+        if (strcmp(ext_of(rel), "csproj") != 0 || c->ncsp >= 300)
+            continue;
+        rooted(c, path, sizeof path, rel);
+        if (!(t = read_small(path)))
+            continue;
+        c->csp = xrealloc(c->csp, (c->ncsp + 1) * sizeof *c->csp);
+        m = &c->csp[c->ncsp++];
+        memset(m, 0, sizeof *m);
+        m->dir = xstrndup(rel, (size_t)(base - rel));
+        m->implicit = strstr(t, "<ImplicitUsings>enable") != NULL || strstr(t, "<ImplicitUsings>true") != NULL;
+        if (strstr(t, "<ImplicitUsings>disable") || strstr(t, "<ImplicitUsings>false"))
+            m->implicit = -1;               /* switched off here, whatever the props say */
+        sbuf_adds(&refs, " ");
+        sbuf_adds(&us, " ");
+        for (p = strstr(t, "<ProjectReference"); p; p = strstr(p + 1, "<ProjectReference")) {
+            char *a = strstr(p, "Include=\""), *z, d[PATH_MAX];
+
+            if (!a || (z = strchr(a + 9, '"')) == NULL)
+                continue;
+            cs_ref_dir(m->dir, a + 9, (size_t)(z - a - 9), d, sizeof d);
+            sbuf_adds(&refs, d);
+            sbuf_adds(&refs, " ");
+        }
+        cs_item_usings(t, &us);
+        sbuf_add(&refs, "", 1);
+        sbuf_add(&us, "", 1);
+        m->refs = xstrdup(refs.p);
+        m->usings = xstrdup(us.p);
+        sbuf_free(&refs);
+        sbuf_free(&us);
+        free(t);
+    }
+    /* the nearest Directory.Build.props above each project */
+    for (k = 0; k < c->ncsp; k++) {
+        struct CsProj *m = &c->csp[k];
+        long best = -1;
+        size_t bl = 0, j;
+
+        for (j = 0; j < nprops; j++) {
+            size_t dl = strlen(props[j].dir);
+
+            if (strncmp(m->dir, props[j].dir, dl) == 0 && (best < 0 || dl >= bl)) {
+                best = (long)j;
+                bl = dl;
+            }
+        }
+        if (best >= 0) {
+            SBuf us = SBUF_INIT;
+
+            if (!m->implicit && props[best].implicit)
+                m->implicit = 1;
+            sbuf_adds(&us, m->usings);
+            sbuf_adds(&us, props[best].usings + 1);
+            sbuf_add(&us, "", 1);
+            free(m->usings);
+            m->usings = xstrdup(us.p);
+            sbuf_free(&us);
+        }
+        if (m->implicit < 0)
+            m->implicit = 0;
+    }
+    for (k = 0; k < nprops; k++) {
+        free(props[k].dir);
+        free(props[k].usings);
+    }
+    free(props);
+    /* the global usings of the files named after them, in the project that holds each */
+    for (i = 0; i < c->nfiles; i++) {
+        const char *rel = c->files[i], *base = strrchr(rel, '/');
+        char path[PATH_MAX], *t;
+        long pm;
+
+        base = base ? base + 1 : rel;
+        if (strcmp(ext_of(rel), "cs") != 0 || !strstr(base, "Using") || (pm = cs_project_of(c, rel)) < 0)
+            continue;
+        rooted(c, path, sizeof path, rel);
+        if ((t = read_small(path)) != NULL) {
+            SBuf us = SBUF_INIT;
+
+            sbuf_adds(&us, c->csp[pm].usings);
+            cs_global_usings(t, &us);
+            sbuf_add(&us, "", 1);
+            free(c->csp[pm].usings);
+            c->csp[pm].usings = xstrdup(us.p);
+            sbuf_free(&us);
+            free(t);
+        }
+    }
+    c->cs_glob = xstrdup(" ");
+}
+
+/* The project of a file: the deepest .csproj folder that holds it; -1 if none. */
+static long cs_project_of(const SymCache *c, const char *rel)
+{
+    size_t i, bl = 0;
+    long best = -1;
+
+    for (i = 0; i < c->ncsp; i++) {
+        size_t dl = strlen(c->csp[i].dir);
+
+        if (strncmp(rel, c->csp[i].dir, dl) == 0 && (best < 0 || dl > bl)) {
+            best = (long)i;
+            bl = dl;
+        }
+    }
+    return best;
+}
+
+/* Marks the projects m reaches through its references (and itself). */
+static void cs_reach(SymCache *c, long m)
+{
+    size_t i, changed = 1;
+
+    for (i = 0; i < c->ncsp; i++)
+        c->csp[i].ok = (long)i == m;
+    while (changed) {
+        changed = 0;
+        for (i = 0; i < c->ncsp; i++) {
+            size_t k;
+            char want[PATH_MAX + 2];
+
+            if (c->csp[i].ok)
+                continue;
+            snprintf(want, sizeof want, " %s ", c->csp[i].dir);
+            for (k = 0; k < c->ncsp; k++)
+                if (c->csp[k].ok && strstr(c->csp[k].refs, want)) {
+                    c->csp[i].ok = 1;
+                    changed = 1;
+                    break;
+                }
+        }
+    }
+}
+
+/* The project (index) of cur, -1 if none; cur's path relative to the root in *rel. */
+static long cs_cur_project(SymCache *c, const SymIndex *x, const char **rel)
+{
+    size_t rl = strlen(c->root);
+
+    *rel = NULL;
+    if (!x->key || strncmp(x->key, c->root, rl) != 0)
+        return -1;
+    *rel = x->key + rl;
+    while (**rel == '/')
+        (*rel)++;
+    return cs_project_of(c, *rel);
+}
+
+/* C#: the types of the project's other files, with the namespace a using needs ("" when cur's
+ * namespace or one around it holds them); from another project only the public ones of the
+ * projects cur's one references, directly or not. */
+static void cs_project(SymCache *c, Doc *cur, Env *e, HdrFn fn, void *ctx)
+{
+    char ns[PM_PATH], path[PATH_MAX];
+    const char *rel;
+    size_t i, j, seen = 0, nl;
+    long mine;
+
+    cs_namespace(&cur->buf, ns, sizeof ns);
+    if (!ensure_files(c))
+        return;
+    cs_projects(c);
+    if ((mine = cs_cur_project(c, e->v[0], &rel)) >= 0)
+        cs_reach(c, mine);
+    for (i = 0; i < c->nfiles && seen < JAVA_FILES_MAX; i++) {
+        struct Hdr *h;
+        long pm = -1;
+
+        if (strcmp(ext_of(c->files[i]), "cs") != 0)
+            continue;
+        if (mine >= 0 && ((pm = cs_project_of(c, c->files[i])) >= 0 && !c->csp[pm].ok))
+            continue;
+        seen++;
+        rooted(c, path, sizeof path, c->files[i]);
+        h = e->v[0]->key && strcmp(e->v[0]->key, path) == 0 ? NULL : hdr_get(c, path);
+        for (j = 0; h && j < h->n; j++) {
+            const char *tns = h->v[j].ns ? h->v[j].ns : "";
+
+            if (mine >= 0 && pm != mine && !h->v[j].def)
+                continue;               /* internal to another project */
+            nl = strlen(tns);
+            /* the namespace of cur or one that holds it: no using */
+            if (!nl || (strncmp(ns, tns, nl) == 0 && (ns[nl] == '\0' || ns[nl] == '.')))
+                fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, "");
+            else
+                fn(ctx, h->v[j].name, h->v[j].kind, h->v[j].sig, h->v[j].ret, tns);
+        }
+    }
+}
+
+typedef struct {
+    const char *name;
+    char *out;
+    size_t n;
+    int found;
+} ClassSpec;
+
+static void class_spec_cb(void *ctx, const char *name, int kind, const char *sig, const char *ret,
+                          const char *spec)
+{
+    ClassSpec *k = ctx;
+
+    (void)sig;
+    (void)ret;
+    if (k->found || kind != RULE_CLASS || strcmp(name, k->name) != 0)
+        return;
+    snprintf(k->out, k->n, "%s", spec);
+    k->found = 1;
+}
+
+int sym_project_class(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, const char *name, char *out,
+                      size_t n)
+{
+    ClassSpec k;
+    long saved = c->deadline_us;
+
+    k.name = name;
+    k.out = out;
+    k.n = n;
+    k.found = 0;
+    out[0] = '\0';
+    c->deadline_us = 0;                 /* asked once, when a name is accepted */
+    sym_project_symbols(c, docs, ndocs, cur, class_spec_cb, &k);
+    c->deadline_us = saved;
+    return k.found && out[0];
+}
+
+int sym_cs_using_known(SymCache *c, Doc *cur, const char *wanted)
+{
+    static const char implicit[] = " System System.Collections.Generic System.IO System.Linq "
+                                   "System.Net.Http System.Threading System.Threading.Tasks ";
+    char want[PM_PATH + 2], ns[PM_PATH];
+    const char *rel;
+    size_t nl;
+    long mine;
+    SymIndex *x;
+
+    if (!wanted || !wanted[0])
+        return 1;
+    nl = strlen(wanted);
+    x = index_of_doc(c, cur);
+    snprintf(want, sizeof want, " %s ", wanted);
+    cs_namespace(&cur->buf, ns, sizeof ns);
+    if (strncmp(ns, wanted, nl) == 0 && (ns[nl] == '\0' || ns[nl] == '.'))
+        return 1;                       /* the file's namespace, or one inside it */
+    set_root(c, x->key);
+    {
+        /* asked once, when a name is accepted: the whole walk, whatever the budget */
+        long saved = c->deadline_us;
+        size_t k;
+
+        c->deadline_us = 0;
+        for (k = 0; !ensure_files(c) && k < 100000; k++)
+            ;
+        c->deadline_us = saved;
+    }
+    cs_projects(c);
+    if (c->cs_glob && strstr(c->cs_glob, want))
+        return 1;
+    if ((mine = cs_cur_project(c, x, &rel)) >= 0)
+        return (c->csp[mine].implicit && strstr(implicit, want)) || strstr(c->csp[mine].usings, want);
+    return 0;
+}
+
 void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, HdrFn fn, void *ctx)
 {
     Env e;
@@ -5120,9 +5677,9 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
     int cl = strcmp(lang, "C") == 0, js = strcmp(lang, "JavaScript") == 0 || strcmp(lang, "TypeScript") == 0;
     int py = strcmp(lang, "Python") == 0;
     int php = strcmp(lang, "PHP") == 0 || strcmp(lang, "PHP/HTML") == 0;
-    int rs = strcmp(lang, "Rust") == 0, jv = strcmp(lang, "Java") == 0;
+    int rs = strcmp(lang, "Rust") == 0, jv = strcmp(lang, "Java") == 0, cs = strcmp(lang, "C#") == 0;
 
-    if (!cur->buf.path || (!cl && !js && !py && !php && !rs && !jv))
+    if (!cur->buf.path || (!cl && !js && !py && !php && !rs && !jv && !cs))
         return;
     env_build(c, docs, ndocs, cur, &e);
     if (!e.v[0]->key)
@@ -5133,6 +5690,10 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
     }
     if (jv) {
         java_project(c, cur, &e, fn, ctx);
+        return;
+    }
+    if (cs) {
+        cs_project(c, cur, &e, fn, ctx);
         return;
     }
     if (php) {

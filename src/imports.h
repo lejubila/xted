@@ -46,5 +46,8 @@ int imp_rust(Editor *e, const char *path);
  * segment (java, javax, com, ...), else in the last group; an import of the whole package
  * (java.util.*) counts. With none, after the package line. */
 int imp_java(Editor *e, const char *fq);
+/* C#: using System.Text; among the usings, in order with the System ones first; with none, at
+ * the top of the file (past its first comments). */
+int imp_csharp(Editor *e, const char *ns);
 
 #endif

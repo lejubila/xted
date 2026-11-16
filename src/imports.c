@@ -1511,3 +1511,111 @@ int imp_java(Editor *e, const char *fq)
     insert_block(e, pk != (size_t)-1 ? pk + 1 : 0, line);
     return 1;
 }
+
+
+/* ---- C# --------------------------------------------------------------------- */
+
+/* Visual Studio's order of usings: System and System.* first, then the others; by name. */
+static int cs_using_cmp(const char *a, size_t an, const char *b, size_t bn)
+{
+    int sa = an >= 6 && memcmp(a, "System", 6) == 0 && (an == 6 || a[6] == '.');
+    int sb = bn >= 6 && memcmp(b, "System", 6) == 0 && (bn == 6 || b[6] == '.');
+    int c;
+
+    if (sa != sb)
+        return sa ? -1 : 1;
+    c = memcmp(a, b, an < bn ? an : bn);
+    return c ? c : (an < bn ? -1 : an > bn);
+}
+
+int imp_csharp(Editor *e, const char *ns)
+{
+    const Buffer *b = e->buf;
+    size_t lim = b->nlines < 400 ? b->nlines : 400, y, nl = strlen(ns), at = 0, n = 0, k;
+    size_t seg = strcspn(ns, ".");
+    struct { size_t y, ind; int blk, same; } v[128];
+    char line[400];
+    int blk = 0, target = -1, any_code = 0;
+
+    for (y = 0; y < lim; y++) {
+        const Line *l = &b->lines[y];
+        const char *u, *s = l->s;
+        size_t ul, i = 0, len = l->len;
+
+        if (y == 0 && len >= 3 && memcmp(s, "\xef\xbb\xbf", 3) == 0)
+            i = 3;                      /* the UTF-8 mark some editors write */
+        while (i < len && (s[i] == ' ' || s[i] == '\t'))
+            i++;
+        if (i == len)
+            continue;
+        if (len - i > 13 && memcmp(s + i, "global using ", 13) == 0)
+            i += 7;
+        if (len - i > 6 && memcmp(s + i, "using ", 6) == 0 && s[i + 6] != '(') {
+            size_t ind = 0;
+
+            while (ind < len && (s[ind] == ' ' || s[ind] == '\t'))
+                ind++;
+            u = s + i + 6;
+            for (ul = len - i - 6; ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '); ul--)
+                ;
+            if (ul == nl && memcmp(u, ns, nl) == 0)
+                return 0;
+            /* using static X; and using A = B; are aliases: they keep their place */
+            if ((ul > 7 && memcmp(u, "static ", 7) == 0) || memchr(u, '=', ul) || n >= 128)
+                continue;
+            v[n].y = y;
+            v[n].ind = ind;
+            v[n].blk = blk;
+            v[n].same = strcspn(u, ".;") == seg && memcmp(u, ns, seg) == 0;
+            if (target < 0 && v[n].same)
+                target = blk;
+            n++;
+            continue;
+        }
+        if (s[i] == '/' || s[i] == '#' || s[i] == '*' || s[i] == '{' ||
+            (len - i > 13 && memcmp(s + i, "extern alias ", 13) == 0)) {
+            if (n == 0 && !any_code && s[i] != '{')
+                at = y + 1;             /* the header comments, #nullable */
+            continue;
+        }
+        if (len - i > 10 && memcmp(s + i, "namespace ", 10) == 0) {
+            blk++;                      /* the usings inside it are another block */
+            if (n == 0)
+                any_code = 1;
+            continue;
+        }
+        break;                          /* the first type: the usings are above it */
+    }
+    if (n == 0) {
+        snprintf(line, sizeof line, "using %s;\n", ns);
+        if (at == 0)
+            insert_lines(e, 0, line, 0, 1);
+        else
+            insert_block(e, at, line);
+        return 1;
+    }
+    if (target < 0)
+        target = v[n - 1].blk;
+    {
+        size_t ins = (size_t)-1, last = 0, ind = 0;
+
+        for (k = 0; k < n; k++) {
+            const Line *l = &b->lines[v[k].y];
+            const char *u = strstr_n(l->s, l->len, "using ") + 6;
+            size_t ul = l->len - (size_t)(u - l->s);
+
+            if (v[k].blk != target)
+                continue;
+            while (ul > 0 && (u[ul - 1] == ';' || u[ul - 1] == ' '))
+                ul--;
+            last = v[k].y;
+            ind = v[k].ind;
+            if (ins == (size_t)-1 && cs_using_cmp(u, ul, ns, nl) > 0)
+                ins = v[k].y;
+        }
+        /* the indentation of the block (inside namespace X { }) */
+        snprintf(line, sizeof line, "%.*susing %s;\n", (int)ind, b->lines[last].s, ns);
+        insert_lines(e, ins != (size_t)-1 ? ins : last + 1, line, 0, 0);
+    }
+    return 1;
+}

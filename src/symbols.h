@@ -115,6 +115,16 @@ int sym_class_fq(SymCache *c, Doc *cur, const char *name, char *out, size_t n);
  * one cur already imports if two have that name; not cur's own. Returns 1 if there is one. */
 int sym_go_package(SymCache *c, Doc *cur, const char *name, char *out, size_t n);
 
+/* Java and C#: the import or using spec of the project's class called name ("com.acme.Foo",
+ * "Acme.Core"), the one that would come with it in sym_project_symbols. Returns 1 if one is
+ * needed. */
+int sym_project_class(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, const char *name, char *out,
+                      size_t n);
+
+/* C#: 1 if namespace wanted needs no using in cur: the file's namespace holds it, or the project
+ * gives it (implicit usings of the .csproj, <Using Include>, global using). */
+int sym_cs_using_known(SymCache *c, Doc *cur, const char *wanted);
+
 /* The type name (class) of the expression before the operator at (y, sep), "" if unknown;
  * writes at most n bytes. Used by the tests. */
 int sym_type_before(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t sep,

@@ -5372,6 +5372,8 @@ static void test_java(void)
         php_case(dir, "src/main/java/com/acme/app/M.java", m, "TextUt", 7,
                  "import java.util.Map;\n\nimport com.acme.util.TextUtils;\n\npublic class M", 1);
         php_case(dir, "src/main/java/com/acme/app/M.java", m, "List.o", 7, "import java.util.Map;\n\npublic class M", 0);
+        php_case(dir, "src/main/java/com/acme/app/M.java", m, "TextUtils.shou", 7,
+                 "import java.util.Map;\n\nimport com.acme.util.TextUtils;\n\npublic class M", 1);
         php_case(dir, "src/main/java/com/acme/app/M.java", m, "Helpe", 7, "import java.util.Map;\n\npublic class M", 0);
         php_case(dir, "src/main/java/com/acme/app/M.java", m, "TextUtilsTe", 7, "import java.util.Map;\n\npublic class M", 0);
         php_case(dir, "src/main/java/com/acme/app/N.java", "package com.acme.app;\n\npublic class N {\n    void f() {\n        \n    }\n}\n",
@@ -5635,6 +5637,112 @@ static void test_java_settings_and_size(void)
         }
         doc_release(&d);
         sym_cache_free(c);
+    }
+    rm_rf(dir);
+}
+
+/* C#: the index (classes, methods, generic methods, constructors, properties, enum constants),
+ * the base library after a typed variable or a type, and the usings: in order with System first,
+ * in the block of the same namespace, not for the implicit usings of the .csproj or of
+ * Directory.Build.props nor for the global usings of the project, nor for the file's namespace
+ * or those around it; the public types of the referenced projects only. */
+static void test_csharp(void)
+{
+    char dir[64], path[256], err[128];
+    size_t y, sep;
+    Doc d;
+    SymCache *c;
+    Doc *docs[1];
+    static Got g;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    mkdirs(dir, "App/Models");
+    mkdirs(dir, "Core");
+    mkdirs(dir, "Tools");
+    mkdirs(dir, "Old");
+    put_file(dir, "Acme.sln", "\n");
+    put_file(dir, "App/App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n"
+                                    "    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n  <ItemGroup>\n"
+                                    "    <ProjectReference Include=\"..\\Core\\Core.csproj\" />\n    <Using Include=\"Acme.Extra\" />\n"
+                                    "  </ItemGroup>\n</Project>\n");
+    put_file(dir, "App/Usings.cs", "global using Acme.Glob;\n");
+    put_file(dir, "Core/Core.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n</Project>\n");
+    put_file(dir, "Tools/Tools.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n</Project>\n");
+    put_file(dir, "Old/Old.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n</Project>\n");
+    put_file(dir, "Directory.Build.props", "<Project>\n</Project>\n");
+    put_file(dir, "Core/TextUtils.cs", "namespace Acme.Core;\n\npublic static class TextUtils\n{\n"
+                                       "    public static string Shout(string s) => s;\n}\n\ninternal class Hidden\n{\n}\n");
+    put_file(dir, "Tools/Tooling.cs", "namespace Acme.Tools;\n\npublic class Tooling\n{\n}\n");
+    put_file(dir, "App/Models/Order.cs",
+             "namespace Acme.App.Models\n{\n    public enum Status\n    {\n        Open,\n        Closed = 2,\n    }\n\n"
+             "    public class Order\n    {\n        public string Id { get; set; }\n        private int qty;\n\n"
+             "        public Order(string id)\n        {\n            this.Id = id;\n        }\n\n"
+             "        public int Total(int price) => qty * price;\n\n        public List<T> Wrap<T>(T x) => null;\n\n"
+             "        void Run()\n        {\n            List<string> names = new List<string>();\n            names.\n"
+             "            Console.\n            Status.\n        }\n    }\n}\n");
+    snprintf(path, sizeof path, "%s/App/Models/Order.cs", dir);
+    c = sym_cache_new();
+    memset(&d, 0, sizeof d);
+    CHECK(doc_load(&d, path, err, sizeof err) == 0);
+    out_text[0] = '\0';
+    sym_outline(c, &d, out_cb, NULL);
+    CHECK(strstr(out_text, "Order()") && strstr(out_text, "Order.Order(string id)") &&
+          strstr(out_text, "Order.Total(int price)") && strstr(out_text, "Order.Wrap(T x)") && strstr(out_text, "Order.Id"));
+    docs[0] = &d;
+    for (y = 25; y <= 27; y++) {
+        sep = sym_member_at(d.syn, &d.buf, y, d.buf.lines[y].len);
+        CHECK(sep != (size_t)-1);
+        if (sep == (size_t)-1)
+            continue;
+        memset(&g, 0, sizeof g);
+        CHECK(sym_members(c, docs, 1, &d, y, sep, got_cb, &g) == 1);
+        CHECK(y == 25 ? has_sym(&g, "Where") && has_sym(&g, "Add") : y == 26 ? has_sym(&g, "WriteLine")
+                                                                         : has_sym(&g, "Open") && has_sym(&g, "Closed"));
+    }
+    doc_release(&d);
+    sym_cache_free(c);
+
+    {
+        static const char *p = "using System.Text;\nusing Acme.Zeta;\n\nnamespace Acme.App;\n\npublic class P\n{\n"
+                               "    void F()\n    {\n        \n    }\n}\n";
+        static const char *q = "namespace Acme.App\n{\n    using System;\n    using System.Linq;\n\n    public class Q\n    {\n"
+                               "        void F()\n        {\n            \n        }\n    }\n}\n";
+
+        php_case(dir, "App/P.cs", p, "Regex.IsMat", 9,
+                 "using System.Text;\nusing System.Text.RegularExpressions;\nusing Acme.Zeta;\n", 1);
+        php_case(dir, "App/P.cs", p, "Stopwatch.StartNe", 9, "using System.Diagnostics;\nusing System.Text;\n", 1);
+        php_case(dir, "App/P.cs", p, "Console.WriteLi", 9, "using System.Text;\nusing Acme.Zeta;\n\nnamespace", 0);
+        php_case(dir, "App/P.cs", p, "File.ReadAllTe", 9, "using System.Text;\nusing Acme.Zeta;\n\nnamespace", 0);
+        php_case(dir, "App/Q.cs", q, "Regex.IsMat", 9,
+                 "    using System;\n    using System.Linq;\n    using System.Text.RegularExpressions;\n", 1);
+        /* the project: a referenced one (public only), not another; the namespace around */
+        php_case(dir, "App/P.cs", p, "TextUti", 9, "using Acme.Core;\nusing Acme.Zeta;\n", 1);
+        php_case(dir, "App/P.cs", p, "Hidde", 9, "using Acme.Zeta;\n\nnamespace", 0);
+        php_case(dir, "App/P.cs", p, "Toolin", 9, "using Acme.Zeta;\n\nnamespace", 0);
+        php_case(dir, "App/P.cs", p, "Orde", 9, "using Acme.App.Models;\nusing Acme.Zeta;\n", 1);
+        php_case(dir, "App/P.cs", p, "TextUtils.Shou", 9, "        TextUtils.Shout(", 1);
+        /* a project without implicit usings: System.IO is written */
+        php_case(dir, "Old/O.cs", "namespace Acme.Old;\n\npublic class O\n{\n    void F()\n    {\n        \n    }\n}\n",
+                 "File.ReadAllTe", 6, "using System.IO;\n\nnamespace Acme.Old;\n", 1);
+        /* Directory.Build.props for all the projects under it */
+        put_file(dir, "Directory.Build.props", "<Project>\n  <PropertyGroup>\n    <ImplicitUsings>enable</ImplicitUsings>\n"
+                                               "  </PropertyGroup>\n</Project>\n");
+        php_case(dir, "Old/O.cs", "namespace Acme.Old;\n\npublic class O\n{\n    void F()\n    {\n        \n    }\n}\n",
+                 "File.ReadAllTe", 6, "namespace Acme.Old;\n\npublic class O", 0);
+    }
+    {
+        /* the usings the project gives: <Using Include> and global using */
+        SymCache *k = sym_cache_new();
+        Doc dd;
+
+        snprintf(path, sizeof path, "%s/App/P.cs", dir);
+        memset(&dd, 0, sizeof dd);
+        CHECK(doc_load(&dd, path, err, sizeof err) == 0);
+        CHECK(sym_cs_using_known(k, &dd, "Acme.Extra") && sym_cs_using_known(k, &dd, "Acme.Glob") &&
+              sym_cs_using_known(k, &dd, "System.Linq") && sym_cs_using_known(k, &dd, "Acme") &&
+              !sym_cs_using_known(k, &dd, "System.Text.Json") && !sym_cs_using_known(k, &dd, "Acme.Core"));
+        doc_release(&dd);
+        sym_cache_free(k);
     }
     rm_rf(dir);
 }
@@ -6197,6 +6305,7 @@ int main(void)
     test_java_more();
     test_java_builds();
     test_java_settings_and_size();
+    test_csharp();
     test_config_merge();
     test_snippets();
     test_cursors();
