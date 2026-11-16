@@ -429,6 +429,10 @@ gestisce dalla versione 0.71, basta scegliere «Colori» nella palette (`Alt+X`)
 `colors = truecolor` nel file `config` sul server, oppure
 `SendEnv COLORTERM` nel client e `AcceptEnv COLORTERM` in `sshd_config`.
 
+I tasti con Alt e Ctrl si riconoscono nelle forme di xterm (`ESC [1;3C`), di PuTTY (Alt+freccia come
+`ESC ESC [ C`, Ctrl+freccia come `ESC O C`: xted tiene i tasti cursore in modalità normale) e di
+rxvt (`ESC O c`, `ESC [ c`).
+
 ### Il file `config`
 
 Righe `chiave = valore`, commenti con `#`. Le chiavi prima della prima sezione valgono per

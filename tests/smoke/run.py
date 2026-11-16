@@ -11,7 +11,7 @@ import tempfile
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from vt import Run, ESC, UP, DOWN, END, ENTER, ctrl, alt  # noqa: E402
+from vt import Run, ESC, UP, DOWN, RIGHT, END, ENTER, ctrl, alt  # noqa: E402
 
 EXE = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].isidentifier() else "./xted")
 ONLY = [a for a in sys.argv[1:] if a.isidentifier()]
@@ -348,6 +348,45 @@ def palette_colors():
     t = r.screen().text()
     check("Enter switches to truecolor at once", "truecolor" in t and b"\x1b[38;2;" in r.out[-6000:], t[-800:])
     r.type(ESC)
+    quit_(r)
+    b.close()
+
+
+@scenario
+def alt_arrows_putty():
+    b = Box()
+    b.write("a.txt", "first\n")
+    b.write("b.txt", "second\n")
+    r = b.run(["a.txt"])
+    # two panes, a.txt and b.txt: Alt+Right and Alt+Left move between them
+    r.type(alt("\\"), 0.2, ctrl("p"), "b.txt", 0.5, ENTER, 0.3)
+
+    def active():
+        # the pane the cursor is in: left or right of the middle
+        return "left" if r.screen().c < r.cols // 2 else "right"
+
+    # PuTTY: ESC before the arrow's own sequence; xterm and KiTTY: CSI 1;3C
+    for seq, label in (("\x1b\x1b[C", "ESC ESC [ C"), ("\x1b[1;3C", "CSI 1;3C")):
+        before = active()
+        r.type(seq, 0.3)
+        after = active()
+        check("Alt+Right as " + label + " goes to the other document",
+              before != after and "[C" not in r.screen().text() and "OC" not in r.screen().text(), after)
+    before = active()
+    r.type("\x1b\x1b[D", 0.3)
+    check("Alt+Left as ESC ESC [ D goes back", active() != before and "[D" not in r.screen().text(), active())
+    quit_(r)
+    check("no text was typed into the files", b.read("a.txt") == "first\n" and b.read("b.txt") == "second\n",
+          b.read("a.txt") + b.read("b.txt"))
+    # PuTTY's Ctrl+Right is ESC O C (the cursor keys are in normal mode): a word to the right
+    b.write("w.txt", "alpha beta gamma\n")
+    r = b.run(["w.txt"])
+    c0 = r.screen().c
+    r.type("\x1bOC", 0.3)
+    c1 = r.screen().c
+    r.type(RIGHT, 0.3)
+    c2 = r.screen().c
+    check("ESC O C is Ctrl+Right (a word), ESC [ C one character", c1 - c0 >= 5 and c2 - c1 == 1, (c0, c1, c2))
     quit_(r)
     b.close()
 

@@ -12,7 +12,8 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H\x1b[?2004h\x1b[?1004h"
+/* ?1l: normal cursor keys (arrows as ESC [ A), so that ESC O A can only be PuTTY's Ctrl+Up */
+#define SEQ_ENTER "\x1b[?1049h\x1b[2J\x1b[H\x1b[?2004h\x1b[?1004h\x1b[?1l"
 #define SEQ_LEAVE "\x1b]112\x07\x1b[0m\x1b[?25h\x1b[?1006l\x1b[?1002l\x1b[?1000l" \
                   "\x1b[?1004l\x1b[?2004l\x1b[?1049l"
 #define PASTE_END "\x1b[201~"
@@ -326,6 +327,21 @@ static uint32_t final_key(int c)
     }
 }
 
+/* The key of ESC O x. The cursor keys are in normal mode (SEQ_ENTER), where a terminal sends
+ * ESC [ A for Up: ESC O A is then PuTTY's Ctrl+Up, and rxvt writes Ctrl+Up as ESC O a. */
+static void ss3_key(Key *k, int c)
+{
+    if (c >= 'A' && c <= 'D') {
+        k->code = final_key(c);
+        k->mods |= MOD_CTRL;
+    } else if (c >= 'a' && c <= 'd') {
+        k->code = final_key(c - 32);
+        k->mods |= MOD_CTRL;
+    } else {
+        k->code = final_key(c);
+    }
+}
+
 /* Reads up to the closing ESC[201~, which is dropped from the text. */
 static void read_paste(void)
 {
@@ -438,6 +454,9 @@ static void parse_csi(Key *k)
     } else if (c == 'Z') {
         k->code = KEY_TAB;
         k->mods |= MOD_SHIFT;
+    } else if (c >= 'a' && c <= 'd' && idx == 0 && params[0] == 0) {
+        k->code = final_key(c - 32);    /* rxvt's Shift+arrow */
+        k->mods |= MOD_SHIFT;
     } else {
         k->code = final_key(c);
     }
@@ -456,9 +475,25 @@ static void parse_escape(Key *k)
     } else if (c == 'O') {
         c = next_byte(ESC_TIMEOUT_MS);
         if (c >= 0)
-            k->code = final_key(c);
+            ss3_key(k, c);
     } else if (c == 27) {
-        k->code = KEY_NONE;
+        /* PuTTY's Alt: ESC before the key's own sequence (ESC ESC [ C for Alt+Right, ESC ESC O C
+         * in application mode); two ESC alone are an Esc */
+        c = next_byte(ESC_TIMEOUT_MS);
+        if (c == '[') {
+            parse_csi(k);
+        } else if (c == 'O') {
+            c = next_byte(ESC_TIMEOUT_MS);
+            if (c >= 0)
+                ss3_key(k, c);
+        } else {
+            if (c >= 0)
+                inpos--;                /* not a sequence: leave it for the next key */
+            k->code = KEY_ESC;
+            return;
+        }
+        if (k->code != KEY_NONE && k->code != KEY_MOUSE && k->code != KEY_PASTE)
+            k->mods |= MOD_ALT;
     } else {
         k->mods = MOD_ALT;
         k->code = c < 0x80 ? (uint32_t)c : read_utf8(c);
