@@ -745,6 +745,17 @@ static int next_key(Editor *e, Key *k)
             e->quit = 1;
             return -1;
         }
+        if (k->code == KEY_MOUSE) {
+            /* a click on a button of the message row is its key; its release is nothing */
+            MouseEv ev = term_mouse_event();
+            Key hk;
+
+            if (ev.y == e->rows - 1 && ev.kind == MOUSE_PRESS && ev.button == 0 &&
+                render_hint_key(ev.x, ev.y, &hk))
+                *k = hk;
+            else if (ev.y == e->rows - 1 && ev.kind == MOUSE_RELEASE)
+                k->code = KEY_NONE;
+        }
         if (k->code != KEY_NONE)
             return 0;
     }
@@ -757,14 +768,18 @@ static int next_key(Editor *e, Key *k)
 static int ask(Editor *e, const char *question, const char *keys)
 {
     editor_set_msg(e, 0, "%s", question);
+    e->asking = keys;                   /* the answers as buttons */
     for (;;) {
         Key k;
         uint32_t c;
 
-        if (next_key(e, &k) < 0)
+        if (next_key(e, &k) < 0) {
+            e->asking = NULL;
             return 0;
+        }
         if (k.code == KEY_ESC) {
             e->msg[0] = '\0';
+            e->asking = NULL;
             return 0;
         }
         c = (k.code >= 'A' && k.code <= 'Z') ? k.code + 32 : k.code;
@@ -776,6 +791,7 @@ static int ask(Editor *e, const char *question, const char *keys)
             c = 't';
         if (c != 0 && c < 0x80 && strchr(keys, (int)c)) {
             e->msg[0] = '\0';
+            e->asking = NULL;
             return (int)c;
         }
     }

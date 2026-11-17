@@ -1,6 +1,7 @@
 #ifndef XTED_RENDER_H
 #define XTED_RENDER_H
 
+#include "term.h"
 #include <stddef.h>
 
 struct Editor;
@@ -19,5 +20,8 @@ size_t render_tab_at(const struct Editor *e, int x);
 int render_picker_height(const struct Editor *e);
 /* Draws the editor state with a single write(); no-op if nothing changed. */
 void render_frame(Render *r, const struct Editor *e);
+
+/* The key a click at (x, y) on the message row's buttons stands for. Returns 0 if none. */
+int render_hint_key(int x, int y, Key *k);
 
 #endif

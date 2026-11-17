@@ -37,6 +37,8 @@ int keymap_find(const Keymap *m, Key k);
 void keymap_bind(Keymap *m, Key k, int cmd);
 /* Every key bound to cmd as a label ("Ctrl+S, F2"), in the order they were bound; empty if none. */
 void keymap_label(const Keymap *m, int cmd, char *out, size_t n);
+/* The first key bound to cmd, in *out. Returns 0 if it has none. */
+int keymap_first(const Keymap *m, int cmd, Key *out);
 
 /* Index in commands[] of the command with this id, or -1. */
 int command_by_id(const char *id);

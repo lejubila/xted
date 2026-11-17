@@ -73,10 +73,14 @@ xted --version            mostra la versione e i crediti (anche -V)
 - Per uscire: `Ctrl+Q` (chiede conferma se ci sono file non salvati).
 - Se non c'è nulla da riaprire compare una schermata iniziale con nome, versione, crediti e i
   primi tasti da usare, che scompare al primo tasto.
-- Quando la riga dei messaggi in fondo è vuota mostra i tasti più usati (salva, esci, comandi,
-  guida, cerca, apri, annulla, buffer, file, simboli, riga; quanti ne entrano), con le
-  scorciatoie attuali anche se cambiate nella configurazione; un messaggio li sostituisce finché
-  dura.
+- La riga in fondo mostra i tasti utili in quel momento, con le scorciatoie attuali anche se
+  cambiate nella configurazione, e col mouse sono pulsanti: un clic fa come il tasto. Scrivendo:
+  salva (più chiaro se ci sono modifiche), esci, comandi, guida, cerca, apri, annulla, buffer, file,
+  simboli, riga; con del testo selezionato: copia, taglia, commenta, Tab rientra, prossima
+  occorrenza; nel popup dei suggerimenti: Tab accetta, ↑ ↓, Esc; in una lista (palette, buffer,
+  file): Invio sceglie, ↑ ↓, Esc chiude; in una pagina in sola lettura: chiudi, cerca; in una
+  domanda le risposte («y sì», «n no»…) e Esc; in un prompt Invio ed Esc. Quanti ne entrano, per
+  importanza; un messaggio sta a sinistra e i tasti a destra.
 
 Il terminale viene sempre ripristinato all'uscita, anche su SIGTERM, SIGHUP o un arresto
 anomalo; l'editor usa lo schermo alternativo, quindi la schermata di prima torna com'era.

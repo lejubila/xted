@@ -942,38 +942,199 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
     return 0;
 }
 
-/* With no message, the message row lists the keys of the most used commands, as the keymap has
- * them (a key rebound in the configuration shows as it is): as many as fit, by importance. */
-static void keys_row(SBuf *o, const Editor *e, size_t cols)
+/* ---- the keys of the message row ------------------------------------------ */
+
+/* A button of the message row: a command (its first key is what a click sends) or a key. */
+typedef struct {
+    const char *id;         /* command id, or NULL for the key below */
+    const char *what;       /* what it does (N_), "" for the key alone */
+    uint32_t code;
+    int mods;
+    int hot;                /* shown brighter (Save with changes to save) */
+    const char *label;      /* shown in place of the key's name (an answer's letter), or NULL */
+} Hint;
+
+#define HINT_HITS 32
+static struct { int x0, x1, y; Key key; } hits[HINT_HITS];
+static size_t nhits;
+
+int render_hint_key(int x, int y, Key *k)
 {
-    static const struct { const char *id, *what; } k[] = {
-        { "save", N_("save") }, { "quit", N_("quit") }, { "palette", N_("commands") }, { "help", N_("help") },
-        { "find", N_("find") }, { "quick_open", N_("open") }, { "undo", N_("undo") },
-        { "buffers", N_("buffers") }, { "toggle_tree", N_("files") }, { "symbols", N_("symbols") },
-        { "goto_line", N_("line") },
-    };
-    size_t i, used = 0;
+    size_t i;
 
-    sbuf_adds(o, "\x1b[2m");
-    for (i = 0; i < sizeof k / sizeof k[0]; i++) {
-        char key[64], item[128];
-        int cmd = command_by_id(k[i].id);
-        size_t w;
+    for (i = 0; i < nhits; i++)
+        if (y == hits[i].y && x >= hits[i].x0 && x < hits[i].x1) {
+            *k = hits[i].key;
+            return 1;
+        }
+    return 0;
+}
 
-        if (cmd < 0)
-            continue;
-        keymap_label(&e->km, cmd, key, sizeof key);
-        if (!key[0])
-            continue;                   /* unbound */
-        key[strcspn(key, ",")] = '\0';  /* the first of its keys */
-        snprintf(item, sizeof item, "%s%s %s", used ? "  " : "", key, tr(k[i].what));
-        w = utf8_cols(item, strlen(item), strlen(item), 8);
-        if (used + w > cols)
-            break;
-        sbuf_adds(o, item);
-        used += w;
+static size_t hint_add(Hint *h, size_t n, size_t max, const char *id, const char *what)
+{
+    if (n < max) {
+        memset(&h[n], 0, sizeof h[n]);
+        h[n].id = id;
+        h[n].what = what;
     }
-    sbuf_adds(o, "\x1b[22m");
+    return n + 1;
+}
+
+static size_t hint_key(Hint *h, size_t n, size_t max, uint32_t code, const char *what)
+{
+    if (n < max) {
+        memset(&h[n], 0, sizeof h[n]);
+        h[n].code = code;
+        h[n].what = what;
+    }
+    return n + 1;
+}
+
+/* What the user can do now, most useful first: the answers of a question, the suggestions, a
+ * list, a selection, a read-only page, editing. */
+static size_t context_hints(const Editor *e, Hint *h, size_t max)
+{
+    size_t n = 0;
+
+    if (e->asking) {
+        /* the answers, with the letter typed in the language of the interface (y for s) */
+        static const struct { char c; const char *key, *what; } ans[] = {
+            { 's', N_("y"), N_("yes") }, { 'n', "n", N_("no") }, { 't', N_("a"), N_("save all") },
+            { 'r', "r", N_("reload") }, { 'i', "i", N_("ignore") },
+        };
+        const char *c;
+        size_t k;
+
+        for (c = e->asking; *c; c++) {
+            n = hint_key(h, n, max, (uint32_t)(unsigned char)*c, "");
+            for (k = 0; k < sizeof ans / sizeof ans[0] && n <= max; k++)
+                if (ans[k].c == *c) {
+                    h[n - 1].label = tr(ans[k].key);
+                    h[n - 1].what = ans[k].what;
+                }
+        }
+        return hint_key(h, n, max, KEY_ESC, N_("cancel"));
+    }
+    if (e->comp.on) {
+        n = hint_key(h, n, max, KEY_TAB, N_("accept"));
+        n = hint_key(h, n, max, KEY_UP, "");
+        n = hint_key(h, n, max, KEY_DOWN, "");
+        return hint_key(h, n, max, KEY_ESC, N_("close"));
+    }
+    if (e->picker.on) {
+        n = hint_key(h, n, max, KEY_ENTER, N_("choose"));
+        n = hint_key(h, n, max, KEY_UP, "");
+        n = hint_key(h, n, max, KEY_DOWN, "");
+        return hint_key(h, n, max, KEY_ESC, N_("close"));
+    }
+    if (edit_sel_active(e)) {
+        n = hint_add(h, n, max, "copy", N_("copy"));
+        n = hint_add(h, n, max, "cut", N_("cut"));
+        n = hint_add(h, n, max, "comment", N_("comment"));
+        n = hint_key(h, n, max, KEY_TAB, N_("indent"));
+        n = hint_add(h, n, max, "cursor_next", N_("next occurrence"));
+        n = hint_add(h, n, max, "find", N_("find"));
+        return hint_add(h, n, max, "palette", N_("commands"));
+    }
+    if (e->doc->readonly) {
+        n = hint_add(h, n, max, "close_buffer", N_("close"));
+        n = hint_add(h, n, max, "find", N_("find"));
+        n = hint_add(h, n, max, "palette", N_("commands"));
+        n = hint_add(h, n, max, "help", N_("help"));
+        return hint_add(h, n, max, "quit", N_("quit"));
+    }
+    n = hint_add(h, n, max, "save", N_("save"));
+    if (n <= max)
+        h[n - 1].hot = e->doc->buf.modified;
+    n = hint_add(h, n, max, "quit", N_("quit"));
+    n = hint_add(h, n, max, "palette", N_("commands"));
+    n = hint_add(h, n, max, "help", N_("help"));
+    n = hint_add(h, n, max, "find", N_("find"));
+    n = hint_add(h, n, max, "quick_open", N_("open"));
+    n = hint_add(h, n, max, "undo", N_("undo"));
+    n = hint_add(h, n, max, "buffers", N_("buffers"));
+    n = hint_add(h, n, max, "toggle_tree", N_("files"));
+    n = hint_add(h, n, max, "symbols", N_("symbols"));
+    return hint_add(h, n, max, "goto_line", N_("line"));
+}
+
+/* Draws the buttons of h that fit in [from, cols) of the message row (from is the column the
+ * output is at), left-aligned or against the right edge with a gap of 3 after what is there, and
+ * remembers where they are for the mouse. Returns the columns used. */
+static size_t draw_hints(SBuf *o, const Editor *e, const Hint *h, size_t n, size_t from, size_t cols,
+                         int right)
+{
+    char lab[HINT_HITS][96];
+    Key key[HINT_HITS];
+    size_t w[HINT_HITS], kl[HINT_HITS], i, total = 0, take = 0, x;
+    int y = e->rows - 1;
+
+    if (n > HINT_HITS)
+        n = HINT_HITS;
+    for (i = 0; i < n; i++) {
+        char ks[48];
+        int cmd = h[i].id ? command_by_id(h[i].id) : -1;
+
+        w[i] = 0;
+        if (h[i].id) {
+            if (cmd < 0 || !keymap_first(&e->km, cmd, &key[i]))
+                continue;                   /* unbound: no button */
+        } else {
+            key[i].code = h[i].code;
+            key[i].mods = h[i].mods;
+        }
+        if (h[i].label)
+            snprintf(ks, sizeof ks, "%s", h[i].label);
+        else
+            key_format(key[i], 1, ks, sizeof ks);
+        kl[i] = strlen(ks);
+        snprintf(lab[i], sizeof lab[i], "%s%s%s", ks, h[i].what[0] ? " " : "", h[i].what[0] ? tr(h[i].what) : "");
+        w[i] = utf8_cols(lab[i], strlen(lab[i]), strlen(lab[i]), 8);
+    }
+    /* as many as fit, in order */
+    for (i = 0; i < n; i++) {
+        if (!w[i])
+            continue;
+        if (from + (right ? 3 : 0) + total + (take ? 2 : 0) + w[i] + (right ? 1 : 0) > cols)
+            break;
+        total += (take ? 2 : 0) + w[i];
+        take = i + 1;
+    }
+    if (!total)
+        return 0;
+    x = right ? cols - total - 1 : from;
+    if (x > from)
+        spaces(o, x - from);
+    for (i = 0; i < take; i++) {
+        if (!w[i])
+            continue;
+        if (x > (right ? cols - total - 1 : from)) {
+            sbuf_adds(o, "  ");
+            x += 2;
+        }
+        /* the key bright, what it does dim (bright too for a hot one) */
+        sbuf_adds(o, "\x1b[1m");
+        sbuf_add(o, lab[i], kl[i]);
+        sbuf_adds(o, h[i].hot ? "\x1b[22m" : "\x1b[22m\x1b[2m");
+        sbuf_adds(o, lab[i] + kl[i]);
+        sbuf_adds(o, "\x1b[22m");
+        if (nhits < HINT_HITS) {
+            hits[nhits].x0 = (int)x;
+            hits[nhits].x1 = (int)(x + w[i]);
+            hits[nhits].y = y;
+            hits[nhits++].key = key[i];
+        }
+        x += w[i];
+    }
+    return x - from;
+}
+
+static void keys_row(SBuf *o, const Editor *e, size_t from, size_t cols, int right)
+{
+    Hint h[HINT_HITS];
+    size_t n = context_hints(e, h, HINT_HITS);
+
+    draw_hints(o, e, h, n < HINT_HITS ? n : HINT_HITS, from, cols, right);
 }
 
 static void message_row(SBuf *o, const Editor *e, int *pcol)
@@ -981,6 +1142,7 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
     size_t cols = (size_t)e->cols;
 
     *pcol = -1;
+    nhits = 0;
     if (e->prompt_on) {
         const char *t = e->prompt_text;
         size_t tl = e->prompt_len, start = 0;
@@ -1027,11 +1189,27 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
                 sbuf_adds(o, "\x1b[K");
                 return;
             }
+            {
+                /* a prompt with no hints of its own: Enter and Esc as buttons */
+                Hint ph[2];
+
+                memset(ph, 0, sizeof ph);
+                ph[0].code = KEY_ENTER;
+                ph[0].what = N_("ok");
+                ph[1].code = KEY_ESC;
+                ph[1].what = N_("cancel");
+                if (used + 3 < cols)
+                    draw_hints(o, e, ph, 2, used, cols, 1);
+            }
         }
     } else if (e->msg[0]) {
-        fit_cols(o, e->msg, strlen(e->msg), cols);
+        /* the message on the left, the keys on the right when there is room */
+        size_t used = fit_cols(o, e->msg, strlen(e->msg), cols);
+
+        if (used + 3 < cols)
+            keys_row(o, e, used, cols, 1);
     } else {
-        keys_row(o, e, cols);
+        keys_row(o, e, 0, cols, 0);
     }
     sbuf_adds(o, "\x1b[K");
 }

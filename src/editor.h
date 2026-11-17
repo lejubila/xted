@@ -169,6 +169,7 @@ typedef struct Editor {
     int colors_mode;        /* COLOR_* chosen in the palette or the configuration, -1 for auto */
     int glyphs;             /* GLYPHS_*: the symbols of the file browser, the borders, the palette */
     int intro;              /* the start screen (name, version, credits) until the first key */
+    const char *asking;     /* the answers of the question on the message row (ask), or NULL */
     int match_on;           /* the bracket at/before the cursor has a partner */
     size_t by, bx, my, mx;  /* that bracket and its partner */
 

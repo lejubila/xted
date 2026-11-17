@@ -250,3 +250,15 @@ void keymap_label(const Keymap *m, int cmd, char *out, size_t n)
         len += (size_t)snprintf(out + len, n - len, "%s%s", len ? ", " : "", one);
     }
 }
+
+int keymap_first(const Keymap *m, int cmd, Key *out)
+{
+    size_t i;
+
+    for (i = 0; i < m->n; i++)
+        if (m->b[i].cmd == cmd) {
+            *out = m->b[i].key;
+            return 1;
+        }
+    return 0;
+}

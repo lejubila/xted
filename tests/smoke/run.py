@@ -426,7 +426,8 @@ def keys_row():
     r.wait(0.3)
     check("they stay, with no time limit", "Ctrl+S save" in last(), last())
     r.type(ctrl("s"), 0.3)
-    check("a message takes their place", "Ctrl+S save" not in last() and "written" in last(), last())
+    check("a message goes on the left, the keys stay on the right", last().startswith("1 lines") and
+          "written" in last() and "Ctrl+Q quit" in last(), last())
     time.sleep(5.6)
     r.wait(0.3)
     check("and when it is gone they come back", "Ctrl+S save" in last(), last())
@@ -545,6 +546,50 @@ def markdown_preview():
     r.type(alt("u"), 0.3)
     check("a file that is not Markdown has no preview", "Not a Markdown document" in r.screen().text())
     quit_(r)
+    b.close()
+
+
+def click_label(r, label):
+    """Clicks (press and release) on the button of the message row that shows label."""
+    row = r.screen().lines()[-1]
+    x = row.find(label)
+    if x < 0:
+        return False
+    y = r.rows
+    r.type("\x1b[<0;%d;%dM" % (x + 2, y), 0.05, "\x1b[<0;%d;%dm" % (x + 2, y), 0.3)
+    return True
+
+
+@scenario
+def context_keys():
+    b = Box()
+    b.write("a.txt", "text here\nthe end\n")
+    b.write("b.txt", "other\n")
+    r = b.run(["a.txt", "b.txt"], cols=120)
+    last = lambda: r.screen().lines()[-1]
+    check("editing: the keys of editing", "Ctrl+S save" in last() and "Ctrl+F find" in last(), last())
+    click_label(r, "Ctrl+F find")
+    check("a click on Ctrl+F find opens the search", "Find:" in last(), last())
+    check("a prompt with no hints of its own has Enter and Esc as buttons", "Esc" in last(), last())
+    r.type(ESC, 0.2)
+    r.type("\x1b[1;2C" * 4, 0.2)               # Shift+Right: a selection
+    check("a selection: copy, cut, comment", "Ctrl+C copy" in last() and "Ctrl+X cut" in last(), last())
+    click_label(r, "Ctrl+C copy")
+    r.type(ctrl("e"), 0.3)
+    check("a list: Enter, the arrows, Esc", "Enter choose" in last() and "Esc close" in last(), last())
+    click_label(r, "Esc close")
+    check("a click on Esc close closes the list", "Enter choose" not in last(), last())
+    r.type(DOWN, END, ENTER, "te", 0.4)
+    check("the suggestions: Tab accept", "Tab accept" in last(), last())
+    click_label(r, "Tab accept")
+    r.type(" ", ctrl("v"), 0.2, ctrl("s"), 0.3)
+    check("Tab accept completed the word, Ctrl+C copy copied", "\ntext text\n" in b.read("a.txt"), b.read("a.txt"))
+    r.type("x", ctrl("q"), 0.3)
+    check("a question: its answers as buttons", "y yes" in last() and "n no" in last() and "Esc cancel" in last(), last())
+    click_label(r, "n no")
+    r.finish()
+    check("a click on n no answers it: xted quits without saving", r.status == 0 and "textx" not in b.read("a.txt"),
+          b.read("a.txt"))
     b.close()
 
 
