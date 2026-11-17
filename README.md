@@ -156,6 +156,11 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   (ogni `.env.*`), `*.env` e `.flaskenv` sono Dotenv: nomi delle variabili colorati (anche dopo
   `export`), commenti `#` a inizio riga (un `#` in un valore ne fa parte), valori tra virgolette anche
   su più righe, `${VAR}` e `$VAR`; Ctrl+T elenca le variabili.
+  Nei file YAML (`.yml`, `.yaml`) sono colorate le chiavi (anche degli elementi di lista `- nome:`,
+  tra virgolette o col trattino come `runs-on:`, ma non un URL), i commenti `#` solo a inizio riga o
+  dopo uno spazio, le ancore `&base`, i riferimenti `*base` e i tag `!!str` `!Ref`, i trattini delle
+  liste, e i blocchi di testo `chiave: |` e `chiave: >` finché le righe sono più indentate della
+  chiave; Ctrl+T elenca le chiavi.
 - **Variabili d'ambiente nell'autosuggest**: dove un programma legge una variabile si propongono
   quelle dei file `.env`, `.env.local`, `.env.example`, … della cartella del file e di quelle sopra
   fino alla radice del progetto, ognuna col nome del file da cui viene (il valore non si mostra):

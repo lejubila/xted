@@ -12,8 +12,9 @@
  *   nocase                    word lists ignore case (SQL)
  *   calls CLASS               identifier followed by '(' gets CLASS
  *   sigil CLASS CHAR          CHAR followed by a name (shell $var, Python @decorator)
- *   key CLASS CHAR            the name a line starts with (after blanks or "export"), when CHAR
- *                             follows it: APP_KEY=... in a .env file
+ *   key CLASS CHAR            the key a line starts with (after blanks, "export", YAML's "- "),
+ *                             when CHAR follows it: APP_KEY=... in a .env file, name: in YAML
+ *   blockscalar CLASS         YAML's key: | and key: >: the lines indented beyond the key get CLASS
  *   operators CHARS           characters of class operator
  *   idchars CHARS             extra identifier characters
  *   embed LANG CLASS START END [open=TEXT] [peek]
@@ -21,10 +22,11 @@
  *                             alias), one level deep; START and END take CLASS. open= also
  *                             colors the rest of the opening tag up to TEXT; peek leaves END
  *                             to this language. Write embeds before the regions.
- *   region CLASS START END [ml] [bol] [ns] [esc=C]
+ *   region CLASS START END [ml] [bol] [ns] [sp] [esc=C]
  *                             END "$" = end of line, "-" = the START token alone; ml = continues
  *                             on the next lines; bol = only at line start; ns = START not
- *                             followed by a blank. The first region that matches wins.
+ *                             followed by a blank; sp = START at line start or after a blank. The
+ *                             first region that matches wins.
  *   decl KIND PATTERN         a definition for the autosuggest index. KIND: class func method
  *                             prop const var ns (ns: a block that is only a scope) recv (a method
  *                             written outside its type, % the type: Go). A func inside a class is
@@ -451,13 +453,18 @@ static const char *const lang_yaml[] = {
     "file .clang-format",
     "alias yaml yml",
     "words constant true false yes no null True False Yes No Null",
+    "key variable :",
+    "blockscalar string",
     "region preproc --- - bol",
     "region preproc ... - bol",
-    "region comment # $",
+    "region comment # $ sp",
     "region string \" \" esc=\\",
-    "region string ' ' esc=\\",
+    "region string ' '",
+    "sigil type &*!",
     "number",
-    "operators :-",
+    "operators :|>[]{},",
+    "decl const @ :",
+    "decl const - @ :",
     NULL
 };
 

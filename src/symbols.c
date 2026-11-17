@@ -153,7 +153,10 @@ int pat_match(const char *pat, const char *s, size_t len, size_t from, PatMatch 
 
             if (i >= len || !is_idc((unsigned char)s[i]) || isdigit((unsigned char)s[i]))
                 return 0;
-            while (i < len && is_idc((unsigned char)s[i]))
+            /* a dash between two name characters is part of it: YAML's runs-on, max-age */
+            while (i < len && (is_idc((unsigned char)s[i]) ||
+                               (s[i] == '-' && i + 1 < len && is_idc((unsigned char)s[i + 1]) &&
+                                is_idc((unsigned char)s[i - 1]))))
                 i++;
             /* "new" never names a definition, except right after a keyword: fn new */
             if (is_reject(s + st, i - st) && !(was_kw && !(i - st == 2 && memcmp(s + st, "if", 2) == 0)))

@@ -1063,7 +1063,7 @@ static void test_syntax_langs(void)
     CLS(ts, st, "interface A { x: number }", "kkkkkkkkk......o.TTTTTT..");
     CLS(ts, st, "@Component() class B {}", "pppppppppp...kkkkk.....");
     CLS(go, st, "x := `r`", "..oo.sss");
-    CLS(yaml, st, "key: \"v\" # c", "...o.sss.ccc");
+    CLS(yaml, st, "key: \"v\" # c", "vvvo.sss.ccc");
     CLS(css, st, "a { margin: 10px; }", "T...kkkkkko.nnnn...");
     CLS(rb, st, "def foo?(x)", "kkk.ffff...");
 
@@ -6010,6 +6010,68 @@ static void test_palette_colors(void)
     rm_rf(dir);
 }
 
+/* YAML: the keys (also of list items, quoted, with dashes; not a URL), comments only after a
+ * blank, anchors, aliases and tags, block scalars (key: | and >) as long as their lines are
+ * indented beyond the key, and the keys in the outline. */
+static void test_yaml(void)
+{
+    Syntax *y = lang("yaml");
+    uint16_t st = 0;
+    Buffer b;
+    size_t yy = 0, x = 0;
+    static const char *text = "name: app\njobs:\n  build:\n    runs-on: ubuntu\n    steps:\n      - run: |\n"
+                              "          make\n          make test\n      - uses: x\n";
+
+    CHECK(y != NULL);
+    if (!y)
+        return;
+    CLS(y, st, "name: app", "vvvvo....");
+    CLS(y, st, "  - max-age: 3", "..o.vvvvvvvo.n");
+    CLS(y, st, "\"a b\": 1", "vvvvvo.n");
+    CLS(y, st, "http://x.y/a#b", "....o.........");
+    CLS(y, st, "url: http://x#y # c", "vvvo.....o......ccc");
+    CLS(y, st, "base: &b", "vvvvo.TT");
+    CLS(y, st, "<<: *b", "vvo.TT");
+    CLS(y, st, "n: !!int 3", "vo.TTTTT.n");
+    CLS(y, st, "on: true", "vvo.CCCC");
+    /* a block scalar: its lines while they are indented beyond the key */
+    CLS(y, st, "script: |", "vvvvvvo.o");
+    CHECK(st != 0);
+    CLS(y, st, "  echo: not a key", "sssssssssssssssss");
+    CLS(y, st, "", "");
+    CLS(y, st, "  # not a comment", "sssssssssssssssss");
+    CLS(y, st, "next: 1", "vvvvo.n");
+    CHECK(st == 0);
+    CLS(y, st, "  - run: >-", "..o.vvvo.o.");
+    CLS(y, st, "      text", "ssssssssss");
+    CLS(y, st, "    other: 2", "....vvvvvo.n");
+    CLS(y, st, "- |", "o.o");
+    CLS(y, st, "  item", "ssssss");
+    CLS(y, st, "- next", "o.....");
+    CLS(y, st, "say: a | b", "vvvo...o..");
+    CLS(y, st, "    runs-on: ubuntu-latest", "....vvvvvvvo..............");
+    CHECK(st == 0);
+    syn_free(y);
+    buf_init(&b);
+    b.path = xstrdup("ci.yml");
+    buf_insert_text(&b, &yy, &x, text, strlen(text));
+    {
+        Doc d;
+        SymCache *c = sym_cache_new();
+
+        memset(&d, 0, sizeof d);
+        d.buf = b;
+        d.syn = syn_detect(&d.buf);
+        out_text[0] = '\0';
+        sym_outline(c, &d, out_cb, NULL);
+        CHECK(strstr(out_text, "name") && strstr(out_text, "jobs") && strstr(out_text, "runs-on") &&
+              strstr(out_text, "steps") && strstr(out_text, "uses"));
+        syn_free(d.syn);
+        sym_cache_free(c);
+    }
+    buf_free(&b);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -6517,6 +6579,7 @@ int main(void)
     test_syntax_embed();
     test_syntax_detect_langs();
     test_dotenv();
+    test_yaml();
     test_syntax_incremental();
     test_syntax_brackets();
     test_theme();

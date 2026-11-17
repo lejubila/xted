@@ -331,3 +331,4 @@ Copyright (C) %s %s\n	Copyright (C) %s %s\n
 find a file	trova un file
 a text editor for the terminal	un editor di testo per il terminale
 Copyright (C) %s %s, %s license	Copyright (C) %s %s, licenza %s
+line %zu: blockscalar needs a class	riga %zu: blockscalar richiede una classe

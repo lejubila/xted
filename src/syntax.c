@@ -17,6 +17,7 @@ typedef struct {
     uint8_t cls;
     char esc;               /* escape character, 0 for none */
     int ml, bol, ns;        /* multi-line, only at line start, start not followed by a space */
+    int sp;                 /* only at line start or after a blank (YAML's " # comment") */
     /* "embed": the text up to `end` belongs to another language, resolved the first time it is needed */
     int embed, peek;        /* peek: `end` is left for the outer language */
     char *lang, *open;      /* language name; text that closes the opening tag, or NULL */
@@ -28,6 +29,9 @@ typedef struct {
 /* A state with this bit set means "inside an embedded language": bits 8..14 hold the index of
  * the embed region, bits 0..7 the state of the inner language. Other states are 1 + a region. */
 #define EMBED_BIT 0x8000
+/* a YAML block scalar (key: |) goes on: the low bits hold the key's column + 1 */
+#define BLOCK_BIT 0x4000
+#define IS_BLOCK(st) (((st) & 0xC000) == BLOCK_BIT)
 #define EMBED_MAX_REGION 128
 #define STATE_MAX_REGIONS 0x7FFF
 
@@ -45,14 +49,15 @@ struct Syntax {
     WordEnt *tab;           /* open addressing, size is a power of two; w == NULL: free */
     size_t tabsize;
     char *pool;             /* storage for the words */
-    int number, calls, sigil, key;
+    int number, calls, sigil, key, block;
     int nocase;             /* word lists ignore case */
     char *cmt, *cmt_end;    /* comment markers for the toggle command; cmt_end may be NULL */
     SynRule *rules;         /* symbol rules (decl/include/bind/attr), see langs.c */
     size_t nrules, rulecap;
     int indent_scope;       /* blocks are marked by indentation, not braces */
     char *seps;             /* member access operators, blank separated ("-> ::") */
-    uint8_t call_cls, sigil_cls, key_cls;
+    uint8_t call_cls, sigil_cls, key_cls, block_cls;
+    uint8_t sigch[256];     /* sigil CLASS CHARS: the characters that start a sigil */
     char key_sep;           /* key CLASS SEP: the name a line starts with, before SEP */
     uint8_t opch[256], idstart[256], idch[256];
     uint8_t *scratch;
@@ -361,10 +366,18 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
         } else if (tok_is(t[0], "sigil")) {
             int cl = nt > 2 ? class_by_name(t[1].p, t[1].n) : -1;
 
-            if (cl < 0 || t[2].n != 1)
+            if (cl < 0 || t[2].n < 1)
                 PERR(tr("line %zu: sigil needs a class and a character"), lineno);
-            s->sigil = (uint8_t)t[2].p[0];
+            s->sigil = 1;
+            set_chars(s->sigch, t[2].p, t[2].n);   /* one or more: $, or & * ! in YAML */
             s->sigil_cls = (uint8_t)cl;
+        } else if (tok_is(t[0], "blockscalar")) {
+            int cl = nt > 1 ? class_by_name(t[1].p, t[1].n) : -1;
+
+            if (cl < 0)
+                PERR(tr("line %zu: blockscalar needs a class"), lineno);
+            s->block = 1;
+            s->block_cls = (uint8_t)cl;
         } else if (tok_is(t[0], "key")) {
             int cl = nt > 2 ? class_by_name(t[1].p, t[1].n) : -1;
 
@@ -464,6 +477,8 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
                     r->bol = 1;
                 else if (tok_is(t[i], "ns"))
                     r->ns = 1;
+                else if (tok_is(t[i], "sp"))
+                    r->sp = 1;
                 else if (t[i].n == 5 && memcmp(t[i].p, "esc=", 4) == 0)
                     r->esc = t[i].p[4];
                 else
@@ -698,32 +713,120 @@ uint16_t syn_line(Syntax *s, uint16_t state_in, const char *text, size_t len, ui
     return line_impl(s, state_in, text, len, cls, 0);
 }
 
-/* key CLASS SEP: the word [i, j) starts the line (after blanks, or after "export ") and SEP
- * follows it (after blanks): APP_KEY=..., export PATH=..., name: value. */
-static int is_key(const Syntax *s, const char *text, size_t len, size_t i, size_t j)
+/* key CLASS SEP: the key a line starts with (after blanks, the "- " of YAML's list items, or
+ * export), up to SEP: APP_KEY=..., export PATH=..., name: value, - max-age: 3, "a b": 1. With
+ * ":" a blank or the end of the line must follow it (http://x is no key). Returns 1 and the key's
+ * bytes in [*ks, *ke). */
+static int key_range(const Syntax *s, const char *text, size_t len, size_t *ks, size_t *ke)
 {
-    size_t k = j, b = i;
+    size_t k = 0, b;
 
     while (k < len && (text[k] == ' ' || text[k] == '\t'))
         k++;
-    if (k >= len || text[k] != s->key_sep)
+    if (s->key_sep == ':')
+        while (k < len && text[k] == '-' && (k + 1 == len || text[k + 1] == ' ' || text[k + 1] == '\t'))
+            for (k++; k < len && (text[k] == ' ' || text[k] == '\t'); k++)
+                ;
+    if (len - k > 7 && memcmp(text + k, "export", 6) == 0 && (text[k + 6] == ' ' || text[k + 6] == '\t'))
+        for (k += 6; k < len && (text[k] == ' ' || text[k] == '\t'); k++)
+            ;
+    if (k >= len || text[k] == '#')
         return 0;
-    while (b > 0 && (text[b - 1] == ' ' || text[b - 1] == '\t'))
-        b--;
-    if (b >= 6 && memcmp(text + b - 6, "export", 6) == 0) {
-        b -= 6;
-        while (b > 0 && (text[b - 1] == ' ' || text[b - 1] == '\t'))
-            b--;
+    b = k;
+    if (text[k] == '"' || text[k] == '\'') {
+        char q = text[k];
+
+        for (k++; k < len && text[k] != q; k++)
+            if (text[k] == '\\' && q == '"')
+                k++;
+        if (k >= len)
+            return 0;
+        k++;
+    } else {
+        while (k < len && text[k] != ' ' && text[k] != '\t' && text[k] != '#' &&
+               !(text[k] == s->key_sep && (s->key_sep != ':' || k + 1 == len || text[k + 1] == ' ' ||
+                                           text[k + 1] == '\t')))
+            k++;
     }
-    return b == 0;
+    *ks = b;
+    *ke = k;
+    while (k < len && (text[k] == ' ' || text[k] == '\t'))
+        k++;
+    if (k >= len || text[k] != s->key_sep || *ke == b)
+        return 0;
+    return s->key_sep != ':' || k + 1 == len || text[k + 1] == ' ' || text[k + 1] == '\t';
+}
+
+/* A YAML line that opens a block scalar (key: |, key: >-, - |): its last value, before a comment,
+ * is | or > with indicators. Returns the column the block's lines must go beyond, or -1. */
+static long block_opens(const char *text, size_t len)
+{
+    size_t e = len, b, k, col;
+    char q = 0;
+
+    /* the comment: a # after a blank, outside quotes */
+    for (k = 0; k < len; k++) {
+        if (q) {
+            if (text[k] == q)
+                q = 0;
+        } else if (text[k] == '"' || text[k] == '\'') {
+            q = text[k];
+        } else if (text[k] == '#' && (k == 0 || text[k - 1] == ' ' || text[k - 1] == '\t')) {
+            e = k;
+            break;
+        }
+    }
+    while (e > 0 && (text[e - 1] == ' ' || text[e - 1] == '\t'))
+        e--;
+    for (b = e; b > 0 && text[b - 1] != ' ' && text[b - 1] != '\t'; b--)
+        ;
+    if (b >= e || (text[b] != '|' && text[b] != '>'))
+        return -1;
+    for (k = b + 1; k < e; k++)
+        if (!(text[k] == '-' || text[k] == '+' || (text[k] >= '0' && text[k] <= '9')))
+            return -1;
+    /* after "key:" or a list item's "-" */
+    for (k = b; k > 0 && (text[k - 1] == ' ' || text[k - 1] == '\t'); k--)
+        ;
+    if (k == 0 || (text[k - 1] != ':' && text[k - 1] != '-'))
+        return -1;
+    /* the column of the key, or of the last dash for "- |" */
+    for (col = 0; col < len && (text[col] == ' ' || text[col] == '\t'); col++)
+        ;
+    for (;;) {
+        size_t d = col;
+
+        if (d + 1 < len && text[d] == '-' && (text[d + 1] == ' ' || text[d + 1] == '\t')) {
+            for (d++; d < len && (text[d] == ' ' || text[d] == '\t'); d++)
+                ;
+            if (d == b)
+                return (long)col;       /* - | */
+            col = d;
+            continue;
+        }
+        break;
+    }
+    return (long)col;
 }
 
 static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t len,
                           uint8_t *cls, int depth)
 {
-    size_t i = 0;
+    size_t i = 0, key_s = (size_t)-1, key_e = 0;
     uint16_t st = state_in;
 
+    if (IS_BLOCK(st)) {
+        /* inside a block scalar: the lines beyond the key's column (or blank) are its text */
+        size_t col = (size_t)(st & 0x3FFF) - 1, ind = 0;
+
+        while (ind < len && text[ind] == ' ')
+            ind++;
+        if (ind == len || ind > col) {
+            fill(cls, 0, len, s->block_cls);
+            return st;
+        }
+        st = 0;
+    }
     if (st & EMBED_BIT) {
         size_t k = (size_t)((st >> 8) & 0x7F);
 
@@ -731,7 +834,7 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
             st = 0;
         else
             st = run_embedded(s, k, st & 0xFF, text, len, &i, cls);
-    } else if (st && (size_t)st > s->nreg) {
+    } else if (IS_BLOCK(st) || (st && (size_t)st > s->nreg)) {
         st = 0;
     } else if (st) {
         const Region *r = &s->reg[st - 1];
@@ -744,10 +847,38 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
             st = 0;
     }
 
+    if (s->key && i == 0 && !st && !key_range(s, text, len, &key_s, &key_e))
+        key_s = (size_t)-1;
+    /* YAML's list items: the dashes a line starts with are operators (a dash in a value is not) */
+    if (s->key && s->key_sep == ':' && i == 0 && !st) {
+        size_t k = 0;
+
+        for (;;) {
+            while (k < len && (text[k] == ' ' || text[k] == '\t'))
+                k++;
+            if (k < len && text[k] == '-' && (k + 1 == len || text[k + 1] == ' ' || text[k + 1] == '\t')) {
+                fill(cls, k, k + 1, SC_OPERATOR);
+                k++;
+                continue;
+            }
+            break;
+        }
+        while (i < k && (text[i] == ' ' || text[i] == '\t' || text[i] == '-')) {
+            if (text[i] != '-')
+                fill(cls, i, i + 1, SC_NORMAL);
+            i++;
+        }
+    }
     while (i < len) {
         uint8_t c = (uint8_t)text[i];
         size_t k, j;
         int matched = 0;
+
+        if (i == key_s) {
+            fill(cls, i, key_e, s->key_cls);
+            i = key_e;
+            continue;
+        }
 
         for (k = 0; k < s->nreg; k++) {
             const Region *r = &s->reg[k];
@@ -765,6 +896,8 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
                 continue;
             }
             if (r->bol && !only_blanks_before(text, i))
+                continue;
+            if (r->sp && i > 0 && text[i - 1] != ' ' && text[i - 1] != '\t')
                 continue;
             if (r->ns && (i + r->sl >= len || text[i + r->sl] == ' ' || text[i + r->sl] == '\t'))
                 continue;
@@ -788,8 +921,6 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
             wc = lookup(s, text + i, j - i);
             if (wc < 0 && s->calls && j < len && text[j] == '(')
                 wc = s->call_cls;
-            if (s->key && is_key(s, text, len, i, j))
-                wc = s->key_cls;
             fill(cls, i, j, wc < 0 ? SC_NORMAL : (uint8_t)wc);
             i = j;
         } else if (s->number && (isdigit(c) || (c == '.' && i + 1 < len &&
@@ -797,14 +928,16 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
             j = scan_number(s, text, len, c == '.' ? i + 1 : i);
             fill(cls, i, j, SC_NUMBER);
             i = j;
-        } else if (s->sigil && c == (uint8_t)s->sigil && i + 1 < len &&
+        } else if (s->sigil && s->sigch[c] && i + 1 < len &&
                    (s->idstart[(uint8_t)text[i + 1]] || isdigit((uint8_t)text[i + 1]) ||
                     strchr("?@#$!*", text[i + 1]))) {
             j = i + 1;
-            if (s->idstart[(uint8_t)text[j]]) {
+            while (j < len && c == '!' && text[j] == '!')
+                j++;                    /* YAML's !!str */
+            if (j < len && s->idstart[(uint8_t)text[j]]) {
                 while (j < len && s->idch[(uint8_t)text[j]])
                     j++;
-            } else {
+            } else if (j == i + 1) {
                 j++;
             }
             fill(cls, i, j, s->sigil_cls);
@@ -813,6 +946,12 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
             fill(cls, i, i + 1, s->opch[c] ? SC_OPERATOR : SC_NORMAL);
             i++;
         }
+    }
+    if (s->block && !st && !depth) {
+        long col = block_opens(text, len);
+
+        if (col >= 0 && col < 0x3FFE)
+            st = (uint16_t)(BLOCK_BIT | (col + 1));
     }
     return st;
 }

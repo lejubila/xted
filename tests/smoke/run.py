@@ -481,6 +481,22 @@ def version_and_credits():
 
 
 @scenario
+def yaml_file():
+    b = Box()
+    b.write(".github/workflows/ci.yml", "name: CI\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
+            "    steps:\n      - uses: actions/checkout@v4\n      - run: |\n          make\n          make test\n")
+    r = b.run([".github/workflows/ci.yml"])
+    t = r.screen().text()
+    check("a .yml file is YAML", "YAML" in t, t[-300:])
+    r.type(ctrl("t"), 0.3)
+    t = r.screen().text()
+    check("Ctrl+T lists its keys, dashes included", "runs-on" in t and "steps" in t and "jobs" in t, t[-700:])
+    r.type(ESC)
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")
