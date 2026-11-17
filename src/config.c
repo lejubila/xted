@@ -442,6 +442,12 @@ LangCfg config_lang(const Config *c, const char *lang)
     out.indent_width = 0;
     out.set = 0;
     out.suggest_min = 2;
+    /* data files are indented with two spaces (YAML forbids tabs, JSON's tools write so): a
+     * default, under the configuration, .editorconfig and the file's own style */
+    if (lang && (strcmp(lang, "JSON") == 0 || strcmp(lang, "YAML") == 0)) {
+        out.expand_tab = 1;
+        out.indent_width = 2;
+    }
     overlay(&out, &c->base);
     if (lang) {
         snprintf(name, sizeof name, "%s", lang);

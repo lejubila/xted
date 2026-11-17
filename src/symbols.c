@@ -514,6 +514,7 @@ typedef struct {
     } doc[DOC_MAX];
     size_t ndoc;
     int has_doc;                /* the language has docmember rules */
+    int data;                   /* JSON: the keys at every level, not only outside the blocks */
 } Build;
 
 static void push(Build *B, int kind, long owner, long indent)
@@ -594,6 +595,9 @@ static int try_decl(Build *B, size_t y, const char *s, size_t len, size_t i, siz
             continue;
         if (!pat_match(B->r[k].pat, s, len, i, &m))
             continue;
+        /* a quoted name ("name": in JSON) when the pattern has no @ */
+        if (m.name[0] == '\0' && m.path[0] && kind == RULE_CONST)
+            put(m.name, sizeof m.name, m.path, strlen(m.path));
         if (kind != RULE_CLASS && kind != RULE_NS && m.name[0] == '\0')
             continue;
         *end = m.end;
@@ -823,7 +827,7 @@ static void scan_braces(Build *B, size_t y, const char *s, size_t len, const uin
             i += 2;
             stmt = 1;
         } else {
-            if (stmt && B->fr[B->nf - 1].kind != F_OTHER && B->over == 0 &&
+            if (stmt && (B->fr[B->nf - 1].kind != F_OTHER || B->data) && B->over == 0 &&
                 try_decl(B, y, s, len, i, &end) >= 0 && end > i) {
                 i = end;
                 stmt = 0;
@@ -1099,6 +1103,7 @@ SymIndex *sym_build(const Buffer *b, Syntax *syn)
         if (B.r[i].kind == RULE_DOC)
             B.has_doc = 1;
     B.indent = syn_indent_scope(syn);
+    B.data = syn && strcmp(syn_name(syn), "JSON") == 0;
     B.pend = -1;
     B.nf = 1;
     B.fr[0].kind = F_GLOBAL;

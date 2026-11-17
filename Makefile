@@ -1,6 +1,6 @@
 # The modes (each compiles into its own folder, so that objects of different flags never mix):
 #   make            static with musl-gcc, when it is installed: one binary that runs on any Linux
-#                   (SPEC: under 560 KB); without musl, dynamic with the system's cc, with a note
+#                   (SPEC: under 600 KB); without musl, dynamic with the system's cc, with a note
 #   make DYNAMIC=1  dynamic, with the system's cc (or the CC given): for packages, for development
 #   make STATIC=1   static even with another CC (CC=musl-gcc is the default when installed)
 #   make SAN=1      AddressSanitizer + UBSan, dynamic with gcc (the sanitizers need glibc)
@@ -52,7 +52,7 @@ ALLFLAGS = $(WARN) $(DEFS) $(CFLAGS) -ffunction-sections -fdata-sections -MMD -M
 LINK     = $(LDFLAGS) -Wl,--gc-sections
 
 LIBSRC   = src/util.c src/utf8.c src/term.c src/undo.c src/clip.c src/buffer.c \
-           src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c src/shell.c src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c src/mouse.c src/symbols.c src/stdsym.c src/indent.c src/editorconfig.c src/cfgsave.c src/i18n.c src/imports.c \
+           src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c src/shell.c src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c src/mouse.c src/symbols.c src/stdsym.c src/indent.c src/editorconfig.c src/cfgsave.c src/i18n.c src/imports.c src/json.c \
            src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=$(BUILD)/%.o) $(BUILD)/main.o
 

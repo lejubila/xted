@@ -10,6 +10,7 @@
 #include "indent.h"
 #include "i18n.h"
 #include "keymap.h"
+#include "json.h"
 #include "errors.h"
 #include "edit.h"
 #include "files.h"
@@ -1059,7 +1060,7 @@ static void test_syntax_langs(void)
     CLS(sql, st, "x = 'it''s' -- c", "..o.sssssss.cccc");
 
     st = 0;
-    CLS(json, st, "{\"a\": [1, true]}", ".ssso..no.CCCC..");
+    CLS(json, st, "{\"a\": [1, true]}", "ovvvo.ono.CCCCoo");
     CLS(ts, st, "interface A { x: number }", "kkkkkkkkk......o.TTTTTT..");
     CLS(ts, st, "@Component() class B {}", "pppppppppp...kkkkk.....");
     CLS(go, st, "x := `r`", "..oo.sss");
@@ -6072,6 +6073,116 @@ static void test_yaml(void)
     buf_free(&b);
 }
 
+/* JSON: keys and values coloured apart; the check (comments allowed, a trailing comma only where
+ * the files accept it) with the line and column of the first error; formatting and compacting,
+ * refused with comments; the commands, the message after saving, the keys in Ctrl+T. */
+static void test_json(void)
+{
+    static const struct { const char *text; int code; size_t line, col; } bad[] = {
+        { "{\"a\": 1,}", JE_TRAIL, 0, 7 }, { "{\"a\" 1}", JE_COLON, 0, 5 }, { "{\"a\": 1 \"b\": 2}", JE_COMMA, 0, 8 },
+        { "{a: 1}", JE_KEY, 0, 1 }, { "[1, 2", JE_END, 0, 5 }, { "{\"a\": \"x}", JE_STRING, 0, 6 },
+        { "[\"\\q\"]", JE_ESCAPE, 0, 2 }, { "[01]", JE_NUMBER, 0, 1 }, { "[1.]", JE_NUMBER, 0, 1 },
+        { "{}\n[]", JE_EXTRA, 1, 0 }, { "[tru]", JE_CHAR, 0, 1 }, { "{\n  \"a\": 1\n  \"b\": 2\n}", JE_COMMA, 2, 2 },
+        { "/* x", JE_COMMENT, 0, 0 }, { "", JE_END, 0, 0 },
+    };
+    static const char *good[] = { "{}", "[]", "0", "-1.5e+3", "\"\\u00e8\"", "{\"a\":[1,{\"b\":null}]}",
+                                  "// c\n{\"a\": /* x */ 1}" };
+    JsonErr je;
+    SBuf o = SBUF_INIT;
+    size_t i;
+
+    for (i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        int r = json_check(bad[i].text, strlen(bad[i].text), 0, &je);
+
+        if (r == 0 || je.code != bad[i].code || je.line != bad[i].line || je.col != bad[i].col)
+            fprintf(stderr, "json %s: %d %d %zu:%zu\n", bad[i].text, r, je.code, je.line, je.col);
+        CHECK(r < 0 && je.code == bad[i].code && je.line == bad[i].line && je.col == bad[i].col);
+    }
+    for (i = 0; i < sizeof good / sizeof good[0]; i++)
+        CHECK(json_check(good[i], strlen(good[i]), 0, &je) == 0);
+    CHECK(json_check("{\"a\": [1, 2,],}", 15, 1, &je) == 0);  /* lenient: JSONC */
+    CHECK(json_format("{\"a\":[1,2],\"b\":{},\"c\":{\"d\":\"x y\"}}", 34, 0, "  ", &o, &je) == 0);
+    sbuf_add(&o, "", 1);
+    CHECK(strcmp(o.p, "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": {},\n  \"c\": {\n    \"d\": \"x y\"\n  }\n}") == 0);
+    o.len = 0;
+    CHECK(json_format("{ \"a\" : [ 1 , 2 ] }", 19, 0, NULL, &o, &je) == 0);
+    sbuf_add(&o, "", 1);
+    CHECK(strcmp(o.p, "{\"a\":[1,2]}") == 0);
+    o.len = 0;
+    CHECK(json_format("{\"a\": 1 // c\n}", 14, 0, "  ", &o, &je) == 1 && o.len == 0);
+    CHECK(json_format("{\"a\": 1,}", 9, 1, "  ", &o, &je) == 0);  /* a trailing comma goes */
+    sbuf_add(&o, "", 1);
+    CHECK(strcmp(o.p, "{\n  \"a\": 1\n}") == 0);
+    sbuf_free(&o);
+
+    /* the editor's commands */
+    {
+        char dir[64], path[256], err[128];
+        Editor e;
+        Doc *d;
+        size_t k;
+        int idx = -1;
+
+        CHECK(make_dir(dir, sizeof dir) != NULL);
+        put_file(dir, "a.json", "{\"name\": \"x\", \"list\": [1, 2], \"deep\": {\"k\": true}}\n");
+        snprintf(path, sizeof path, "%s/a.json", dir);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        d->expand_tab = 1;
+        d->indent_w = 2;
+        editor_cmd_json_check(&e);
+        CHECK(strcmp(e.msg, "JSON: valid") == 0);
+        editor_cmd_json_format(&e);
+        CHECK(e.buf->nlines == 10 && line_is(e.buf, 1, "  \"name\": \"x\","));
+        out_text[0] = '\0';
+        {
+            SymCache *c = sym_cache_new();
+
+            sym_outline(c, d, out_cb, NULL);
+            CHECK(strstr(out_text, "name") && strstr(out_text, "list") && strstr(out_text, "deep") &&
+                  strstr(out_text, "k"));
+            sym_cache_free(c);
+        }
+        editor_cmd_json_compact(&e);
+        CHECK(e.buf->nlines == 1 && line_is(e.buf, 0, "{\"name\":\"x\",\"list\":[1,2],\"deep\":{\"k\":true}}"));
+        edit_undo(&e);
+        CHECK(e.buf->nlines == 10);
+        edit_undo(&e);
+        CHECK(e.buf->nlines == 1 && line_is(e.buf, 0, "{\"name\": \"x\", \"list\": [1, 2], \"deep\": {\"k\": true}}"));
+        /* an error: the cursor goes there; saving says it */
+        e.cy = 0;
+        e.cx = e.buf->lines[0].len - 1;
+        for (k = 0; k < 1; k++)
+            kkey(&e, ',', 0);
+        editor_cmd_json_check(&e);
+        CHECK(strstr(e.msg, "line 1, column ") && strstr(e.msg, "comma before the closing bracket") && e.cy == 0);
+        for (i = 0; i < ncommands; i++)
+            if (strcmp(commands[i].id, "save") == 0)
+                idx = (int)i;
+        CHECK(idx >= 0);
+        commands[idx].fn(&e);
+        CHECK(strstr(e.msg, "JSON: line 1") != NULL);
+        editor_cmd_json_format(&e);         /* refused: the text stays */
+        CHECK(e.buf->nlines == 1);
+        editor_free(&e);
+        /* comments: checked, not rewritten */
+        put_file(dir, "b.jsonc", "{\n  // c\n  \"a\": 1,\n}\n");
+        snprintf(path, sizeof path, "%s/b.jsonc", dir);
+        editor_init(&e);
+        d = editor_open_doc(&e, path, err, sizeof err);
+        CHECK(d != NULL);
+        editor_activate(&e, d);
+        editor_cmd_json_check(&e);
+        CHECK(strcmp(e.msg, "JSON: valid") == 0);
+        editor_cmd_json_format(&e);
+        CHECK(strstr(e.msg, "comments") && e.buf->nlines == 4 && line_is(e.buf, 1, "  // c"));
+        editor_free(&e);
+        rm_rf(dir);
+    }
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -6580,6 +6691,7 @@ int main(void)
     test_syntax_detect_langs();
     test_dotenv();
     test_yaml();
+    test_json();
     test_syntax_incremental();
     test_syntax_brackets();
     test_theme();

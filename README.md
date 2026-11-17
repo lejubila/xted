@@ -2,7 +2,7 @@
 
 Editor di testo da terminale per Linux, scritto in **C99** con la sola libc POSIX.
 Un unico binario, senza ncurses né altre librerie: il terminale è controllato a mano con
-termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 560 KB.
+termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 600 KB.
 
 Il nome è `xted` (X = Unix/Linux, T = text/terminal, ED = editor); `make install` crea anche
 il collegamento breve `xt`.
@@ -161,6 +161,16 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   dopo uno spazio, le ancore `&base`, i riferimenti `*base` e i tag `!!str` `!Ref`, i trattini delle
   liste, e i blocchi di testo `chiave: |` e `chiave: >` finché le righe sono più indentate della
   chiave; Ctrl+T elenca le chiavi.
+  Nei file JSON le chiavi hanno un colore diverso dai valori, le parentesi `{ } [ ]` sono colorate e
+  Ctrl+T elenca le chiavi a ogni livello. Nella palette: «Controlla JSON» porta il cursore sul primo
+  errore e dice cos'è («JSON: riga 12, colonna 5: manca una virgola»); «Formatta JSON» riscrive il
+  documento una chiave per riga, con l'indentazione del file (spazi o tab, larghezza; JSON e YAML
+  senza altre indicazioni usano 2 spazi); «Compatta
+  JSON» lo mette su una riga; tutto in un solo passo di annullamento. Al salvataggio un JSON non
+  valido viene salvato lo stesso, ma la barra dice dov'è l'errore. I commenti `//` e `/* */` sono
+  accettati (formattare li perderebbe: in quel caso non si riscrive nulla); una virgola prima di `}`
+  o `]` solo nei `.jsonc`, `.json5`, `tsconfig*.json`, `jsconfig*.json`, `devcontainer.json` e nei
+  file di `.vscode/`.
 - **Variabili d'ambiente nell'autosuggest**: dove un programma legge una variabile si propongono
   quelle dei file `.env`, `.env.local`, `.env.example`, … della cartella del file e di quelle sopra
   fino alla radice del progetto, ognuna col nome del file da cui viene (il valore non si mostra):

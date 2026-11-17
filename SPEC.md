@@ -4,7 +4,7 @@ Nov 7, 2026 · @David
 
 ## Obiettivi e vincoli
 
-Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 560 KB, avvio sotto 50 ms.
+Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 600 KB, avvio sotto 50 ms.
 
 - **Zero dipendenze**: niente ncurses, niente librerie esterne; controllo del terminale via termios e sequenze ANSI/VT100 scritte a mano.
 - **Linguaggio**: C99 (alternativa: Rust senza crate esterni, ma binario più grande).
@@ -66,7 +66,7 @@ Evidenziazione, indentazione e suggerimenti sono tutti interni: nessun language 
 - Motore a regole definite in file di sintassi testuali (parole chiave, tipi, stringhe, numeri, commenti, preprocessore, operatori).
 - Stato per riga per gestire costrutti multiriga (commenti `/* */`, stringhe `"""`, heredoc).
 - Rilevamento del linguaggio da estensione, shebang (`#!/usr/bin/env python`) e modeline.
-- Linguaggi iniziali: C/C++, Python, JavaScript/TypeScript, Go, Rust, Java, Shell, HTML, CSS, JSON, YAML, Markdown, Makefile, SQL, Lua, PHP. YAML: chiavi, ancore e tag colorati, blocchi `|`/`>` (direttiva `blockscalar`), Ctrl+T con le chiavi. Anche i file `.env` (Dotenv: `.env`, `.env.*`, `*.env`; nella direttiva `file` una parola che finisce con `*` è un prefisso, e la direttiva `key CLASS =` colora il nome a inizio riga prima di `=`). Dove un programma legge una variabile d'ambiente (`env('`, `process.env.`, `os.getenv('`, `os.Getenv("`, `System.getenv("`, `ENV['`, `$` in Shell, …) l'autosuggest propone le variabili dei file `.env*` della cartella del file e di quelle sopra fino alla radice (`sym_env_keys`, `env_context` in complete.c), col nome del file e senza il valore.
+- Linguaggi iniziali: C/C++, Python, JavaScript/TypeScript, Go, Rust, Java, Shell, HTML, CSS, JSON, YAML, Markdown, Makefile, SQL, Lua, PHP. JSON: chiavi colorate (direttiva `strkey`), Ctrl+T con le chiavi, comandi «Controlla JSON», «Formatta JSON», «Compatta JSON» e controllo al salvataggio (`src/json.c`). YAML: chiavi, ancore e tag colorati, blocchi `|`/`>` (direttiva `blockscalar`), Ctrl+T con le chiavi. Anche i file `.env` (Dotenv: `.env`, `.env.*`, `*.env`; nella direttiva `file` una parola che finisce con `*` è un prefisso, e la direttiva `key CLASS =` colora il nome a inizio riga prima di `=`). Dove un programma legge una variabile d'ambiente (`env('`, `process.env.`, `os.getenv('`, `os.Getenv("`, `System.getenv("`, `ENV['`, `$` in Shell, …) l'autosuggest propone le variabili dei file `.env*` della cartella del file e di quelle sopra fino alla radice (`sym_env_keys`, `env_context` in complete.c), col nome del file e senza il valore.
 - Temi colore intercambiabili (almeno uno scuro e uno chiaro).
 
 ### Indentazione

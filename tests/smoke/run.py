@@ -497,6 +497,28 @@ def yaml_file():
 
 
 @scenario
+def json_file():
+    b = Box()
+    b.write("package.json", '{"name": "app", "version": "1.0.0", "scripts": {"test": "make test"}}\n')
+    r = b.run(["package.json"])
+    r.type(alt("x"), "Format JSON", 0.3, ENTER, 0.3, ctrl("s"), 0.3)
+    check("Format JSON writes one key a line, indented",
+          b.read("package.json").startswith('{\n  "name": "app",\n  "version": "1.0.0",\n  "scripts": {\n'),
+          b.read("package.json"))
+    r.type(ctrl("t"), 0.3)
+    t = r.screen().text()
+    check("Ctrl+T lists the keys", "version" in t and "scripts" in t and "test" in t, t[-600:])
+    r.type(ESC, ctrl("g"), "2", ENTER, END, ",", 0.2, ctrl("s"), 0.3)
+    last = r.screen().lines()[-1]
+    check("saving an invalid JSON says where the error is", "JSON: line 2, column 17" in last, last)
+    r.type(ctrl("g"), "1", ENTER, alt("x"), "Check JSON", 0.3, ENTER, 0.3)
+    t = r.screen().text()
+    check("Check JSON moves the cursor to the error", "Ln 2, Col 17" in t, t[-300:])
+    quit_(r, discard=True)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

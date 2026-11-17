@@ -332,3 +332,25 @@ find a file	trova un file
 a text editor for the terminal	un editor di testo per il terminale
 Copyright (C) %s %s, %s license	Copyright (C) %s %s, licenza %s
 line %zu: blockscalar needs a class	riga %zu: blockscalar richiede una classe
+line %zu: strkey needs a class	riga %zu: strkey richiede una classe
+Check JSON	Controlla JSON
+Format JSON	Formatta JSON
+Compact JSON	Compatta JSON
+JSON: line %zu, column %zu: %s	JSON: riga %zu, colonna %zu: %s
+Not a JSON document	Non è un documento JSON
+JSON: valid	JSON: valido
+JSON with comments: not rewritten, they would be lost	JSON con commenti: non riscritto, andrebbero persi
+JSON: %zu lines	JSON: %zu righe
+the text ends too soon	il testo finisce troppo presto
+unexpected character	carattere inatteso
+string not closed	stringa non chiusa
+invalid escape in a string	sequenza di escape non valida in una stringa
+control character in a string	carattere di controllo in una stringa
+invalid number	numero non valido
+a key in double quotes was expected	era attesa una chiave tra virgolette doppie
+':' was expected after the key	dopo la chiave era atteso ':'
+a comma is missing	manca una virgola
+comma before the closing bracket	virgola di troppo prima della parentesi di chiusura
+text after the end of the value	testo dopo la fine del valore
+nested too deep	annidamento troppo profondo
+comment not closed	commento non chiuso

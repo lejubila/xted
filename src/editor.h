@@ -267,6 +267,9 @@ void editor_cmd_theme(Editor *e);
 void editor_cmd_colors(Editor *e);
 void editor_cmd_glyphs(Editor *e);
 void editor_cmd_about(Editor *e);
+void editor_cmd_json_check(Editor *e);
+void editor_cmd_json_format(Editor *e);
+void editor_cmd_json_compact(Editor *e);
 /* "unicode", "windows" or "ascii". */
 const char *editor_glyphs_name(int g);
 /* The colour mode for the palette: "auto (256)", "truecolor", "256", "16", "none". */

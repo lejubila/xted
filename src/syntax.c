@@ -49,14 +49,14 @@ struct Syntax {
     WordEnt *tab;           /* open addressing, size is a power of two; w == NULL: free */
     size_t tabsize;
     char *pool;             /* storage for the words */
-    int number, calls, sigil, key, block;
+    int number, calls, sigil, key, block, strkey;
     int nocase;             /* word lists ignore case */
     char *cmt, *cmt_end;    /* comment markers for the toggle command; cmt_end may be NULL */
     SynRule *rules;         /* symbol rules (decl/include/bind/attr), see langs.c */
     size_t nrules, rulecap;
     int indent_scope;       /* blocks are marked by indentation, not braces */
     char *seps;             /* member access operators, blank separated ("-> ::") */
-    uint8_t call_cls, sigil_cls, key_cls, block_cls;
+    uint8_t call_cls, sigil_cls, key_cls, block_cls, strkey_cls;
     uint8_t sigch[256];     /* sigil CLASS CHARS: the characters that start a sigil */
     char key_sep;           /* key CLASS SEP: the name a line starts with, before SEP */
     uint8_t opch[256], idstart[256], idch[256];
@@ -371,6 +371,13 @@ Syntax *syn_parse(const char *text, size_t n, char *err, size_t errlen)
             s->sigil = 1;
             set_chars(s->sigch, t[2].p, t[2].n);   /* one or more: $, or & * ! in YAML */
             s->sigil_cls = (uint8_t)cl;
+        } else if (tok_is(t[0], "strkey")) {
+            int cl = nt > 1 ? class_by_name(t[1].p, t[1].n) : -1;
+
+            if (cl < 0)
+                PERR(tr("line %zu: strkey needs a class"), lineno);
+            s->strkey = 1;
+            s->strkey_cls = (uint8_t)cl;
         } else if (tok_is(t[0], "blockscalar")) {
             int cl = nt > 1 ? class_by_name(t[1].p, t[1].n) : -1;
 
@@ -902,7 +909,19 @@ static uint16_t line_impl(Syntax *s, uint16_t state_in, const char *text, size_t
             if (r->ns && (i + r->sl >= len || text[i + r->sl] == ' ' || text[i + r->sl] == '\t'))
                 continue;
             e = find_end(r, text, len, i + r->sl, &closed);
-            fill(cls, i, e, r->cls);
+            {
+                /* strkey: a string followed by ":" is a key ("name": in JSON) */
+                uint8_t rc = r->cls;
+                size_t q = e;
+
+                if (s->strkey && rc == SC_STRING && closed) {
+                    while (q < len && (text[q] == ' ' || text[q] == '\t'))
+                        q++;
+                    if (q < len && text[q] == ':')
+                        rc = s->strkey_cls;
+                }
+                fill(cls, i, e, rc);
+            }
             i = e;
             if (!closed && r->ml)
                 st = (uint16_t)(k + 1);

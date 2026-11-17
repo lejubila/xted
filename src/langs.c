@@ -15,6 +15,7 @@
  *   key CLASS CHAR            the key a line starts with (after blanks, "export", YAML's "- "),
  *                             when CHAR follows it: APP_KEY=... in a .env file, name: in YAML
  *   blockscalar CLASS         YAML's key: | and key: >: the lines indented beyond the key get CLASS
+ *   strkey CLASS              a string followed by ":" gets CLASS ("name": in JSON)
  *   operators CHARS           characters of class operator
  *   idchars CHARS             extra identifier characters
  *   embed LANG CLASS START END [open=TEXT] [peek]
@@ -438,11 +439,13 @@ static const char *const lang_json[] = {
     "file .eslintrc .prettierrc .babelrc composer.lock",
     "alias json jsonc",
     "words constant true false null",
+    "strkey variable",
     "region comment /* */ ml",
     "region comment // $",
     "region string \" \" esc=\\",
     "number",
-    "operators :,",
+    "operators :,{}[]",
+    "decl const ~ :",
     NULL
 };
 

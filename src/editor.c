@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "version.h"
+#include "json.h"
 #include "edit.h"
 #include "imports.h"
 #include "cfgsave.h"
@@ -956,6 +957,127 @@ static int on_disk_change(Editor *e, Doc *d)
     return 0;
 }
 
+/* ---- JSON ------------------------------------------------------------- */
+
+static int is_json(const Doc *d)
+{
+    return d->syn && strcmp(syn_name(d->syn), "JSON") == 0;
+}
+
+/* A comma before } or ] is accepted in JSONC, JSON5 and the files that are read that way:
+ * tsconfig.json, jsconfig.json, VS Code's settings (.vscode/), devcontainer.json. */
+static int json_lenient(const Doc *d)
+{
+    const char *p = d->buf.path, *base, *dot;
+
+    if (!p)
+        return 0;
+    base = strrchr(p, '/');
+    base = base ? base + 1 : p;
+    dot = strrchr(base, '.');
+    return (dot && (strcmp(dot, ".jsonc") == 0 || strcmp(dot, ".json5") == 0)) ||
+           strncmp(base, "tsconfig", 8) == 0 || strncmp(base, "jsconfig", 8) == 0 ||
+           strstr(p, "/.vscode/") != NULL || strcmp(base, "devcontainer.json") == 0 ||
+           strcmp(base, ".devcontainer.json") == 0;
+}
+
+static char *doc_text(const Doc *d, size_t *n)
+{
+    const Buffer *b = &d->buf;
+
+    return buf_get_range(b, 0, 0, b->nlines - 1, b->lines[b->nlines - 1].len, n);
+}
+
+/* "JSON: line 12, column 5: a comma is missing" in out; the cursor goes there with go. */
+static void json_error(Editor *e, const JsonErr *je, int go, char *out, size_t n)
+{
+    snprintf(out, n, tr("JSON: line %zu, column %zu: %s"), je->line + 1, je->col + 1,
+             tr(json_err_text(je->code)));
+    if (go && je->line < e->buf->nlines) {
+        e->cy = je->line;
+        e->cx = je->col <= e->buf->lines[e->cy].len ? je->col : e->buf->lines[e->cy].len;
+        e->want_col = editor_cursor_col(e);
+    }
+}
+
+void editor_cmd_json_check(Editor *e)
+{
+    size_t n;
+    char *t, msg[200];
+    JsonErr je;
+
+    if (!is_json(e->doc)) {
+        editor_set_msg(e, MSG_TTL_MS, "%s", tr("Not a JSON document"));
+        return;
+    }
+    t = doc_text(e->doc, &n);
+    if (json_check(t, n, json_lenient(e->doc), &je) == 0) {
+        editor_set_msg(e, MSG_TTL_MS, "%s", tr("JSON: valid"));
+    } else {
+        json_error(e, &je, 1, msg, sizeof msg);
+        editor_set_msg(e, MSG_TTL_MS, "%s", msg);
+    }
+    free(t);
+}
+
+/* The whole document written again: indented with its own indentation, or on one line. */
+static void json_rewrite(Editor *e, int compact)
+{
+    size_t n, y = 0, x = 0, cy = e->cy;
+    char *t, msg[200], ind[17];
+    JsonErr je;
+    SBuf o = SBUF_INIT;
+    int r, w = e->doc->indent_w > 0 && e->doc->indent_w <= 16 ? e->doc->indent_w : 4;
+    Buffer *b = e->buf;
+
+    if (e->doc->readonly)
+        return;
+    if (!is_json(e->doc)) {
+        editor_set_msg(e, MSG_TTL_MS, "%s", tr("Not a JSON document"));
+        return;
+    }
+    if (e->doc->expand_tab) {
+        memset(ind, ' ', (size_t)w);
+        ind[w] = '\0';
+    } else {
+        snprintf(ind, sizeof ind, "\t");
+    }
+    t = doc_text(e->doc, &n);
+    r = json_format(t, n, json_lenient(e->doc), compact ? NULL : ind, &o, &je);
+    free(t);
+    if (r < 0) {
+        json_error(e, &je, 1, msg, sizeof msg);
+        editor_set_msg(e, MSG_TTL_MS, "%s", msg);
+        sbuf_free(&o);
+        return;
+    }
+    if (r > 0) {
+        editor_set_msg(e, MSG_TTL_MS, "%s", tr("JSON with comments: not rewritten, they would be lost"));
+        sbuf_free(&o);
+        return;
+    }
+    /* one step of undo */
+    buf_undo_begin(b, e->cy, e->cx);
+    buf_delete_range(b, 0, 0, b->nlines - 1, b->lines[b->nlines - 1].len);
+    buf_insert_text(b, &y, &x, o.p ? o.p : "", o.len);
+    buf_undo_close(b);
+    sbuf_free(&o);
+    e->cy = cy < b->nlines ? cy : b->nlines - 1;
+    e->cx = 0;
+    e->want_col = 0;
+    editor_set_msg(e, MSG_TTL_MS, tr("JSON: %zu lines"), b->nlines);
+}
+
+void editor_cmd_json_format(Editor *e)
+{
+    json_rewrite(e, 0);
+}
+
+void editor_cmd_json_compact(Editor *e)
+{
+    json_rewrite(e, 1);
+}
+
 static int save_doc_as(Editor *e, Doc *d, int force_prompt)
 {
     char name[sizeof e->prompt_text], err[256];
@@ -998,6 +1120,18 @@ static int save_doc_as(Editor *e, Doc *d, int force_prompt)
     apply_cfg(e, d);
     git_refresh_doc(e, d);
     editor_set_msg(e, MSG_TTL_MS, tr("%zu lines, %ld bytes written"), d->buf.nlines, n);
+    if (is_json(d)) {
+        /* saved anyway, but an invalid JSON is said at once */
+        size_t tn;
+        char *t = doc_text(d, &tn), msg[200];
+        JsonErr je;
+
+        if (json_check(t, tn, json_lenient(d), &je) < 0) {
+            json_error(e, &je, 0, msg, sizeof msg);
+            editor_set_msg(e, MSG_TTL_MS, "%s", msg);
+        }
+        free(t);
+    }
     return 0;
 }
 
