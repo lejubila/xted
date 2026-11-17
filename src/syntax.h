@@ -54,6 +54,8 @@ void syn_clear_user(void);
 /* Picks the language for a file from its name, first line (shebang) and
  * modelines in the first/last 5 lines. NULL means plain text. */
 Syntax *syn_detect(const Buffer *b);
+/* The language called name or one of its aliases (python, js, bash, c++ ...), NULL if none. */
+Syntax *syn_by_name(const char *name);
 
 /* Classifies one line: cls[i] receives the class of byte i (cls may be NULL
  * when only the state is wanted). Returns the state at the end of the line:

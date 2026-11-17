@@ -84,6 +84,7 @@ const Command commands[] = {
     { "git_refresh", N_("Refresh Git markers"), "", editor_cmd_git, 0, 0, G_RUN, ST_NONE },
     { "help", N_("Help"), "f1", editor_cmd_help, 0, 0, G_OTHER, ST_NONE },
     { "about", N_("About xted"), "", editor_cmd_about, 0, 0, G_OTHER, ST_NONE },
+    { "md_preview", N_("Markdown preview"), "alt+u", editor_cmd_md_preview, 0, 0, G_OTHER, ST_NONE },
     { "json_check", N_("Check JSON"), "", editor_cmd_json_check, 0, 0, G_OTHER, ST_NONE },
     { "json_format", N_("Format JSON"), "", editor_cmd_json_format, 1, 0, G_OTHER, ST_NONE },
     { "json_compact", N_("Compact JSON"), "", editor_cmd_json_compact, 1, 0, G_OTHER, ST_NONE },

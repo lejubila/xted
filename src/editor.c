@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "version.h"
 #include "json.h"
+#include "md.h"
 #include "edit.h"
 #include "imports.h"
 #include "cfgsave.h"
@@ -611,6 +612,32 @@ static void scroll(Editor *e)
 }
 
 /* Everything the renderer needs to be true before it draws. */
+/* A Markdown preview pane: made again when its source changed, the pane's width or the glyphs;
+ * scrolled to the part the source's cursor is in, when the source is the pane being edited. */
+static void md_refresh(Editor *e, Win *w)
+{
+    MdPreview *m = w->doc->md;
+    Doc *src = m->src;
+    int width = win_text_w(w), ascii = e->glyphs == GLYPHS_ASCII;
+    size_t th = w->h >= 2 ? (size_t)w->h - 1 : 1;
+
+    if (m->gen != src->buf.gen || m->width != width || m->glyphs != ascii || !m->st) {
+        md_build(m, &src->buf, &w->doc->buf, width, ascii);
+        m->gen = src->buf.gen;
+        m->synced_y = (size_t)-1;
+    }
+    if (e->doc == src && w != e->layout.active && m->synced_y != e->cy) {
+        size_t t = md_line_for(m, e->cy);
+
+        w->view.cy = t;
+        w->view.cx = 0;
+        w->view.rowoff = t > th / 3 ? t - th / 3 : 0;
+        if (w->view.rowoff + th > w->doc->buf.nlines)
+            w->view.rowoff = w->doc->buf.nlines > th ? w->doc->buf.nlines - th : 0;
+        m->synced_y = e->cy;
+    }
+}
+
 static void prepare_frame(Editor *e)
 {
     Win *w[64];
@@ -627,6 +654,8 @@ static void prepare_frame(Editor *e)
         Doc *d = w[i]->doc;
         size_t th = w[i]->h >= 2 ? (size_t)w[i]->h - 1 : 1;
 
+        if (d->md && d->md->src)
+            md_refresh(e, w[i]);
         view_clamp(&d->buf, &w[i]->view);
         if (w[i] != e->layout.active)
             scroll_view(&d->buf, &w[i]->view, th, (size_t)win_text_w(w[i]), d->tabw);
@@ -651,6 +680,11 @@ static void prepare_frame(Editor *e)
                 e->hint[0] = '\0';
         }
     }
+}
+
+void editor_render_prepare(Editor *e)
+{
+    prepare_frame(e);
 }
 
 static void resize(Editor *e)
@@ -1000,6 +1034,82 @@ static void json_error(Editor *e, const JsonErr *je, int go, char *out, size_t n
     }
 }
 
+static void remove_doc(Editor *e, Doc *d);
+
+/* The preview document of src: the one there is, or a new one. */
+static Doc *preview_doc(Editor *e, Doc *src)
+{
+    Doc *pd;
+    const char *base;
+    char title[300];
+    size_t k;
+
+    for (k = 0; k < e->ndocs; k++)
+        if (e->docs[k]->md && e->docs[k]->md->src == src)
+            return e->docs[k];
+    pd = doc_new();
+    pd->scratch = 1;
+    pd->readonly = 1;
+    pd->tabw = src->tabw;
+    base = src->buf.path ? strrchr(src->buf.path, '/') : NULL;
+    base = base ? base + 1 : src->buf.path ? src->buf.path : src->title ? src->title : "";
+    snprintf(title, sizeof title, "[%s] %s", tr("Preview"), base);
+    pd->title = xstrdup(title);
+    pd->md = xmalloc(sizeof *pd->md);
+    memset(pd->md, 0, sizeof *pd->md);
+    pd->md->src = src;
+    pd->md->synced_y = (size_t)-1;
+    add_doc(e, pd);
+    return pd;
+}
+
+/* Opens the rendered preview of the Markdown document beside it, or closes it. */
+void editor_cmd_md_preview(Editor *e)
+{
+    Win *w[64], *old = e->layout.active, *nw;
+    size_t n = layout_wins(&e->layout, w, 64), k;
+    Doc *src = e->doc, *pd = NULL;
+
+    if (src->md) {
+        /* in the preview itself: its pane goes, and the preview with it (it is no buffer) */
+        if (layout_count(&e->layout) > 1) {
+            layout_close(&e->layout, old);
+            load_win(e, e->layout.active);
+            remove_doc(e, src);
+            relayout(e);
+        }
+        return;
+    }
+    if (!src->syn || strcmp(syn_name(src->syn), "Markdown") != 0) {
+        editor_set_msg(e, MSG_TTL_MS, "%s", tr("Not a Markdown document"));
+        return;
+    }
+    for (k = 0; k < n && k < 64; k++)
+        if (w[k]->doc->md && w[k]->doc->md->src == src) {
+            Doc *p = w[k]->doc;
+
+            editor_store_view(e);
+            layout_close(&e->layout, w[k]);
+            load_win(e, e->layout.active);
+            remove_doc(e, p);
+            relayout(e);
+            return;
+        }
+    pd = preview_doc(e, src);
+    if (editor_split(e, 1) < 0) {
+        editor_set_msg(e, MSG_TTL_MS, "%s", tr("Not enough room to split"));
+        return;
+    }
+    /* the new pane, on the right, shows the preview; the source keeps the focus */
+    nw = e->layout.active;
+    load_win(e, old);
+    nw->doc = pd;
+    memset(&nw->view, 0, sizeof nw->view);
+    pd->md->gen = 0;
+    pd->md->synced_y = (size_t)-1;
+    relayout(e);
+}
+
 void editor_cmd_json_check(Editor *e)
 {
     size_t n;
@@ -1210,9 +1320,25 @@ static void cycle_doc(Editor *e, int delta)
 /* Drops d from the list; panes that showed it show a neighbour instead. */
 static void remove_doc(Editor *e, Doc *d)
 {
-    size_t i = doc_index(e, d), n, k;
+    size_t i, n, k;
     Doc *repl;
     Win *w[64];
+
+    /* its Markdown preview goes with it, and the panes that show it */
+    for (i = 0; i < e->ndocs; i++) {
+        Doc *p = e->docs[i];
+
+        if (p != d && p->md && p->md->src == d) {
+            n = layout_wins(&e->layout, w, 64);
+            for (k = 0; k < n && k < 64; k++)
+                if (w[k]->doc == p && layout_count(&e->layout) > 1)
+                    layout_close(&e->layout, w[k]);
+            p->md->src = NULL;
+            remove_doc(e, p);
+            i = (size_t)-1;             /* the list changed: from the start */
+        }
+    }
+    i = doc_index(e, d);
 
     if (e->ndocs == 1) {
         repl = doc_new();
@@ -1697,15 +1823,18 @@ static int handle_tree(Editor *e, Key k)
 }
 
 /* The panes as a prefix expression: "V50 <a> <b>" (side by side, a gets 50%),
- * "H30 <a> <b>" (stacked), or a leaf "W<doc>,<line>,<col>,<rowoff>,<coloff>". */
+ * "H30 <a> <b>" (stacked), or a leaf "W<doc>,<line>,<col>,<rowoff>,<coloff>" ("P" for the
+ * Markdown preview of that document). */
 static void ser_layout(SBuf *b, const Node *n, const int *docmap, const Editor *e)
 {
     if (n->win) {
         const View *v = &n->win->view;
-        int idx = docmap[doc_index(e, n->win->doc)];
+        const Doc *md_src = n->win->doc->md ? n->win->doc->md->src : NULL;
+        int idx = docmap[doc_index(e, md_src ? md_src : n->win->doc)];
 
-        sbuf_addf(b, "W%d,%zu,%zu,%zu,%zu ", idx < 0 ? 0 : idx, v->cy, v->cx, v->rowoff,
-                  v->coloff);
+        /* a Markdown preview is written as the preview of its source: P<doc> */
+        sbuf_addf(b, "%c%d,%zu,%zu,%zu,%zu ", md_src ? 'P' : 'W', idx < 0 ? 0 : idx, v->cy, v->cx,
+                  v->rowoff, v->coloff);
         return;
     }
     sbuf_addf(b, "%c%d ", n->vertical ? 'V' : 'H', (n->frac + 5) / 10);
@@ -1714,7 +1843,7 @@ static void ser_layout(SBuf *b, const Node *n, const int *docmap, const Editor *
 }
 
 typedef struct PNode {
-    int vertical, pct, leaf;
+    int vertical, pct, leaf, preview;
     long doc;
     size_t y, x, ro, co;
     struct PNode *a, *b;
@@ -1741,13 +1870,14 @@ static PNode *parse_layout(const char **p, int depth, int *count)
         return NULL;
     n = xmalloc(sizeof *n);
     memset(n, 0, sizeof *n);
-    if (**p == 'W') {
+    if (**p == 'W' || **p == 'P') {
         if (sscanf(*p + 1, "%ld,%zu,%zu,%zu,%zu%n", &n->doc, &n->y, &n->x, &n->ro, &n->co,
                    &used) < 5) {
             free(n);
             return NULL;
         }
         n->leaf = 1;
+        n->preview = **p == 'P';
         *p += 1 + used;
         return n;
     }
@@ -1774,6 +1904,8 @@ static int build_layout(Editor *e, const PNode *n, Doc *const *opened, size_t no
 
         w->doc = n->doc >= 0 && (size_t)n->doc < nopened && opened[n->doc] ? opened[n->doc]
                                                                            : e->doc;
+        if (n->preview && w->doc->syn && strcmp(syn_name(w->doc->syn), "Markdown") == 0)
+            w->doc = preview_doc(e, w->doc);
         memset(&w->view, 0, sizeof w->view);
         w->view.cy = n->y;
         w->view.cx = n->x;

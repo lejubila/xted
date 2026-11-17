@@ -161,6 +161,14 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   dopo uno spazio, le ancore `&base`, i riferimenti `*base` e i tag `!!str` `!Ref`, i trattini delle
   liste, e i blocchi di testo `chiave: |` e `chiave: >` finché le righe sono più indentate della
   chiave; Ctrl+T elenca le chiavi.
+  Per i file Markdown, `Alt+U` (o «Anteprima Markdown» nella palette) apre accanto al documento la
+  sua anteprima resa: titoli in grassetto e sottolineati, grassetto, corsivo, codice e barrato con lo
+  stile vero e senza i simboli, link sottolineati con l'indirizzo, liste con `•` e caselle `☐` `☑`,
+  citazioni con la barra, blocchi di codice su sfondo diverso e colorati col loro linguaggio
+  (` ```c `, ` ```python `…), tabelle con le colonne allineate, righe orizzontali, al posto delle
+  immagini il loro testo. L'anteprima si aggiorna mentre si scrive, va a capo alla larghezza del
+  pannello e segue la parte del documento dov'è il cursore; è in sola lettura e si chiude con
+  `Alt+U` o insieme al documento. Con «Caratteri grafici: ascii» usa `*`, `|`, `-`, `[x]`.
   Nei file JSON le chiavi hanno un colore diverso dai valori, le parentesi `{ } [ ]` sono colorate e
   Ctrl+T elenca le chiavi a ogni livello. Nella palette: «Controlla JSON» porta il cursore sul primo
   errore e dice cos'è («JSON: riga 12, colonna 5: manca una virgola»); «Formatta JSON» riscrive il
@@ -404,6 +412,7 @@ annulla, `Invio` conferma.
 |---|---|
 | `F1` | Guida: versione e crediti, tutti i comandi con le scorciatoie attuali, i tasti delle liste e della ricerca, i file usati |
 | `Alt+X` | Command palette |
+| `Alt+U` | Anteprima di un file Markdown, in un pannello accanto (di nuovo `Alt+U` per chiuderla) |
 | `Alt+T` | Cambia tema |
 | `Ctrl+L` | Ridisegna lo schermo |
 

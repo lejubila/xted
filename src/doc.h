@@ -49,6 +49,7 @@ typedef struct Doc {
     off_t size;
     ino_t ino;
     View last;              /* where the cursor was when the document was last left */
+    struct MdPreview *md;   /* a Markdown preview: its source and the style of its text */
 } Doc;
 
 Doc *doc_new(void);

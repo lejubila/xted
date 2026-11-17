@@ -1,5 +1,6 @@
 #include "render.h"
 #include "keymap.h"
+#include "md.h"
 #include "commands.h"
 #include "i18n.h"
 #include "doc.h"
@@ -207,6 +208,31 @@ static void set_cls(SBuf *o, const Editor *e, int *cur, int cls)
         return;
     theme_fg(o, e->color_depth, e->theme->cls[cls]);
     *cur = cls;
+}
+
+/* The attributes of a Markdown preview's byte (MD_BOLD...), only emitting the changes; the code
+ * blocks take the popup's background. */
+static void set_md(SBuf *o, const Editor *e, int *at, int want)
+{
+    int ch = *at ^ want;
+
+    if (!ch)
+        return;
+    if (ch & MD_BOLD)
+        sbuf_adds(o, want & MD_BOLD ? "\x1b[1m" : "\x1b[22m");
+    if (ch & MD_ITALIC)
+        sbuf_adds(o, want & MD_ITALIC ? "\x1b[3m" : "\x1b[23m");
+    if (ch & MD_UNDER)
+        sbuf_adds(o, want & MD_UNDER ? "\x1b[4m" : "\x1b[24m");
+    if ((ch & MD_CODEBG) && e->color_depth != COLOR_NONE) {
+        if (want & MD_CODEBG)
+            theme_bg(o, e->color_depth, e->theme->popup);
+        else if (e->theme->has_bg)
+            theme_bg(o, e->color_depth, e->theme->bg);
+        else
+            sbuf_adds(o, "\x1b[49m");
+    }
+    *at = want;
 }
 
 /* Bold + underline marks a bracket and its partner, without needing colours. */
@@ -424,7 +450,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     int colors, cur = SC_NORMAL, br = 0, prev_visible = 0, hl = 0, sel_nl = 0, has_sel;
     Matcher *hm = e->find.hl && e->find.m && e->find.m->valid ? e->find.m : NULL;
     size_t mr[32][2], nm = 0, mk = 0;
-    int mt = 0, ov_done = 0, xeol = 0;
+    int mt = 0, ov_done = 0, xeol = 0, at = 0;
+    const uint8_t *mds = NULL;
     size_t xr[64][2], nxr = 0, xi;
     int bg_row = e->color_depth != COLOR_NONE && e->theme->has_bg;
 
@@ -471,7 +498,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         return;
     }
     l = &d->buf.lines[y];
-    colors = e->color_depth != COLOR_NONE && (d->syn || e->theme->has_bg);
+    colors = e->color_depth != COLOR_NONE && (d->syn || e->theme->has_bg || d->md);
+    mds = d->md ? md_styles(d->md, y) : NULL;
     if (colors) {
         theme_fg(o, e->color_depth, e->theme->fg);
         if (e->theme->has_bg)
@@ -524,7 +552,7 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
 
         int mark = active && e->match_on &&
                    ((y == e->by && i == e->bx) || (y == e->my && i == e->mx));
-        int cc = cls ? cls[i] : SC_NORMAL;
+        int cc = mds ? (mds[i] & MD_CLS) : cls ? cls[i] : SC_NORMAL;
         int inm;
 
         for (xk = 0; xk < nxr; xk++)
@@ -575,6 +603,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         set_br(o, &br, mark);
         if (colors)
             set_cls(o, e, &cur, cc);
+        if (mds)
+            set_md(o, e, &at, mds[i - (size_t)n] & ~MD_CLS);
         if (start >= left && stop <= right) {
             if (cp == '\t') {
                 spaces(o, cw);
@@ -600,6 +630,7 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     set_hl(o, &hl, 0);
     set_mt(o, e, &mt, 0);
     set_br(o, &br, 0);
+    set_md(o, e, &at, 0);
     if (ov && !ov_done) {
         /* the line ends before the popup */
         if (col < ov->c0)

@@ -268,6 +268,9 @@ void editor_cmd_colors(Editor *e);
 void editor_cmd_glyphs(Editor *e);
 void editor_cmd_about(Editor *e);
 void editor_cmd_json_check(Editor *e);
+void editor_cmd_md_preview(Editor *e);
+/* What is done before a frame is drawn (layout, scroll, previews made again): for the tests. */
+void editor_render_prepare(Editor *e);
 void editor_cmd_json_format(Editor *e);
 void editor_cmd_json_compact(Editor *e);
 /* "unicode", "windows" or "ascii". */

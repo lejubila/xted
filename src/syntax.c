@@ -1320,6 +1320,11 @@ static Syntax *lang_by_name(const char *name)
     return i < 0 ? NULL : parse_lang((size_t)i);
 }
 
+Syntax *syn_by_name(const char *name)
+{
+    return name && name[0] ? lang_by_name(name) : NULL;
+}
+
 /* A .php file that does not start with "<?" is a template: HTML with PHP inside. */
 static int php_is_template(const Buffer *b)
 {

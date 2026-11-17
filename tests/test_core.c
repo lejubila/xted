@@ -11,6 +11,7 @@
 #include "i18n.h"
 #include "keymap.h"
 #include "json.h"
+#include "md.h"
 #include "errors.h"
 #include "edit.h"
 #include "files.h"
@@ -6183,6 +6184,163 @@ static void test_json(void)
     }
 }
 
+/* The rendered Markdown: the text, the style of its bytes and the source line of each line. */
+static void test_md_render(void)
+{
+    static const char *src =
+        "# Title\n"                                   /* 0 */
+        "\n"
+        "Text with **bold**, *it*, `code`, [link](http://x.y) and a_b_c.\n"  /* 2 */
+        "\n"
+        "- one\n"                                     /* 4 */
+        "  - two\n"
+        "- [x] done\n"
+        "\n"
+        "> quote\n"                                   /* 8 */
+        "\n"
+        "```c\n"                                      /* 10 */
+        "int x;\n"
+        "```\n"
+        "\n"
+        "| A | B |\n"                                 /* 14 */
+        "|---|--:|\n"
+        "| xy | 1 |\n"
+        "\n"
+        "Sub\n"                                       /* 18 */
+        "---\n"
+        "\n"
+        "***\n";                                      /* 21 */
+    Buffer b, out;
+    MdPreview m;
+    size_t y = 0, x = 0, i;
+    const uint8_t *st;
+    const char *t;
+
+    buf_init(&b);
+    buf_init(&out);
+    buf_insert_text(&b, &y, &x, src, strlen(src));
+    memset(&m, 0, sizeof m);
+    md_build(&m, &b, &out, 40, 0);
+    CHECK(m.n == out.nlines);
+    CHECK(line_is(&out, 0, "Title"));
+    st = md_styles(&m, 0);
+    CHECK(st && (st[0] & MD_CLS) == SC_HEADING && (st[0] & MD_BOLD));
+    CHECK(line_is(&out, 1, "\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90"));
+    /* the paragraph: the marks gone, the styles on, wrapped at 40 columns */
+    CHECK(line_is(&out, 3, "Text with bold, it, code, link"));
+    st = md_styles(&m, 3);
+    t = out.lines[3].s;
+    CHECK((st[10] & MD_BOLD) && !(st[9] & MD_BOLD));                    /* bold */
+    CHECK(st[16] & MD_ITALIC);                                           /* it */
+    CHECK((st[20] & MD_CLS) == SC_CODE);                                 /* code */
+    CHECK((st[26] & MD_CLS) == SC_LINK && (st[26] & MD_UNDER) && t[26] == 'l');
+    CHECK(line_is(&out, 4, "(http://x.y) and a_b_c."));
+    CHECK(m.srcline[3] == 2 && m.srcline[4] == 2);
+    /* lists, nested, a task */
+    CHECK(line_is(&out, 6, "\xe2\x80\xa2 one") && line_is(&out, 7, "  \xe2\x80\xa2 two") &&
+          line_is(&out, 8, "\xe2\x98\x91 done"));
+    CHECK(m.srcline[7] == 5);
+    CHECK(line_is(&out, 10, "\xe2\x94\x82 quote") && (md_styles(&m, 10)[0] & MD_CLS) == SC_COMMENT);
+    /* the code block: its background over the whole width, the C keyword coloured */
+    for (i = 0; i < out.nlines && !line_is(&out, i, " int x;"); i++)
+        if (out.lines[i].len >= 7 && memcmp(out.lines[i].s, " int x;", 7) == 0)
+            break;
+    CHECK(i < out.nlines && out.lines[i].len == 40);
+    st = md_styles(&m, i);
+    CHECK((st[0] & MD_CODEBG) && (st[39] & MD_CODEBG) && (st[1] & MD_CLS) == SC_TYPE && m.srcline[i] == 11);
+    /* the table: columns aligned, the second to the right */
+    for (i = 0; i < out.nlines; i++)
+        if (out.lines[i].len > 3 && memcmp(out.lines[i].s, " A ", 3) == 0)
+            break;
+    CHECK(i + 3 < out.nlines);
+    CHECK(line_is(&out, i, " A  \xe2\x94\x82 B ") && line_is(&out, i + 2, " xy \xe2\x94\x82 1 "));
+    CHECK((md_styles(&m, i)[1] & MD_BOLD) && m.srcline[i + 2] == 16);
+    /* a setext heading and a rule */
+    for (i = 0; i < out.nlines && !line_is(&out, i, "Sub"); i++)
+        ;
+    CHECK(i < out.nlines && (md_styles(&m, i)[0] & MD_CLS) == SC_HEADING);
+    CHECK(md_line_for(&m, 18) == i);
+    CHECK(out.lines[out.nlines - 1].len == 40 * 3);          /* ─ is 3 bytes */
+    /* ascii */
+    md_build(&m, &b, &out, 40, 1);
+    CHECK(line_is(&out, 1, "=====") && line_is(&out, 6, "* one") && line_is(&out, 8, "[x] done") &&
+          line_is(&out, 10, "| quote"));
+    md_free(&m);
+    buf_free(&b);
+    buf_free(&out);
+}
+
+/* The preview pane: Alt+U opens it beside the document, the source keeps the focus, the preview
+ * follows the text and the cursor, Alt+U again closes it, closing the source takes it away. */
+static void test_md_preview_pane(void)
+{
+    char dir[64], path[256], err[128];
+    Editor e;
+    Doc *d;
+    Win *w[8];
+    size_t n, k, i;
+    Doc *pv = NULL;
+    SBuf big = SBUF_INIT;
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    sbuf_adds(&big, "# Doc\n\n");
+    for (i = 0; i < 80; i++)
+        sbuf_addf(&big, "Paragraph %zu.\n\n", i);
+    sbuf_adds(&big, "## End\n");
+    sbuf_add(&big, "", 1);
+    put_file(dir, "r.md", big.p);
+    sbuf_free(&big);
+    put_file(dir, "a.txt", "x\n");
+    editor_init(&e);
+    e.rows = 30;
+    e.cols = 120;
+    snprintf(path, sizeof path, "%s/a.txt", dir);
+    d = editor_open_doc(&e, path, err, sizeof err);
+    editor_activate(&e, d);
+    editor_cmd_md_preview(&e);
+    CHECK(strstr(e.msg, "Markdown") && layout_count(&e.layout) == 1);
+    snprintf(path, sizeof path, "%s/r.md", dir);
+    d = editor_open_doc(&e, path, err, sizeof err);
+    CHECK(d != NULL);
+    editor_activate(&e, d);
+    kkey(&e, 'u', MOD_ALT);
+    CHECK(layout_count(&e.layout) == 2 && e.doc == d);
+    n = layout_wins(&e.layout, w, 8);
+    for (k = 0; k < n; k++)
+        if (w[k]->doc->md)
+            pv = w[k]->doc;
+    CHECK(pv && pv->readonly && pv->scratch && strstr(pv->title, "r.md"));
+    editor_render_prepare(&e);
+    CHECK(pv->buf.nlines > 100 && line_is(&pv->buf, 0, "Doc"));
+    /* the cursor at the end: the preview shows the end */
+    e.cy = d->buf.nlines - 1;
+    editor_render_prepare(&e);
+    for (k = 0; k < n; k++)
+        if (w[k]->doc == pv)
+            CHECK(w[k]->view.rowoff > 100);
+    /* an edit shows at once */
+    e.cy = 0;
+    e.cx = d->buf.lines[0].len;
+    kkey(&e, 'X', 0);
+    editor_render_prepare(&e);
+    CHECK(line_is(&pv->buf, 0, "DocX"));
+    /* Alt+U again closes it, from the source */
+    kkey(&e, 'u', MOD_ALT);
+    CHECK(layout_count(&e.layout) == 1 && e.doc == d);
+    for (k = 0; k < e.ndocs; k++)
+        CHECK(!e.docs[k]->md);                  /* the preview is no buffer of its own */
+    kkey(&e, 'u', MOD_ALT);
+    CHECK(layout_count(&e.layout) == 2);
+    /* closing the source (without saving) takes the preview and its pane away */
+    edit_undo(&e);
+    editor_cmd_close_buffer(&e);
+    CHECK(layout_count(&e.layout) == 1);
+    for (k = 0; k < e.ndocs; k++)
+        CHECK(!e.docs[k]->md);
+    editor_free(&e);
+    rm_rf(dir);
+}
+
 static void test_config_merge(void)
 {
     Config user, proj;
@@ -6692,6 +6850,8 @@ int main(void)
     test_dotenv();
     test_yaml();
     test_json();
+    test_md_render();
+    test_md_preview_pane();
     test_syntax_incremental();
     test_syntax_brackets();
     test_theme();

@@ -22,6 +22,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | File | Responsabilità |
 |---|---|
 | `src/main.c` | Argomenti da riga di comando (`--version`) e avvio (la schermata iniziale: `Editor.intro`) |
+| `src/md.[ch]` | Anteprima Markdown: `md_build` scrive il testo reso nel buffer del documento di anteprima e uno stile per byte (`MdPreview.st`: classe `SC_*` più `MD_BOLD/ITALIC/UNDER/CODEBG`, disegnati da `set_md` in render.c) con la riga sorgente di ogni riga (`md_line_for` per lo scorrimento); il documento di anteprima ha `Doc.md` (sorgente, gen e larghezza per cui è fatto), `md_refresh` in editor.c lo rifà e lo sincronizza in `prepare_frame`, `editor_cmd_md_preview` (Alt+U) apre e chiude il pannello, `remove_doc` lo chiude col sorgente; i blocchi di codice usano `syn_by_name` |
 | `src/json.[ch]` | Parser JSON senza allocazioni: `json_check` (primo errore con riga e colonna, commenti ammessi, virgola finale solo `lenient`) e `json_format` (indentato o compatto, rifiuta i testi con commenti); i comandi «Controlla/Formatta/Compatta JSON» e il controllo dopo il salvataggio sono in editor.c (`json_lenient` decide per nome di file) |
 | `src/version.h` | Versione e crediti (`XTED_VERSION`, anno, autore, licenza): `--version`, guida F1, «Informazioni su xted», schermata iniziale |
 | `src/term.[ch]` | Raw mode, alternate screen, segnali, `poll()`, decodifica dei tasti |

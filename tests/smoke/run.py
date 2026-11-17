@@ -519,6 +519,36 @@ def json_file():
 
 
 @scenario
+def markdown_preview():
+    b = Box()
+    b.write("notes.md", "# Notes\n\nSome **bold** text.\n\n- first\n- second\n")
+    b.write("a.txt", "plain\n")
+    r = b.run(["notes.md"], cols=120)
+    r.type(alt("u"), 0.4)
+    t = r.screen().text()
+    rows = r.screen().lines()
+    check("Alt+U opens the rendered preview beside the document",
+          "[Preview] notes.md" in t and "\u2022 first" in t and "Some bold text." in t, t[:900])
+    check("the source keeps the cursor", r.screen().c < 60, r.screen().c)
+    r.type(DOWN, DOWN, END, " More", 0.4)
+    check("the preview follows the edits", "Some bold text. More" in r.screen().text(), r.screen().text()[:900])
+    r.type(alt("u"), 0.3)
+    check("Alt+U again closes it", "[Preview]" not in r.screen().text())
+    r.type(alt("u"), 0.3)
+    quit_(r, discard=True)
+    r = b.run([], cols=120)
+    t = r.screen().text()
+    check("the session brings the preview back as a preview", "[Preview] notes.md" in t and "\u2022 first" in t,
+          t[:600])
+    quit_(r)
+    r = b.run(["a.txt"])
+    r.type(alt("u"), 0.3)
+    check("a file that is not Markdown has no preview", "Not a Markdown document" in r.screen().text())
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

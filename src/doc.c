@@ -1,4 +1,5 @@
 #include "doc.h"
+#include "md.h"
 #include "i18n.h"
 #include "util.h"
 
@@ -28,6 +29,10 @@ void doc_free(Doc *d)
     syn_free(d->syn);
     buf_free(&d->buf);
     free(d->title);
+    if (d->md) {
+        md_free(d->md);
+        free(d->md);
+    }
     free(d);
 }
 
