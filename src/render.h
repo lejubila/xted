@@ -23,5 +23,7 @@ void render_frame(Render *r, const struct Editor *e);
 
 /* The key a click at (x, y) on the message row's buttons stands for. Returns 0 if none. */
 int render_hint_key(int x, int y, Key *k);
+/* The button at (x, y) is held down (drawn in reverse) when on, none when off. */
+void render_hint_press(int x, int y, int on);
 
 #endif

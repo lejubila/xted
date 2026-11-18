@@ -193,7 +193,7 @@ static int tabbar_visible(const Editor *e)
 
 static void relayout(Editor *e)
 {
-    int y0 = tabbar_visible(e) ? 1 : 0, x0 = 0, h = e->rows - y0 - 1;
+    int y0 = tabbar_visible(e) ? 1 : 0, x0 = 0, h = e->rows - y0 - EDITOR_BOTTOM(e);
     int sb = e->sidebar_on ? e->sidebar_cols : 0;
 
     if (sb > e->cols / 2)
@@ -403,6 +403,8 @@ void editor_load_config(Editor *e)
     }
     if (e->cfg.glyphs >= 0)
         e->glyphs = e->cfg.glyphs;
+    if (e->cfg.keybar >= 0)
+        e->keybar = e->cfg.keybar;
     if (e->cfg.theme[0]) {
         int t = theme_by_name(e->cfg.theme);
 
@@ -645,7 +647,7 @@ static void prepare_frame(Editor *e)
 
     relayout(e);
     if (e->tree_ready)
-        tree_fit(&e->tree, (size_t)(e->rows - e->text_y - 1));
+        tree_fit(&e->tree, (size_t)(e->rows - e->text_y - EDITOR_BOTTOM(e)));
     fold_reveal(e);
     scroll(e);
     editor_store_view(e);
@@ -750,11 +752,16 @@ static int next_key(Editor *e, Key *k)
             MouseEv ev = term_mouse_event();
             Key hk;
 
-            if (ev.y == e->rows - 1 && ev.kind == MOUSE_PRESS && ev.button == 0 &&
-                render_hint_key(ev.x, ev.y, &hk))
+            /* a button of the key bar: its key; shown pressed until the button is let go */
+            if (ev.y >= e->rows - EDITOR_BOTTOM(e) && ev.kind == MOUSE_PRESS && ev.button == 0 &&
+                render_hint_key(ev.x, ev.y, &hk)) {
                 *k = hk;
-            else if (ev.y == e->rows - 1 && ev.kind == MOUSE_RELEASE)
-                k->code = KEY_NONE;
+                render_hint_press(ev.x, ev.y, 1);
+            } else if (ev.kind == MOUSE_RELEASE) {
+                render_hint_press(0, 0, 0);     /* let go anywhere: no button is held */
+                if (ev.y >= e->rows - EDITOR_BOTTOM(e))
+                    k->code = KEY_NONE;
+            }
         }
         if (k->code != KEY_NONE)
             return 0;
@@ -3114,6 +3121,21 @@ const char *editor_glyphs_name(int g)
     return g == GLYPHS_ASCII ? "ascii" : g == GLYPHS_WINDOWS ? "windows" : "unicode";
 }
 
+const char *editor_keybar_name(int k)
+{
+    return k == KEYBAR_LINE ? "line" : k == KEYBAR_OFF ? "off" : "message";
+}
+
+/* Where the keys of the context go: the message row -> a row of their own -> none. */
+void editor_cmd_keybar(Editor *e)
+{
+    e->keybar = (e->keybar + 1) % 3;
+    e->pend |= PEND_KEYBAR;
+    relayout(e);
+    render_invalidate(e->render);
+    editor_set_msg(e, MSG_TTL_MS, tr("Key bar: %s"), editor_keybar_name(e->keybar));
+}
+
 /* The symbols of the file browser, the pane borders and the palette: unicode -> windows ->
  * ascii -> unicode. */
 void editor_cmd_glyphs(Editor *e)
@@ -3494,6 +3516,13 @@ static void project_globals(Editor *e, int live)
         if (live)
             e->glyphs = c.glyphs;
     }
+    if (c.keybar >= 0) {
+        e->cfg.keybar = c.keybar;
+        if (live && e->keybar != c.keybar) {
+            e->keybar = c.keybar;
+            relayout(e);
+        }
+    }
     if (c.git >= 0) {
         int changed = c.git != (e->cfg.git != 0);
 
@@ -3619,6 +3648,10 @@ static void pending_get(const Editor *e, Pending *p)
         p->gp[p->ng].key = "glyphs";
         p->gp[p->ng++].value = editor_glyphs_name(e->glyphs);
     }
+    if (e->pend & PEND_KEYBAR) {
+        p->gp[p->ng].key = "keybar";
+        p->gp[p->ng++].value = editor_keybar_name(e->keybar);
+    }
     for (i = 0; i < e->ndocs && p->nmore < 6; i++) {
         Doc *o = e->docs[i];
         const char *lg = o->syn ? syn_name(o->syn) : NULL;
@@ -3717,7 +3750,7 @@ static int proj_sets_globals(const Editor *e, const Pending *p)
         if ((strcmp(k, "theme") == 0 && c.theme[0]) || (strcmp(k, "mouse") == 0 && c.mouse >= 0) ||
             (strcmp(k, "git") == 0 && c.git >= 0) || (strcmp(k, "clipboard") == 0 && c.clipboard >= 0) ||
             (strcmp(k, "language") == 0 && c.language[0]) || (strcmp(k, "colors") == 0 && c.colors >= 0) ||
-            (strcmp(k, "glyphs") == 0 && c.glyphs >= 0))
+            (strcmp(k, "glyphs") == 0 && c.glyphs >= 0) || (strcmp(k, "keybar") == 0 && c.keybar >= 0))
             r = 1;
     }
     config_free(&c);

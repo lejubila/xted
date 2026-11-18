@@ -39,8 +39,13 @@ typedef struct {
  * ascii: + - | * o */
 enum { GLYPHS_UNICODE = 0, GLYPHS_WINDOWS = 1, GLYPHS_ASCII = 2 };
 
+/* where the keys of the context go: in the message row, in a row of their own above it, nowhere */
+enum { KEYBAR_MESSAGE = 0, KEYBAR_LINE = 1, KEYBAR_OFF = 2 };
+/* the rows at the bottom of the screen that are not text: the message row, and the keys' own */
+#define EDITOR_BOTTOM(e) ((e)->keybar == KEYBAR_LINE ? 2 : 1)
+
 enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8, PEND_LANG = 16, PEND_COLORS = 32,
-       PEND_GLYPHS = 64 };
+       PEND_GLYPHS = 64, PEND_KEYBAR = 128 };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -168,6 +173,7 @@ typedef struct Editor {
     int color_depth;
     int colors_mode;        /* COLOR_* chosen in the palette or the configuration, -1 for auto */
     int glyphs;             /* GLYPHS_*: the symbols of the file browser, the borders, the palette */
+    int keybar;             /* KEYBAR_*: where the keys of the context are shown */
     int intro;              /* the start screen (name, version, credits) until the first key */
     const char *asking;     /* the answers of the question on the message row (ask), or NULL */
     int match_on;           /* the bracket at/before the cursor has a partner */
@@ -267,6 +273,7 @@ void editor_cmd_match(Editor *e);
 void editor_cmd_theme(Editor *e);
 void editor_cmd_colors(Editor *e);
 void editor_cmd_glyphs(Editor *e);
+void editor_cmd_keybar(Editor *e);
 void editor_cmd_about(Editor *e);
 void editor_cmd_json_check(Editor *e);
 void editor_cmd_md_preview(Editor *e);
@@ -276,6 +283,7 @@ void editor_cmd_json_format(Editor *e);
 void editor_cmd_json_compact(Editor *e);
 /* "unicode", "windows" or "ascii". */
 const char *editor_glyphs_name(int g);
+const char *editor_keybar_name(int k);
 /* The colour mode for the palette: "auto (256)", "truecolor", "256", "16", "none". */
 void editor_colors_label(const Editor *e, char *out, size_t n);
 void editor_cmd_indent_tabs(Editor *e);

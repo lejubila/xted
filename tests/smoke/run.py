@@ -433,7 +433,7 @@ def keys_row():
     check("and when it is gone they come back", "Ctrl+S save" in last(), last())
     quit_(r)
     r = b.run(["a.txt"], cols=50)
-    check("a narrow terminal shows the first ones that fit", "Ctrl+S save" in last() and "Ctrl+G" not in last()
+    check("a narrow terminal shows the first ones that fit", "^S save" in last() and "^G" not in last()
           and len(last().rstrip()) <= 50, last())
     quit_(r)
     b.close()
@@ -629,6 +629,38 @@ def context_keys_more():
     before = r.out
     click_label(r, "Alt+C")
     check("a click on Alt+C turns the option on (shown bold)", len(r.out) > len(before) and "Alt+C" in last(), last())
+    quit_(r)
+    b.close()
+
+
+@scenario
+def keybar_options():
+    b = Box()
+    b.write("a.txt", "one\ntwo\n")
+    b.write(".cfg/xted/config", "keybar = line\n")
+    r = b.run(["a.txt"], cols=120)
+    lines = lambda: r.screen().lines()
+    check("keybar = line: the keys in a row of their own above the messages", "Ctrl+S save" in lines()[-2]
+          and "Ctrl+S" not in lines()[-1], "\n".join(lines()[-3:]))
+    r.type(ctrl("s"), 0.3)
+    check("a message leaves them in their row", "written" in lines()[-1] and "Ctrl+S save" in lines()[-2],
+          "\n".join(lines()[-2:]))
+    row = lines()[-2]
+    x = row.find("Ctrl+F find")
+    r.type("\x1b[<0;%d;%dM" % (x + 2, r.rows - 1), 0.3)
+    check("a click on their row works too, and holds the button down until let go",
+          "Find:" in lines()[-1] and b"\x1b[7m" in r.out, lines()[-1])
+    r.type("\x1b[<0;%d;%dm" % (x + 2, r.rows - 1), 0.2, ESC, 0.2)
+    r.type(alt("x"), "key bar", 0.3, ENTER, 0.3)
+    check("Key bar in the palette: off hides them", "off" in lines()[-1] and
+          "Ctrl+S save" not in "\n".join(lines()[-2:]), "\n".join(lines()[-2:]))
+    r.type(ENTER, 0.3, ESC, 0.3)
+    check("and again: back in the message row", "Ctrl+Q quit" in lines()[-1], lines()[-1])
+    quit_(r)
+    b.write(".cfg/xted/config", "")
+    r = b.run(["a.txt"], cols=60)
+    check("a narrow terminal: short names (^S, M-x) to show more keys", "^S save" in lines()[-1] and
+          "M-x commands" in lines()[-1], lines()[-1])
     quit_(r)
     b.close()
 

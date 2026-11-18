@@ -973,6 +973,15 @@ int render_hint_key(int x, int y, Key *k)
     return 0;
 }
 
+static struct { int x, y, on; } press;
+
+void render_hint_press(int x, int y, int on)
+{
+    press.x = x;
+    press.y = y;
+    press.on = on;
+}
+
 static size_t hint_add(Hint *h, size_t n, size_t max, const char *id, const char *what)
 {
     size_t k;
@@ -1106,19 +1115,31 @@ static size_t context_hints(const Editor *e, Hint *h, size_t max)
     return hint_add(h, n, max, "goto_line", N_("line"));
 }
 
-/* Draws the buttons of h that fit in [from, cols) of the message row (from is the column the
- * output is at), left-aligned or against the right edge with a gap of 3 after what is there, and
- * remembers where they are for the mouse. Returns the columns used. */
-static size_t draw_hints(SBuf *o, const Editor *e, const Hint *h, size_t n, size_t from, size_t cols,
-                         int right)
+/* The short name of a key, as nano writes it: ^S for Ctrl+S, M-x for Alt+X, S- for Shift. */
+static void key_short(char *s)
 {
-    char lab[HINT_HITS][96];
-    Key key[HINT_HITS];
-    size_t w[HINT_HITS], kl[HINT_HITS], i, total = 0, take = 0, x;
-    int y = e->rows - 1;
+    static const char *const from[] = { "Ctrl+", "Alt+", "Shift+" }, *const to[] = { "^", "M-", "S-" };
+    size_t i;
+    char *p;
 
-    if (n > HINT_HITS)
-        n = HINT_HITS;
+    for (i = 0; i < 3; i++)
+        while ((p = strstr(s, from[i])) != NULL) {
+            size_t fl = strlen(from[i]), tl = strlen(to[i]);
+
+            memcpy(p, to[i], tl);
+            memmove(p + tl, p + fl, strlen(p + fl) + 1);
+            if (i == 1 && p[tl] >= 'A' && p[tl] <= 'Z' && p[tl + 1] == '\0')
+                p[tl] = (char)(p[tl] - 'A' + 'a');     /* M-x: Alt+letter in lower case */
+        }
+}
+
+/* Fills the labels of the buttons of h (short key names when shortk) and their widths; a button
+ * that cannot be shown (a command that does not exist) has width 0. Returns how many have one. */
+static size_t hint_labels(const Editor *e, const Hint *h, size_t n, int shortk, char (*lab)[96],
+                          Key *key, size_t *w, size_t *kl)
+{
+    size_t i, shown = 0;
+
     for (i = 0; i < n; i++) {
         char ks[48];
         int cmd = h[i].id ? command_by_id(h[i].id) : -1;
@@ -1140,22 +1161,69 @@ static size_t draw_hints(SBuf *o, const Editor *e, const Hint *h, size_t n, size
             key[i].code = h[i].code;
             key[i].mods = h[i].mods;
         }
-        if (h[i].label)
+        if (h[i].label) {
             snprintf(ks, sizeof ks, "%s", h[i].label);
-        else
+        } else {
             key_format(key[i], 1, ks, sizeof ks);
+            if (shortk)
+                key_short(ks);
+        }
         kl[i] = strlen(ks);
         snprintf(lab[i], sizeof lab[i], "%s%s%s", ks, h[i].what[0] ? " " : "", h[i].what[0] ? tr(h[i].what) : "");
         w[i] = utf8_cols(lab[i], strlen(lab[i]), strlen(lab[i]), 8);
     }
-    /* as many as fit, in order */
+    for (i = 0; i < n; i++)
+        shown += w[i] > 0;
+    return shown;
+}
+
+/* How many of the buttons fit in [from, cols), in order: their total width in *total, the end of
+ * the last one in *take, the number in the return. */
+static size_t hint_fit(const size_t *w, size_t n, size_t from, size_t cols, int right, size_t *total,
+                       size_t *take)
+{
+    size_t i, fit = 0;
+
+    *total = *take = 0;
     for (i = 0; i < n; i++) {
         if (!w[i])
             continue;
-        if (from + (right ? 3 : 0) + total + (take ? 2 : 0) + w[i] + (right ? 1 : 0) > cols)
+        if (from + (right ? 3 : 0) + *total + (*take ? 2 : 0) + w[i] + (right ? 1 : 0) > cols)
             break;
-        total += (take ? 2 : 0) + w[i];
-        take = i + 1;
+        *total += (*take ? 2 : 0) + w[i];
+        *take = i + 1;
+        fit++;
+    }
+    return fit;
+}
+
+/* Draws the buttons of h that fit in [from, cols) of screen row y (from is the column the output
+ * is at), left-aligned or against the right edge with a gap of 3 after what is there, and
+ * remembers where they are for the mouse; when they do not all fit the keys get their short names
+ * (^S, M-x) when not even half fit, if that shows more. Returns the columns used. */
+static size_t draw_hints(SBuf *o, const Editor *e, const Hint *h, size_t n, size_t from, size_t cols,
+                         int right, int y)
+{
+    char lab[HINT_HITS][96];
+    Key key[HINT_HITS];
+    size_t w[HINT_HITS], kl[HINT_HITS], i, total, take, x, shown;
+
+    if (n > HINT_HITS)
+        n = HINT_HITS;
+    shown = hint_labels(e, h, n, 0, lab, key, w, kl);
+    /* a narrow row, where not even half of them fit: the short names */
+    if (hint_fit(w, n, from, cols, right, &total, &take) * 2 < shown) {
+        char slab[HINT_HITS][96];
+        size_t sw[HINT_HITS], skl[HINT_HITS], stotal, stake;
+
+        hint_labels(e, h, n, 1, slab, key, sw, skl);
+        if (hint_fit(sw, n, from, cols, right, &stotal, &stake) > hint_fit(w, n, from, cols, right, &total, &take)) {
+            memcpy(lab, slab, sizeof lab);
+            memcpy(w, sw, sizeof w);
+            memcpy(kl, skl, sizeof kl);
+            total = stotal;
+            take = stake;
+        }
     }
     if (!total)
         return 0;
@@ -1169,12 +1237,16 @@ static size_t draw_hints(SBuf *o, const Editor *e, const Hint *h, size_t n, size
             sbuf_adds(o, "  ");
             x += 2;
         }
-        /* the key bright, what it does dim (bright too for a hot one) */
-        sbuf_adds(o, "\x1b[1m");
-        sbuf_add(o, lab[i], kl[i]);
-        sbuf_adds(o, h[i].hot ? "\x1b[22m" : "\x1b[22m\x1b[2m");
-        sbuf_adds(o, lab[i] + kl[i]);
-        sbuf_adds(o, "\x1b[22m");
+        /* the key bright, what it does dim (bright too for a hot one); in reverse while held */
+        {
+            int held = press.on && press.y == y && press.x >= (int)x && press.x < (int)(x + w[i]);
+
+            sbuf_adds(o, held ? "\x1b[7m\x1b[1m" : "\x1b[1m");
+            sbuf_add(o, lab[i], kl[i]);
+            sbuf_adds(o, h[i].hot || held ? "\x1b[22m" : "\x1b[22m\x1b[2m");
+            sbuf_adds(o, lab[i] + kl[i]);
+            sbuf_adds(o, held ? "\x1b[22m\x1b[27m" : "\x1b[22m");
+        }
         if (nhits < HINT_HITS) {
             hits[nhits].x0 = (int)x;
             hits[nhits].x1 = (int)(x + w[i]);
@@ -1186,12 +1258,20 @@ static size_t draw_hints(SBuf *o, const Editor *e, const Hint *h, size_t n, size
     return x - from;
 }
 
-static void keys_row(SBuf *o, const Editor *e, size_t from, size_t cols, int right)
+static void keys_row(SBuf *o, const Editor *e, size_t from, size_t cols, int right, int y)
 {
     Hint h[HINT_HITS];
     size_t n = context_hints(e, h, HINT_HITS);
 
-    draw_hints(o, e, h, n < HINT_HITS ? n : HINT_HITS, from, cols, right);
+    draw_hints(o, e, h, n < HINT_HITS ? n : HINT_HITS, from, cols, right, y);
+}
+
+/* The key bar in a row of its own (keybar = line), above the message row. */
+static void keybar_row(SBuf *o, const Editor *e)
+{
+    if (!e->prompt_on)
+        keys_row(o, e, 0, (size_t)e->cols, 0, e->rows - 2);
+    sbuf_adds(o, "\x1b[K");
 }
 
 static void message_row(SBuf *o, const Editor *e, int *pcol)
@@ -1199,7 +1279,6 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
     size_t cols = (size_t)e->cols;
 
     *pcol = -1;
-    nhits = 0;
     if (e->prompt_on) {
         const char *t = e->prompt_text;
         size_t tl = e->prompt_len, start = 0;
@@ -1271,17 +1350,17 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
                 ph[1].code = KEY_ESC;
                 ph[1].what = N_("cancel");
                 if (used + 3 < cols)
-                    draw_hints(o, e, ph, 2, used, cols, 1);
+                    draw_hints(o, e, ph, 2, used, cols, 1, e->rows - 1);
             }
         }
     } else if (e->msg[0]) {
         /* the message on the left, the keys on the right when there is room */
         size_t used = fit_cols(o, e->msg, strlen(e->msg), cols);
 
-        if (used + 3 < cols)
-            keys_row(o, e, used, cols, 1);
-    } else {
-        keys_row(o, e, 0, cols, 0);
+        if (used + 3 < cols && e->keybar == KEYBAR_MESSAGE)
+            keys_row(o, e, used, cols, 1, e->rows - 1);
+    } else if (e->keybar == KEYBAR_MESSAGE) {
+        keys_row(o, e, 0, cols, 0, e->rows - 1);
     }
     sbuf_adds(o, "\x1b[K");
 }
@@ -1563,8 +1642,8 @@ int render_picker_height(const Editor *e)
 
     if (n > PICKER_ROWS)
         n = PICKER_ROWS;
-    if (n > e->rows - 4)
-        n = e->rows - 4;
+    if (n > e->rows - 3 - EDITOR_BOTTOM(e))
+        n = e->rows - 3 - EDITOR_BOTTOM(e);
     return (n < 1 ? 1 : n) + 1;
 }
 
@@ -1659,14 +1738,18 @@ void render_frame(Render *r, const Editor *e)
 
     popup_geom(e, &pg);
     pcol = -1;
+    nhits = 0;
     for (y = 0; y < e->rows; y++) {
         SBuf *row = &r->row;
+        int bottom = e->rows - EDITOR_BOTTOM(e);
 
         row->len = 0;
         if (y == e->rows - 1)
             message_row(row, e, &pcol);
-        else if (e->picker.on && y >= e->rows - 1 - render_picker_height(e))
-            picker_row(row, e, y - (e->rows - 1 - render_picker_height(e)));
+        else if (y == e->rows - 2 && e->keybar == KEYBAR_LINE)
+            keybar_row(row, e);
+        else if (e->picker.on && y >= bottom - render_picker_height(e))
+            picker_row(row, e, y - (bottom - render_picker_height(e)));
         else if (e->text_y == 1 && y == 0)
             tab_row(row, e);
         else
@@ -1687,7 +1770,7 @@ void render_frame(Render *r, const Editor *e)
     }
 
     if (e->picker.on) {
-        cr = e->rows - render_picker_height(e);
+        cr = e->rows - EDITOR_BOTTOM(e) + 1 - render_picker_height(e);
         cc = 1 + 1 + (int)utf8_cols(e->picker.title, strlen(e->picker.title),
                                      strlen(e->picker.title), 8) + 3 +
              (int)utf8_cols(e->picker.query, e->picker.qlen, e->picker.qlen, 8);

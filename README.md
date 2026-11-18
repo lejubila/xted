@@ -84,7 +84,11 @@ xted --version            mostra la versione e i crediti (anche -V)
   torna al testo, nascondi; con più cursori: prossima occorrenza, tutte, Esc un cursore; in uno
   snippet: Tab campo successivo, Esc; nel ridimensionamento dei pannelli: le frecce ed Esc. In base al
   linguaggio si aggiungono: anteprima (Markdown), formatta e controlla (JSON), simboli e definizione
-  (codice). Quanti ne entrano, per importanza; un messaggio sta a sinistra e i tasti a destra.
+  (codice). Quanti ne entrano, per importanza; un messaggio sta a sinistra e i tasti a destra. Se
+  non entrano tutti si usano i nomi brevi (`^S`, `M-x`) per mostrarne di più; il pulsante cliccato
+  resta in negativo finché non si rilascia. Dove stanno si sceglie con «Barra dei tasti» nella
+  palette o con `keybar` nel file `config`: `message` (predefinito) nella riga dei messaggi,
+  `line` in una riga a sé sopra, sempre visibile anche con un messaggio, `off` per nasconderli.
 
 Il terminale viene sempre ripristinato all'uscita, anche su SIGTERM, SIGHUP o un arresto
 anomalo; l'editor usa lo schermo alternativo, quindi la schermata di prima torna com'era.
@@ -500,6 +504,7 @@ git = on
 clipboard = on            # copie anche negli appunti di sistema (OSC 52)
 colors = auto             # auto | truecolor | 256 | 16 | none
 glyphs = unicode          # unicode (▸ ▾ │) | windows (► ▼, in tutti i font di Windows) | ascii (+ - |)
+keybar = message          # i tasti del contesto: message (nella riga dei messaggi) | line (riga a sé) | off
 
 # valori per tutti i linguaggi
 tab_width = 8

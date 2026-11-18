@@ -103,6 +103,7 @@ const Command commands[] = {
     { "theme", N_("Change theme"), "alt+t", editor_cmd_theme, 0, 0, G_SETTINGS, ST_THEME },
     { "colors", N_("Colors"), "", editor_cmd_colors, 0, 0, G_SETTINGS, ST_COLORS },
     { "glyphs", N_("Glyphs"), "", editor_cmd_glyphs, 0, 0, G_SETTINGS, ST_GLYPHS },
+    { "keybar", N_("Key bar"), "", editor_cmd_keybar, 0, 0, G_SETTINGS, ST_KEYBAR },
     { "language", N_("Language"), "", editor_cmd_language, 0, 0, G_SETTINGS, ST_LANG },
     { "save_settings", N_("Save settings…"), "", editor_cmd_save_settings, 0, 0, G_SETTINGS, ST_NONE },
 };
@@ -158,6 +159,9 @@ int command_state(const Editor *e, int idx, char *val, size_t n)
         return 2;
     case ST_GLYPHS:
         snprintf(val, n, "%s", editor_glyphs_name(e->glyphs));
+        return 2;
+    case ST_KEYBAR:
+        snprintf(val, n, "%s", editor_keybar_name(e->keybar));
         return 2;
     default:
         val[0] = '\0';

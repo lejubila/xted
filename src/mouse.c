@@ -47,15 +47,15 @@ void mouse_locate(Editor *e, int x, int y, MouseHit *h)
     editor_store_view(e);
 
     if (e->picker.on) {
-        int top = e->rows - 1 - render_picker_height(e);
+        int top = e->rows - EDITOR_BOTTOM(e) - render_picker_height(e);
 
-        if (y >= top && y < e->rows - 1) {
+        if (y >= top && y < e->rows - EDITOR_BOTTOM(e)) {
             h->kind = MH_PICKER;
             h->index = (size_t)(y - top);
         }
         return;
     }
-    if (y < 0 || y >= e->rows - 1 || x < 0 || x >= e->cols)
+    if (y < 0 || y >= e->rows - EDITOR_BOTTOM(e) || x < 0 || x >= e->cols)
         return;
     if (e->text_y == 1 && y == 0) {
         size_t t = render_tab_at(e, x);

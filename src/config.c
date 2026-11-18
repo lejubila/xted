@@ -28,6 +28,7 @@ void config_init(Config *c)
     c->mouse = -1;
     c->colors = -1;
     c->glyphs = -1;
+    c->keybar = -1;
 }
 
 void config_free(Config *c)
@@ -279,6 +280,18 @@ int config_parse(Config *c, const char *text, size_t n)
                         r = -2;
                     else
                         snprintf(c->language, sizeof c->language, "%s", lv);
+                    if (r != -2)
+                        r = 0;
+                } else if (!strcmp(key, "keybar")) {
+                    /* the keys of the context: in the message row, in a row of their own, none */
+                    if (!strcmp(lv, "message"))
+                        c->keybar = 0;
+                    else if (!strcmp(lv, "line"))
+                        c->keybar = 1;
+                    else if (!strcmp(lv, "off"))
+                        c->keybar = 2;
+                    else
+                        r = -2;
                     if (r != -2)
                         r = 0;
                 } else if (!strcmp(key, "glyphs")) {
