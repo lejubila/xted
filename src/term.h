@@ -23,7 +23,8 @@ enum {
     KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12,
     KEY_PASTE,      /* bracketed paste: the text is in term_paste_text() */
     KEY_MOUSE,      /* a mouse event: see term_mouse_event() */
-    KEY_EOF
+    KEY_EOF,
+    KEY_CMD         /* a button of the message row for a command with no key: its index in mods */
 };
 
 #define CTRL(c) ((c) & 0x1f)

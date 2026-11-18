@@ -883,6 +883,8 @@ static void sidebar_row(SBuf *o, const Editor *e, int y)
 typedef struct {
     const char *txt;
     int on;                 /* 1: the option is on, 0: off, -1: not an option */
+    uint32_t code;          /* the key a click on it sends */
+    int mods;
 } HintSeg;
 
 #define HINT_MAXSEG 6
@@ -908,8 +910,8 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
     size_t nt[3], k, i;
 
     if (mode == FIND_WITH) {
-        HintSeg a[] = { { tr("Enter starts"), -1 }, { tr("Esc cancels"), -1 } };
-        HintSeg b[] = { { tr("Enter"), -1 }, { "Esc", -1 } };
+        HintSeg a[] = { { tr("Enter starts"), -1, KEY_ENTER, 0 }, { tr("Esc cancels"), -1, KEY_ESC, 0 } };
+        HintSeg b[] = { { tr("Enter"), -1, KEY_ENTER, 0 }, { "Esc", -1, KEY_ESC, 0 } };
 
         memcpy(t[0], a, sizeof a);
         nt[0] = 2;
@@ -917,11 +919,12 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
         nt[1] = nt[2] = 2;
         memcpy(t[2], b, sizeof b);
     } else if (mode == FIND_SEARCH || mode == FIND_FILES) {
-        HintSeg a[] = { { tr("Alt+C Case"), cs }, { tr("Alt+W Word"), wd }, { tr("Alt+R Regex"), rx },
-                        { go, -1 }, { tr("Esc cancels"), -1 } };
-        HintSeg b[] = { { "Alt+C Aa", cs }, { tr("Alt+W Word"), wd }, { tr("Alt+R Regex"), rx },
-                        { "Esc", -1 } };
-        HintSeg c[] = { { "Alt+C Aa", cs }, { "Alt+W W", wd }, { "Alt+R .*", rx } };
+        HintSeg a[] = { { tr("Alt+C Case"), cs, 'c', MOD_ALT }, { tr("Alt+W Word"), wd, 'w', MOD_ALT }, { tr("Alt+R Regex"), rx, 'r', MOD_ALT },
+                        { go, -1, KEY_ENTER, 0 }, { tr("Esc cancels"), -1, KEY_ESC, 0 } };
+        HintSeg b[] = { { "Alt+C Aa", cs, 'c', MOD_ALT }, { tr("Alt+W Word"), wd, 'w', MOD_ALT },
+                        { tr("Alt+R Regex"), rx, 'r', MOD_ALT }, { "Esc", -1, KEY_ESC, 0 } };
+        HintSeg c[] = { { "Alt+C Aa", cs, 'c', MOD_ALT }, { "Alt+W W", wd, 'w', MOD_ALT },
+                        { "Alt+R .*", rx, 'r', MOD_ALT } };
 
         memcpy(t[0], a, sizeof a);
         nt[0] = 5;
@@ -972,6 +975,11 @@ int render_hint_key(int x, int y, Key *k)
 
 static size_t hint_add(Hint *h, size_t n, size_t max, const char *id, const char *what)
 {
+    size_t k;
+
+    for (k = 0; k < n && k < max; k++)
+        if (h[k].id && strcmp(h[k].id, id) == 0)
+            return n;                   /* already there */
     if (n < max) {
         memset(&h[n], 0, sizeof h[n]);
         h[n].id = id;
@@ -1015,6 +1023,13 @@ static size_t context_hints(const Editor *e, Hint *h, size_t max)
         }
         return hint_key(h, n, max, KEY_ESC, N_("cancel"));
     }
+    if (e->resize_mode) {
+        n = hint_key(h, n, max, KEY_LEFT, "");
+        n = hint_key(h, n, max, KEY_RIGHT, "");
+        n = hint_key(h, n, max, KEY_UP, "");
+        n = hint_key(h, n, max, KEY_DOWN, "");
+        return hint_key(h, n, max, KEY_ESC, N_("done"));
+    }
     if (e->comp.on) {
         n = hint_key(h, n, max, KEY_TAB, N_("accept"));
         n = hint_key(h, n, max, KEY_UP, "");
@@ -1026,6 +1041,25 @@ static size_t context_hints(const Editor *e, Hint *h, size_t max)
         n = hint_key(h, n, max, KEY_UP, "");
         n = hint_key(h, n, max, KEY_DOWN, "");
         return hint_key(h, n, max, KEY_ESC, N_("close"));
+    }
+    if (e->snip.on) {
+        n = hint_key(h, n, max, KEY_TAB, N_("next field"));
+        return hint_key(h, n, max, KEY_ESC, N_("done"));
+    }
+    if (e->sidebar_on && e->sidebar_focus) {
+        n = hint_key(h, n, max, KEY_ENTER, N_("open"));
+        n = hint_key(h, n, max, KEY_UP, "");
+        n = hint_key(h, n, max, KEY_DOWN, "");
+        n = hint_key(h, n, max, KEY_LEFT, N_("close folder"));
+        n = hint_key(h, n, max, KEY_ESC, N_("back to the text"));
+        return hint_add(h, n, max, "toggle_tree", N_("hide"));
+    }
+    if (e->nxc > 0) {
+        n = hint_add(h, n, max, "cursor_next", N_("next occurrence"));
+        n = hint_add(h, n, max, "cursor_all", N_("all"));
+        n = hint_key(h, n, max, KEY_ESC, N_("one cursor"));
+        n = hint_add(h, n, max, "copy", N_("copy"));
+        return hint_add(h, n, max, "undo", N_("undo"));
     }
     if (edit_sel_active(e)) {
         n = hint_add(h, n, max, "copy", N_("copy"));
@@ -1046,6 +1080,20 @@ static size_t context_hints(const Editor *e, Hint *h, size_t max)
     n = hint_add(h, n, max, "save", N_("save"));
     if (n <= max)
         h[n - 1].hot = e->doc->buf.modified;
+    /* what the language of the document adds */
+    {
+        const char *lang = e->doc->syn ? syn_name(e->doc->syn) : "";
+
+        if (strcmp(lang, "Markdown") == 0) {
+            n = hint_add(h, n, max, "md_preview", N_("preview"));
+        } else if (strcmp(lang, "JSON") == 0) {
+            n = hint_add(h, n, max, "json_format", N_("format"));
+            n = hint_add(h, n, max, "json_check", N_("check"));
+        } else if (syn_rule_count(e->doc->syn) > 0) {
+            n = hint_add(h, n, max, "symbols", N_("symbols"));
+            n = hint_add(h, n, max, "goto_tag", N_("definition"));
+        }
+    }
     n = hint_add(h, n, max, "quit", N_("quit"));
     n = hint_add(h, n, max, "palette", N_("commands"));
     n = hint_add(h, n, max, "help", N_("help"));
@@ -1077,8 +1125,17 @@ static size_t draw_hints(SBuf *o, const Editor *e, const Hint *h, size_t n, size
 
         w[i] = 0;
         if (h[i].id) {
-            if (cmd < 0 || !keymap_first(&e->km, cmd, &key[i]))
-                continue;                   /* unbound: no button */
+            if (cmd < 0)
+                continue;
+            if (!keymap_first(&e->km, cmd, &key[i])) {
+                /* a command with no key: the button has its name only, a click runs it */
+                key[i].code = KEY_CMD;
+                key[i].mods = cmd;
+                kl[i] = 0;
+                snprintf(lab[i], sizeof lab[i], "%s", tr(h[i].what));
+                w[i] = utf8_cols(lab[i], strlen(lab[i]), strlen(lab[i]), 8);
+                continue;
+            }
         } else {
             key[i].code = h[i].code;
             key[i].mods = h[i].mods;
@@ -1170,11 +1227,26 @@ static void message_row(SBuf *o, const Editor *e, int *pcol)
             if (hw > 0 || (info && cols > used + iw + 2)) {
                 size_t block = hw + (hw && info ? 2 : 0) + (info ? iw : 0);
 
+                size_t hx = cols - block - 1;
+
                 spaces(o, cols - used - block - 1);
                 sbuf_adds(o, "\x1b[2m");
                 for (i = 0; i < n; i++) {
-                    if (i)
+                    size_t sw = utf8_cols(g[i].txt, strlen(g[i].txt), strlen(g[i].txt), 8);
+
+                    if (i) {
                         sbuf_adds(o, "  ");
+                        hx += 2;
+                    }
+                    /* each hint of the search bar is a button too */
+                    if (g[i].code && nhits < HINT_HITS) {
+                        hits[nhits].x0 = (int)hx;
+                        hits[nhits].x1 = (int)(hx + sw);
+                        hits[nhits].y = e->rows - 1;
+                        hits[nhits].key.code = g[i].code;
+                        hits[nhits++].key.mods = g[i].mods;
+                    }
+                    hx += sw;
                     if (g[i].on == 1)
                         sbuf_adds(o, "\x1b[22m\x1b[1m");
                     sbuf_adds(o, g[i].txt);

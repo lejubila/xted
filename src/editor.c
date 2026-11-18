@@ -2916,7 +2916,7 @@ static void handle_key(Editor *e, Key k)
             return;
         }
     }
-    cmd = keymap_find(&e->km, k);
+    cmd = k.code == KEY_CMD ? (k.mods >= 0 && (size_t)k.mods < ncommands ? k.mods : -1) : keymap_find(&e->km, k);
     mod = cmd >= 0 ? commands[cmd].modifies : modifies(k);
     if (e->doc->readonly && mod) {
         editor_set_msg(e, MSG_TTL_MS, tr("File is read-only (Alt+S to save under another name)"));

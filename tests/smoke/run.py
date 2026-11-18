@@ -594,6 +594,46 @@ def context_keys():
 
 
 @scenario
+def context_keys_more():
+    b = Box()
+    b.write("n.md", "# T\n")
+    b.write("d.json", "{}\n")
+    b.write("m.c", "int main(void)\n{\n    return 0;\n}\n")
+    b.write("w.txt", "one two one two\n")
+    last = lambda: r.screen().lines()[-1]
+    for name, want in (("n.md", "Alt+U preview"), ("d.json", "format"), ("m.c", "Ctrl+T symbols")):
+        r = b.run([name], cols=140)
+        check(name + ": the keys of its language", want in last(), last())
+        if name == "d.json":
+            # a command with no key: the button runs it
+            click_label(r, "format")
+            check("a click on format (no key) runs Format JSON", "JSON: 1 lines" in last(), last())
+        quit_(r)
+    r = b.run(["m.c"], cols=140)
+    r.type(alt("\\"), 0.2, alt("e"), 0.2)
+    check("resize mode: the arrows and Esc", "Esc done" in last(), last())
+    r.type(ESC, 0.2, alt("q"), 0.2, ctrl("b"), 0.4)
+    check("the file browser: open, close folder, back to the text", "Enter open" in last() and
+          "Esc back to the text" in last(), last())
+    click_label(r, "Esc back to the text")
+    check("a click on it gives the keys back to the text", "Ctrl+S save" in last(), last())
+    r.type(ctrl("b"), 0.2, ctrl("b"), 0.2)
+    r.type(DOWN, END, ENTER, "for", 0.3, "\t", 0.3)
+    check("a snippet: Tab next field, Esc", "Tab next field" in last(), last())
+    quit_(r, discard=True)
+    r = b.run(["w.txt"], cols=140)
+    r.type(alt("w"), 0.2, ctrl("d"), 0.3)
+    check("several cursors: next occurrence, Esc one cursor", "Esc one cursor" in last(), last())
+    r.type(ESC, ESC, 0.2, ctrl("f"), 0.3)
+    check("the search bar: its keys", "Alt+C" in last(), last())
+    before = r.out
+    click_label(r, "Alt+C")
+    check("a click on Alt+C turns the option on (shown bold)", len(r.out) > len(before) and "Alt+C" in last(), last())
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")
