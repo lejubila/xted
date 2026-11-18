@@ -27,6 +27,39 @@ definizioni, tutto interno: non serve alcun language server.
 
 ## Installazione
 
+### Installazione rapida (binario pronto)
+
+Su Linux x86_64 basta una riga, senza compilare nulla:
+
+```
+curl -fsSL https://github.com/lejubila/xted/releases/latest/download/install.sh | sh
+```
+
+Lo script scarica l'ultima release, la controlla con `SHA256SUMS` e installa il binario statico, il
+collegamento `xt`, il catalogo italiano e le pagine del manuale: da utente normale in `~/.local`
+(senza `sudo`; se `~/.local/bin` non è nel `PATH` dice la riga da aggiungere), da root in
+`/usr/local`. Funziona con `curl` o `wget` e con qualsiasi `sh`. Rilanciato, aggiorna.
+
+```
+curl -fsSL https://github.com/lejubila/xted/releases/latest/download/install.sh | sudo sh   # in /usr/local
+curl -fsSL .../install.sh | PREFIX=/opt/xted sh               # in un'altra cartella
+curl -fsSL .../install.sh | XTED_VERSION=0.9.0 sh             # una versione precisa
+curl -fsSL .../install.sh | sh -s -- --uninstall              # lo toglie (stesso PREFIX)
+```
+
+Chi preferisce leggere lo script prima di eseguirlo:
+
+```
+curl -fsSLO https://github.com/lejubila/xted/releases/latest/download/install.sh
+less install.sh
+sh install.sh
+```
+
+Gli stessi file si scaricano anche a mano dalla pagina delle
+[release](https://github.com/lejubila/xted/releases).
+
+### Compilare dai sorgenti
+
 Servono un compilatore C (`gcc` o `clang`) e `make`. Per il binario statico, quello predefinito,
 anche musl (`apt install musl-tools`, `dnf install musl-gcc`, `pacman -S musl`); senza musl `make`
 compila un binario dinamico e lo dice.
@@ -653,7 +686,7 @@ salvataggio delle impostazioni, comandi e comportamento dell'editor senza termin
 
 ## Stato del progetto
 
-Versione 0.9.0 (`src/version.h`).
+Versione 0.10.0 (`src/version.h`).
 
 Le fasi 1–9 della roadmap di `SPEC.md` sono completate: nucleo, editing, sintassi,
 multifile, ricerca, produttività, strumenti, configurazione e rifiniture. Resta fuori il
@@ -665,5 +698,5 @@ xted è distribuito con licenza **MIT**: puoi usarlo, modificarlo e ridistribuir
 anche in programmi chiusi, mantenendo l'avviso di copyright. Il testo completo è nel file
 [`LICENSE`](LICENSE).
 
-Copyright (c) 2026 David Bigagli. La versione attuale è la **0.9.0** (`xted --version`, «Informazioni su
+Copyright (c) 2026 David Bigagli. La versione attuale è la **0.10.0** (`xted --version`, «Informazioni su
 xted» nella palette, l'intestazione della guida `F1`).
