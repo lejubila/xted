@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "edit.h"
 #include "imports.h"
 #include "i18n.h"
@@ -10,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <sys/wait.h>
 #include <string.h>
 
 static Line *cur_line(Editor *e)

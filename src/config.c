@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "config.h"
 #include "i18n.h"
 #include "util.h"
@@ -359,7 +360,7 @@ char *config_dir(void)
     size_t n;
     char *d;
 
-    if (x && x[0] == '/')
+    if (x && sys_is_abs(x))
         return app_dir(x);
     if (h && h[0]) {
         n = strlen(h) + 16;

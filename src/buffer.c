@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "buffer.h"
 #include "i18n.h"
 #include "util.h"
@@ -237,7 +238,7 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
         snprintf(err, errlen, tr("no file name"));
         return -1;
     }
-    real = realpath(want, NULL);
+    real = sys_realpath(want, NULL);
     target = real ? real : want;
 
     existed = stat(target, &st) == 0;
@@ -285,10 +286,10 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
             out.len = 0;
         }
     }
-    if (existed && fchown(fd, st.st_uid, st.st_gid) < 0) {
+    if (existed && sys_fchown(fd, st.st_uid, st.st_gid) < 0) {
         /* best effort: not fatal when we are not the owner */
     }
-    if (fchmod(fd, mode) < 0 || fsync(fd) < 0) {
+    if (sys_fchmod(fd, mode) < 0 || sys_fsync(fd) < 0) {
         snprintf(err, errlen, "%s", strerror(errno));
         goto fail;
     }
@@ -298,7 +299,7 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
         goto fail;
     }
     fd = -1;
-    if (rename(tmp, target) < 0) {
+    if (sys_rename(tmp, target) < 0) {
         snprintf(err, errlen, "%s", strerror(errno));
         goto fail;
     }

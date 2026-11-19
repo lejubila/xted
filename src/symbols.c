@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "symbols.h"
 #include "files.h"
 #include "util.h"
@@ -1315,7 +1316,7 @@ static void set_root(SymCache *c, const char *key)
     char found[PATH_MAX];
 
     found[0] = '\0';
-    if (key && key[0] == '/') {
+    if (key && sys_is_abs(key)) {
         snprintf(dir, sizeof dir, "%s", key);
         /* the folder with Composer's vendor/, however high: a package inside the project may
          * have a composer.json of its own (October's modules/backend) */
@@ -1557,7 +1558,7 @@ static SymIndex *index_of_doc(SymCache *c, Doc *d)
                 c->v[i] = nx;
         sym_index_free(x);
     } else {
-        char *rp = d->buf.path ? realpath(d->buf.path, NULL) : NULL;
+        char *rp = d->buf.path ? sys_realpath(d->buf.path, NULL) : NULL;
 
         nx->key = rp;
         cache_put(c, nx);
@@ -1807,7 +1808,7 @@ static char *psr4_file(SymCache *c, const char *qual)
                 path[n++] = qual[k] == '\\' ? '/' : qual[k];
             memcpy(path + n, ".php", 5);
             if (stat(path, &st) == 0 && S_ISREG(st.st_mode) &&
-                (r = realpath(path, NULL)) != NULL)
+                (r = sys_realpath(path, NULL)) != NULL)
                 return r;
         }
         last = bl;
@@ -1860,7 +1861,7 @@ static char *psr4_sibling(SymCache *c, const char *qual)
                     continue;
                 snprintf(path, sizeof path, "%s/%s/%s.php", dir, de->d_name, name);
                 if (stat(path, &st) == 0 && S_ISREG(st.st_mode))
-                    f = realpath(path, NULL);
+                    f = sys_realpath(path, NULL);
             }
             closedir(d);
         }
@@ -1908,7 +1909,7 @@ static char *find_class_file(SymCache *c, const char *qual, const char *ext)
         char path[PATH_MAX];
 
         rooted(c, path, sizeof path, c->files[best]);
-        return realpath(path, NULL);
+        return sys_realpath(path, NULL);
     }
 }
 
@@ -1945,7 +1946,7 @@ static char *probe(const char *dir, const char *spec, const char *ext)
                          sfx[b]) >= (int)sizeof path)
                 continue;
             if (stat(path, &st) == 0 && S_ISREG(st.st_mode))
-                return realpath(path, NULL);
+                return sys_realpath(path, NULL);
         }
     return NULL;
 }
@@ -2169,7 +2170,7 @@ static void go_siblings(SymCache *c, const Doc *cur, const char *ext)
     size_t i, cl;
     int test;
 
-    if (!cur->buf.path || !realpath(cur->buf.path, dir))
+    if (!cur->buf.path || !sys_realpath(cur->buf.path, dir))
         return;
     cl = strlen(dir);
     test = cl > 8 && strcmp(dir + cl - 8, "_test.go") == 0;
@@ -2263,7 +2264,7 @@ static void env_build(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, Env
         /* one package is one folder: its other files are visible without an import */
         go_siblings(c, cur, lang[0] == 'G' ? ".go" : lang[0] == 'J' ? ".java" : ".cs");
         for (i = 0; i < c->ngsib; i++) {
-            char *real = realpath(c->gsib[i], NULL);
+            char *real = sys_realpath(c->gsib[i], NULL);
 
             if (real && (!e->v[0]->key || strcmp(real, e->v[0]->key) != 0))
                 env_add(e, index_of_path(c, real), 1);
@@ -3308,7 +3309,7 @@ static int go_module(SymCache *c, const Doc *cur, char *curdir)
     char dir[PATH_MAX], probe[PATH_MAX + 16], line[512], *sl;
     int up;
 
-    if (!cur->buf.path || !realpath(cur->buf.path, dir) || !(sl = strrchr(dir, '/')))
+    if (!cur->buf.path || !sys_realpath(cur->buf.path, dir) || !(sl = strrchr(dir, '/')))
         return 0;
     *sl = '\0';
     snprintf(curdir, PATH_MAX, "%s", dir);
@@ -3396,7 +3397,7 @@ static void go_walk(SymCache *c, const char *dir, int depth, size_t *seen)
             strcmp(de->d_name, "testdata") == 0 || strcmp(de->d_name, "node_modules") == 0)
             continue;
         snprintf(sub, sizeof sub, "%s/%s", dir, de->d_name);
-        if (lstat(sub, &st) == 0 && S_ISDIR(st.st_mode))
+        if (sys_lstat(sub, &st) == 0 && S_ISDIR(st.st_mode))
             go_walk(c, sub, depth + 1, seen);
     }
     closedir(d);
@@ -4581,7 +4582,7 @@ static void php_project(SymCache *c, Env *e, HdrFn fn, void *ctx)
                 put(rel, sizeof rel, a + 1, (size_t)(b - a - 1));
                 q = b + 1;
                 rooted(c, path, sizeof path, rel);
-                real = realpath(path, NULL);
+                real = sys_realpath(path, NULL);
                 if (!real)
                     continue;
                 h = hdr_get(c, real);
@@ -4616,7 +4617,7 @@ static void php_project(SymCache *c, Env *e, HdrFn fn, void *ctx)
             continue;
         seen++;
         rooted(c, path, sizeof path, rel);
-        real = realpath(path, NULL);
+        real = sys_realpath(path, NULL);
         if (!real)
             continue;
         for (k = 0; k < e->n; k++)
@@ -4726,7 +4727,7 @@ static void rust_walk(RustWalk *w, const char *dir, int depth)
         if (de->d_name[0] == '.')
             continue;
         snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
-        if (lstat(path, &st) != 0)
+        if (sys_lstat(path, &st) != 0)
             continue;
         if (S_ISDIR(st.st_mode)) {
             /* src/bin holds other programs, not modules of this crate */
@@ -5719,7 +5720,7 @@ void sym_project_symbols(SymCache *c, Doc *const *docs, size_t ndocs, Doc *cur, 
             continue;
         seen++;
         rooted(c, path, sizeof path, c->files[i]);
-        real = realpath(path, NULL);
+        real = sys_realpath(path, NULL);
         if (!real)
             continue;
         /* C: a header the file reaches needs nothing; JS: a module it imports may still lack the
@@ -6501,7 +6502,7 @@ void sym_env_keys(SymCache *c, Doc *cur, EnvFn fn, void *ctx)
     SBuf seen = SBUF_INIT;
     int up;
 
-    if (!cur->buf.path || !realpath(cur->buf.path, dir))
+    if (!cur->buf.path || !sys_realpath(cur->buf.path, dir))
         return;
     set_root(c, dir);
     root = c->root;

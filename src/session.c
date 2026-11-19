@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "session.h"
 #include "util.h"
 
@@ -20,7 +21,7 @@ char *session_file(void)
 
     if (!getcwd(cwd, sizeof cwd))
         return NULL;
-    if (state && state[0] == '/') {
+    if (state && sys_is_abs(state)) {
         sbuf_adds(&b, state);
     } else if (home && home[0]) {
         sbuf_adds(&b, home);
@@ -70,7 +71,7 @@ static int make_parents(const char *path)
         if (p[i] != '/')
             continue;
         p[i] = '\0';
-        if (mkdir(p, 0700) < 0 && errno != EEXIST)
+        if (sys_mkdir(p, 0700) < 0 && errno != EEXIST)
             r = -1;
         p[i] = '/';
     }

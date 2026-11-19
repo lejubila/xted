@@ -8,6 +8,11 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 
 - C99 (`-std=c99`), con `-D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700` (musl dichiara `realpath` solo con quest'ultimo).
 - Nessuna dipendenza oltre la libc POSIX: niente ncurses, terminfo, termcap o librerie esterne.
+- Port per Windows in corso (MinGW-w64, llvm-mingw in `~/.local/opt/llvm-mingw`): le chiamate che
+  cambiano tra i sistemi passano da `src/sys.h` (`sys_realpath`, `sys_rename`, `sys_fsync`,
+  `sys_mkdir`, `sys_lstat`, `SYS_MTIME`, `sys_is_abs`, …), mai direttamente; su POSIX sono macro
+  sulle funzioni della libc, così il binario Linux non cambia. `XTED_NO_REGEX` toglie le
+  espressioni regolari (la build Windows non le ha).
 - Terminale controllato a mano con termios e sequenze ANSI/VT100.
 - Un solo binario e un solo `Makefile`, compilabile con `gcc` o `clang`, con link statico opzionale.
 - Nessun lavoro in background inutile: il ciclo principale attende input con `poll()`.
@@ -25,6 +30,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/md.[ch]` | Anteprima Markdown: `md_build` scrive il testo reso nel buffer del documento di anteprima e uno stile per byte (`MdPreview.st`: classe `SC_*` più `MD_BOLD/ITALIC/UNDER/CODEBG`, disegnati da `set_md` in render.c) con la riga sorgente di ogni riga (`md_line_for` per lo scorrimento); il documento di anteprima ha `Doc.md` (sorgente, gen e larghezza per cui è fatto), `md_refresh` in editor.c lo rifà e lo sincronizza in `prepare_frame`, `editor_cmd_md_preview` (Alt+U) apre e chiude il pannello, `remove_doc` lo chiude col sorgente; i blocchi di codice usano `syn_by_name` |
 | `src/json.[ch]` | Parser JSON senza allocazioni: `json_check` (primo errore con riga e colonna, commenti ammessi, virgola finale solo `lenient`) e `json_format` (indentato o compatto, rifiuta i testi con commenti); i comandi «Controlla/Formatta/Compatta JSON» e il controllo dopo il salvataggio sono in editor.c (`json_lenient` decide per nome di file) |
 | (barra dei tasti) | In render.c `context_hints` sceglie i pulsanti della riga dei messaggi secondo il contesto (domanda `Editor.asking`, ridimensionamento, popup, lista, snippet, browser dei file, più cursori, selezione, sola lettura, modifica con i tasti del linguaggio), `draw_hints` li disegna e ne ricorda le colonne (anche i suggerimenti della barra di ricerca, con il tasto in `HintSeg`), `render_hint_key` dà il tasto di un clic; `next_key` (editor.c) trasforma il clic in quel tasto, così vale anche dentro `ask` e `prompt`; il tasto di un comando è il primo della mappa (`keymap_first`), un comando senza tasto è un pulsante `KEY_CMD`; i nomi brevi (`key_short`) quando non entrano tutti; `render_hint_press` lo disegna premuto; `keybar` (`KEYBAR_*`) li mette nella riga dei messaggi, in una riga a sé (`EDITOR_BOTTOM` righe in fondo non sono testo) o da nessuna parte |
+| `src/sys.h` | Le chiamate che differiscono tra sistemi: su POSIX macro sulla libc, su Windows dichiarazioni (implementate in `sys_win.c`, fase 3); anche `WIFEXITED`/`WEXITSTATUS` per lo stato dei comandi |
 | `src/version.h` | Versione e crediti (`XTED_VERSION`, anno, autore, licenza): `--version`, guida F1, «Informazioni su xted», schermata iniziale |
 | `src/term.[ch]` | Raw mode, alternate screen, segnali, `poll()`, decodifica dei tasti |
 | `src/buffer.[ch]` | Testo (indipendente dalla UI), caricamento e salvataggio, primitive di modifica, helper multi-riga, undo/redo |
@@ -42,7 +48,7 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | `src/fuzzy.[ch]`, `src/picker.[ch]` | Punteggio fuzzy e lista filtrabile (elenco buffer, apertura rapida) |
 | `src/files.[ch]` | Scansione dei file del progetto e modello ad albero del file browser |
 | `src/session.[ch]` | File di sessione per cartella (`$XDG_STATE_HOME/xted/sessions/`) |
-| `src/search.[ch]` | Nucleo della ricerca: `Matcher` (testo o regex POSIX ERE, per riga), ricerca nel buffer, sostituzione, ricerca nei file; senza terminale |
+| `src/search.[ch]` | Nucleo della ricerca: `Matcher` (testo o regex POSIX ERE, per riga; senza regex con `XTED_NO_REGEX`), ricerca nel buffer, sostituzione, ricerca nei file; senza terminale |
 | `src/find.[ch]` | Comandi di ricerca/sostituzione/vai alla riga sull'`Editor`: barra di ricerca come macchina a stati |
 | `src/commands.[ch]` | Tabella dei comandi (nome, scorciatoia come testo, funzione): alimenta la command palette (Alt+X) |
 | `src/complete.[ch]` | Candidati dell'autosuggest (membri dopo `->` `::` `.`, simboli del file, dei file inclusi e della libreria standard, parole dei buffer aperti, parole chiave, snippet) con firma (mostrata su ogni riga del popup; alla conferma `complete_call_body` inserisce la chiamata con gli argomenti come segnaposto di snippet), e stato del popup; in PHP dopo `use` propone i nomi qualificati delle classi del progetto (`sym_classes`: classmap e PSR-4 di Composer, alias di `config/app.php`) e, scegliendo una classe, `edit_replace_class` aggiunge l'istruzione `use` in ordine (`imp_php_use`); senza terminale |

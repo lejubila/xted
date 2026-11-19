@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "doc.h"
 #include "md.h"
 #include "i18n.h"
@@ -52,7 +53,7 @@ static void record_disk(Doc *d)
     if (!d->buf.path || stat(d->buf.path, &st) != 0)
         return;
     d->disk_known = 1;
-    d->mtime = st.st_mtim;
+    d->mtime = SYS_MTIME(st);
     d->size = st.st_size;
     d->ino = st.st_ino;
     d->readonly = access(d->buf.path, W_OK) != 0;
@@ -102,7 +103,7 @@ int doc_disk_changed(const Doc *d)
         return DISK_SAME;
     if (stat(d->buf.path, &st) != 0)
         return DISK_MISSING;
-    if (st.st_mtim.tv_sec != d->mtime.tv_sec || st.st_mtim.tv_nsec != d->mtime.tv_nsec ||
+    if (SYS_MTIME(st).tv_sec != d->mtime.tv_sec || SYS_MTIME(st).tv_nsec != d->mtime.tv_nsec ||
         st.st_size != d->size || st.st_ino != d->ino)
         return DISK_CHANGED;
     return DISK_SAME;

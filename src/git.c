@@ -1,10 +1,10 @@
+#include "sys.h"
 #include "git.h"
 #include "shell.h"
 #include "util.h"
 
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 
 #define GIT_TIMEOUT_MS 1500
 #define GIT_MAX_OUTPUT (8u << 20)
@@ -105,7 +105,7 @@ int git_file_marks(const char *path, size_t nlines, uint8_t **marks)
         base = slash + 1;
     }
     /* reading must not take the index lock behind the user's back */
-    setenv("GIT_OPTIONAL_LOCKS", "0", 1);
+    sys_setenv("GIT_OPTIONAL_LOCKS", "0");
     ls[2] = dir;
     ls[6] = base;
     r = shell_capture(ls, NULL, NULL, 0, NULL, NULL, GIT_TIMEOUT_MS, 1 << 16, &st);

@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "editor.h"
 #include "version.h"
 #include "json.h"
@@ -263,7 +264,7 @@ void editor_free(Editor *e)
 
 static int same_file(const char *a, const char *b)
 {
-    char *ra = realpath(a, NULL), *rb = realpath(b, NULL);
+    char *ra = sys_realpath(a, NULL), *rb = sys_realpath(b, NULL);
     int r = ra && rb && strcmp(ra, rb) == 0;
 
     free(ra);
@@ -1975,7 +1976,7 @@ void editor_save_session(Editor *e)
         docmap[i] = -1;
         if (!d->buf.path || d->buf.is_new)
             continue;
-        abs = realpath(d->buf.path, NULL);
+        abs = sys_realpath(d->buf.path, NULL);
         if (!abs)
             continue;
         if (d == e->doc)

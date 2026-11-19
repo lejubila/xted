@@ -919,19 +919,27 @@ static size_t find_hint(const Editor *e, size_t room, HintSeg *g, size_t *n)
         nt[1] = nt[2] = 2;
         memcpy(t[2], b, sizeof b);
     } else if (mode == FIND_SEARCH || mode == FIND_FILES) {
-        HintSeg a[] = { { tr("Alt+C Case"), cs, 'c', MOD_ALT }, { tr("Alt+W Word"), wd, 'w', MOD_ALT }, { tr("Alt+R Regex"), rx, 'r', MOD_ALT },
+/* Alt+R, the regular expressions: not in a build without them */
+#ifndef XTED_NO_REGEX
+#define RX_HINT(txt) { txt, rx, 'r', MOD_ALT },
+#else
+#define RX_HINT(txt)
+#endif
+        HintSeg a[] = { { tr("Alt+C Case"), cs, 'c', MOD_ALT }, { tr("Alt+W Word"), wd, 'w', MOD_ALT }, RX_HINT(tr("Alt+R Regex"))
                         { go, -1, KEY_ENTER, 0 }, { tr("Esc cancels"), -1, KEY_ESC, 0 } };
         HintSeg b[] = { { "Alt+C Aa", cs, 'c', MOD_ALT }, { tr("Alt+W Word"), wd, 'w', MOD_ALT },
-                        { tr("Alt+R Regex"), rx, 'r', MOD_ALT }, { "Esc", -1, KEY_ESC, 0 } };
+                        RX_HINT(tr("Alt+R Regex")) { "Esc", -1, KEY_ESC, 0 } };
         HintSeg c[] = { { "Alt+C Aa", cs, 'c', MOD_ALT }, { "Alt+W W", wd, 'w', MOD_ALT },
-                        { "Alt+R .*", rx, 'r', MOD_ALT } };
+                        RX_HINT("Alt+R .*") };
+#undef RX_HINT
 
+        (void)rx;
         memcpy(t[0], a, sizeof a);
-        nt[0] = 5;
+        nt[0] = sizeof a / sizeof a[0];
         memcpy(t[1], b, sizeof b);
-        nt[1] = 4;
+        nt[1] = sizeof b / sizeof b[0];
         memcpy(t[2], c, sizeof c);
-        nt[2] = 3;
+        nt[2] = sizeof c / sizeof c[0];
     } else {
         return 0;
     }

@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "files.h"
 #include "util.h"
 
@@ -157,7 +158,7 @@ int files_scan_step(FScan *s, void (*add)(const char *rel, void *ctx), void *ctx
         name = f->names[f->ni++];
         r = f->rel[0] ? files_join(f->rel, name) : xstrdup(name);
         full = files_join(s->root, r);
-        if (lstat(full, &st) == 0) {
+        if (sys_lstat(full, &st) == 0) {
             if (S_ISDIR(st.st_mode)) {
                 size_t pi;
                 int skip = 0;

@@ -4,9 +4,17 @@
 #include "buffer.h"
 #include "util.h"
 
-#include <regex.h>
 #include <stddef.h>
 #include <stdint.h>
+
+/* XTED_NO_REGEX (the Windows build): no regular expressions, only plain text; the groups keep
+ * the shape of POSIX's for the callers */
+#ifndef XTED_NO_REGEX
+#include <regex.h>
+#else
+typedef long regoff_t;
+typedef struct { regoff_t rm_so, rm_eo; } regmatch_t;
+#endif
 
 /* A compiled search pattern: plain text or an extended regular expression
  * (POSIX ERE, matched one line at a time). Matches are never empty. */
@@ -15,7 +23,9 @@ typedef struct {
     int regex, cs, word;    /* regular expression, match case, whole words only */
     uint32_t *raw, *fold;   /* plain text: the pattern's code points, as is and lower-cased */
     size_t ncp;
+#ifndef XTED_NO_REGEX
     regex_t re;
+#endif
     int has_re;
     char *line;             /* scratch: NUL-terminated copy of the line being searched */
     size_t linecap;

@@ -15,6 +15,7 @@
 
 /* ---- compile ----------------------------------------------------------- */
 
+#ifndef XTED_NO_REGEX
 /* Rewrites \d \D \w \W \s \S as POSIX classes; brackets are copied as they are. */
 static char *translate(const char *p, size_t n)
 {
@@ -72,11 +73,14 @@ static char *translate(const char *p, size_t n)
     sbuf_add(&o, "", 1);
     return sbuf_steal(&o);
 }
+#endif
 
 void sm_free(Matcher *m)
 {
+#ifndef XTED_NO_REGEX
     if (m->has_re)
         regfree(&m->re);
+#endif
     free(m->raw);
     free(m->fold);
     free(m->line);
@@ -92,6 +96,10 @@ int sm_compile(Matcher *m, const char *pat, size_t n, int regex, int cs, int wor
     if (n == 0)
         return -1;
     if (regex) {
+#ifdef XTED_NO_REGEX
+        snprintf(m->err, sizeof m->err, "%s", "regular expressions are not available");
+        return -1;
+#else
         char *tr = translate(pat, n);
         int rc = regcomp(&m->re, tr, REG_EXTENDED | (cs ? 0 : REG_ICASE));
 
@@ -101,6 +109,7 @@ int sm_compile(Matcher *m, const char *pat, size_t n, int regex, int cs, int wor
             return -1;
         }
         m->has_re = 1;
+#endif
     } else {
         size_t i = 0;
 
@@ -196,6 +205,10 @@ static int find_lit(const Matcher *m, const char *s, size_t len, size_t from, si
 /* m->line must hold the line (regex mode). */
 static int find_re(Matcher *m, size_t len, size_t from, size_t *ms, size_t *me, regmatch_t *grp)
 {
+#ifdef XTED_NO_REGEX
+    (void)m; (void)len; (void)from; (void)ms; (void)me; (void)grp;
+    return 0;
+#else
     regmatch_t pm[10];
     int i;
 
@@ -212,6 +225,7 @@ static int find_re(Matcher *m, size_t len, size_t from, size_t *ms, size_t *me, 
             grp[i].rm_eo = pm[i].rm_eo < 0 ? -1 : pm[i].rm_eo + (regoff_t)from;
         }
     return 1;
+#endif
 }
 
 /* Non-empty, whole-word-checked match at or after `from`. */

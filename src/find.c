@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "find.h"
 #include "i18n.h"
 #include "edit.h"
@@ -473,8 +474,10 @@ void find_handle_key(Editor *e, Key k)
             f->cs = !f->cs;
         else if (k.code == 'w')
             f->word = !f->word;
+#ifndef XTED_NO_REGEX
         else if (k.code == 'r')
             f->regex = !f->regex;
+#endif
         else
             return;
         refresh(e);
@@ -630,7 +633,7 @@ static void goto_hit(Editor *e, const TagHit *h)
     char *full, err[256];
     size_t line;
 
-    if (h->file[0] == '/')
+    if (sys_is_abs(h->file))
         full = xstrdup(h->file);
     else
         full = files_join(e->find.tags_dir ? e->find.tags_dir : ".", h->file);

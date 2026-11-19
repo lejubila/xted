@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "editorconfig.h"
 #include "util.h"
 
@@ -279,13 +280,13 @@ int editorconfig_lookup(const char *path, EcProps *out)
     out->expand = out->size = out->tab_width = out->trim = out->final_nl = -1;
     if (!path || !path[0])
         return 0;
-    if (!realpath(path, abs)) {
+    if (!sys_realpath(path, abs)) {
         /* a file that does not exist yet: its directory */
         char tmp[PATH_MAX];
         const char *base = strrchr(path, '/');
 
         snprintf(tmp, sizeof tmp, "%.*s", base ? (int)(base - path) : 1, base ? path : ".");
-        if (!realpath(tmp, dir))
+        if (!sys_realpath(tmp, dir))
             return 0;
         {
             const char *name = base ? base + 1 : path;

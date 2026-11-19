@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "run.h"
 #include "i18n.h"
 #include "errors.h"
@@ -364,7 +365,7 @@ static char *line_error(const Editor *e, size_t y, size_t *ln, size_t *col)
     rel = xmalloc(pl + 1);
     memcpy(rel, l->s + po, pl);
     rel[pl] = '\0';
-    full = rel[0] == '/' ? xstrdup(rel) : files_join(e->root ? e->root : ".", rel);
+    full = sys_is_abs(rel) ? xstrdup(rel) : files_join(e->root ? e->root : ".", rel);
     free(rel);
     if (stat(full, &st) != 0 || !S_ISREG(st.st_mode)) {
         free(full);

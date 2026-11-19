@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "tags.h"
 #include "util.h"
 
@@ -16,7 +17,7 @@ char *tags_find_file(const char *dir)
     int depth;
 
     /* make "." concrete so that going up is possible */
-    if (d[0] != '/') {
+    if (!sys_is_abs(d)) {
         char cwd[4096];
 
         if (getcwd(cwd, sizeof cwd)) {

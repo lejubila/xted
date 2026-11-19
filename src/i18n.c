@@ -1,4 +1,5 @@
 #include "i18n.h"
+#include "sys.h"
 #include "util.h"
 
 #include <ctype.h>
@@ -104,7 +105,7 @@ static void unescape(char *s)
 static char *exe_dir(void)
 {
     char buf[4096];
-    ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1);
+    long n = (long)sys_exe_path(buf, sizeof buf - 1);
     char *slash;
 
     if (n <= 0)

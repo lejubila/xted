@@ -1,3 +1,4 @@
+#include "sys.h"
 #include "cfgsave.h"
 #include "i18n.h"
 #include "editorconfig.h"
@@ -65,7 +66,7 @@ static void make_parents(const char *file)
     for (i = 1; p[i]; i++)
         if (p[i] == '/') {
             p[i] = '\0';
-            mkdir(p, 0755);
+            sys_mkdir(p, 0755);
             p[i] = '/';
         }
     free(p);
@@ -92,11 +93,11 @@ static int write_lines(const char *file, const Lines *L, char *err, size_t errn)
         fputs(L->v[i], f);
         fputc('\n', f);
     }
-    ok = fflush(f) == 0 && fsync(fileno(f)) == 0;
+    ok = fflush(f) == 0 && sys_fsync(fileno(f)) == 0;
     ok = fclose(f) == 0 && ok;
     if (ok)
         chmod(tmp, mode);
-    if (!ok || rename(tmp, file) != 0) {
+    if (!ok || sys_rename(tmp, file) != 0) {
         snprintf(err, errn, tr("cannot write %s: %s"), file, strerror(errno));
         unlink(tmp);
         free(tmp);
@@ -221,7 +222,7 @@ static char *abs_dir(const char *path, const char **base)
     if (slash && slash != path) {
         char *d = xstrndup(path, (size_t)(slash - path));
 
-        r = realpath(d, dir) ? xstrdup(dir) : NULL;
+        r = sys_realpath(d, dir) ? xstrdup(dir) : NULL;
         free(d);
     } else if (slash) {
         r = xstrdup("/");
