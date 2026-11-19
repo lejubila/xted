@@ -32,6 +32,8 @@
 #define SYS_MTIME(st) ((st).st_mtim)
 /* path starts at the root (a drive or a network share on Windows) */
 #define sys_is_abs(path) ((path)[0] == '/')
+/* what the system needs before anything else, at the start of main */
+#define sys_init() ((void)0)
 
 #else
 
@@ -50,6 +52,7 @@ long sys_exe_path(char *buf, size_t n);
 #define SYS_MTIME(st) (sys_timespec((st).st_mtime))
 struct timespec sys_timespec(time_t t);
 int sys_is_abs(const char *path);
+void sys_init(void);
 /* the status of a command that ended (shell_capture, shell_reap) is its exit code */
 #define WIFEXITED(s) 1
 #define WEXITSTATUS(s) (s)

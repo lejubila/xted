@@ -4,11 +4,15 @@
 #   make DYNAMIC=1  dynamic, with the system's cc (or the CC given): for packages, for development
 #   make STATIC=1   static even with another CC (CC=musl-gcc is the default when installed)
 #   make SAN=1      AddressSanitizer + UBSan, dynamic with gcc (the sanitizers need glibc)
+#   make WIN=1      xted.exe for Windows 10/11, with MinGW-w64 (llvm-mingw in ~/.local/opt by
+#                   default: MINGW=dir/bin/ for another); no regular expressions
 # A CC given on the command line is used as it is (dynamic, unless STATIC=1).
 LDFLAGS ?=
 MUSL    := $(shell command -v musl-gcc 2>/dev/null)
 
-ifdef SAN
+ifdef WIN
+MODE     = win
+else ifdef SAN
 MODE     = san
 else ifdef DYNAMIC
 MODE     = dynamic
@@ -23,7 +27,15 @@ MODE     = dynamic
 NO_MUSL  = 1
 endif
 
-ifeq ($(MODE),san)
+ifeq ($(MODE),win)
+MINGW   ?= $(wildcard $(HOME)/.local/opt/llvm-mingw/bin/)
+CC       = $(MINGW)x86_64-w64-mingw32-gcc
+STRIP    = $(MINGW)x86_64-w64-mingw32-strip
+CFLAGS  ?= -Os
+LDFLAGS += -static
+LDLIBS   = -lpthread
+BUILD    = build/win
+else ifeq ($(MODE),san)
 ifeq ($(origin CC),default)
 CC       = gcc
 endif
@@ -43,16 +55,29 @@ BUILD    = build
 endif
 
 PROG     = xted
+STRIP   ?= strip
 PREFIX  ?= /usr/local
 MANDIR  ?= $(PREFIX)/share/man
 
 WARN     = -std=c99 -Wall -Wextra -pedantic
 DEFS     = -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DXTED_DATADIR='"$(PREFIX)/share/xted"'
+ifeq ($(MODE),win)
+PROG     = xted.exe
+DEFS    += -DXTED_NO_REGEX
+endif
 ALLFLAGS = $(WARN) $(DEFS) $(CFLAGS) -ffunction-sections -fdata-sections -MMD -MP
 LINK     = $(LDFLAGS) -Wl,--gc-sections
 
-LIBSRC   = src/util.c src/utf8.c src/term.c src/undo.c src/clip.c src/buffer.c \
-           src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c src/shell.c src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c src/mouse.c src/symbols.c src/stdsym.c src/indent.c src/editorconfig.c src/cfgsave.c src/i18n.c src/imports.c src/json.c src/md.c \
+# what changes between the systems: the terminal, the commands, the calls of sys.h
+ifeq ($(MODE),win)
+TERMSRC  = src/term_win.c src/sys_win.c
+SHELLSRC = src/shell_win.c
+else
+TERMSRC  = src/term.c
+SHELLSRC = src/shell.c
+endif
+LIBSRC   = src/util.c src/utf8.c $(TERMSRC) src/term_keys.c src/undo.c src/clip.c src/buffer.c \
+           src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c $(SHELLSRC) src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c src/mouse.c src/symbols.c src/stdsym.c src/indent.c src/editorconfig.c src/cfgsave.c src/i18n.c src/imports.c src/json.c src/md.c \
            src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=$(BUILD)/%.o) $(BUILD)/main.o
 
@@ -65,9 +90,9 @@ $(PROG): $(BUILD)/$(PROG)
 	cp $< $@
 
 $(BUILD)/$(PROG): $(OBJ)
-	$(CC) -o $@ $(OBJ) $(LINK)
+	$(CC) -o $@ $(OBJ) $(LINK) $(LDLIBS)
 ifndef SAN
-	strip -s $@
+	$(STRIP) -s $@
 endif
 ifdef NO_MUSL
 	@echo "xted: built dynamic, musl-gcc was not found. For the static binary install musl"
@@ -80,7 +105,7 @@ $(BUILD)/%.o: src/%.c
 
 $(BUILD)/test_core: tests/test_core.c $(LIBSRC)
 	@mkdir -p $(BUILD)
-	$(CC) $(WARN) $(DEFS) $(CFLAGS) -Isrc -o $@ $^ $(LDFLAGS)
+	$(CC) $(WARN) $(DEFS) $(CFLAGS) -Isrc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 test: $(BUILD)/test_core
 	./$(BUILD)/test_core

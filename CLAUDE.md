@@ -12,7 +12,8 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
   cambiano tra i sistemi passano da `src/sys.h` (`sys_realpath`, `sys_rename`, `sys_fsync`,
   `sys_mkdir`, `sys_lstat`, `SYS_MTIME`, `sys_is_abs`, …), mai direttamente; su POSIX sono macro
   sulle funzioni della libc, così il binario Linux non cambia. `XTED_NO_REGEX` toglie le
-  espressioni regolari (la build Windows non le ha).
+  espressioni regolari (la build Windows non le ha). `make WIN=1` compila `xted.exe` (`-Os`,
+  statico, dipende solo da KERNEL32 e dalla UCRT di Windows 10); va provato su una VM Windows.
 - Terminale controllato a mano con termios e sequenze ANSI/VT100.
 - Un solo binario e un solo `Makefile`, compilabile con `gcc` o `clang`, con link statico opzionale.
 - Nessun lavoro in background inutile: il ciclo principale attende input con `poll()`.
@@ -32,7 +33,9 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
 | (barra dei tasti) | In render.c `context_hints` sceglie i pulsanti della riga dei messaggi secondo il contesto (domanda `Editor.asking`, ridimensionamento, popup, lista, snippet, browser dei file, più cursori, selezione, sola lettura, modifica con i tasti del linguaggio), `draw_hints` li disegna e ne ricorda le colonne (anche i suggerimenti della barra di ricerca, con il tasto in `HintSeg`), `render_hint_key` dà il tasto di un clic; `next_key` (editor.c) trasforma il clic in quel tasto, così vale anche dentro `ask` e `prompt`; il tasto di un comando è il primo della mappa (`keymap_first`), un comando senza tasto è un pulsante `KEY_CMD`; i nomi brevi (`key_short`) quando non entrano tutti; `render_hint_press` lo disegna premuto; `keybar` (`KEYBAR_*`) li mette nella riga dei messaggi, in una riga a sé (`EDITOR_BOTTOM` righe in fondo non sono testo) o da nessuna parte |
 | `src/sys.h` | Le chiamate che differiscono tra sistemi: su POSIX macro sulla libc, su Windows dichiarazioni (implementate in `sys_win.c`, fase 3); anche `WIFEXITED`/`WEXITSTATUS` per lo stato dei comandi |
 | `src/version.h` | Versione e crediti (`XTED_VERSION`, anno, autore, licenza): `--version`, guida F1, «Informazioni su xted», schermata iniziale |
-| `src/term.[ch]` | Raw mode, alternate screen, segnali, `poll()`, decodifica dei tasti |
+| `src/term.[ch]` | Raw mode, alternate screen, segnali, `poll()` (POSIX); `term.h` è l'interfaccia comune |
+| `src/term_keys.c`, `src/term_in.h` | Decodifica dei tasti dai byte del terminale (sequenze xterm, PuTTY, rxvt, mouse SGR, incolla, focus), uguale su ogni sistema; `term_fill` del sistema riempie il buffer |
+| `src/term_win.c`, `src/sys_win.c`, `src/shell_win.c` | Windows (`make WIN=1`, `build/win/xted.exe`): console in modalità VT (tasti come sequenze VT da `ReadConsoleInputW`, mouse della console classica tradotto in SGR, dimensione e focus dai record), le funzioni di `sys.h` (file in modalità binaria con `sys_init`), comandi non ancora disponibili (fase 4) |
 | `src/buffer.[ch]` | Testo (indipendente dalla UI), caricamento e salvataggio, primitive di modifica, helper multi-riga, undo/redo |
 | `src/undo.[ch]` | Log delle operazioni e gruppi di undo; non conosce `Buffer` |
 | `src/clip.[ch]` | Kill ring e codifica base64/OSC 52 per gli appunti di sistema |

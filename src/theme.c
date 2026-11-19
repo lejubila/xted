@@ -122,6 +122,11 @@ int theme_detect_depth(void)
         return COLOR_NONE;
     if (ct && (strstr(ct, "truecolor") || strstr(ct, "24bit")))
         return COLOR_TRUE;
+#ifdef _WIN32
+    /* no TERM on Windows: Windows Terminal and the console of Windows 10 show any colour */
+    if (!t || !t[0])
+        return COLOR_TRUE;
+#endif
     if (!t || !t[0] || strcmp(t, "dumb") == 0)
         return COLOR_NONE;
     tl = strlen(t);

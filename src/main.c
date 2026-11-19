@@ -2,6 +2,7 @@
 #include "editor.h"
 #include "version.h"
 #include "i18n.h"
+#include "sys.h"
 #include "term.h"
 
 #include <ctype.h>
@@ -69,8 +70,10 @@ int main(int argc, char **argv)
     Editor e;
     Doc *first = NULL;
     int i, stdin_used = 0;
-    char *cd = config_dir();
+    char *cd;
 
+    sys_init();
+    cd = config_dir();
     /* the language of the command line messages comes from the environment (the configuration
      * is read later and may choose another one) */
     i18n_init(cd);
