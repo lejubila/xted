@@ -14,10 +14,17 @@
 
 static void usage(FILE *f)
 {
+#ifdef _WIN32
+    fputs(tr("usage: xted [file[:line[:column]] ...]\n"
+             "     xted -       reads the text from stdin\n"
+             "     xted -V      shows the version (also --version)\n"
+             "configuration: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n"), f);
+#else
     fputs(tr("usage: xted [file[:line[:column]] ...]\n"
              "     xted -       reads the text from stdin\n"
              "     xted -V      shows the version (also --version)\n"
              "configuration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n"), f);
+#endif
 }
 
 /* Splits "name:12:3" into the name and a line/column, but only when the
@@ -104,6 +111,7 @@ int main(int argc, char **argv)
         Doc *d;
         size_t line, col;
 
+        sys_path_fix(argv[i]);              /* C:\dir\a.c as C:/dir/a.c on Windows */
         if (strcmp(argv[i], "-") == 0) {
             if (stdin_used || isatty(STDIN_FILENO)) {
                 fputs(tr("xted: '-' needs the text on stdin (only once)\n"), stderr);

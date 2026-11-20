@@ -283,6 +283,7 @@ void i18n_detect(char *out, size_t n)
         out[k] = '\0';
         return;
     }
+    sys_lang(out, n);
 }
 
 static int cmp_str(const void *a, const void *b)

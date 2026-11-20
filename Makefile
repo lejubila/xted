@@ -31,6 +31,7 @@ ifeq ($(MODE),win)
 MINGW   ?= $(wildcard $(HOME)/.local/opt/llvm-mingw/bin/)
 CC       = $(MINGW)x86_64-w64-mingw32-gcc
 STRIP    = $(MINGW)x86_64-w64-mingw32-strip
+WINDRES  = $(MINGW)x86_64-w64-mingw32-windres
 CFLAGS  ?= -Os
 LDFLAGS += -static
 LDLIBS   = -lpthread
@@ -63,6 +64,7 @@ WARN     = -std=c99 -Wall -Wextra -pedantic
 DEFS     = -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -DXTED_DATADIR='"$(PREFIX)/share/xted"'
 ifeq ($(MODE),win)
 PROG     = xted.exe
+EXE      = .exe
 DEFS    += -DXTED_NO_REGEX
 endif
 ALLFLAGS = $(WARN) $(DEFS) $(CFLAGS) -ffunction-sections -fdata-sections -MMD -MP
@@ -80,6 +82,9 @@ LIBSRC   = src/util.c src/utf8.c $(TERMSRC) src/term_keys.c src/undo.c src/clip.
            src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c $(SHELLSRC) src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c src/mouse.c src/symbols.c src/stdsym.c src/indent.c src/editorconfig.c src/cfgsave.c src/i18n.c src/imports.c src/json.c src/md.c \
            src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=$(BUILD)/%.o) $(BUILD)/main.o
+ifeq ($(MODE),win)
+OBJ     += $(BUILD)/xted_res.o
+endif
 
 
 all: $(PROG)
@@ -103,12 +108,23 @@ $(BUILD)/%.o: src/%.c
 	@mkdir -p $(BUILD)
 	$(CC) $(ALLFLAGS) -c -o $@ $<
 
-$(BUILD)/test_core: tests/test_core.c $(LIBSRC)
+# Windows: the manifest (UTF-8 code page) into the program
+$(BUILD)/xted_res.o: src/win/xted.rc src/win/xted.manifest
+	@mkdir -p $(BUILD)
+	cd src/win && $(WINDRES) xted.rc -O coff -o $(CURDIR)/$@
+
+$(BUILD)/test_core$(EXE): tests/test_core.c $(LIBSRC)
 	@mkdir -p $(BUILD)
 	$(CC) $(WARN) $(DEFS) $(CFLAGS) -Isrc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-test: $(BUILD)/test_core
-	./$(BUILD)/test_core
+ifeq ($(MODE),win)
+# built here, run on Windows (from its folder: it makes \tmp on the drive)
+test: $(BUILD)/test_core$(EXE)
+	@echo "$(BUILD)/test_core.exe: run it on Windows"
+else
+test: $(BUILD)/test_core$(EXE)
+	./$(BUILD)/test_core$(EXE)
+endif
 
 # the editor on a real pseudo-terminal: what is drawn and the files written (needs python3)
 smoke: $(PROG)

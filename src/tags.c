@@ -20,7 +20,7 @@ char *tags_find_file(const char *dir)
     if (!sys_is_abs(d)) {
         char cwd[4096];
 
-        if (getcwd(cwd, sizeof cwd)) {
+        if (sys_getcwd(cwd, sizeof cwd)) {
             size_t pn = strlen(cwd) + strlen(d) + 2;
 
             path = xmalloc(pn);

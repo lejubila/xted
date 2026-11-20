@@ -83,13 +83,60 @@ struct timespec sys_timespec(time_t t)
     return ts;
 }
 
+/* name = the folder in the variable from, with '/', unless name is set already. */
+static void env_dir(const char *name, const char *from)
+{
+    const char *v = getenv(from);
+    char buf[PATH_MAX];
+
+    if ((getenv(name) && getenv(name)[0]) || !v || !v[0] || strlen(v) >= sizeof buf)
+        return;
+    memcpy(buf, v, strlen(v) + 1);
+    slashes(buf);
+    _putenv_s(name, buf);
+}
+
 /* Files in binary mode, as on POSIX: the C library of Windows would otherwise write CR LF for
- * every LF and stop reading at Ctrl+Z. The line ends are the editor's business. */
+ * every LF and stop reading at Ctrl+Z. The line ends are the editor's business.
+ * The folders of the user as the variables the editor reads on every system: the configuration
+ * in %APPDATA%\xted, the session in %LOCALAPPDATA%\xted, HOME for ~ (Git for Windows reads it
+ * the same way). */
 void sys_init(void)
 {
     _set_fmode(_O_BINARY);
     _setmode(0, _O_BINARY);
     _setmode(1, _O_BINARY);
+    env_dir("XDG_CONFIG_HOME", "APPDATA");
+    env_dir("XDG_STATE_HOME", "LOCALAPPDATA");
+    env_dir("HOME", "USERPROFILE");
+}
+
+char *sys_getcwd(char *buf, size_t n)
+{
+    if (!_getcwd(buf, (int)n))
+        return NULL;
+    slashes(buf);
+    return buf;
+}
+
+void sys_path_fix(char *path)
+{
+    slashes(path);
+}
+
+/* The language of Windows' interface, "it-IT" as "it". */
+void sys_lang(char *out, size_t n)
+{
+    WCHAR name[LOCALE_NAME_MAX_LENGTH];
+    size_t k;
+
+    if (n < 3 || !LCIDToLocaleName(MAKELCID(GetUserDefaultUILanguage(), SORT_DEFAULT), name,
+                                     LOCALE_NAME_MAX_LENGTH, 0))
+        return;
+    for (k = 0; k + 1 < n && name[k] && name[k] != '-' && name[k] < 0x80; k++)
+        out[k] = (char)tolower((unsigned char)name[k]);
+    if (k > 0)
+        out[k] = '\0';
 }
 
 int sys_is_abs(const char *p)

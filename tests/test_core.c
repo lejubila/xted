@@ -39,9 +39,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
+#include "sys.h"
 #include <time.h>
 #include <unistd.h>
+
+#include "test_win.h"
 
 static int failures;
 
@@ -202,7 +204,9 @@ static void test_files(void)
     CHECK(buf_save(&b, NULL, err, sizeof err) == 3);
     out = read_file(path, &n);
     CHECK(n == 3 && memcmp(out, "xy\n", 3) == 0);
-    CHECK(stat(path, &st) == 0 && (st.st_mode & 07777) == 0640);
+#ifndef _WIN32
+    CHECK(stat(path, &st) == 0 && (st.st_mode & 07777) == 0640);     /* no such modes on Windows */
+#endif
     free(out);
     buf_free(&b);
 
@@ -1611,7 +1615,14 @@ static void put_file(const char *dir, const char *name, const char *text)
 static char *make_dir(char *buf, size_t n)
 {
     snprintf(buf, n, "/tmp/xted-test-XXXXXX");
+#ifdef _WIN32
+    /* as the editor writes it: C:/tmp/... (with the drive) */
+    if (!mkdtemp(buf) || !sys_realpath(buf, buf))
+        return NULL;
+    return buf;
+#else
     return mkdtemp(buf);
+#endif
 }
 
 static void rm_rf(const char *dir)
@@ -1924,7 +1935,12 @@ static void test_session(void)
     {
         char *f = session_file();
 
+#ifdef _WIN32
+        /* C:/tmp/...: the drive is in the name, without its ':' */
+        CHECK(f && strstr(f, "/xted/sessions/") != NULL && !strchr(strstr(f, "/sessions/"), ':'));
+#else
         CHECK(f && strstr(f, "/xted/sessions/%") != NULL && strncmp(f, dir, strlen(dir)) == 0);
+#endif
         free(f);
     }
     unsetenv("XDG_STATE_HOME");
@@ -2033,6 +2049,7 @@ static void test_search_lines(void)
     CHECK(!find1(&m, "concat cats", 0, &a, &b));
     CHECK(find1(&m, "(cat)", 0, &a, &b) && a == 1);
 
+#ifndef XTED_NO_REGEX
     CHECK(sm_compile(&m, "a*", 2, 1, 0, 0) == 0);                     /* no empty matches */
     CHECK(!find1(&m, "xyz", 0, &a, &b));
     CHECK(find1(&m, "xaay", 0, &a, &b) && a == 1 && b == 3);
@@ -2052,6 +2069,10 @@ static void test_search_lines(void)
           g[2].rm_so == 6 && g[2].rm_eo == 9);
     CHECK(sm_compile(&m, "(", 1, 1, 0, 0) < 0 && !m.valid && m.err[0] != '\0');
     CHECK(sm_compile(&m, "[a", 2, 1, 0, 0) < 0);
+#else
+    CHECK(sm_compile(&m, "a*", 2, 1, 0, 0) < 0 && m.err[0] != '\0');  /* no regular expressions */
+    (void)g;
+#endif
 
     CHECK(sm_compile(&m, "ab", 2, 0, 0, 0) == 0);
     CHECK(sm_find_last(&m, "ab ab ab", 8, 8, &a, &b) && a == 6);
@@ -2119,6 +2140,7 @@ static void test_search_replace(void)
     size_t a, e;
 
     memset(&m, 0, sizeof m);
+#ifndef XTED_NO_REGEX
     sm_compile(&m, "(\\w)(\\d+)", 9, 1, 0, 0);
     CHECK(sm_find(&m, "xx b22", 6, 0, &a, &e, g));
     search_expand(&m, "xx b22", g, "<\\2\\1\\0\\\\\\t>", &o);
@@ -2132,6 +2154,15 @@ static void test_search_replace(void)
     CHECK(buf_undo(b, &a, &e) == 1 && buf_is(b, "a1 b22\nc333 a4\nnone"));   /* one undo step */
     CHECK(buf_redo(b, &a, &e) == 1 && buf_is(b, "1a 22b\n333c 4a\nnone"));
     sm_free(&m);
+#else
+    (void)g;
+    (void)o;
+    (void)a;
+    (void)e;
+    buf_free(b);                                /* the text the regex would have given */
+    free(b);
+    b = buf_of("1a 22b\n333c 4a\nnone");
+#endif
 
     sm_compile(&m, "a", 1, 0, 1, 0);                                  /* limited to a span */
     lim.y0 = 0; lim.x0 = 0; lim.y1 = 1; lim.x1 = 7;
@@ -3669,7 +3700,7 @@ static void test_params(void)
     size_t from, to, hf, ht;
 
     CHECK(sym_param_span("const char *dest, const char *src, size_t n", 1, &from, &to) &&
-          strncmp("const char *dest, const char *src, size_t n" + from, "const char *src", to - from) == 0 &&
+          strncmp(&"const char *dest, const char *src, size_t n"[from], "const char *src", to - from) == 0 &&
           to - from == 15);
     CHECK(!sym_param_span("a, b", 2, &from, &to));
     CHECK(sym_param_span("fmt, ...", 4, &from, &to) && to - from == 3);
@@ -3984,7 +4015,11 @@ static void test_app_dir(void)
     CHECK(mkdir(path, 0700) == 0);
     setenv("XDG_STATE_HOME", dir, 1);
     f = session_file();
+#ifdef _WIN32
+    CHECK(f && strstr(f, "/ked/sessions/") != NULL && strstr(f, "/xted/") == NULL);
+#else
     CHECK(f && strstr(f, "/ked/sessions/%") != NULL && strstr(f, "/xted/") == NULL);
+#endif
     free(f);
     unsetenv("XDG_STATE_HOME");
     setenv("XDG_CONFIG_HOME", dir, 1);
@@ -4046,8 +4081,11 @@ static void test_cfgsave(void)
     CHECK(cfgsave_write(file, "PHP", p2, 1, err, sizeof err) == 0);       /* a new section at the end */
     CHECK(strstr(slurp_file(file), "ctrl+s = save\n\n[PHP]\nexpand_tab = true\n") != NULL);
 
-    /* a folder that cannot be written is reported, and nothing is left behind */
+#ifndef _WIN32
+    /* a folder that cannot be written is reported, and nothing is left behind (no /proc on
+     * Windows: it would be made) */
     CHECK(cfgsave_write("/proc/xted-no/config", NULL, p1, 1, err, sizeof err) == -1 && err[0]);
+#endif
 
     /* project files */
     snprintf(file, sizeof file, "%s/proj", dir);
@@ -6826,6 +6864,10 @@ static void test_symbols(void)
 
 int main(void)
 {
+    sys_init();
+#ifdef _WIN32
+    _mkdir("/tmp");                 /* the folders of the tests: \tmp on the current drive */
+#endif
     setenv("LC_ALL", "C", 1);     /* the texts are checked in English whatever the environment says */
     test_utf8();
     test_edit();
@@ -6874,7 +6916,9 @@ int main(void)
     test_config();
     test_config_apply();
     test_user_themes_syntax();
-    test_git();
+#ifndef _WIN32
+    test_git();                     /* commands: not yet on Windows (port, phase 4) */
+#endif
     test_tags();
     test_complete();
     test_symbols();
@@ -6912,10 +6956,19 @@ int main(void)
     test_snippets();
     test_cursors();
     test_folding();
+#ifndef _WIN32
     test_shell();
+#else
+    (void)test_shell;
+    (void)test_run;
+    (void)test_filter;
+    (void)test_git;
+#endif
     test_errors_parse();
+#ifndef _WIN32
     test_run();
     test_filter();
+#endif
     if (failures) {
         fprintf(stderr, "%d test falliti\n", failures);
         return 1;

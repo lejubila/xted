@@ -281,7 +281,7 @@ void tree_init(Tree *t, const char *root)
     if (strcmp(root, ".") == 0) {
         char cwd[4096];
 
-        if (getcwd(cwd, sizeof cwd)) {
+        if (sys_getcwd(cwd, sizeof cwd)) {
             const char *b = strrchr(cwd, '/');
 
             free(r.name);

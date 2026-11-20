@@ -227,7 +227,7 @@ static char *abs_dir(const char *path, const char **base)
     } else if (slash) {
         r = xstrdup("/");
     } else {
-        r = getcwd(dir, sizeof dir) ? xstrdup(dir) : NULL;
+        r = sys_getcwd(dir, sizeof dir) ? xstrdup(dir) : NULL;
     }
     *base = slash ? slash + 1 : path;
     return r ? r : xstrdup(".");

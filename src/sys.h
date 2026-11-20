@@ -34,6 +34,12 @@
 #define sys_is_abs(path) ((path)[0] == '/')
 /* what the system needs before anything else, at the start of main */
 #define sys_init() ((void)0)
+/* the current folder, as getcwd */
+#define sys_getcwd(buf, n) getcwd((buf), (n))
+/* a path given by the user in the form of the editor ('/' between the folders on Windows) */
+#define sys_path_fix(path) ((void)(path))
+/* the language of the system when no LANG says it (Windows): its code in out, as "it" */
+#define sys_lang(out, n) ((void)(out), (void)(n))
 
 #else
 
@@ -53,6 +59,9 @@ long sys_exe_path(char *buf, size_t n);
 struct timespec sys_timespec(time_t t);
 int sys_is_abs(const char *path);
 void sys_init(void);
+char *sys_getcwd(char *buf, size_t n);
+void sys_path_fix(char *path);
+void sys_lang(char *out, size_t n);
 /* the status of a command that ended (shell_capture, shell_reap) is its exit code */
 #define WIFEXITED(s) 1
 #define WEXITSTATUS(s) (s)

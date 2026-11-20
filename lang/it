@@ -387,3 +387,4 @@ check	controlla
 definition	definizione
 Key bar	Barra dei tasti
 Key bar: %s	Barra dei tasti: %s
+usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\nconfiguration: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\nconfigurazione: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n

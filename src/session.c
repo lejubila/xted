@@ -19,7 +19,7 @@ char *session_file(void)
     SBuf b = SBUF_INIT;
     size_t i;
 
-    if (!getcwd(cwd, sizeof cwd))
+    if (!sys_getcwd(cwd, sizeof cwd))
         return NULL;
     if (state && sys_is_abs(state)) {
         sbuf_adds(&b, state);
@@ -35,7 +35,12 @@ char *session_file(void)
     free(base);
     key = xstrdup(cwd);
     for (i = 0; key[i]; i++)
+#ifdef _WIN32
+        /* C:/dir: a ':' in a name is a stream of NTFS, not a file */
+        if (key[i] == '/' || key[i] == ':')
+#else
         if (key[i] == '/')
+#endif
             key[i] = '%';
     sbuf_adds(&b, dir);
     sbuf_adds(&b, "/sessions/");
