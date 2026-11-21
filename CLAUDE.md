@@ -13,7 +13,11 @@ Le funzionalità e la roadmap a fasi sono in `SPEC.md`, che è la fonte di verit
   `sys_mkdir`, `sys_lstat`, `SYS_MTIME`, `sys_is_abs`, …), mai direttamente; su POSIX sono macro
   sulle funzioni della libc, così il binario Linux non cambia. `XTED_NO_REGEX` toglie le
   espressioni regolari (la build Windows non le ha). `make WIN=1` compila `xted.exe` (`-Os`,
-  statico, dipende solo da KERNEL32 e dalla UCRT di Windows 10); va provato su una VM Windows.
+  statico, dipende solo da KERNEL32 e dalla UCRT di Windows 10, limite 600 KB come Linux); va
+  provato su una VM Windows (`make WIN=1 test` dà `test_core.exe`).
+- Release: `tools/release.sh` (versione da `src/version.h`) prepara in `build/release/` binario e
+  tar.gz Linux, zip Windows, `install.sh`, `install.ps1` e `SHA256SUMS`, controllando il limite;
+  le note (`NOTES.md`) e la pubblicazione con `gh release create` restano a mano.
 - Terminale controllato a mano con termios e sequenze ANSI/VT100.
 - Un solo binario e un solo `Makefile`, compilabile con `gcc` o `clang`, con link statico opzionale.
 - Nessun lavoro in background inutile: il ciclo principale attende input con `poll()`.

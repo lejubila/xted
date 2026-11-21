@@ -4,7 +4,7 @@ Nov 7, 2026 · @David
 
 ## Obiettivi e vincoli
 
-Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 600 KB, avvio sotto 50 ms.
+Un editor da terminale per Linux, scritto in C99 con sola libc POSIX: un unico binario statico sotto 600 KB, avvio sotto 50 ms. Anche per Windows 10/11 (`make WIN=1`, MinGW-w64): un unico `xted.exe` sotto 600 KB, con le API Win32 al posto di quelle POSIX dietro `sys.h`, `term_win.c` e `shell_win.c`, senza espressioni regolari. `tools/release.sh` controlla il limite di entrambi.
 
 - **Zero dipendenze**: niente ncurses, niente librerie esterne; controllo del terminale via termios e sequenze ANSI/VT100 scritte a mano.
 - **Linguaggio**: C99 (alternativa: Rust senza crate esterni, ma binario più grande).

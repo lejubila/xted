@@ -58,6 +58,46 @@ sh install.sh
 Gli stessi file si scaricano anche a mano dalla pagina delle
 [release](https://github.com/lejubila/xted/releases).
 
+### Windows
+
+xted gira anche su Windows 10 (1809 o successivo) e Windows 11, come un solo `xted.exe` senza
+DLL da installare: in Windows Terminal, in PowerShell o nel Prompt dei comandi. In PowerShell:
+
+```
+irm https://github.com/lejubila/xted/releases/latest/download/install.ps1 | iex
+```
+
+Lo script scarica l'ultima release, la controlla con `SHA256SUMS` e installa `xted.exe`, `xt.exe`
+(lo stesso programma, un collegamento) e il catalogo italiano in `%LOCALAPPDATA%\Programs\xted`,
+senza permessi di amministratore, e aggiunge la cartella al `PATH` dell'utente (vale nei
+terminali aperti dopo). Rilanciato, aggiorna; per toglierlo:
+
+```
+$env:XTED_UNINSTALL = '1'; irm https://github.com/lejubila/xted/releases/latest/download/install.ps1 | iex
+```
+
+`$env:XTED_DIR` sceglie un'altra cartella, `$env:XTED_VERSION` una versione precisa. Oppure si
+scarica `xted-<versione>-windows-x86_64.zip` dalle release e si estrae dove si vuole (`lang\`
+accanto a `xted.exe`).
+
+Su Windows:
+
+- la configurazione è in `%APPDATA%\xted` (`config`, `syntax\`, `themes\`, `lang\`), la sessione
+  in `%LOCALAPPDATA%\xted`; la lingua è quella di Windows (o `LANG`, o `language` nel `config`);
+- i comandi (Esegui `Alt+R`, i filtri) passano da `cmd.exe` (o `%COMSPEC%`); il loro output arriva
+  in UTF-8 con fine riga LF come su Linux, anche quello dei comandi di `cmd` (dalla code page OEM:
+  i caratteri che questa non ha, come `€` nella 850, arrivano come `?`); gli indicatori Git
+  richiedono Git for Windows nel `PATH`;
+- **non ci sono le espressioni regolari** nella ricerca (`Alt+R` nella barra di ricerca): la
+  ricerca semplice, «parola intera» e «maiuscole» restano;
+- la copia negli appunti di sistema (OSC 52) funziona in Windows Terminal, non nella console
+  classica; i nomi di file fuori da ASCII richiedono Windows 10 1903 o successivo.
+
+Per compilarlo da Linux serve [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) (o un altro
+MinGW-w64): `make WIN=1` dà `build/win/xted.exe` (cerca il compilatore in
+`~/.local/opt/llvm-mingw/bin`, o `MINGW=cartella/bin/`); `make WIN=1 test` dà `test_core.exe` da
+lanciare su Windows.
+
 ### Compilare dai sorgenti
 
 Servono un compilatore C (`gcc` o `clang`) e `make`. Per il binario statico, quello predefinito,
