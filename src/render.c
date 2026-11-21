@@ -1065,11 +1065,15 @@ static size_t context_hints(const Editor *e, Hint *h, size_t max)
     }
     if (e->sidebar_on && e->sidebar_focus) {
         n = hint_key(h, n, max, KEY_ENTER, N_("open"));
-        n = hint_key(h, n, max, KEY_UP, "");
-        n = hint_key(h, n, max, KEY_DOWN, "");
+        n = hint_add(h, n, max, "new_file", N_("new file"));
+        n = hint_key(h, n, max, KEY_F7, N_("new folder"));
+        n = hint_key(h, n, max, KEY_F2, N_("rename"));
+        n = hint_key(h, n, max, KEY_DEL, N_("delete"));
         n = hint_key(h, n, max, KEY_LEFT, N_("close folder"));
         n = hint_key(h, n, max, KEY_ESC, N_("back to the text"));
-        return hint_add(h, n, max, "toggle_tree", N_("hide"));
+        n = hint_add(h, n, max, "toggle_tree", N_("hide"));
+        n = hint_key(h, n, max, KEY_UP, "");
+        return hint_key(h, n, max, KEY_DOWN, "");
     }
     if (e->nxc > 0) {
         n = hint_add(h, n, max, "cursor_next", N_("next occurrence"));

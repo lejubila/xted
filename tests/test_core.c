@@ -1902,6 +1902,39 @@ static void test_files_tree(void)
         tree_left(&t);                                          /* an open folder: closes it */
         CHECK(!t.e[i].open && t.n == before);
     }
+    /* read again (a file made, a folder made, one removed): the open folders stay open,
+     * the selected row stays selected; with show, the way to it is opened and it is selected */
+    {
+        char p[700];
+        size_t k;
+
+        tree_toggle(&t, i);                                     /* src open */
+        for (k = 0; k < t.n && strcmp(t.e[k].name, "z.txt") != 0; k++)
+            ;
+        t.sel = k;
+        put_file(dir, "m.txt", "");
+        put_file(dir, "src/a.c", "");
+        tree_refresh(&t, NULL);
+        for (k = 1; k < t.n && strcmp(t.e[k].name, "src") != 0; k++)
+            ;
+        CHECK(k < t.n && t.e[k].open && strcmp(t.e[k + 1].name, "a.c") == 0 &&
+              strcmp(t.e[k + 2].name, "main.c") == 0);
+        CHECK(t.sel < t.n && strcmp(t.e[t.sel].name, "z.txt") == 0);
+        for (k = 1; k < t.n && strcmp(t.e[k].name, "m.txt") != 0; k++)
+            ;
+        CHECK(k < t.n && strcmp(t.e[k - 1].name, "a.txt") == 0);
+        snprintf(p, sizeof p, "%s/build/new.o", dir);           /* in a closed folder */
+        put_file(dir, "build/new.o", "");
+        tree_refresh(&t, p);
+        CHECK(t.sel < t.n && strcmp(t.e[t.sel].name, "new.o") == 0 && t.e[t.sel].depth == 2 &&
+              strcmp(t.e[t.sel - 1].name, "build") == 0 && t.e[t.sel - 1].open);
+        snprintf(p, sizeof p, "%s/m.txt", dir);
+        remove(p);
+        tree_refresh(&t, NULL);
+        for (k = 1; k < t.n && strcmp(t.e[k].name, "m.txt") != 0; k++)
+            ;
+        CHECK(k == t.n);
+    }
     tree_free(&t);
     rm_rf(dir);
 }

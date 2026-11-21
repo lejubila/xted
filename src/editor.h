@@ -256,6 +256,7 @@ void editor_cmd_save(Editor *e);
 void editor_cmd_save_as(Editor *e);
 void editor_cmd_save_all(Editor *e);
 void editor_cmd_open(Editor *e);
+void editor_cmd_new_file(Editor *e);
 void editor_cmd_quick_open(Editor *e);
 void editor_cmd_buffers(Editor *e);
 void editor_cmd_symbols(Editor *e);

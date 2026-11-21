@@ -3,6 +3,7 @@
 #include "util.h"
 
 #include <dirent.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -329,6 +330,56 @@ void tree_left(Tree *t)
         i--;
     if (i > 0)
         t->sel = i - 1;
+}
+
+/* real is a folder of path, or path itself. */
+static int under(const char *path, const char *real)
+{
+    size_t n = strlen(real);
+
+    return strncmp(path, real, n) == 0 && (path[n] == '\0' || path[n] == '/' || (n > 0 && real[n - 1] == '/'));
+}
+
+void tree_refresh(Tree *t, const char *show)
+{
+    char **open = NULL, *root = xstrdup(t->root), real[PATH_MAX], want[PATH_MAX];
+    size_t nopen = 0, i, k, old_sel = t->sel, top = t->top;
+    int have_want = 0;
+
+    /* the folders open now and the row to select, by their real paths */
+    open = xmalloc((t->n + 1) * sizeof *open);
+    for (i = 1; i < t->n; i++)
+        if (t->e[i].is_dir && t->e[i].open && sys_realpath(t->e[i].path, real))
+            open[nopen++] = xstrdup(real);
+    if (show)
+        have_want = sys_realpath(show, want) != NULL;
+    else if (t->sel < t->n)
+        have_want = sys_realpath(t->e[t->sel].path, want) != NULL;
+    tree_free(t);
+    tree_init(t, root);
+    free(root);
+    t->sel = old_sel;
+    /* down the list as it grows: the folders that were open, and those on the way to show */
+    for (i = 1; i < t->n; i++) {
+        if (!t->e[i].is_dir || t->e[i].open || !sys_realpath(t->e[i].path, real))
+            continue;
+        for (k = 0; k < nopen && strcmp(open[k], real) != 0; k++)
+            ;
+        if (k < nopen || (show && have_want && strcmp(want, real) != 0 && under(want, real)))
+            expand(t, i);
+    }
+    if (have_want)
+        for (i = 0; i < t->n; i++)
+            if (sys_realpath(t->e[i].path, real) && strcmp(real, want) == 0) {
+                t->sel = i;
+                break;
+            }
+    if (t->sel >= t->n)
+        t->sel = t->n ? t->n - 1 : 0;
+    t->top = top;
+    for (k = 0; k < nopen; k++)
+        free(open[k]);
+    free(open);
 }
 
 void tree_fit(Tree *t, size_t rows)

@@ -26,6 +26,7 @@ const Command commands[] = {
     { "save", N_("Save"), "ctrl+s", editor_cmd_save, 0, 0, G_FILE, ST_NONE },
     { "save_as", N_("Save as"), "alt+s", editor_cmd_save_as, 0, 0, G_FILE, ST_NONE },
     { "save_all", N_("Save all"), "alt+a", editor_cmd_save_all, 0, 0, G_FILE, ST_NONE },
+    { "new_file", N_("New file"), "ctrl+n", editor_cmd_new_file, 0, 0, G_FILE, ST_NONE },
     { "open", N_("Open file"), "ctrl+o", editor_cmd_open, 0, 0, G_FILE, ST_NONE },
     { "quick_open", N_("Quick open"), "ctrl+p", editor_cmd_quick_open, 0, 0, G_FILE, ST_NONE },
     { "quit", N_("Quit"), "ctrl+q", editor_cmd_quit, 0, 0, G_FILE, ST_NONE },

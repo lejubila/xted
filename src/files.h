@@ -51,5 +51,8 @@ void tree_toggle(Tree *t, size_t i);
 void tree_left(Tree *t);
 /* Keeps top such that sel is within rows visible rows. */
 void tree_fit(Tree *t, size_t rows);
+/* Reads the folders again (files made, renamed or removed by anyone), keeping the open ones and
+ * the selected row; with show, also opens the folders on the way to it and selects it. */
+void tree_refresh(Tree *t, const char *show);
 
 #endif

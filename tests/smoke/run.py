@@ -666,6 +666,54 @@ def keybar_options():
 
 
 @scenario
+def new_file():
+    b = Box()
+    b.write("a.txt", "uno\n")
+    b.write("sub/b.txt", "due\n")
+    r = b.run(["a.txt"], cols=110)
+    last = lambda: r.screen().lines()[-1]
+    text = lambda: r.screen().text()
+    r.type(ctrl("n"), 0.3)
+    check("Ctrl+N: a new empty buffer, no name asked", "New buffer" in last() and "[Untitled]" in text(),
+          last())
+    r.type("ciao", ctrl("s"), 0.3)
+    check("Ctrl+S on it asks the name", "Save as:" in last(), last())
+    r.type("sub/nuovo.txt", ENTER, 0.3)
+    check("and writes it", b.read("sub/nuovo.txt") == "ciao\n" or b.read("sub/nuovo.txt") == "ciao",
+          repr(b.read("sub/nuovo.txt")))
+    # the file browser: a click selects the folder sub
+    r.type(ctrl("b"), 0.3)
+    rows = r.screen().lines()
+    y = next(i for i, l in enumerate(rows) if " sub" in l[:25])
+    x = rows[y].index("sub")
+    r.type("\x1b[<0;%d;%dM" % (x + 2, y + 1), 0.05, "\x1b[<0;%d;%dm" % (x + 2, y + 1), 0.3)
+    r.type(ctrl("n"), 0.3)
+    check("Ctrl+N in the browser asks a name in the selected folder", "New file: sub/" in last(), last())
+    r.type("x.txt", ENTER, 0.4)
+    check("the file is made empty and opened", os.path.exists(b.path("sub/x.txt")) and
+          os.path.getsize(b.path("sub/x.txt")) == 0 and "created" in last(), last())
+    r.type(ctrl("b"), 0.2, "\x1b[1~", 0.1, "\x1b[18~", 0.3)          # Home, F7
+    check("F7: a new folder", "New folder:" in last(), last())
+    r.type("nuova", ENTER, 0.4)
+    check("made and shown", os.path.isdir(b.path("nuova")) and "nuova" in text(), last())
+    r.type("\x1b[12~", 0.3)                                         # F2 on it
+    check("F2 renames: the name to change", "Rename to: nuova" in last(), last())
+    r.type("2", ENTER, 0.4)
+    check("renamed", os.path.isdir(b.path("nuova2")) and not os.path.exists(b.path("nuova")), last())
+    r.type("\x1b[3~", 0.3)                                          # Del
+    check("Del asks first", "Delete the folder" in last(), last())
+    r.type("y", 0.4)
+    check("an empty folder is deleted", not os.path.exists(b.path("nuova2")) and "deleted" in last(), last())
+    b.write("esterno.txt", "x\n")
+    r.type("\x1b[I", 0.4)                                           # the window comes back
+    check("a file made by another program shows when the window comes back", "esterno.txt" in text(),
+          text()[:500])
+    r.type(ESC, ctrl("q"), 0.3, "n", 0.3)
+    r.finish()
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

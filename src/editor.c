@@ -23,6 +23,8 @@
 #include "util.h"
 
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -1253,6 +1255,8 @@ static int save_doc_as(Editor *e, Doc *d, int force_prompt)
     }
     apply_cfg(e, d);
     git_refresh_doc(e, d);
+    if (target && e->sidebar_on)
+        tree_refresh(&e->tree, NULL);       /* a file under a new name: in the browser too */
     editor_set_msg(e, MSG_TTL_MS, tr("%zu lines, %ld bytes written"), d->buf.nlines, n);
     if (is_json(d)) {
         /* saved anyway, but an invalid JSON is said at once */
@@ -1310,6 +1314,15 @@ static void cmd_save_all(Editor *e)
     if (e->doc != keep)
         show_doc(e, keep);
     editor_set_msg(e, MSG_TTL_MS, tr("%zu files saved"), saved);
+}
+
+/* Ctrl+N: a new empty buffer, with no name: Ctrl+S asks for one (in the file browser Ctrl+N
+ * makes a file in the selected folder instead: browser_make). */
+static void cmd_new_file(Editor *e)
+{
+    buf_undo_close(e->buf);
+    install_doc(e, doc_new());
+    editor_set_msg(e, MSG_TTL_MS, tr("New buffer: Ctrl+S saves it with a name"));
 }
 
 static void cmd_open(Editor *e)
@@ -1769,6 +1782,8 @@ static void cmd_toggle_tree(Editor *e)
         if (!e->tree_ready) {
             tree_init(&e->tree, e->root ? e->root : ".");
             e->tree_ready = 1;
+        } else {
+            tree_refresh(&e->tree, NULL);   /* what others made or removed meanwhile */
         }
         e->sidebar_on = 1;
         e->sidebar_focus = 1;
@@ -1780,6 +1795,178 @@ static void cmd_toggle_tree(Editor *e)
     }
     relayout(e);
     render_invalidate(e->render);
+}
+
+/* ---- making, renaming, removing in the file browser ---------------------------- */
+
+/* The folder of the selected row, as the start of a name: "src/" ("" for the root). */
+static void tree_sel_dir(Editor *e, char *out, size_t n)
+{
+    const TreeEntry *en = e->tree.sel < e->tree.n ? &e->tree.e[e->tree.sel] : NULL;
+    const char *p = en ? en->path : ".", *slash;
+    size_t len;
+
+    if (en && !en->is_dir) {
+        slash = strrchr(p, '/');
+        len = slash ? (size_t)(slash - p) : 0;
+    } else {
+        len = strcmp(p, ".") == 0 ? 0 : strlen(p);
+    }
+    if (len + 2 > n)
+        len = 0;
+    memcpy(out, p, len);
+    if (len && out[len - 1] != '/')
+        out[len++] = '/';
+    out[len] = '\0';
+}
+
+/* Asks the name of a new file (folder: of a folder) in the selected folder and makes it: the
+ * file empty, opened; the folder shown, selected. A folder in the way must be there already. */
+static void browser_make(Editor *e, int folder)
+{
+    char init[sizeof e->prompt_text], path[sizeof e->prompt_text], err[256], *dir, *ds;
+    struct stat st;
+    int fd;
+
+    tree_sel_dir(e, init, sizeof init);
+    if (prompt(e, folder ? tr("New folder: ") : tr("New file: "), init, path, sizeof path) == 0)
+        return;
+    sys_path_fix(path);
+    if (path[strlen(path) - 1] == '/')
+        path[strlen(path) - 1] = '\0';
+    if (!path[0] || strcmp(path, init) == 0) {
+        editor_set_msg(e, MSG_TTL_MS, tr("Write the name after the folder"));
+        return;
+    }
+    if (stat(path, &st) == 0) {
+        editor_set_msg(e, MSG_TTL_MS, tr("«%s» exists already"), path);
+        tree_refresh(&e->tree, path);
+        return;
+    }
+    dir = xstrdup(path);
+    ds = strrchr(dir, '/');
+    if (ds && ds != dir) {
+        *ds = '\0';
+        if (stat(dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            editor_set_msg(e, MSG_TTL_MS, tr("The folder «%s» does not exist"), dir);
+            free(dir);
+            return;
+        }
+    }
+    free(dir);
+    if (folder) {
+        if (sys_mkdir(path, 0777) < 0) {
+            editor_set_msg(e, MSG_TTL_MS, tr("Cannot create «%s»: %s"), path, strerror(errno));
+            return;
+        }
+        tree_refresh(&e->tree, path);
+        editor_set_msg(e, MSG_TTL_MS, tr("New folder «%s» created"), path);
+        return;
+    }
+    fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
+    if (fd < 0 || close(fd) < 0) {
+        editor_set_msg(e, MSG_TTL_MS, tr("Cannot create «%s»: %s"), path, strerror(errno));
+        return;
+    }
+    tree_refresh(&e->tree, path);
+    buf_undo_close(e->buf);
+    if (!editor_open_doc(e, path, err, sizeof err)) {
+        editor_set_msg(e, MSG_TTL_MS, "%s: %s", path, err);
+        return;
+    }
+    e->sidebar_focus = 0;                   /* to write in it */
+    editor_set_msg(e, MSG_TTL_MS, tr("New file «%s» created"), path);
+}
+
+/* The buffers of files under old (a file, or a folder) take the paths under new. */
+static void docs_moved(Editor *e, const char *old_real, const char *new_real)
+{
+    size_t i, ol = strlen(old_real);
+    char real[PATH_MAX];
+
+    for (i = 0; i < e->ndocs; i++) {
+        Doc *d = e->docs[i];
+        SBuf b = SBUF_INIT;
+
+        if (!d->buf.path || !sys_realpath(d->buf.path, real) || strncmp(real, old_real, ol) != 0 ||
+            (real[ol] != '\0' && real[ol] != '/'))
+            continue;
+        sbuf_adds(&b, new_real);
+        sbuf_adds(&b, real + ol);
+        sbuf_add(&b, "", 1);
+        free(d->buf.path);
+        d->buf.path = sbuf_steal(&b);
+    }
+}
+
+static void browser_rename(Editor *e)
+{
+    const TreeEntry *en = e->tree.sel < e->tree.n ? &e->tree.e[e->tree.sel] : NULL;
+    char to[sizeof e->prompt_text], old_real[PATH_MAX], new_real[PATH_MAX], *from;
+    struct stat st;
+
+    if (!en || e->tree.sel == 0)
+        return;                             /* not the root */
+    from = xstrdup(en->path);
+    if (prompt(e, tr("Rename to: "), from, to, sizeof to) == 0 || strcmp(to, from) == 0) {
+        free(from);
+        return;
+    }
+    sys_path_fix(to);
+    if (stat(to, &st) == 0) {
+        editor_set_msg(e, MSG_TTL_MS, tr("«%s» exists already"), to);
+    } else if (!sys_realpath(from, old_real) || sys_rename(from, to) < 0) {
+        editor_set_msg(e, MSG_TTL_MS, tr("Cannot rename «%s»: %s"), from, strerror(errno));
+    } else {
+        if (sys_realpath(to, new_real))
+            docs_moved(e, old_real, new_real);
+        tree_refresh(&e->tree, to);
+        editor_set_msg(e, MSG_TTL_MS, tr("«%s» renamed to «%s»"), from, to);
+    }
+    free(from);
+}
+
+/* A file, or an empty folder, after a question. A buffer of the file stays, as not saved. */
+static void browser_delete(Editor *e)
+{
+    const TreeEntry *en = e->tree.sel < e->tree.n ? &e->tree.e[e->tree.sel] : NULL;
+    char q[PATH_MAX + 80], real[PATH_MAX], other[PATH_MAX], *path;
+    unsigned char *mine;
+    int dir, r;
+    size_t i;
+
+    if (!en || e->tree.sel == 0)
+        return;
+    path = xstrdup(en->path);
+    dir = en->is_dir;
+    snprintf(q, sizeof q, dir ? tr("Delete the folder «%s»? (y = yes, n = no)")
+                              : tr("Delete «%s»? (y = yes, n = no)"), path);
+    if (ask(e, q, "sn") != 's') {
+        e->msg[0] = '\0';
+        free(path);
+        return;
+    }
+    /* the buffers of the file, found while it is there */
+    r = sys_realpath(path, real) != NULL;
+    mine = xmalloc(e->ndocs + 1);
+    for (i = 0; i < e->ndocs; i++)
+        mine[i] = r && !dir && e->docs[i]->buf.path && sys_realpath(e->docs[i]->buf.path, other) &&
+                  strcmp(other, real) == 0;
+    if ((dir ? sys_rmdir(path) : unlink(path)) < 0) {
+        editor_set_msg(e, MSG_TTL_MS, dir && (errno == ENOTEMPTY || errno == EEXIST)
+                                          ? tr("«%s» is not empty") : tr("Cannot delete «%s»: %s"),
+                       path, strerror(errno));
+        free(mine);
+        free(path);
+        return;
+    }
+    for (i = 0; i < e->ndocs; i++)
+        if (mine[i])
+            e->docs[i]->buf.modified = 1;   /* its text is only here now */
+    free(mine);
+    tree_refresh(&e->tree, NULL);
+    editor_set_msg(e, MSG_TTL_MS, tr("«%s» deleted"), path);
+    free(path);
 }
 
 /* Returns 0 for keys the browser leaves to the normal commands (Ctrl and Alt combinations). */
@@ -1819,6 +2006,15 @@ static int handle_tree(Editor *e, Key k)
     case KEY_LEFT:
         tree_left(t);
         break;
+    case KEY_F7:
+        browser_make(e, 1);
+        break;
+    case KEY_F2:
+        browser_rename(e);
+        break;
+    case KEY_DEL:
+        browser_delete(e);
+        break;
     case KEY_RIGHT:
     case KEY_ENTER:
         if (!en)
@@ -1838,6 +2034,11 @@ static int handle_tree(Editor *e, Key k)
         }
         break;
     default:
+        /* the key of New file (Ctrl+N): a file in the selected folder */
+        if (keymap_find(&e->km, k) == command_by_id("new_file")) {
+            browser_make(e, 0);
+            break;
+        }
         if ((k.mods & (MOD_CTRL | MOD_ALT)) ||
             (k.code < 0x20 && k.code != KEY_ENTER && k.code != KEY_TAB))
             return 0;
@@ -2902,6 +3103,8 @@ static void handle_key(Editor *e, Key k)
     if (k.code == KEY_FOCUS_IN) {
         on_disk_change(e, e->doc);
         git_refresh_doc(e, e->doc);
+        if (e->sidebar_on)
+            tree_refresh(&e->tree, NULL);   /* files made elsewhere while away */
         return;
     }
     if (k.code == KEY_FOCUS_OUT)
@@ -2990,6 +3193,7 @@ void editor_cmd_save(Editor *e) { cmd_save(e); }
 void editor_cmd_save_as(Editor *e) { cmd_save_as(e); }
 void editor_cmd_save_all(Editor *e) { cmd_save_all(e); }
 void editor_cmd_open(Editor *e) { cmd_open(e); }
+void editor_cmd_new_file(Editor *e) { cmd_new_file(e); }
 void editor_cmd_quick_open(Editor *e) { cmd_quick_open(e); }
 void editor_cmd_buffers(Editor *e) { cmd_buffers(e); }
 void editor_cmd_symbols(Editor *e) { cmd_symbols(e); }
@@ -3395,6 +3599,11 @@ void editor_cmd_help(Editor *e)
                      "  Up, Down  previous and next match     Enter  keep it     Esc  go back\n"
                      "  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n"));
 #endif
+    sbuf_addf(&t, "\n%s\n", tr("File browser (Ctrl+B)"));
+    sbuf_adds(&t, tr("  Enter opens; Left closes a folder; Esc goes back to the text.\n"
+                     "  Ctrl+N new file and F7 new folder in the selected folder; F2 renames;\n"
+                     "  Del deletes a file or an empty folder, after a question.\n"
+                     "  It reads the folders again when shown and when the window comes back.\n"));
     sbuf_addf(&t, "\n%s\n", tr("Lists (palette, buffers, symbols, files)"));
     sbuf_adds(&t, tr("  Type to filter; Up, Down, PgUp, PgDn move; Enter chooses; Esc closes.\n"
                      "  In the palette Enter on a setting changes it and leaves the palette open.\n"));

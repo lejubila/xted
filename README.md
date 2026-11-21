@@ -153,7 +153,7 @@ xted --version            mostra la versione e i crediti (anche -V)
   occorrenza; nel popup dei suggerimenti: Tab accetta, ↑ ↓, Esc; in una lista (palette, buffer,
   file): Invio sceglie, ↑ ↓, Esc chiude; in una pagina in sola lettura: chiudi, cerca; in una
   domanda le risposte («y sì», «n no»…) e Esc; in un prompt Invio ed Esc; nella barra di ricerca
-  Alt+C, Alt+W, Alt+R, Invio ed Esc; col browser dei file attivo: Invio apri, ↑ ↓, chiudi cartella,
+  Alt+C, Alt+W, Alt+R, Invio ed Esc; col browser dei file attivo: Invio apri, nuovo file, nuova cartella, rinomina, elimina, chiudi cartella,
   torna al testo, nascondi; con più cursori: prossima occorrenza, tutte, Esc un cursore; in uno
   snippet: Tab campo successivo, Esc; nel ridimensionamento dei pannelli: le frecce ed Esc. In base al
   linguaggio si aggiungono: anteprima (Markdown), formatta e controlla (JSON), simboli e definizione
@@ -176,7 +176,12 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
 - **Apertura rapida** (`Ctrl+P`): ricerca fuzzy dei file del progetto. L'elenco si apre subito
   e si riempie mentre la cartella viene letta (anche su dischi di rete lenti): si può già
   filtrare e scegliere, e sulla riga del titolo c'è «Caricamento» con un contatore.
-- **Browser dei file** laterale (`Ctrl+B`), con cartelle apribili e chiudibili.
+- **Browser dei file** laterale (`Ctrl+B`), con cartelle apribili e chiudibili. Con il browser
+  attivo: `Ctrl+N` crea un file vuoto nella cartella selezionata e lo apre, `F7` una nuova
+  cartella, `F2` rinomina (anche spostando, con un percorso; i buffer aperti seguono il file),
+  `Canc` elimina un file o una cartella vuota dopo una domanda (il buffer di un file eliminato
+  resta, come non salvato). Rilegge le cartelle quando viene mostrato e quando la finestra del
+  terminale torna in primo piano, tenendo aperte quelle che lo erano.
 - **Split** orizzontali e verticali, anche dello stesso file; i bordi si ridimensionano con
   il mouse o con la modalità ridimensionamento (`Alt+E`).
 - **Salvataggio** atomico (file temporaneo e `rename`) che conserva i permessi; salva, salva
@@ -420,6 +425,7 @@ accanto ai comandi nella palette. Quelle predefinite:
 | `Ctrl+S` | Salva |
 | `Alt+S` | Salva con nome |
 | `Alt+A` | Salva tutto |
+| `Ctrl+N` | Nuovo buffer vuoto, senza nome: `Ctrl+S` chiede il nome quando lo si salva (nel browser dei file: nuovo file nella cartella selezionata) |
 | `Ctrl+O` | Apri file |
 | `Ctrl+P` | Apri rapido (ricerca fuzzy nel progetto) |
 | `Ctrl+E` | Elenco dei buffer |

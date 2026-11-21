@@ -23,6 +23,7 @@
 #define sys_fchown(fd, uid, gid) fchown((fd), (uid), (gid))
 #define sys_fchmod(fd, mode) fchmod((fd), (mode))
 #define sys_mkdir(path, mode) mkdir((path), (mode))
+#define sys_rmdir(path) rmdir(path)
 /* stat that does not follow a symbolic link */
 #define sys_lstat(path, st) lstat((path), (st))
 #define sys_setenv(name, value) setenv((name), (value), 1)
@@ -43,6 +44,7 @@
 
 #else
 
+#include <direct.h>
 #include <stddef.h>
 
 char *sys_realpath(const char *path, char *out);
@@ -51,6 +53,7 @@ int sys_fsync(int fd);
 #define sys_fchown(fd, uid, gid) ((void)(fd), (void)(uid), (void)(gid), 0)
 #define sys_fchmod(fd, mode) ((void)(fd), (void)(mode), 0)
 int sys_mkdir(const char *path, int mode);
+#define sys_rmdir(path) _rmdir(path)
 #define sys_lstat(path, st) stat((path), (st))
 #define S_ISLNK(m) 0
 int sys_setenv(const char *name, const char *value);

@@ -389,3 +389,26 @@ Key bar	Barra dei tasti
 Key bar: %s	Barra dei tasti: %s
 usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\nconfiguration: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\nconfigurazione: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n
   Alt+C  match case          Alt+W  whole words\n  Up, Down  previous and next match     Enter  keep it     Esc  go back\n  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n	  Alt+C  maiuscole e minuscole   Alt+W  parole intere\n  Su, Giù  occorrenza precedente e successiva     Invio  la tiene     Esc  torna indietro\n  Sostituendo: s sostituisce, n salta, t sostituisce tutte le altre, Esc si ferma.\n
+New file: 	Nuovo file: 
+The folder «%s» does not exist	La cartella «%s» non esiste
+Cannot create «%s»: %s	Impossibile creare «%s»: %s
+New file «%s» created	Creato il nuovo file «%s»
+New buffer: Ctrl+S saves it with a name	Nuovo buffer: Ctrl+S lo salva con un nome
+New folder: 	Nuova cartella: 
+Write the name after the folder	Scrivi il nome dopo la cartella
+«%s» exists already	«%s» esiste già
+New folder «%s» created	Creata la nuova cartella «%s»
+Rename to: 	Rinomina in: 
+Cannot rename «%s»: %s	Impossibile rinominare «%s»: %s
+«%s» renamed to «%s»	«%s» rinominato in «%s»
+Delete the folder «%s»? (y = yes, n = no)	Eliminare la cartella «%s»? (s = sì, n = no)
+Delete «%s»? (y = yes, n = no)	Eliminare «%s»? (s = sì, n = no)
+«%s» is not empty	«%s» non è vuota
+Cannot delete «%s»: %s	Impossibile eliminare «%s»: %s
+«%s» deleted	«%s» eliminato
+File browser (Ctrl+B)	Browser dei file (Ctrl+B)
+  Enter opens; Left closes a folder; Esc goes back to the text.\n  Ctrl+N new file and F7 new folder in the selected folder; F2 renames;\n  Del deletes a file or an empty folder, after a question.\n  It reads the folders again when shown and when the window comes back.\n	  Invio apre; Sinistra chiude una cartella; Esc torna al testo.\n  Ctrl+N nuovo file e F7 nuova cartella nella cartella selezionata; F2 rinomina;\n  Canc elimina un file o una cartella vuota, dopo una domanda.\n  Rilegge le cartelle quando viene mostrato e quando la finestra torna in primo piano.\n
+new file	nuovo file
+new folder	nuova cartella
+rename	rinomina
+delete	elimina
