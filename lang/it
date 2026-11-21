@@ -388,3 +388,4 @@ definition	definizione
 Key bar	Barra dei tasti
 Key bar: %s	Barra dei tasti: %s
 usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\nconfiguration: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\nconfigurazione: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n
+  Alt+C  match case          Alt+W  whole words\n  Up, Down  previous and next match     Enter  keep it     Esc  go back\n  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n	  Alt+C  maiuscole e minuscole   Alt+W  parole intere\n  Su, Giù  occorrenza precedente e successiva     Invio  la tiene     Esc  torna indietro\n  Sostituendo: s sostituisce, n salta, t sostituisce tutte le altre, Esc si ferma.\n

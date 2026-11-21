@@ -16,6 +16,7 @@
 #include "term_in.h"
 #include "utf8.h"
 
+#include <io.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -170,6 +171,16 @@ void term_write(const char *s, size_t n)
 void term_watch(int fd)
 {
     watch_fd = fd;
+}
+
+/* The watched pipe (the output of Alt+R) has something to read, or is closed. */
+static int watch_ready(void)
+{
+    DWORD n = 0;
+
+    if (watch_fd < 0)
+        return 0;
+    return !PeekNamedPipe((HANDLE)_get_osfhandle(watch_fd), NULL, 0, NULL, &n, NULL) || n > 0;
 }
 
 static void put(const char *s, size_t n)
@@ -329,10 +340,12 @@ int term_wait(int timeout_ms)
             resized = 0;
             return TERM_EV_RESIZE;
         }
-        /* a watched command (Alt+R) is looked at every 50 ms: a pipe cannot be waited on with
-         * the console (Windows port, phase 4) */
-        if (watch_fd >= 0 && (left < 0 || left > 50))
-            left = 50;
+        if (watch_ready())
+            return ev | TERM_EV_FD;
+        /* a watched command (Alt+R) is looked at every 20 ms: an anonymous pipe cannot be
+         * waited on together with the console */
+        if (watch_fd >= 0 && (left < 0 || left > 20))
+            left = 20;
         if (wait_records(left)) {
             term_inpos = term_inlen = 0;
             read_records();
@@ -343,7 +356,7 @@ int term_wait(int timeout_ms)
                 ev |= TERM_EV_RESIZE;
             }
         }
-        if (watch_fd >= 0)
+        if (watch_ready())
             ev |= TERM_EV_FD;
         if (ev || (timeout_ms >= 0 && GetTickCount64() >= end))
             return ev;

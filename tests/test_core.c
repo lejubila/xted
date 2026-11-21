@@ -2751,6 +2751,121 @@ static int wait_job(Job *j, SBuf *out)
     return 0;
 }
 
+#ifdef _WIN32
+/* The commands on Windows: cmd.exe in place of /bin/sh, the same rules otherwise. */
+static void test_shell_win(void)
+{
+    SBuf out = SBUF_INIT, err = SBUF_INIT;
+    const char *echo_all[] = { "/bin/sh", "-c", "findstr \"^\"", NULL };
+    const char *two[] = { "/bin/sh", "-c", "echo out& (echo bad)1>&2& exit /b 3", NULL };
+    const char *slow[] = { "/bin/sh", "-c", "ping -n 6 127.0.0.1 >nul", NULL };
+    const char *big[] = { "/bin/sh", "-c", "for /l %i in (1,1,2000) do @echo xxxxxxxxxx", NULL };
+    const char *utf[] = { "/bin/sh", "-c", "echo \xc3\xa0\xc3\xa8", NULL };
+    const char *sort[] = { "/bin/sh", "-c", "sort", NULL };
+    const char *where[] = { "/bin/sh", "-c", "cd", NULL };
+    const char *bad[] = { "C:/nonexistent/prog.exe", NULL };
+    const char *argv_q[] = { "cmd.exe", "/d", "/c", "exit 7", NULL };
+    int st = 0, guard;
+    Job j;
+    char e[128], buf[256];
+    long t0, n;
+
+    /* stdin to stdout, more than a pipe holds; CR LF come as LF */
+    {
+        char *in = xmalloc(300000);
+        size_t i;
+
+        for (i = 0; i < 300000; i++)
+            in[i] = i % 100 == 99 ? '\n' : 'x';
+        CHECK(shell_capture(echo_all, NULL, in, 300000, &out, &err, 10000, 1 << 20, &st) == 0);
+        CHECK(out.len == 300000 && st == 0 && memchr(out.p, '\r', out.len) == NULL);
+        free(in);
+    }
+    sbuf_free(&out);
+    sbuf_free(&err);
+
+    /* stdout and stderr apart, exit status */
+    CHECK(shell_capture(two, NULL, NULL, 0, &out, &err, 5000, 1 << 20, &st) == 0);
+    CHECK(out.len == 4 && memcmp(out.p, "out\n", 4) == 0);
+    CHECK(err.len == 4 && memcmp(err.p, "bad\n", 4) == 0);
+    CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 3);
+    sbuf_free(&out);
+    sbuf_free(&err);
+
+    /* UTF-8 to the command (the manifest's code page), its OEM output back as UTF-8 */
+    CHECK(shell_capture(utf, NULL, NULL, 0, &out, NULL, 5000, 1 << 20, &st) == 0);
+    CHECK(out.len == 5 && memcmp(out.p, "\xc3\xa0\xc3\xa8\n", 5) == 0);
+    sbuf_free(&out);
+
+    /* sort as a filter (with chcp 65001 it wrote nothing) */
+    CHECK(shell_capture(sort, NULL, "pera\nmela\nbanana\n", 17, &out, NULL, 5000, 1 << 20, &st) == 0);
+    CHECK(st == 0 && out.len == 17 && memcmp(out.p, "banana\nmela\npera\n", 17) == 0);
+    sbuf_free(&out);
+
+    /* the folder given */
+    CHECK(shell_capture(where, "C:/Windows", NULL, 0, &out, NULL, 5000, 1 << 20, &st) == 0);
+    CHECK(out.len >= 11 && _strnicmp(out.p, "C:\\Windows\n", 11) == 0);
+    sbuf_free(&out);
+
+    /* a command that is too slow is killed */
+    t0 = (long)time(NULL);
+    CHECK(shell_capture(slow, NULL, NULL, 0, &out, NULL, 300, 1 << 20, &st) == -2);
+    CHECK((long)time(NULL) - t0 < 4);
+    sbuf_free(&out);
+
+    /* output over the cap is dropped, not an error */
+    CHECK(shell_capture(big, NULL, NULL, 0, &out, NULL, 10000, 1000, &st) == 0 && out.len == 1000);
+    sbuf_free(&out);
+
+    /* a program that does not exist: status 127; arguments quoted and split again */
+    CHECK(shell_capture(bad, NULL, NULL, 0, &out, NULL, 2000, 100, &st) == 0 && st == 127);
+    CHECK(shell_capture(argv_q, NULL, NULL, 0, &out, NULL, 5000, 100, &st) == 0 && st == 7);
+    sbuf_free(&out);
+
+    /* in the background: the output, then the exit code */
+    CHECK(shell_start(&j, "echo ciao& exit /b 4", NULL, e, sizeof e) == 0);
+    for (guard = 0; guard < 500; guard++) {
+        n = shell_read(&j, buf, sizeof buf);
+        if (n > 0)
+            sbuf_add(&out, buf, (size_t)n);
+        else if (n == 0)
+            break;
+        else
+            Sleep(10);
+    }
+    CHECK(out.len == 5 && memcmp(out.p, "ciao\n", 5) == 0);
+    for (guard = 0; guard < 500 && !shell_reap(&j); guard++)
+        Sleep(10);
+    CHECK(shell_exit_code(&j) == 4);
+    shell_close(&j);
+    sbuf_free(&out);
+
+    /* the same with letters outside ASCII: OEM as UTF-8 in the pieces read too */
+    CHECK(shell_start(&j, "echo \xc3\xa0\xc3\xa8 ok", NULL, e, sizeof e) == 0);
+    for (guard = 0; guard < 500; guard++) {
+        n = shell_read(&j, buf, sizeof buf);
+        if (n > 0)
+            sbuf_add(&out, buf, (size_t)n);
+        else if (n == 0)
+            break;
+        else
+            Sleep(10);
+    }
+    CHECK(out.len == 8 && memcmp(out.p, "\xc3\xa0\xc3\xa8 ok\n", 8) == 0);
+    shell_close(&j);
+    sbuf_free(&out);
+
+    /* stopping one ends it at once */
+    CHECK(shell_start(&j, "ping -n 30 127.0.0.1", NULL, e, sizeof e) == 0);
+    t0 = (long)time(NULL);
+    shell_stop(&j);
+    for (guard = 0; guard < 300 && !shell_reap(&j); guard++)
+        Sleep(10);
+    CHECK(shell_reap(&j) && (long)time(NULL) - t0 < 3);
+    shell_close(&j);
+}
+#endif
+
 static void test_shell(void)
 {
     SBuf out = SBUF_INIT, err = SBUF_INIT;
@@ -6959,6 +7074,7 @@ int main(void)
 #ifndef _WIN32
     test_shell();
 #else
+    test_shell_win();
     (void)test_shell;
     (void)test_run;
     (void)test_filter;

@@ -3386,9 +3386,15 @@ void editor_cmd_help(Editor *e)
         sbuf_addf(&t, "  %-*s  %s\n", (int)kw, label, tr(commands[i].name));
     }
     sbuf_addf(&t, "\n%s\n", tr("Search bar"));
+#ifdef XTED_NO_REGEX
+    sbuf_adds(&t, tr("  Alt+C  match case          Alt+W  whole words\n"
+                     "  Up, Down  previous and next match     Enter  keep it     Esc  go back\n"
+                     "  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n"));
+#else
     sbuf_adds(&t, tr("  Alt+C  match case          Alt+W  whole words      Alt+R  regular expression\n"
                      "  Up, Down  previous and next match     Enter  keep it     Esc  go back\n"
                      "  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n"));
+#endif
     sbuf_addf(&t, "\n%s\n", tr("Lists (palette, buffers, symbols, files)"));
     sbuf_adds(&t, tr("  Type to filter; Up, Down, PgUp, PgDn move; Enter chooses; Esc closes.\n"
                      "  In the palette Enter on a setting changes it and leaves the palette open.\n"));

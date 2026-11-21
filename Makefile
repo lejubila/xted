@@ -83,7 +83,8 @@ LIBSRC   = src/util.c src/utf8.c $(TERMSRC) src/term_keys.c src/undo.c src/clip.
            src/render.c src/edit.c src/editor.c
 OBJ      = $(LIBSRC:src/%.c=$(BUILD)/%.o) $(BUILD)/main.o
 ifeq ($(MODE),win)
-OBJ     += $(BUILD)/xted_res.o
+RESOBJ   = $(BUILD)/xted_res.o
+OBJ     += $(RESOBJ)
 endif
 
 
@@ -113,7 +114,8 @@ $(BUILD)/xted_res.o: src/win/xted.rc src/win/xted.manifest
 	@mkdir -p $(BUILD)
 	cd src/win && $(WINDRES) xted.rc -O coff -o $(CURDIR)/$@
 
-$(BUILD)/test_core$(EXE): tests/test_core.c $(LIBSRC)
+# on Windows with the program's manifest: the tests run with its UTF-8 code page
+$(BUILD)/test_core$(EXE): tests/test_core.c $(LIBSRC) $(RESOBJ)
 	@mkdir -p $(BUILD)
 	$(CC) $(WARN) $(DEFS) $(CFLAGS) -Isrc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 

@@ -4,6 +4,15 @@
 /* test_core.c on Windows (make WIN=1 test): the POSIX calls the tests use, in the names of
  * Windows. Not for the editor, which has sys.h. */
 #ifdef _WIN32
+/* Sleep; not winuser.h, whose mouse_event is a name of the tests */
+#define WIN32_LEAN_AND_MEAN
+#define NOUSER
+#include <windows.h>
+/* the hot key modifiers of imm.h (and winuser.h): the names are term.h's */
+#undef MOD_ALT
+#undef MOD_CONTROL
+#undef MOD_SHIFT
+#undef MOD_WIN
 #include <direct.h>
 #include <io.h>
 #include <stdio.h>

@@ -12,6 +12,12 @@ typedef struct {
     int fd;                 /* read end of the output pipe, -1 once closed */
     int status;             /* wait status, valid when done */
     int done;
+#ifdef _WIN32
+    void *proc, *group;     /* the process and its job object (what it starts too) */
+    int cr;                 /* a CR held back at the end of a read: CR LF is LF */
+    char hold[4];           /* the start of a UTF-8 character cut by a read */
+    int nhold;
+#endif
 } Job;
 
 /* Starts /bin/sh -c cmd in directory cwd (NULL: the current one), in a process group of its
