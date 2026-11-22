@@ -447,25 +447,25 @@ def version_and_credits():
     import subprocess
     out = subprocess.run([EXE, "--version"], capture_output=True, text=True, env=dict(os.environ, LANG="C", LC_ALL=""))
     check("xted --version prints the version and the credits",
-          out.returncode == 0 and out.stdout.startswith("xted 0.11.0\nCopyright (C) 2026 David Bigagli\nMIT license"),
+          out.returncode == 0 and out.stdout.startswith("xted 0.12.0\nCopyright (C) 2026 David Bigagli\nMIT license"),
           out.stdout)
     b = Box()
     r = b.run([], cols=100)
     t = r.screen().text()
     check("with nothing to open the start screen shows name, version, credits and keys",
-          "xted 0.11.0" in t and "a text editor for the terminal" in t and "Copyright (C) 2026 David Bigagli" in t
+          "xted 0.12.0" in t and "a text editor for the terminal" in t and "Copyright (C) 2026 David Bigagli" in t
           and "F1 help" in t, t)
     # the terminal reports the focus (ESC [ I) as soon as xted starts: that is no key
     r.type("\x1b[I", 0.3, "\x1b[O", 0.2, "\x1b[I", 0.3)
-    check("the focus events the terminal sends leave the start screen", "xted 0.11.0" in r.screen().text(),
+    check("the focus events the terminal sends leave the start screen", "xted 0.12.0" in r.screen().text(),
           r.screen().text())
     r.type("x", 0.3)
     t = r.screen().text()
-    check("the first key takes it away", "xted 0.11.0" not in t and "Copyright" not in t, t)
+    check("the first key takes it away", "xted 0.12.0" not in t and "Copyright" not in t, t)
     r.type(alt("x"), "About", 0.3, ENTER, 0.3)
     t = r.screen().text()
     check("About xted shows the version and the credits in a page of its own",
-          "[About]" in t and "xted 0.11.0" in t and "MIT license" in t, t[:800])
+          "[About]" in t and "xted 0.12.0" in t and "MIT license" in t, t[:800])
     r.type(ctrl("w"), ctrl("q"), 0.3, "n", 0.3)
     b.write("a.txt", "x\n")
     r = b.run(["a.txt"])
@@ -834,7 +834,7 @@ def help_page():
     r.type("\x1bOP")
     t = r.screen().text()
     check("F1 opens the help page with the commands and their keys",
-          "xted 0.11.0: help" in t and "Copyright (C) 2026 David Bigagli, MIT license" in t and "Ctrl+S" in t and "Save" in t and "[Help]" in t, t[:600])
+          "xted 0.12.0: help" in t and "Copyright (C) 2026 David Bigagli, MIT license" in t and "Ctrl+S" in t and "Save" in t and "[Help]" in t, t[:600])
     r.type("x")
     check("the help page cannot be changed", "read-only" in r.screen().text())
     r.type(ctrl("w"))
@@ -844,7 +844,7 @@ def help_page():
     r = b.run(["a.txt"], rows=40, env={"LANG": "it_IT.UTF-8"})
     r.type("\x1bOP")
     t = r.screen().text()
-    check("the help page follows the language", "xted 0.11.0: guida" in t and "Salva" in t, t[:400])
+    check("the help page follows the language", "xted 0.12.0: guida" in t and "Salva" in t, t[:400])
     quit_(r)
     b.close()
 

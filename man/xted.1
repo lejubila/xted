@@ -16,6 +16,14 @@ xted, xt \- terminal text editor
 .br
 .B xted
 .B \-V
+.br
+.B xted
+.B \-\^\-remote
+.IR file \ ...
+.br
+.B xted
+.B \-\^\-desktop
+.RI [ file \ ...]
 .SH DESCRIPTION
 .B xted
 is a text editor for the terminal, written in C99 with nothing but the POSIX C library: no
@@ -30,6 +38,9 @@ For programming it has syntax highlighting, automatic indentation, suggestions o
 the file, of the files it includes and of the standard library (PHP, C, C++, Python,
 JavaScript, TypeScript, Go, Rust, Java and C#), snippets, multiple cursors, folding and jumps to definitions.
 It needs no language server.
+.PP
+The text is UTF-8; files in UTF-16 (LE, BE) or in UTF-8 with a BOM, known by their BOM, are
+opened as text and saved back in their encoding, which the status bar shows.
 .SH OPTIONS
 .TP
 .IR file [: line [: column ]]
@@ -52,6 +63,20 @@ The palette's
 .I About xted
 shows them too, as does the first line of the help page (F1) and the start screen that xted
 shows when it opens with nothing to edit.
+.TP
+\fB\-\^\-remote\fR \fIfile\fR ...
+Open the files in the xted already open (the first one started listens for the others: see
+.BR single_instance ),
+as new buffers, and exit at once; when there is none, start as usual.
+Without this option every xted is on its own.
+.TP
+\fB\-\^\-desktop\fR [\fIfile\fR ...]
+What the icon and "Open with" of the desktop run (xted.desktop): the files go to the xted already
+open, with no window of their own; when there is none, a terminal emulator is started with xted
+in it, in the folder of the first file (see
+.BR terminal ).
+From a terminal it is as
+.BR \-\^\-remote .
 .PP
 Without arguments, the files that were open and the cursor positions of the last session in the
 current folder are restored.
@@ -67,6 +92,9 @@ Save.
 saves as,
 .B Alt+A
 saves all.
+.TP
+.B Ctrl+N
+A new empty buffer, with no name: Ctrl+S asks for one.
 .TP
 .B Ctrl+O
 Open a file.
@@ -90,6 +118,12 @@ go to the next and the previous buffer.
 .TP
 .B Ctrl+B
 Show or hide the file browser.
+In it Ctrl+N makes a file and F7 a folder in the selected folder, F2 renames (and moves), Del
+deletes a file or an empty folder after a question; it reads the folders again when shown and
+when the window comes back.
+.TP
+.B Alt+U
+The rendered preview of a Markdown document beside it, following the edits.
 .TP
 .B Ctrl+Q
 Quit.
@@ -233,7 +267,7 @@ open.
 .PP
 The settings are: mouse, autosuggest, automatic pairs of brackets and quotes, Git markers,
 system clipboard, indentation (tab, 2, 4 or 8 spaces), theme, colors (auto, shown with what it
-found, as in "auto (256)", truecolor, 256, 16 or none), glyphs (unicode, windows or ascii) and language
+found, as in "auto (256)", truecolor, 256, 16 or none), glyphs (unicode, windows or ascii), key bar (message, line or off) and language
 (with the catalog file in use).
 .B Save settings...\&
 writes the choices into a configuration file.
@@ -290,6 +324,25 @@ windows draws the folders of the file browser with the triangles every Windows c
 .B language
 .BR auto " (from the environment), " en ", " it
 or the code of any catalog found.
+.TP
+.B keybar
+Where the keys of the context go (they are buttons for the mouse):
+.BR message " (default: in the message row), " line " (a row of their own) or " off .
+.TP
+.B single_instance
+.BR on " (default) or " off :
+whether the first xted listens for the files of
+.BR "xted \-\^\-remote" " and " "\-\^\-desktop" .
+.TP
+.B terminal
+The terminal emulator of
+.BR "xted \-\^\-desktop" ,
+as a command (for example
+.B kitty
+or
+.BR "alacritty \-e" ).
+When it is not set: $TERMINAL, xdg-terminal-exec, the one of the desktop, x-terminal-emulator,
+then the usual ones.
 .TP
 .BR tab_width ", " indent_width
 Width of a tab, and spaces of one indentation level (1 to 16).
@@ -412,6 +465,17 @@ Decide whether colors are truecolor, 256 or 16.
 .TP
 .B NO_COLOR
 Turns the colors off.
+.TP
+.B XDG_RUNTIME_DIR
+Folder of the socket of the single instance (else
+.BR /tmp/xted\-\fIuid\fR ).
+.TP
+.BR TERMINAL ", " XDG_CURRENT_DESKTOP
+Choose the terminal emulator of
+.B \-\^\-desktop
+when
+.B terminal
+is not set.
 .SH EXIT STATUS
 .TP
 .B 0

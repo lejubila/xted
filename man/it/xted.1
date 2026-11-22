@@ -16,6 +16,14 @@ xted, xt \- editor di testo da terminale
 .br
 .B xted
 .B \-V
+.br
+.B xted
+.B \-\^\-remote
+.IR file \ ...
+.br
+.B xted
+.B \-\^\-desktop
+.RI [ file \ ...]
 .SH DESCRIZIONE
 .B xted
 è un editor di testo per il terminale, scritto in C99 con la sola libreria C POSIX: niente
@@ -30,6 +38,9 @@ Per programmare ha l'evidenziazione della sintassi, l'indentazione automatica, i
 simboli del file, dei file inclusi e della libreria standard (PHP, C, C++, Python, JavaScript,
 TypeScript, Go, Rust, Java e C#), gli snippet, il multi-cursore, il folding e il salto alle definizioni.
 Non richiede alcun language server.
+.PP
+Il testo è UTF-8; i file in UTF-16 (LE, BE) o in UTF-8 con BOM, riconosciuti dal BOM, si aprono
+come testo e si salvano nella loro codifica, che la barra di stato mostra.
 .SH OPZIONI
 .TP
 .IR file [: riga [: colonna ]]
@@ -52,6 +63,20 @@ Li mostrano anche
 .I Informazioni su xted
 nella palette, la prima riga della guida (F1) e la schermata iniziale che xted mostra quando si
 apre senza nulla da modificare.
+.TP
+\fB\-\^\-remote\fR \fIfile\fR ...
+Apre i file nello xted già aperto (il primo avviato resta in ascolto per gli altri: vedi
+.BR single_instance ),
+come nuovi buffer, e termina subito; se non ce n'è uno, si avvia come al solito.
+Senza questa opzione ogni xted è indipendente.
+.TP
+\fB\-\^\-desktop\fR [\fIfile\fR ...]
+Quello che lanciano l'icona e «Apri con» del desktop (xted.desktop): i file vanno nello xted già
+aperto, senza nessuna finestra in più; se non ce n'è uno, si avvia un emulatore di terminale con
+xted dentro, nella cartella del primo file (vedi
+.BR terminal ).
+Da un terminale è come
+.BR \-\^\-remote .
 .PP
 Senza argomenti si ripristinano i file aperti e le posizioni del cursore dell'ultima sessione
 nella cartella corrente.
@@ -67,6 +92,9 @@ Salva.
 salva con nome,
 .B Alt+A
 salva tutto.
+.TP
+.B Ctrl+N
+Un nuovo buffer vuoto, senza nome: Ctrl+S lo chiede.
 .TP
 .B Ctrl+O
 Apre un file.
@@ -90,6 +118,12 @@ vanno al buffer successivo e al precedente.
 .TP
 .B Ctrl+B
 Mostra o nasconde il browser dei file.
+Lì Ctrl+N crea un file e F7 una cartella nella cartella selezionata, F2 rinomina (e sposta), Canc
+elimina un file o una cartella vuota dopo una domanda; rilegge le cartelle quando viene mostrato e
+quando la finestra torna in primo piano.
+.TP
+.B Alt+U
+L'anteprima di un documento Markdown accanto a esso, che segue le modifiche.
 .TP
 .B Ctrl+Q
 Esce.
@@ -233,7 +267,8 @@ aperta.
 Le impostazioni sono: mouse, autosuggest, coppie automatiche di parentesi e virgolette,
 indicatori Git, appunti di sistema, indentazione (tabulatore, 2, 4 o 8 spazi), tema, colori (auto,
 con quello che ha scelto, come «auto (256)», truecolor, 256, 16 o nessuno), caratteri grafici
-(unicode, windows o ascii) e lingua (con il file del catalogo in uso).
+(unicode, windows o ascii), barra dei tasti (message, line o off) e lingua (con il file del catalogo
+in uso).
 .B Salva le impostazioni...\&
 scrive le scelte in un file di configurazione.
 .SH CONFIGURAZIONE
@@ -291,6 +326,25 @@ dei pallini.
 .B language
 .BR auto " (dall'ambiente), " en ", " it
 o il codice di un qualsiasi catalogo trovato.
+.TP
+.B keybar
+Dove vanno i tasti del contesto (col mouse sono pulsanti):
+.BR message " (predefinito: nella riga dei messaggi), " line " (una riga a sé) oppure " off .
+.TP
+.B single_instance
+.BR on " (predefinito) oppure " off :
+se il primo xted resta in ascolto per i file di
+.BR "xted \-\^\-remote" " e " "\-\^\-desktop" .
+.TP
+.B terminal
+L'emulatore di terminale di
+.BR "xted \-\^\-desktop" ,
+come comando (per esempio
+.B kitty
+oppure
+.BR "alacritty \-e" ).
+Se non è indicato: $TERMINAL, xdg-terminal-exec, quello del desktop, x-terminal-emulator, poi i
+soliti.
 .TP
 .BR tab_width ", " indent_width
 Larghezza di un tabulatore e spazi di un livello di indentazione (da 1 a 16).
@@ -414,6 +468,17 @@ Decidono se i colori sono truecolor, 256 o 16.
 .TP
 .B NO_COLOR
 Spegne i colori.
+.TP
+.B XDG_RUNTIME_DIR
+Cartella del socket dell'istanza unica (altrimenti
+.BR /tmp/xted\-\fIuid\fR ).
+.TP
+.BR TERMINAL ", " XDG_CURRENT_DESKTOP
+Scelgono l'emulatore di terminale di
+.B \-\^\-desktop
+quando
+.B terminal
+non è indicato.
 .SH CODICE DI USCITA
 .TP
 .B 0
