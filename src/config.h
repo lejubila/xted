@@ -18,11 +18,14 @@ typedef struct {
     int autosuggest;
     int autopair;               /* typing an opening bracket or quote adds the closing one */
     int suggest_min;            /* letters typed before the popup shows, 1..10 */
+    int line_numbers;           /* the numbers of the lines in a margin */
+    int invisibles;             /* "show_invisibles": line ends, tabs and trailing spaces shown */
     unsigned set;               /* CFG_*: given by the user, not a default (config_lang) */
 } LangCfg;
 
 enum { CFG_TAB_WIDTH = 1, CFG_EXPAND_TAB = 2, CFG_INDENT_WIDTH = 4, CFG_TRIM = 8, CFG_FINAL_NL = 16,
-       CFG_AUTOSUGGEST = 32, CFG_AUTOPAIR = 64, CFG_SUGGEST_MIN = 128 };
+       CFG_AUTOSUGGEST = 32, CFG_AUTOPAIR = 64, CFG_SUGGEST_MIN = 128, CFG_NUMBERS = 256,
+       CFG_INVIS = 512 };
 
 typedef struct {
     char *name;                 /* language name, lower case */

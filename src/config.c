@@ -17,6 +17,7 @@ static LangCfg unset(void)
     l.indent_width = -1;
     l.set = 0;
     l.autosuggest = l.suggest_min = l.autopair = -1;
+    l.line_numbers = l.invisibles = -1;
     return l;
 }
 
@@ -137,6 +138,14 @@ static int set_lang_value(LangCfg *l, const char *key, const char *val)
         if (v < 0)
             return -2;
         l->autopair = v;
+    } else if (!strcmp(key, "line_numbers") || !strcmp(key, "show_invisibles")) {
+        v = parse_bool(val);
+        if (v < 0)
+            return -2;
+        if (key[0] == 'l')
+            l->line_numbers = v;
+        else
+            l->invisibles = v;
     } else if (!strcmp(key, "suggest_min")) {
         v = parse_int(val, 1, 10);
         if (v < 0)
@@ -451,6 +460,14 @@ static void overlay(LangCfg *dst, const LangCfg *src)
         dst->suggest_min = src->suggest_min;
         dst->set |= CFG_SUGGEST_MIN;
     }
+    if (src->line_numbers >= 0) {
+        dst->line_numbers = src->line_numbers;
+        dst->set |= CFG_NUMBERS;
+    }
+    if (src->invisibles >= 0) {
+        dst->invisibles = src->invisibles;
+        dst->set |= CFG_INVIS;
+    }
 }
 
 LangCfg config_lang(const Config *c, const char *lang)
@@ -468,6 +485,8 @@ LangCfg config_lang(const Config *c, const char *lang)
     out.indent_width = 0;
     out.set = 0;
     out.suggest_min = 2;
+    out.line_numbers = 0;
+    out.invisibles = 0;
     /* data files are indented with two spaces (YAML forbids tabs, JSON's tools write so): a
      * default, under the configuration, .editorconfig and the file's own style */
     if (lang && (strcmp(lang, "JSON") == 0 || strcmp(lang, "YAML") == 0)) {
@@ -503,5 +522,9 @@ void config_merge(LangCfg *d, const LangCfg *s)
         d->autopair = s->autopair;
     if (s->set & CFG_SUGGEST_MIN)
         d->suggest_min = s->suggest_min;
+    if (s->set & CFG_NUMBERS)
+        d->line_numbers = s->line_numbers;
+    if (s->set & CFG_INVIS)
+        d->invisibles = s->invisibles;
     d->set |= s->set;
 }

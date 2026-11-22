@@ -122,6 +122,14 @@ In it Ctrl+N makes a file and F7 a folder in the selected folder, F2 renames (an
 deletes a file or an empty folder after a question; it reads the folders again when shown and
 when the window comes back.
 .TP
+.B Alt+G
+Show or hide the line numbers, in a margin (a click on a number selects the line, a drag whole
+lines).
+.TP
+.B Alt+I
+Show or hide the invisible characters: the line ends (LF and CR LF have each a mark; none on a last
+line with no newline), the tabs and the spaces at the end of a line.
+.TP
 .B Alt+U
 The rendered preview of a Markdown document beside it, following the edits.
 .TP
@@ -267,7 +275,8 @@ open.
 .PP
 The settings are: mouse, autosuggest, automatic pairs of brackets and quotes, Git markers,
 system clipboard, indentation (tab, 2, 4 or 8 spaces), theme, colors (auto, shown with what it
-found, as in "auto (256)", truecolor, 256, 16 or none), glyphs (unicode, windows or ascii), key bar (message, line or off) and language
+found, as in "auto (256)", truecolor, 256, 16 or none), glyphs (unicode, windows or ascii), key bar (message, line or off), line numbers, invisible
+characters and language
 (with the catalog file in use).
 .B Save settings...\&
 writes the choices into a configuration file.
@@ -327,6 +336,13 @@ windows draws the folders of the file browser with the triangles every Windows c
 .B language
 .BR auto " (from the environment), " en ", " it
 or the code of any catalog found.
+.TP
+.BR line_numbers ", " show_invisibles
+.BR on " or " off " (default):"
+the line numbers, and the marks of the line ends, tabs and trailing spaces.
+Also in a language's section
+.RB ( [Text]
+for the files of no language).
 .TP
 .B keybar
 Where the keys of the context go (they are buttons for the mouse):

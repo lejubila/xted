@@ -10,7 +10,8 @@ enum { G_FILE, G_BUFFERS, G_SEARCH, G_EDIT, G_BLOCKS, G_RUN, G_OTHER, G_SETTINGS
 
 /* What a setting command shows in the palette (see command_state). */
 enum { ST_NONE, ST_MOUSE, ST_SUGGEST, ST_PAIR, ST_GIT, ST_CLIP, ST_TABS, ST_SP2, ST_SP4, ST_SP8,
-       ST_THEME, ST_LANG, ST_COLORS, ST_GLYPHS, ST_KEYBAR };
+       ST_THEME, ST_LANG, ST_COLORS, ST_GLYPHS, ST_KEYBAR,
+       ST_NUMBERS, ST_INVIS };
 
 typedef struct {
     const char *id;         /* stable English name used in the configuration */

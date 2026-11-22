@@ -416,3 +416,9 @@ delete	elimina
 %zu files opened from the desktop	%zu file aperti dal desktop
 xted: no terminal emulator found: set one with "terminal =" in the configuration\n	xted: nessun emulatore di terminale trovato: indicane uno con "terminal =" nella configurazione\n
  (for the desktop's clipboard install wl-clipboard, or xclip)	 (per gli appunti del desktop installa wl-clipboard, o xclip)
+Line numbers	Numeri di riga
+Show invisible characters	Mostra caratteri invisibili
+Line numbers on	Numeri di riga attivi
+Line numbers off	Numeri di riga disattivati
+Invisible characters shown	Caratteri invisibili visibili
+Invisible characters hidden	Caratteri invisibili nascosti

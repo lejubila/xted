@@ -122,6 +122,14 @@ Lì Ctrl+N crea un file e F7 una cartella nella cartella selezionata, F2 rinomin
 elimina un file o una cartella vuota dopo una domanda; rilegge le cartelle quando viene mostrato e
 quando la finestra torna in primo piano.
 .TP
+.B Alt+G
+Mostra o nasconde i numeri di riga, in un margine (un clic su un numero seleziona la riga, un
+trascinamento righe intere).
+.TP
+.B Alt+I
+Mostra o nasconde i caratteri invisibili: i fine riga (LF e CR LF hanno ciascuno un segno; nessuno
+sull'ultima riga senza a-capo), i tab e gli spazi in fondo alla riga.
+.TP
 .B Alt+U
 L'anteprima di un documento Markdown accanto a esso, che segue le modifiche.
 .TP
@@ -267,7 +275,8 @@ aperta.
 Le impostazioni sono: mouse, autosuggest, coppie automatiche di parentesi e virgolette,
 indicatori Git, appunti di sistema, indentazione (tabulatore, 2, 4 o 8 spazi), tema, colori (auto,
 con quello che ha scelto, come «auto (256)», truecolor, 256, 16 o nessuno), caratteri grafici
-(unicode, windows o ascii), barra dei tasti (message, line o off) e lingua (con il file del catalogo
+(unicode, windows o ascii), barra dei tasti (message, line o off), numeri di riga, caratteri
+invisibili e lingua (con il file del catalogo
 in uso).
 .B Salva le impostazioni...\&
 scrive le scelte in un file di configurazione.
@@ -329,6 +338,13 @@ dei pallini.
 .B language
 .BR auto " (dall'ambiente), " en ", " it
 o il codice di un qualsiasi catalogo trovato.
+.TP
+.BR line_numbers ", " show_invisibles
+.BR on " oppure " off " (predefinito):"
+i numeri di riga, e i segni dei fine riga, dei tab e degli spazi finali.
+Anche nella sezione di un linguaggio
+.RB ( [Text]
+per i file senza linguaggio).
 .TP
 .B keybar
 Dove vanno i tasti del contesto (col mouse sono pulsanti):

@@ -862,6 +862,45 @@ def desktop_clipboard():
 
 
 @scenario
+def numbers_and_invisibles():
+    b = Box()
+    b.write("a.c", "int x;   \n\tif (a)\t{\n\nfine")
+    b.write("w.txt", "uno\r\ndue\r\n")
+    r = b.run(["a.c"], rows=10, cols=60)
+    lines = lambda: r.screen().lines()
+    r.type(alt("g"), 0.3)
+    check("Alt+G: the line numbers in a margin", lines()[0].startswith("  1 int x;") and lines()[3].startswith("  4 fine"),
+          repr(lines()[:4]))
+    # a click on a number selects the line, a drag more lines
+    r.type("\x1b[<0;2;2M", 0.05, "\x1b[<32;2;3M", 0.05, "\x1b[<0;2;3m", 0.2, ctrl("c"), 0.3)
+    r.type(ctrl("e"), 0.1, ESC, 0.1)
+    r.type(ctrl("n"), 0.2, ctrl("v"), 0.2)
+    check("a drag over the numbers selects whole lines", "\tif (a)\t{" in r.screen().text() or
+          "if (a)" in r.screen().text(), r.screen().text()[:300])
+    r.type(ctrl("w"), 0.2, "n", 0.3)
+    r.type(alt("i"), 0.3)
+    check("Alt+I: trailing spaces, tabs and line ends shown", lines()[0].startswith("  1 int x;\u00b7\u00b7\u00b7\u21b5") and
+          lines()[1].startswith("  2 \u2192") and "\u2192 {\u21b5" in lines()[1] and lines()[3].startswith("  4 fine") and
+          "\u21b5" not in lines()[3], repr(lines()[:4]))
+    quit_(r)
+    r = b.run(["w.txt"], rows=10, cols=60)
+    check("a CR LF file: \u00b6 at the line ends (the settings stay off unless saved)",
+          not lines()[0].startswith("  1"), repr(lines()[:2]))
+    r.type(alt("i"), 0.3)
+    check("CR LF shown as \u00b6", lines()[0] == "uno\u00b6" or lines()[0].startswith("uno\u00b6"), repr(lines()[:2]))
+    quit_(r)
+    b.write(".cfg/xted/config", "line_numbers = on\n[Text]\nshow_invisibles = on\n")
+    r = b.run(["w.txt"], rows=10, cols=60)
+    check("line_numbers in the config, show_invisibles for a language", lines()[0].startswith("  1 uno\u00b6"),
+          repr(lines()[:2]))
+    quit_(r)
+    r = b.run(["w.txt"], rows=10, cols=22)
+    check("a pane too narrow for them: no numbers", lines()[0].startswith("uno"), repr(lines()[:2]))
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

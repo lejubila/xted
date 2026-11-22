@@ -94,6 +94,9 @@ const Command commands[] = {
     { "toggle_mouse", N_("Toggle mouse"), "", editor_cmd_toggle_mouse, 0, 0, G_SETTINGS, ST_MOUSE },
     { "toggle_autosuggest", N_("Toggle autosuggest"), "", editor_cmd_toggle_autosuggest, 0, 0, G_SETTINGS, ST_SUGGEST },
     { "toggle_autopair", N_("Toggle auto-pairs"), "", editor_cmd_toggle_autopair, 0, 0, G_SETTINGS, ST_PAIR },
+    { "toggle_numbers", N_("Line numbers"), "alt+g", editor_cmd_toggle_numbers, 0, 0, G_SETTINGS, ST_NUMBERS },
+    { "toggle_invisibles", N_("Show invisible characters"), "alt+i", editor_cmd_toggle_invisibles, 0, 0,
+      G_SETTINGS, ST_INVIS },
     { "toggle_git", N_("Toggle Git markers"), "", editor_cmd_toggle_git, 0, 0, G_SETTINGS, ST_GIT },
     { "toggle_clipboard", N_("Toggle system clipboard"), "", editor_cmd_toggle_clipboard, 0, 0, G_SETTINGS, ST_CLIP },
     { "indent_tabs", N_("Indentation: tab"), "", editor_cmd_indent_tabs, 0, 0, G_SETTINGS, ST_TABS },
@@ -143,6 +146,8 @@ int command_state(const Editor *e, int idx, char *val, size_t n)
     case ST_MOUSE: on = e->mouse_on; break;
     case ST_SUGGEST: on = e->doc->autosuggest; break;
     case ST_PAIR: on = e->doc->autopair; break;
+    case ST_NUMBERS: on = e->doc->numbers; break;
+    case ST_INVIS: on = e->doc->invisibles; break;
     case ST_GIT: on = e->cfg.git != 0; break;
     case ST_CLIP: on = e->clipboard_osc52; break;
     case ST_TABS: on = !e->doc->expand_tab; break;

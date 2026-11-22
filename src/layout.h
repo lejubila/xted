@@ -26,10 +26,26 @@ typedef struct {
     Win *active;
 } Layout;
 
-/* The text area of a pane is its width minus the Git margin, when the document has one. */
+/* The column of the line numbers: as many digits as the last line has (3 at least) and a space;
+ * none when they are off, or when the pane is so narrow that the text would have less than
+ * 20 columns. */
+static inline int win_numw(const Win *w)
+{
+    size_t n;
+    int d = 1;
+
+    if (!w->doc || !w->doc->numbers)
+        return 0;
+    for (n = w->doc->buf.nlines; n >= 10; n /= 10)
+        d++;
+    d = (d < 3 ? 3 : d) + 1;
+    return w->w - d - (w->doc->gutter ? 1 : 0) >= 20 ? d : 0;
+}
+
+/* The text area of a pane is its width minus the margin: the line numbers, the Git marks. */
 static inline int win_gutter(const Win *w)
 {
-    return w->doc && w->doc->gutter ? 1 : 0;
+    return win_numw(w) + (w->doc && w->doc->gutter ? 1 : 0);
 }
 
 static inline int win_text_w(const Win *w)

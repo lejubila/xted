@@ -22,6 +22,7 @@ typedef struct {
     Win *win;
     Node *node;
     size_t y, x;
+    int margin;         /* MH_TEXT: the cell is in the column of the line numbers */
 } MouseHit;
 
 /* Where screen cell (x, y), 0-based, falls. Brings the panes' views up to date first. */

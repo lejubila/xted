@@ -45,7 +45,7 @@ enum { KEYBAR_MESSAGE = 0, KEYBAR_LINE = 1, KEYBAR_OFF = 2 };
 #define EDITOR_BOTTOM(e) ((e)->keybar == KEYBAR_LINE ? 2 : 1)
 
 enum { PEND_THEME = 1, PEND_MOUSE = 2, PEND_GIT = 4, PEND_CLIP = 8, PEND_LANG = 16, PEND_COLORS = 32,
-       PEND_GLYPHS = 64, PEND_KEYBAR = 128 };
+       PEND_GLYPHS = 64, PEND_KEYBAR = 128, PEND_NUMBERS = 256, PEND_INVIS = 512 };
 
 enum { FIND_OFF = 0, FIND_SEARCH, FIND_WITH, FIND_CONFIRM, FIND_FILES };
 
@@ -106,9 +106,10 @@ typedef struct {
     int x, y, n;            /* where it was, and how many presses in a row (1..3) */
     int drag;               /* DRAG_*: what the running drag moves */
     struct Node *node;      /* the split whose border is dragged */
+    size_t line0;           /* the line where a drag over the line numbers started */
 } MouseState;
 
-enum { DRAG_NONE, DRAG_TEXT, DRAG_BORDER, DRAG_SIDEBAR };
+enum { DRAG_NONE, DRAG_TEXT, DRAG_BORDER, DRAG_SIDEBAR, DRAG_LINES };
 
 typedef struct Editor {
     Doc **docs;             /* open documents, in tab order */
@@ -174,6 +175,7 @@ typedef struct Editor {
     int colors_mode;        /* COLOR_* chosen in the palette or the configuration, -1 for auto */
     int glyphs;             /* GLYPHS_*: the symbols of the file browser, the borders, the palette */
     int keybar;             /* KEYBAR_*: where the keys of the context are shown */
+    int man_numbers, man_invis; /* Alt+N, Alt+I for every document: 0 not used, 1 on, 2 off */
     int intro;              /* the start screen (name, version, credits) until the first key */
     const char *asking;     /* the answers of the question on the message row (ask), or NULL */
     int match_on;           /* the bracket at/before the cursor has a partner */
@@ -299,6 +301,8 @@ void editor_cmd_git(Editor *e);
 void editor_cmd_toggle_mouse(Editor *e);
 void editor_cmd_toggle_autosuggest(Editor *e);
 void editor_cmd_toggle_autopair(Editor *e);
+void editor_cmd_toggle_numbers(Editor *e);
+void editor_cmd_toggle_invisibles(Editor *e);
 void editor_cmd_toggle_git(Editor *e);
 void editor_cmd_toggle_clipboard(Editor *e);
 void editor_cmd_language(Editor *e);

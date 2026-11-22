@@ -310,7 +310,8 @@ static int project_lang(const Doc *d, LangCfg *out)
 /* The settings of the language the document turned out to be in. */
 static void apply_cfg(Editor *e, Doc *d)
 {
-    LangCfg l = config_lang(&e->cfg, d->syn ? syn_name(d->syn) : NULL), pl;
+    /* a file of no language is "Text", as the status bar says: its section is [Text] */
+    LangCfg l = config_lang(&e->cfg, syn_name(d->syn)), pl;
     EcProps ec;
     int tabw, expand, iw, trim, final_nl;
 
@@ -357,6 +358,8 @@ static void apply_cfg(Editor *e, Doc *d)
     d->final_nl = final_nl;
     d->autosuggest = d->man_sug ? d->man_sug == 1 : l.autosuggest;
     d->autopair = d->man_pair ? d->man_pair == 1 : l.autopair;
+    d->numbers = !d->scratch && (e->man_numbers ? e->man_numbers == 1 : l.line_numbers);
+    d->invisibles = !d->scratch && (e->man_invis ? e->man_invis == 1 : l.invisibles);
     d->suggest_min = l.suggest_min;
     if (d == e->doc)
         e->tabw = d->tabw;
@@ -3553,6 +3556,31 @@ void editor_cmd_toggle_autosuggest(Editor *e)
     editor_set_msg(e, MSG_TTL_MS, "%s", e->doc->autosuggest ? tr("Autosuggest on") : tr("Autosuggest off"));
 }
 
+/* Alt+N, Alt+I: for every document (the configuration may say it per language). */
+static void toggle_all(Editor *e, int *man, int on, int pend)
+{
+    size_t i;
+
+    *man = on ? 2 : 1;
+    for (i = 0; i < e->ndocs; i++)
+        apply_cfg(e, e->docs[i]);
+    e->pend |= pend;
+    render_invalidate(e->render);
+}
+
+void editor_cmd_toggle_numbers(Editor *e)
+{
+    toggle_all(e, &e->man_numbers, e->doc->numbers, PEND_NUMBERS);
+    editor_set_msg(e, MSG_TTL_MS, "%s", e->man_numbers == 1 ? tr("Line numbers on") : tr("Line numbers off"));
+}
+
+void editor_cmd_toggle_invisibles(Editor *e)
+{
+    toggle_all(e, &e->man_invis, e->doc->invisibles, PEND_INVIS);
+    editor_set_msg(e, MSG_TTL_MS, "%s", e->man_invis == 1 ? tr("Invisible characters shown")
+                                                         : tr("Invisible characters hidden"));
+}
+
 void editor_cmd_toggle_autopair(Editor *e)
 {
     e->doc->man_pair = e->doc->autopair ? 2 : 1;
@@ -3833,7 +3861,7 @@ typedef struct {
 } OtherLang;
 
 typedef struct {
-    CfgPair lp[6], gp[7];
+    CfgPair lp[6], gp[12];          /* gp: one for each PEND_* */
     char val[6][16];
     size_t nl, ng;
     unsigned mask;
@@ -3909,6 +3937,14 @@ static void pending_get(const Editor *e, Pending *p)
     if (e->pend & PEND_KEYBAR) {
         p->gp[p->ng].key = "keybar";
         p->gp[p->ng++].value = editor_keybar_name(e->keybar);
+    }
+    if (e->pend & PEND_NUMBERS) {
+        p->gp[p->ng].key = "line_numbers";
+        p->gp[p->ng++].value = e->man_numbers == 1 ? "on" : "off";
+    }
+    if (e->pend & PEND_INVIS) {
+        p->gp[p->ng].key = "show_invisibles";
+        p->gp[p->ng++].value = e->man_invis == 1 ? "on" : "off";
     }
     for (i = 0; i < e->ndocs && p->nmore < 6; i++) {
         Doc *o = e->docs[i];
@@ -4008,7 +4044,9 @@ static int proj_sets_globals(const Editor *e, const Pending *p)
         if ((strcmp(k, "theme") == 0 && c.theme[0]) || (strcmp(k, "mouse") == 0 && c.mouse >= 0) ||
             (strcmp(k, "git") == 0 && c.git >= 0) || (strcmp(k, "clipboard") == 0 && c.clipboard >= 0) ||
             (strcmp(k, "language") == 0 && c.language[0]) || (strcmp(k, "colors") == 0 && c.colors >= 0) ||
-            (strcmp(k, "glyphs") == 0 && c.glyphs >= 0) || (strcmp(k, "keybar") == 0 && c.keybar >= 0))
+            (strcmp(k, "glyphs") == 0 && c.glyphs >= 0) || (strcmp(k, "keybar") == 0 && c.keybar >= 0) ||
+            (strcmp(k, "line_numbers") == 0 && c.base.line_numbers >= 0) ||
+            (strcmp(k, "show_invisibles") == 0 && c.base.invisibles >= 0))
             r = 1;
     }
     config_free(&c);

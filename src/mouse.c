@@ -97,6 +97,7 @@ void mouse_locate(Editor *e, int x, int y, MouseHit *h)
     h->kind = MH_TEXT;
     h->y = line_at_row(&w->doc->buf, &w->view, (size_t)row);
     rel = x - w->x - win_gutter(w);
+    h->margin = x - w->x < win_numw(w);
     h->x = byte_at(w, h->y, w->view.coloff + (size_t)(rel > 0 ? rel : 0));
 }
 
@@ -186,6 +187,35 @@ static void settle(Editor *e)
     complete_close(&e->comp);
 }
 
+/* Whole lines from line a to line b (either way): the anchor stays on a's side. */
+static void select_lines(Editor *e, size_t a, size_t b)
+{
+    const Buffer *buf = e->buf;
+    size_t lo = a < b ? a : b, hi = a < b ? b : a, ey, ex;
+
+    /* the end of the last line: the start of the next one, or the end of the text */
+    if (hi + 1 < buf->nlines) {
+        ey = hi + 1;
+        ex = 0;
+    } else {
+        ey = hi;
+        ex = buf->lines[hi].len;
+    }
+    e->sel_on = 1;
+    if (b >= a) {
+        e->ay = lo;
+        e->ax = 0;
+        e->cy = ey;
+        e->cx = ex;
+    } else {
+        e->ay = ey;
+        e->ax = ex;
+        e->cy = lo;
+        e->cx = 0;
+    }
+    e->want_col = editor_cursor_col(e);
+}
+
 static void press_text(Editor *e, const MouseEv *ev, const MouseHit *h)
 {
     MouseState *m = &e->mouse;
@@ -204,6 +234,14 @@ static void press_text(Editor *e, const MouseEv *ev, const MouseHit *h)
     }
     cur_clear(e);
     buf_undo_close(e->buf);
+    /* the line numbers: the line (from the anchor's line with Shift), more dragging */
+    if (h->margin) {
+        m->line0 = (ev->mods & MOD_SHIFT) && e->sel_on ? e->ay : h->y;
+        select_lines(e, m->line0, h->y);
+        m->drag = DRAG_LINES;
+        settle(e);
+        return;
+    }
     if (ev->mods & MOD_SHIFT) {
         if (!e->sel_on) {
             e->ay = e->cy;
@@ -253,6 +291,10 @@ static void drag_to(Editor *e, const MouseEv *ev)
         col = e->coloff > 0 ? e->coloff - 1 : 0;
     else
         col = e->coloff + (size_t)rel;
+    if (e->mouse.drag == DRAG_LINES) {
+        select_lines(e, e->mouse.line0, y);
+        return;
+    }
     e->sel_on = 1;
     e->cy = y;
     e->cx = utf8_byte_at_col(b->lines[y].s, b->lines[y].len, col, e->tabw);
@@ -321,7 +363,7 @@ void mouse_event(Editor *e, const MouseEv *ev)
     if (ev->kind == MOUSE_DRAG) {
         if (e->picker.on)
             return;
-        if (e->mouse.drag == DRAG_TEXT)
+        if (e->mouse.drag == DRAG_TEXT || e->mouse.drag == DRAG_LINES)
             drag_to(e, ev);
         else if (e->mouse.drag == DRAG_BORDER)
             drag_border(e, ev);

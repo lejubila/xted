@@ -396,7 +396,44 @@ static void emit_gutter(SBuf *o, const Editor *e, int mark, int colors)
     }
 }
 
-/* One line of a pane's text, exactly w->w cells wide (the Git margin included). */
+/* The marks of the invisible characters (show_invisibles), in the glyphs chosen: a tab, a
+ * trailing space, a line end LF, a line end CR LF. */
+enum { INV_TAB, INV_SPACE, INV_LF, INV_CRLF };
+
+static void emit_invisible(SBuf *o, const Editor *e, int which)
+{
+    static const char *const uni[] = { "\xe2\x86\x92", "\xc2\xb7", "\xe2\x86\xb5", "\xc2\xb6" };
+    static const char *const win[] = { "\xe2\x86\x92", "\xc2\xb7", "\xc2\xac", "\xc2\xb6" };
+    static const char *const asc[] = { ">", ".", "$", "<" };
+
+    sbuf_adds(o, "\x1b[2m");
+    sbuf_adds(o, (e->glyphs == GLYPHS_ASCII ? asc : e->glyphs == GLYPHS_WINDOWS ? win : uni)[which]);
+    sbuf_adds(o, "\x1b[22m");
+}
+
+/* The number of line y in the column of the line numbers, numw cells: the cursor's line plain,
+ * the others dim. */
+static void emit_number(SBuf *o, size_t y, int numw, int current)
+{
+    char dg[24];
+    size_t n = y + 1;
+    int k = 0;
+
+    do
+        dg[k++] = (char)('0' + n % 10);
+    while ((n /= 10) > 0 && k < 24);
+    if (!current)
+        sbuf_adds(o, "\x1b[2m");
+    if (numw - 1 > k)
+        spaces(o, (size_t)(numw - 1 - k));
+    while (k > 0)
+        sbuf_add(o, &dg[--k], 1);
+    sbuf_add(o, " ", 1);
+    if (!current)
+        sbuf_adds(o, "\x1b[22m");
+}
+
+/* One line of a pane's text, exactly w->w cells wide (the margin included). */
 /* The start screen's line for row r of a window of h text rows, "" for none: the name and the
  * version, what it is, the credits and the keys to begin with, centred above the middle. */
 static int intro_line(const Editor *e, int r, int h, char *out, size_t n)
@@ -450,7 +487,8 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     int colors, cur = SC_NORMAL, br = 0, prev_visible = 0, hl = 0, sel_nl = 0, has_sel;
     Matcher *hm = e->find.hl && e->find.m && e->find.m->valid ? e->find.m : NULL;
     size_t mr[32][2], nm = 0, mk = 0;
-    int mt = 0, ov_done = 0, xeol = 0, at = 0;
+    int mt = 0, ov_done = 0, xeol = 0, at = 0, eol;
+    size_t trail = 0;
     const uint8_t *mds = NULL;
     size_t xr[64][2], nxr = 0, xi;
     int bg_row = e->color_depth != COLOR_NONE && e->theme->has_bg;
@@ -458,8 +496,7 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
     if (y >= d->buf.nlines) {
         if (bg_row)
             theme_bg(o, e->color_depth, e->theme->bg);
-        if (gut)
-            sbuf_adds(o, " ");
+        spaces(o, (size_t)gut);
         if (ov) {
             size_t pc = ov->c0 - v->coloff;
 
@@ -505,7 +542,9 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         if (e->theme->has_bg)
             theme_bg(o, e->color_depth, e->theme->bg);
     }
-    if (gut)
+    if (win_numw(w))
+        emit_number(o, y, win_numw(w), active && y == v->cy);
+    if (d->gutter)
         emit_gutter(o, e, l->git, colors);
     cls = colors ? syn_classes(d->syn, &d->buf, y) : NULL;
     has_sel = active && edit_view_sel_line(&d->buf, v, y, &sel_from, &sel_to, &sel_nl);
@@ -542,6 +581,12 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
             }
         }
 
+    /* the trailing blanks, drawn as dots with show_invisibles */
+    if (d->invisibles) {
+        trail = l->len;
+        while (trail > 0 && (l->s[trail - 1] == ' ' || l->s[trail - 1] == '\t'))
+            trail--;
+    }
     while (i < l->len && col < right) {
         uint32_t cp;
         int n = utf8_decode(l->s + i, l->len - i, &cp);
@@ -606,8 +651,13 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         if (mds)
             set_md(o, e, &at, mds[i - (size_t)n] & ~MD_CLS);
         if (start >= left && stop <= right) {
-            if (cp == '\t') {
+            if (cp == '\t' && d->invisibles) {
+                emit_invisible(o, e, INV_TAB);
+                spaces(o, cw - 1);
+            } else if (cp == '\t') {
                 spaces(o, cw);
+            } else if (cp == ' ' && d->invisibles && i - (size_t)n >= trail) {
+                emit_invisible(o, e, INV_SPACE);
             } else if (cw == 2 && (cp < 0x20 || (cp >= 0x7F && cp < 0xA0))) {
                 /* ^X is drawn in reverse video; inside a selection that is already on */
                 sbuf_adds(o, hl ? "^" : "\x1b[7m^");
@@ -644,9 +694,19 @@ static void text_row(SBuf *o, const Editor *e, const Win *w, size_t y, int activ
         col = ov->c1;
         ov_done = 1;
     }
-    /* a selection running past the end of the line shows the newline as one cell */
+    /* a selection running past the end of the line shows the newline as one cell; with
+     * show_invisibles the line end has its mark (none on a last line with no newline) */
+    eol = d->invisibles && !ov && (y + 1 < d->buf.nlines || d->buf.final_newline);
     if (((has_sel && sel_nl) || xeol) && !ov && col >= left && col < right) {
-        sbuf_adds(o, "\x1b[7m \x1b[27m");
+        sbuf_adds(o, "\x1b[7m");
+        if (eol)
+            emit_invisible(o, e, d->buf.crlf ? INV_CRLF : INV_LF);
+        else
+            sbuf_adds(o, " ");
+        sbuf_adds(o, "\x1b[27m");
+        col++;
+    } else if (eol && col >= left && col < right) {
+        emit_invisible(o, e, d->buf.crlf ? INV_CRLF : INV_LF);
         col++;
     }
     if (col < left)

@@ -233,6 +233,17 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
 - **Protezioni**: conferma prima di chiudere file non salvati, avviso se il file è cambiato
   su disco, file in sola lettura gestiti, avviso sui file binari.
 - **Fine riga**: rileva e conserva LF o CRLF, e l'assenza del newline finale.
+- **Numeri di riga** (`Alt+G`, «Numeri di riga» nella palette, `line_numbers = on`): in un margine
+  a sinistra, larghi quanto l'ultima riga (3 cifre almeno), con il numero della riga del cursore
+  in evidenza; un clic su un numero seleziona la riga, trascinando si selezionano più righe
+  intere (Shift+clic estende la selezione). Spariscono nei pannelli troppo stretti e non ci sono
+  nelle pagine come la guida o l'anteprima.
+- **Caratteri invisibili** (`Alt+I`, «Mostra caratteri invisibili», `show_invisibles = on`): il fine
+  riga come `↵` (LF) o `¶` (CRLF), nessun segno sull'ultima riga se il file non finisce con un
+  a-capo; i tab come `→` e gli spazi in fondo alla riga come `·`. Con `glyphs = windows` il fine
+  riga LF è `¬`, con `glyphs = ascii` i segni sono `$` `<` `>` `.`. Le due opzioni valgono per
+  tutti i file aperti; nel `config` si possono dare anche per linguaggio (`[Python]`…, `[Text]`
+  per i file senza linguaggio).
 - **Codifica**: il testo è UTF-8; i file UTF-16 (LE e BE) e UTF-8 con BOM, riconosciuti dal BOM
   (su Windows: `desktop.ini`, i file `.reg`, il Blocco note), si aprono come testo e si salvano
   nella loro codifica, con il BOM; la barra di stato la mostra. Un UTF-16 non valido resta com'è.
@@ -490,6 +501,8 @@ accanto ai comandi nella palette. Quelle predefinite:
 | `Alt+.` · `Ctrl+PgDn` | Buffer successivo |
 | `Alt+,` · `Ctrl+PgUp` | Buffer precedente |
 | `Ctrl+B` | Mostra/nascondi il browser dei file |
+| `Alt+G` | Mostra/nascondi i numeri di riga |
+| `Alt+I` | Mostra/nascondi i caratteri invisibili (fine riga, tab, spazi finali) |
 | `Ctrl+Q` | Esci |
 
 ### Pannelli
@@ -643,6 +656,8 @@ clipboard = on            # copie anche negli appunti di sistema (OSC 52)
 colors = auto             # auto | truecolor | 256 | 16 | none
 glyphs = unicode          # unicode (▸ ▾ │) | windows (► ▼, in tutti i font di Windows) | ascii (+ - |)
 keybar = message          # i tasti del contesto: message (nella riga dei messaggi) | line (riga a sé) | off
+line_numbers = off        # i numeri di riga (Alt+G)
+show_invisibles = off     # fine riga, tab e spazi finali visibili (Alt+I)
 
 # valori per tutti i linguaggi
 tab_width = 8
