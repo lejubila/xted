@@ -124,8 +124,9 @@ Su Windows:
   richiedono Git for Windows nel `PATH`;
 - **non ci sono le espressioni regolari** nella ricerca (`Alt+R` nella barra di ricerca): la
   ricerca semplice, «parola intera» e «maiuscole» restano;
-- la copia negli appunti di sistema (OSC 52) funziona in Windows Terminal, non nella console
-  classica; i nomi di file fuori da ASCII richiedono Windows 10 1903 o successivo.
+- gli appunti sono quelli di Windows, nella console classica come in Windows Terminal: quello che
+  si copia in xted si incolla nelle altre applicazioni, e `Ctrl+V` incolla quello copiato
+  altrove; i nomi di file fuori da ASCII richiedono Windows 10 1903 o successivo.
 
 Per compilarlo da Linux serve [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) (o un altro
 MinGW-w64): `make WIN=1` dà `build/win/xted.exe` (cerca il compilatore in
@@ -244,8 +245,12 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   Ctrl+frecce, inizio e fine del file.
 - **Selezione**: Shift+movimento, seleziona tutto, seleziona riga o parola.
 - **Copia, taglia, incolla** con una cronologia (kill ring): `Alt+V` incolla la voce
-  precedente. Copia e taglia lavorano sulla riga intera se non c'è selezione. Gli appunti
-  di sistema si raggiungono con OSC 52 (si attiva con `clipboard = on`).
+  precedente. Copia e taglia lavorano sulla riga intera se non c'è selezione. Con
+  `clipboard = on` (predefinito) le copie vanno anche negli appunti di sistema: su Windows
+  direttamente, altrove con OSC 52 (i terminali che lo supportano: Windows Terminal, kitty,
+  WezTerm, foot, Alacritty, Konsole, xterm; non quelli basati su VTE, come GNOME Terminal). Su
+  Windows `Ctrl+V` incolla anche un testo copiato in un'altra applicazione; dovunque, la
+  scorciatoia di incolla del terminale (Ctrl+Shift+V) lo inserisce.
 - **Undo/redo** illimitato, con raggruppamento delle modifiche consecutive.
 - **Righe**: duplica, elimina, unisci, sposta su e giù (`Alt+frecce`).
 - **Indentazione**: Tab e Shift+Tab su una selezione indentano o tolgono un livello;

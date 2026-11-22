@@ -152,6 +152,100 @@ void sys_attention(void)
     SetForegroundWindow(w);
 }
 
+/* The clipboard is busy while another program reads or writes it: tried for a while. */
+static int open_clipboard(void)
+{
+    int i;
+
+    for (i = 0; i < 20; i++) {
+        if (OpenClipboard(NULL))
+            return 1;
+        Sleep(10);
+    }
+    return 0;
+}
+
+/* UTF-8 with LF to the clipboard as UTF-16 with CR LF, as the programs of Windows want it. */
+int sys_clip_set(const char *s, size_t n)
+{
+    size_t i, lf = 0;
+    char *crlf;
+    int wl;
+    HGLOBAL g;
+    WCHAR *w;
+
+    for (i = 0; i < n; i++)
+        lf += s[i] == '\n' && (i == 0 || s[i - 1] != '\r');
+    crlf = malloc(n + lf + 1);
+    if (!crlf)
+        return -1;
+    for (i = 0, lf = 0; i < n; i++) {
+        if (s[i] == '\n' && (i == 0 || s[i - 1] != '\r'))
+            crlf[lf++] = '\r';
+        crlf[lf++] = s[i];
+    }
+    wl = n ? MultiByteToWideChar(CP_UTF8, 0, crlf, (int)lf, NULL, 0) : 0;
+    g = GlobalAlloc(GMEM_MOVEABLE, ((size_t)wl + 1) * sizeof(WCHAR));
+    if (!g || !(w = GlobalLock(g))) {
+        if (g)
+            GlobalFree(g);
+        free(crlf);
+        return -1;
+    }
+    if (wl)
+        MultiByteToWideChar(CP_UTF8, 0, crlf, (int)lf, w, wl);
+    w[wl] = 0;
+    GlobalUnlock(g);
+    free(crlf);
+    if (!open_clipboard()) {
+        GlobalFree(g);
+        return -1;
+    }
+    EmptyClipboard();
+    if (!SetClipboardData(CF_UNICODETEXT, g)) {
+        CloseClipboard();
+        GlobalFree(g);
+        return -1;
+    }
+    CloseClipboard();                   /* the memory is the clipboard's now */
+    return 0;
+}
+
+char *sys_clip_get(size_t *n)
+{
+    HANDLE h;
+    const WCHAR *w;
+    char *s = NULL;
+    int len;
+    size_t i, k;
+
+    *n = 0;
+    if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !open_clipboard())
+        return NULL;
+    h = GetClipboardData(CF_UNICODETEXT);
+    if (h && (w = GlobalLock(h)) != NULL) {
+        len = WideCharToMultiByte(CP_UTF8, 0, w, -1, NULL, 0, NULL, NULL);
+        if (len > 1 && (s = malloc((size_t)len)) != NULL) {
+            WideCharToMultiByte(CP_UTF8, 0, w, -1, s, len, NULL, NULL);
+            /* CR LF (and a CR alone) as LF */
+            for (i = k = 0; s[i]; i++) {
+                if (s[i] == '\r') {
+                    s[k++] = '\n';
+                    if (s[i + 1] == '\n')
+                        i++;
+                } else {
+                    s[k++] = s[i];
+                }
+            }
+            s[k] = '\0';
+            *n = k;
+        }
+        GlobalUnlock(h);
+    }
+    CloseClipboard();
+    return s;
+}
+
 int sys_is_abs(const char *p)
 {
     return p[0] == '/' || p[0] == '\\' ||

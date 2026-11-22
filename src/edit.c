@@ -572,7 +572,8 @@ static void store_clip(Editor *e, char *text, size_t n, int whole, const char *v
 {
     int too_big = 0;
 
-    if (e->clipboard_osc52) {
+    /* the system clipboard: the system's own when it has one (Windows), else OSC 52 */
+    if (e->clipboard_osc52 && sys_clip_set(text, n) < 0) {
         SBuf osc = SBUF_INIT;
 
         if (clip_osc52(&osc, text, n) == 0)
@@ -661,6 +662,20 @@ void edit_paste(Editor *e)
     const ClipEntry *c = clip_get(&e->clip, 0);
     int had_sel;
 
+    /* a text copied in another program is in the system clipboard: it goes first (into the ring
+     * too, for Alt+V); the same text as the last copy of xted is that copy (it knows a whole
+     * line) */
+    if (e->clipboard_osc52) {
+        size_t sn;
+        char *s = sys_clip_get(&sn);
+
+        if (s && sn > 0 && (!c || c->n != sn || memcmp(c->text, s, sn) != 0)) {
+            clip_push(&e->clip, s, sn, 0);
+            c = clip_get(&e->clip, 0);
+        } else {
+            free(s);
+        }
+    }
     if (!c) {
         editor_set_msg(e, MSG_TTL_MS, tr("Clipboard is empty"));
         return;

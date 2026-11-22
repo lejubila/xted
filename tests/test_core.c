@@ -2019,6 +2019,39 @@ static DWORD WINAPI ipc_sender(LPVOID arg)
 }
 #endif
 
+#ifdef _WIN32
+/* The clipboard of Windows: text both ways, and Ctrl+V with a text copied in another program. */
+static void test_clipboard_win(void)
+{
+    Editor e;
+    size_t n;
+    char *s;
+
+    CHECK(sys_clip_set("uno \xc3\xa0\ndue", 10) == 0);
+    s = sys_clip_get(&n);
+    CHECK(s && n == 10 && memcmp(s, "uno \xc3\xa0\ndue", 10) == 0);     /* CR LF there, LF here */
+    free(s);
+
+    ed_load(&e, "a\nb\nc");
+    e.clipboard_osc52 = 1;                                      /* ed_load turns it off */
+    sys_clip_set("altrove", 7);                                 /* copied in another program */
+    e.cy = 1;
+    edit_paste(&e);
+    CHECK(buf_is(e.buf, "a\naltroveb\nc") && e.clip.count == 1);
+    edit_undo(&e);
+    e.cy = 0;
+    e.cx = 0;
+    edit_copy(&e);                                              /* a whole line, copied here */
+    s = sys_clip_get(&n);
+    CHECK(s && n == 2 && memcmp(s, "a\n", 2) == 0);
+    free(s);
+    e.cy = 2;
+    edit_paste(&e);                                             /* still a whole line */
+    CHECK(buf_is(e.buf, "a\nb\na\nc") && e.clip.count == 2 && e.clip.e[0].whole_line);
+    editor_free(&e);
+}
+#endif
+
 /* The single instance: the request, the queue, and a real channel between two of us. */
 static void test_ipc(void)
 {
@@ -7283,6 +7316,9 @@ int main(void)
 #endif
     test_errors_parse();
     test_ipc();
+#ifdef _WIN32
+    test_clipboard_win();
+#endif
 #ifndef _WIN32
     test_run();
     test_filter();

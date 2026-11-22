@@ -43,6 +43,10 @@
 #define sys_lang(out, n) ((void)(out), (void)(n))
 /* the window of the editor to the front, when files came from the desktop (Windows' console) */
 #define sys_attention() ((void)0)
+/* The system clipboard, when the system has one a program can reach: 0 when the text went there
+ * (else -1: OSC 52 is tried); its text as UTF-8 with LF, malloc'd, or NULL. */
+#define sys_clip_set(s, n) ((void)(s), (void)(n), -1)
+#define sys_clip_get(np) ((void)(np), (char *)NULL)
 
 #else
 
@@ -68,6 +72,8 @@ char *sys_getcwd(char *buf, size_t n);
 void sys_path_fix(char *path);
 void sys_lang(char *out, size_t n);
 void sys_attention(void);
+int sys_clip_set(const char *s, size_t n);
+char *sys_clip_get(size_t *n);
 /* the status of a command that ended (shell_capture, shell_reap) is its exit code */
 #define WIFEXITED(s) 1
 #define WEXITSTATUS(s) (s)
