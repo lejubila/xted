@@ -309,9 +309,10 @@ or a theme of your own.
 .TP
 .BR mouse ", " git ", " clipboard
 .BR on " or " off .
-The clipboard setting also sends the copies to the system clipboard: Windows' own, else through
-OSC 52 (the terminal must support it). On Windows Ctrl+V also pastes a text copied in another
-program.
+The clipboard setting also sends the copies to the clipboard of the desktop, and Ctrl+V pastes a
+text copied in another program: Windows' own; on Linux, in a local graphical session, through
+wl-copy and wl-paste (wl-clipboard) or xclip or xsel; else (SSH, none of those programs) the
+copies go through OSC 52, which the terminal must support.
 .TP
 .B colors
 .BR auto " (default: from " COLORTERM " and " TERM "; the xterm family, PuTTY included, gets 256), "

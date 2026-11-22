@@ -43,10 +43,11 @@
 #define sys_lang(out, n) ((void)(out), (void)(n))
 /* the window of the editor to the front, when files came from the desktop (Windows' console) */
 #define sys_attention() ((void)0)
-/* The system clipboard, when the system has one a program can reach: 0 when the text went there
- * (else -1: OSC 52 is tried); its text as UTF-8 with LF, malloc'd, or NULL. */
-#define sys_clip_set(s, n) ((void)(s), (void)(n), -1)
-#define sys_clip_get(np) ((void)(np), (char *)NULL)
+/* The system clipboard (clip_unix.c: the programs of a graphical session): 0 when the text went
+ * there, -1 when there is none to reach (SSH, a console), -2 when its programs are missing (OSC
+ * 52 is tried in both); its text as UTF-8 with LF, malloc'd, or NULL. */
+int sys_clip_set(const char *s, size_t n);
+char *sys_clip_get(size_t *n);
 
 #else
 

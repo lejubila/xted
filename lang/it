@@ -415,3 +415,4 @@ delete	elimina
 «%s» opened from the desktop	«%s» aperto dal desktop
 %zu files opened from the desktop	%zu file aperti dal desktop
 xted: no terminal emulator found: set one with "terminal =" in the configuration\n	xted: nessun emulatore di terminale trovato: indicane uno con "terminal =" nella configurazione\n
+ (for the desktop's clipboard install wl-clipboard, or xclip)	 (per gli appunti del desktop installa wl-clipboard, o xclip)

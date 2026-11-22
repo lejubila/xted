@@ -61,8 +61,9 @@ class Box:
 
     def run(self, args, rows=24, cols=80, env=None):
         # the channel of the single instance is the box's: never the one of a real xted
+        # and no graphical session: the copies never reach the clipboard of the desktop
         e = {"XDG_CONFIG_HOME": self.cfg, "XDG_STATE_HOME": self.state,
-             "XTED_IPC": os.path.join(self.dir, ".ipc.sock")}
+             "XTED_IPC": os.path.join(self.dir, ".ipc.sock"), "WAYLAND_DISPLAY": "", "DISPLAY": ""}
         if env:
             e.update(env)
         return Run(EXE, args, rows, cols, e, cwd=self.dir)
@@ -823,6 +824,40 @@ def desktop_launcher():
         os.remove(os.path.join(fake, name))
     out = run("a.txt")
     check("no terminal at all: said, and an error", out.returncode == 1 and b"terminal" in out.stderr, out)
+    b.close()
+
+
+@scenario
+def desktop_clipboard():
+    b = Box()
+    b.write("a.txt", "uno\ndue\n")
+    # fake wl-copy and wl-paste: the clipboard is a file of the box
+    fake, clip = b.path("fake"), b.path("clip")
+    os.makedirs(fake)
+    for name, body in (("wl-copy", "/bin/cat > %s" % clip), ("wl-paste", "[ -f %s ] && exec /bin/cat %s; exit 1" % (clip, clip))):
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n" + body + "\n")
+        os.chmod(os.path.join(fake, name), 0o755)
+    r = b.run(["a.txt"], cols=100, env={"WAYLAND_DISPLAY": "wayland-test", "PATH": fake, "SSH_CONNECTION": "",
+                                         "SSH_TTY": ""})
+    r.type(ctrl("c"), 0.5)
+    check("Ctrl+C: the line goes to the desktop's clipboard (wl-copy)", os.path.exists(clip) and
+          open(clip).read() == "uno\n", open(clip).read() if os.path.exists(clip) else None)
+    with open(clip, "w") as f:
+        f.write("dal desktop\r\n")
+    r.type(DOWN, END, ctrl("v"), ctrl("s"), 0.5)
+    check("Ctrl+V: what another program copied (CR LF as LF)", b.read("a.txt") == "uno\ndue" + "dal desktop\n" + "\n",
+          repr(b.read("a.txt")))
+    quit_(r)
+    # a graphical session without the programs: OSC 52, and a hint once
+    os.remove(os.path.join(fake, "wl-copy"))
+    r = b.run(["a.txt"], cols=140, env={"WAYLAND_DISPLAY": "wayland-test", "PATH": fake})
+    r.type(ctrl("c"), 0.5)
+    check("no wl-copy: the copy says what to install", "wl-clipboard" in r.screen().lines()[-1] and
+          b"\x1b]52;c;" in r.out, r.screen().lines()[-1])
+    r.type(ctrl("c"), 0.5)
+    check("only once", "wl-clipboard" not in r.screen().lines()[-1], r.screen().lines()[-1])
+    quit_(r, discard=True)
     b.close()
 
 

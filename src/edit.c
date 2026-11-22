@@ -570,10 +570,12 @@ size_t edit_convert_indent(Editor *e, int to_tabs, size_t cols_per_tab)
 /* Takes ownership of text. */
 static void store_clip(Editor *e, char *text, size_t n, int whole, const char *verb)
 {
-    int too_big = 0;
+    static int hinted;
+    int too_big = 0, sys = e->clipboard_osc52 ? sys_clip_set(text, n) : 0;
+    const char *hint = "";
 
-    /* the system clipboard: the system's own when it has one (Windows), else OSC 52 */
-    if (e->clipboard_osc52 && sys_clip_set(text, n) < 0) {
+    /* the system clipboard: the system's own when it is reachable, else OSC 52 */
+    if (e->clipboard_osc52 && sys < 0) {
         SBuf osc = SBUF_INIT;
 
         if (clip_osc52(&osc, text, n) == 0)
@@ -583,8 +585,13 @@ static void store_clip(Editor *e, char *text, size_t n, int whole, const char *v
         sbuf_free(&osc);
     }
     clip_push(&e->clip, text, n, whole);
+    /* a desktop whose clipboard programs are missing: said once (OSC 52 may reach it anyway) */
+    if (sys == -2 && !hinted) {
+        hint = tr(" (for the desktop's clipboard install wl-clipboard, or xclip)");
+        hinted = 1;
+    }
     editor_set_msg(e, MSG_TTL_MS, tr("%s: %zu bytes%s"), verb, n,
-                   too_big ? tr(" (too large for the system clipboard)") : "");
+                   too_big ? tr(" (too large for the system clipboard)") : hint);
 }
 
 static void copy_to_clip(Editor *e, const char *verb)

@@ -246,11 +246,17 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
 - **Selezione**: Shift+movimento, seleziona tutto, seleziona riga o parola.
 - **Copia, taglia, incolla** con una cronologia (kill ring): `Alt+V` incolla la voce
   precedente. Copia e taglia lavorano sulla riga intera se non c'è selezione. Con
-  `clipboard = on` (predefinito) le copie vanno anche negli appunti di sistema: su Windows
-  direttamente, altrove con OSC 52 (i terminali che lo supportano: Windows Terminal, kitty,
-  WezTerm, foot, Alacritty, Konsole, xterm; non quelli basati su VTE, come GNOME Terminal). Su
-  Windows `Ctrl+V` incolla anche un testo copiato in un'altra applicazione; dovunque, la
-  scorciatoia di incolla del terminale (Ctrl+Shift+V) lo inserisce.
+  `clipboard = on` (predefinito) le copie vanno anche negli appunti del desktop, e `Ctrl+V`
+  incolla un testo copiato in un'altra applicazione (se è diverso dall'ultima copia fatta in
+  xted, che ricorda anche le righe intere; entra nella cronologia, per `Alt+V`):
+  - su Windows con gli appunti di Windows, nella console classica come in Windows Terminal;
+  - su Linux in una sessione grafica locale con `wl-copy`/`wl-paste` (Wayland, pacchetto
+    `wl-clipboard`) oppure `xclip` o `xsel` (X11, anche Wayland tramite XWayland): se mancano,
+    la prima copia dice cosa installare (su Ubuntu e Debian `sudo apt install wl-clipboard`);
+  - via SSH, e dove quei programmi non ci sono, le copie usano OSC 52, che arriva agli appunti se
+    il terminale lo supporta (Windows Terminal, kitty, WezTerm, foot, Alacritty, Konsole, xterm;
+    non quelli basati su VTE, come GNOME Terminal); per incollare resta la scorciatoia del
+    terminale (Ctrl+Shift+V), che xted riceve come testo incollato.
 - **Undo/redo** illimitato, con raggruppamento delle modifiche consecutive.
 - **Righe**: duplica, elimina, unisci, sposta su e giù (`Alt+frecce`).
 - **Indentazione**: Tab e Shift+Tab su una selezione indentano o tolgono un livello;
