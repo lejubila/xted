@@ -41,6 +41,8 @@
 #define sys_path_fix(path) ((void)(path))
 /* the language of the system when no LANG says it (Windows): its code in out, as "it" */
 #define sys_lang(out, n) ((void)(out), (void)(n))
+/* the window of the editor to the front, when files came from the desktop (Windows' console) */
+#define sys_attention() ((void)0)
 
 #else
 
@@ -65,6 +67,7 @@ void sys_init(void);
 char *sys_getcwd(char *buf, size_t n);
 void sys_path_fix(char *path);
 void sys_lang(char *out, size_t n);
+void sys_attention(void);
 /* the status of a command that ended (shell_capture, shell_reap) is its exit code */
 #define WIFEXITED(s) 1
 #define WEXITSTATUS(s) (s)

@@ -139,6 +139,19 @@ void sys_lang(char *out, size_t n)
         out[k] = '\0';
 }
 
+/* The console window to the front: the classic console lets it (xtedw.exe gave the right);
+ * Windows Terminal's window is not the console's, and stays where it is. */
+void sys_attention(void)
+{
+    HWND w = GetConsoleWindow();
+
+    if (!w)
+        return;
+    if (IsIconic(w))
+        ShowWindow(w, SW_RESTORE);
+    SetForegroundWindow(w);
+}
+
 int sys_is_abs(const char *p)
 {
     return p[0] == '/' || p[0] == '\\' ||

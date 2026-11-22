@@ -737,6 +737,8 @@ static void open_remote(Editor *e)
     }
     free(f);
     e->intro = 0;
+    if (ok > 0)
+        sys_attention();
     if (ok == 1 && e->doc->buf.path)
         editor_set_msg(e, MSG_TTL_MS, tr("«%s» opened from the desktop"), doc_base_name(e->doc));
     else if (ok > 1)

@@ -2,7 +2,7 @@
 
 Editor di testo da terminale per Linux, scritto in **C99** con la sola libc POSIX.
 Un unico binario, senza ncurses né altre librerie: il terminale è controllato a mano con
-termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 600 KB.
+termios e sequenze ANSI. Parte in meno di 50 ms e il binario statico resta sotto 640 KB.
 
 Il nome è `xted` (X = Unix/Linux, T = text/terminal, ED = editor); `make install` crea anche
 il collegamento breve `xt`.
@@ -98,6 +98,21 @@ $env:XTED_UNINSTALL = '1'; irm https://github.com/lejubila/xted/releases/latest/
 `$env:XTED_DIR` sceglie un'altra cartella, `$env:XTED_VERSION` una versione precisa. Oppure si
 scarica `xted-<versione>-windows-x86_64.zip` dalle release e si estrae dove si vuole (`lang\`
 accanto a `xted.exe`).
+
+Per il desktop lo script installa anche `xtedw.exe`, un piccolo lanciatore senza console con
+l'icona, e (tutto in `HKCU`, senza amministratore):
+
+- **xted** nel menu Start;
+- xted tra i programmi di **«Apri con»** dei file di testo (`.txt`, `.md`, `.json`, `.py`, `.c`,
+  `.php`, `.js`…); come predefinito lo sceglie l'utente («Apri con → Scegli un'altra app → Usa
+  sempre», o Impostazioni → App predefinite): Windows non lascia farlo a un programma da solo;
+- **«Apri con xted»** nel menu dei file, **«Apri cartella in xted»** in quello delle cartelle e
+  **«Apri xted qui»** dentro una cartella (su Windows 11 sotto «Mostra altre opzioni»).
+
+Se uno xted è già aperto, i file vanno lì come nuovi buffer e la sua finestra viene in primo
+piano (nella console classica; Windows Terminal la lascia dov'è); se no, `xtedw.exe` apre una
+nuova console con xted nella cartella del file. Più file scelti insieme vanno nello stesso xted.
+`$env:XTED_DESKTOP = '0'` installa senza tutto questo; la disinstallazione lo toglie.
 
 Su Windows:
 

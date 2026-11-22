@@ -1,6 +1,6 @@
 # The modes (each compiles into its own folder, so that objects of different flags never mix):
 #   make            static with musl-gcc, when it is installed: one binary that runs on any Linux
-#                   (SPEC: under 600 KB); without musl, dynamic with the system's cc, with a note
+#                   (SPEC: under 640 KB); without musl, dynamic with the system's cc, with a note
 #   make DYNAMIC=1  dynamic, with the system's cc (or the CC given): for packages, for development
 #   make STATIC=1   static even with another CC (CC=musl-gcc is the default when installed)
 #   make SAN=1      AddressSanitizer + UBSan, dynamic with gcc (the sanitizers need glibc)
@@ -85,10 +85,11 @@ OBJ      = $(LIBSRC:src/%.c=$(BUILD)/%.o) $(BUILD)/main.o
 ifeq ($(MODE),win)
 RESOBJ   = $(BUILD)/xted_res.o
 OBJ     += $(RESOBJ)
+EXTRA    = $(BUILD)/xtedw.exe
 endif
 
 
-all: $(PROG)
+all: $(PROG) $(EXTRA)
 
 # ./xted is the program of the mode just built: copied each time, so that switching mode (make,
 # make DYNAMIC=1, make SAN=1) never leaves the binary of another one
@@ -113,6 +114,17 @@ $(BUILD)/%.o: src/%.c
 $(BUILD)/xted_res.o: src/win/xted.rc src/win/xted.manifest
 	@mkdir -p $(BUILD)
 	cd src/win && $(WINDRES) xted.rc -O coff -o $(CURDIR)/$@
+
+# Windows: xtedw.exe, the launcher with no console of the Start menu and of "Open with" (the
+# single instance's client, and the icon)
+$(BUILD)/xtedw_res.o: src/win/xtedw.rc src/win/xted.manifest desktop/xted.ico
+	@mkdir -p $(BUILD)
+	cd src/win && $(WINDRES) xtedw.rc -O coff -o $(CURDIR)/$@
+
+$(BUILD)/xtedw.exe: src/xtedw.c src/ipc.c src/ipc_win.c $(BUILD)/xtedw_res.o
+	$(CC) $(WARN) $(DEFS) $(CFLAGS) -Isrc -mwindows -o $@ src/xtedw.c src/ipc.c src/ipc_win.c \
+	    $(BUILD)/xtedw_res.o $(LDFLAGS) -lshell32
+	$(STRIP) -s $@
 
 # on Windows with the program's manifest: the tests run with its UTF-8 code page
 $(BUILD)/test_core$(EXE): tests/test_core.c $(LIBSRC) $(RESOBJ)

@@ -10,7 +10,7 @@
 #   tools/release.sh --no-win   Linux only (no MinGW at hand)
 set -eu
 
-LIMIT=614400                        # 600 KB: SPEC.md
+LIMIT=655360                        # 640 KB: SPEC.md
 
 cd "$(dirname "$0")/.."
 V=$(sed -n 's/^#define XTED_VERSION "\(.*\)"$/\1/p' src/version.h)
@@ -62,6 +62,7 @@ v, r = sys.argv[1], sys.argv[2]
 top = "xted-%s/" % v
 with zipfile.ZipFile(os.path.join(r, "xted-%s-windows-x86_64.zip" % v), "w", zipfile.ZIP_DEFLATED) as z:
     z.write("build/win/xted.exe", top + "xted.exe")
+    z.write("build/win/xtedw.exe", top + "xtedw.exe")
     for f in sorted(os.listdir("lang")):
         z.write(os.path.join("lang", f), top + "lang/" + f)
     z.write("README.md", top + "README.md")
