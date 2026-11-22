@@ -273,6 +273,15 @@ int config_parse(Config *c, const char *text, size_t n)
                     else
                         snprintf(c->theme, sizeof c->theme, "%s", val);
                     r = 0;
+                } else if (!strcmp(key, "terminal")) {
+                    /* the terminal emulator xted --desktop starts: a command, as "kitty" or
+                     * "foot" or "alacritty -e" (the words before xted) */
+                    if (strlen(val) >= sizeof c->terminal)
+                        r = -2;
+                    else
+                        snprintf(c->terminal, sizeof c->terminal, "%s", val);
+                    if (r != -2)
+                        r = 0;
                 } else if (!strcmp(key, "language")) {
                     size_t k;
 

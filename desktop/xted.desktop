@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=xted
+GenericName=Text Editor
+GenericName[it]=Editor di testo
+Comment=Edit text files in the terminal
+Comment[it]=Modifica file di testo nel terminale
+Icon=xted
+# --desktop: the files go to the xted already open, else a terminal is started with xted in it
+# (so Terminal=false: no window that flashes); install.sh writes the full path of xted here
+Exec=xted --desktop %F
+Terminal=false
+StartupNotify=false
+Categories=Utility;TextEditor;
+Keywords=text;editor;terminal;code;
+MimeType=text/plain;text/markdown;text/x-markdown;text/x-csrc;text/x-chdr;text/x-c++src;text/x-c++hdr;text/x-python;text/x-python3;text/x-script.python;application/x-shellscript;text/x-shellscript;text/javascript;application/javascript;application/x-javascript;text/x-typescript;application/typescript;application/json;application/x-yaml;application/yaml;text/x-yaml;application/toml;text/x-toml;text/x-php;application/x-php;text/css;text/html;text/xml;application/xml;text/x-java;text/x-csharp;text/x-go;text/x-rust;text/x-makefile;text/x-cmake;text/x-log;text/x-readme;text/x-sql;application/sql;text/x-ini;text/x-lua;text/x-ruby;text/x-perl;text/csv;text/x-diff;text/x-patch;application/x-desktop;

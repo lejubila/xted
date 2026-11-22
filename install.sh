@@ -1,6 +1,7 @@
 #!/bin/sh
-# Installs xted from a GitHub release: the static binary, the xt link, the language catalogs and
-# the manual pages. Nothing is compiled.
+# Installs xted from a GitHub release: the static binary, the xt link, the language catalogs, the
+# manual pages and what the desktop needs (the icon, the menu entry, "Open with", "Open with xted"
+# in Dolphin and Nemo). Nothing is compiled.
 #
 #   curl -fsSL https://github.com/lejubila/xted/releases/latest/download/install.sh | sh
 #
@@ -8,6 +9,8 @@
 #   PREFIX=/dir         where to install (default: /usr/local for root, ~/.local otherwise)
 #   XTED_VERSION=0.9.0  a given release (default: the latest)
 #   XTED_URL=url        where the release files are (a mirror; default: GitHub)
+#   XTED_DESKTOP=0      without the desktop entry and the icon
+#   XTED_DEFAULT=1      xted as the default application of the text files it knows
 # Arguments: --uninstall removes what it installs, --help prints this.
 #   curl -fsSL .../install.sh | sh -s -- --uninstall
 set -eu
@@ -26,6 +29,8 @@ Installs xted (a text editor for the terminal) from a GitHub release.
   PREFIX=/dir         where to install (default: /usr/local for root, ~/.local otherwise)
   XTED_VERSION=0.9.0  a given release (default: the latest)
   XTED_URL=url        where the release files are (a mirror)
+  XTED_DESKTOP=0      without the desktop entry and the icon
+  XTED_DEFAULT=1      xted as the default application of the text files it knows
 EOF
 }
 
@@ -49,6 +54,17 @@ fi
 BIN=$PREFIX/bin
 LANGDIR=$PREFIX/share/xted/lang
 MAN=$PREFIX/share/man
+APPS=$PREFIX/share/applications
+ICONS=$PREFIX/share/icons/hicolor
+DOLPHIN=$PREFIX/share/kio/servicemenus
+NEMO=$PREFIX/share/nemo/actions
+
+# the menus and the icons know what changed (quietly: a desktop may have none of these tools)
+refresh_desktop() {
+    command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q "$APPS" 2>/dev/null
+    command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t -f "$ICONS" 2>/dev/null
+    return 0
+}
 
 # ---- uninstall ------------------------------------------------------------
 if [ "$uninstall" = 1 ]; then
@@ -60,6 +76,8 @@ if [ "$uninstall" = 1 ]; then
     fi
     rm -f "$LANGDIR"/*
     rmdir "$LANGDIR" "$PREFIX/share/xted" 2>/dev/null || true
+    rm -f "$APPS/xted.desktop" "$ICONS/scalable/apps/xted.svg" "$DOLPHIN/xted.desktop" "$NEMO/xted.nemo_action"
+    refresh_desktop
     say "removed from $PREFIX (the settings in ~/.config/xted are left)"
     exit 0
 fi
@@ -139,7 +157,34 @@ done
 [ -f "$src/share/man/man1/xted.1" ] && cp "$src/share/man/man1/xted.1" "$MAN/man1/"
 [ -f "$src/share/man/it/man1/xted.1" ] && cp "$src/share/man/it/man1/xted.1" "$MAN/it/man1/"
 
+# ---- the desktop ----------------------------------------------------------
+# a desktop file of the archive with the full path of xted in its Exec lines
+put_desktop() {
+    mkdir -p "$2" && sed "s|^Exec=xted |Exec=\"$BIN/xted\" |" "$1" > "$2/$3" && chmod "${4:-644}" "$2/$3"
+}
+desk=
+if [ "${XTED_DESKTOP:-1}" != 0 ] && [ -f "$src/share/applications/xted.desktop" ]; then
+    put_desktop "$src/share/applications/xted.desktop" "$APPS" xted.desktop
+    mkdir -p "$ICONS/scalable/apps"
+    cp "$src/share/icons/hicolor/scalable/apps/xted.svg" "$ICONS/scalable/apps/xted.svg"
+    # "Open with xted" at the top of the menu of the file managers that have a way for it
+    if command -v dolphin >/dev/null 2>&1 && [ -f "$src/share/xted/desktop/dolphin-xted.desktop" ]; then
+        put_desktop "$src/share/xted/desktop/dolphin-xted.desktop" "$DOLPHIN" xted.desktop 755
+    fi
+    if command -v nemo >/dev/null 2>&1 && [ -f "$src/share/xted/desktop/xted.nemo_action" ]; then
+        put_desktop "$src/share/xted/desktop/xted.nemo_action" "$NEMO" xted.nemo_action
+    fi
+    refresh_desktop
+    desk=yes
+    if [ "${XTED_DEFAULT:-0}" = 1 ] && command -v xdg-mime >/dev/null 2>&1; then
+        # shellcheck disable=SC2046
+        xdg-mime default xted.desktop $(sed -n 's/^MimeType=//p' "$APPS/xted.desktop" | tr ';' ' ')
+        say "xted is the default application of the text files"
+    fi
+fi
+
 say "installed $("$BIN/xted" --version | head -n 1) in $BIN$also"
+[ -n "$desk" ] && say "in the menu of the applications too, and in \"Open with\" of the files"
 case ":${PATH:-}:" in
 *":$BIN:"*) ;;
 *)

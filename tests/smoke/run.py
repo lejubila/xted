@@ -776,6 +776,57 @@ def utf16_file():
 
 
 @scenario
+def desktop_launcher():
+    b = Box()
+    b.write("a.txt", "uno\n")
+    b.write("sub/b.txt", "due\nseconda\nterza\n")
+    # fake terminals: they write how they were called; PATH has only them (never a real one)
+    fake = b.path("fake")
+    os.makedirs(fake)
+    for name in ("konsole", "xdg-terminal-exec", "myterm"):
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n{ echo \"$(basename \"$0\")\"; for a in \"$@\"; do echo \"$a\"; done; pwd; } > %s\n"
+                    % b.path("called." + name))
+        os.chmod(os.path.join(fake, name), 0o755)
+    env = dict(os.environ, XDG_CONFIG_HOME=b.cfg, XDG_STATE_HOME=b.state, XTED_IPC=b.path(".ipc.sock"),
+               PATH=fake, XDG_CURRENT_DESKTOP="KDE")
+    env.pop("TERMINAL", None)
+    run = lambda *args: subprocess.run([EXE, "--desktop"] + list(args), cwd=b.dir, env=env,
+                                       stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
+    called = lambda n: open(b.path("called." + n)).read().split("\n") if os.path.exists(b.path("called." + n)) else None
+
+    # an xted open: the files go to it, no terminal is started
+    r = b.run(["a.txt"], cols=100)
+    out = run("sub/b.txt:2")
+    r.type("", 0.5)
+    check("--desktop hands the files to the open xted", out.returncode == 0 and "b.txt" in r.screen().text() and
+          called("xdg-terminal-exec") is None, (out, r.screen().text()[-200:]))
+    quit_(r)
+
+    # none open: a terminal with xted in it, in the folder of the first file
+    out = run("sub/b.txt:3")
+    c = called("xdg-terminal-exec")
+    check("none open: the terminal is started (xdg-terminal-exec first)", c is not None and c[1] == EXE and
+          c[2] == b.path("sub/b.txt") + ":3:1", (out, c))
+    check("in the folder of the file", c is not None and os.path.realpath(c[3]) == os.path.realpath(b.path("sub")), c)
+    os.remove(os.path.join(fake, "xdg-terminal-exec"))
+    out = run("a.txt")
+    c = called("konsole")
+    check("then the terminal of the desktop (KDE: konsole -e)", c is not None and c[1] == "-e" and c[2] == EXE, c)
+    b.write(".cfg/xted/config", "terminal = myterm --flag\n")
+    out = run()
+    c = called("myterm")
+    check("terminal = in the configuration wins, with its words", c is not None and c[1] == "--flag" and c[2] == EXE and
+          len(c) == 5, c)
+    b.write(".cfg/xted/config", "")
+    for name in ("konsole", "myterm"):
+        os.remove(os.path.join(fake, name))
+    out = run("a.txt")
+    check("no terminal at all: said, and an error", out.returncode == 1 and b"terminal" in out.stderr, out)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

@@ -58,6 +58,25 @@ sh install.sh
 Gli stessi file si scaricano anche a mano dalla pagina delle
 [release](https://github.com/lejubila/xted/releases).
 
+#### Desktop Linux
+
+Lo script installa anche quello che serve al desktop (GNOME, KDE, XFCE, Cinnamon, MATE…):
+
+- l'icona e la voce **xted** nel menu delle applicazioni (`share/applications/xted.desktop`);
+- xted tra le applicazioni di **«Apri con»** dei file di testo (testo, Markdown, C, Python, PHP,
+  JavaScript, JSON, YAML…), dove si può scegliere come predefinito; con `XTED_DEFAULT=1` lo
+  script lo imposta da sé (`xdg-mime default`);
+- la voce **«Apri con xted»** nel menu dei file di Dolphin (KDE) e di Nemo (Cinnamon), se ci sono.
+
+Icona e «Apri con» lanciano `xted --desktop`: se uno xted è già aperto, i file si aprono lì come
+nuovi buffer (vedi «Istanza unica» in [Uso](#uso)), senza nessuna finestra in più; se no, si apre
+un terminale con xted dentro, nella cartella del primo file. Il terminale è quello di
+`terminal = …` nel `config` (per esempio `terminal = kitty` o `terminal = alacritty -e`), oppure
+di `$TERMINAL`, oppure `xdg-terminal-exec`, quello del desktop in uso (Ptyxis, Console o GNOME
+Terminal su GNOME, Konsole su KDE, xfce4-terminal, mate-terminal), `x-terminal-emulator`, e
+infine kitty, Alacritty, foot, WezTerm, Tilix, xterm. `XTED_DESKTOP=0` installa senza tutto
+questo; `--uninstall` lo toglie.
+
 ### Windows
 
 xted gira anche su Windows 10 (1809 o successivo) e Windows 11, come un solo `xted.exe` senza
@@ -592,6 +611,7 @@ theme = light             # dark (predefinito) o light, o un tema tuo (anche scu
 language = auto           # auto (da LC_ALL, LC_MESSAGES, LANG), en, it, o un codice con catalogo
 mouse = on
 single_instance = on      # il primo xted riceve i file di xted --remote (icona, «Apri con»)
+terminal = kitty          # il terminale dell'icona e di «Apri con» (vuoto: lo sceglie xted)
 git = on
 clipboard = on            # copie anche negli appunti di sistema (OSC 52)
 colors = auto             # auto | truecolor | 256 | 16 | none

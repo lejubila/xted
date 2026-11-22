@@ -76,7 +76,7 @@ TERMSRC  = src/term_win.c src/sys_win.c
 SHELLSRC = src/shell_win.c src/ipc_win.c
 else
 TERMSRC  = src/term.c
-SHELLSRC = src/shell.c src/ipc_unix.c
+SHELLSRC = src/shell.c src/ipc_unix.c src/launch.c
 endif
 LIBSRC   = src/util.c src/utf8.c $(TERMSRC) src/term_keys.c src/undo.c src/clip.c src/buffer.c \
            src/syntax.c src/langs.c src/theme.c src/doc.c src/layout.c src/fuzzy.c src/picker.c src/files.c src/session.c src/search.c src/find.c src/commands.c src/complete.c src/snippet.c src/cursors.c src/fold.c $(SHELLSRC) src/ipc.c src/run.c src/errors.c src/keymap.c src/config.c src/git.c src/tags.c src/mouse.c src/symbols.c src/stdsym.c src/indent.c src/editorconfig.c src/cfgsave.c src/i18n.c src/imports.c src/json.c src/md.c \
@@ -145,6 +145,10 @@ install: $(PROG)
 	install -d $(DESTDIR)$(MANDIR)/man1 $(DESTDIR)$(MANDIR)/it/man1
 	install -m 644 man/xted.1 $(DESTDIR)$(MANDIR)/man1/xted.1
 	install -m 644 man/it/xted.1 $(DESTDIR)$(MANDIR)/it/man1/xted.1
+	install -d $(DESTDIR)$(PREFIX)/share/applications $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps
+	sed 's|^Exec=xted |Exec="$(PREFIX)/bin/$(PROG)" |' desktop/xted.desktop > $(DESTDIR)$(PREFIX)/share/applications/xted.desktop
+	install -m 644 desktop/xted.svg $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/xted.svg
+	-update-desktop-database -q $(DESTDIR)$(PREFIX)/share/applications 2>/dev/null
 	@if [ -e $(DESTDIR)$(PREFIX)/bin/xt ] && [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" != "$(PROG)" ]; then \
 	    echo "xt esiste già in $(DESTDIR)$(PREFIX)/bin e non è un collegamento a $(PROG): non lo tocco"; \
 	else \
@@ -156,6 +160,7 @@ uninstall:
 	rm -f $(addprefix $(DESTDIR)$(PREFIX)/share/xted/,$(wildcard lang/*))
 	-rmdir $(DESTDIR)$(PREFIX)/share/xted/lang $(DESTDIR)$(PREFIX)/share/xted
 	rm -f $(DESTDIR)$(MANDIR)/man1/xted.1 $(DESTDIR)$(MANDIR)/it/man1/xted.1
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/xted.desktop $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/xted.svg
 	@if [ "$$(readlink $(DESTDIR)$(PREFIX)/bin/xt)" = "$(PROG)" ]; then rm -f $(DESTDIR)$(PREFIX)/bin/xt; fi
 
 .PHONY: all test smoke clean install uninstall $(PROG)

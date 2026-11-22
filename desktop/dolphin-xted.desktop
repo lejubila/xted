@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Service
+X-KDE-ServiceTypes=KonqPopupMenu/Plugin
+MimeType=application/octet-stream;text/plain;inode/directory;
+Actions=openInXted;
+X-KDE-Priority=TopLevel
+
+[Desktop Action openInXted]
+Name=Open with xted
+Name[it]=Apri con xted
+Icon=xted
+Exec=xted --desktop %F

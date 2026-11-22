@@ -38,6 +38,7 @@ typedef struct {
     LangCfg base;               /* settings outside any section, over the defaults */
     char theme[64];             /* "" when not set */
     char language[16];          /* "auto", a language code, "" when not set */
+    char terminal[256];         /* "terminal =": the emulator of xted --desktop, "" when not set */
     int clipboard;              /* copies also go to the system clipboard (OSC 52) */
     int git;                    /* Git indicators in the margin */
     int mouse;                  /* the terminal reports clicks and the wheel */

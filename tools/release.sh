@@ -35,15 +35,20 @@ file build/static/xted | grep -q "statically linked" ||
 size_ok build/static/xted
 cp build/static/xted "$R/xted-$V-linux-x86_64"
 S=$R/stage/xted-$V
-mkdir -p "$S/bin" "$S/share/xted/lang" "$S/share/man/man1" "$S/share/man/it/man1"
+mkdir -p "$S/bin" "$S/share/xted/lang" "$S/share/man/man1" "$S/share/man/it/man1" \
+         "$S/share/applications" "$S/share/icons/hicolor/scalable/apps" "$S/share/xted/desktop"
 cp build/static/xted "$S/bin/xted"
 ln -s xted "$S/bin/xt"
 cp lang/* "$S/share/xted/lang/"
 cp man/xted.1 "$S/share/man/man1/"
 cp man/it/xted.1 "$S/share/man/it/man1/"
 cp LICENSE README.md "$S/"
+cp desktop/xted.desktop "$S/share/applications/"
+cp desktop/xted.svg "$S/share/icons/hicolor/scalable/apps/"
+cp desktop/dolphin-xted.desktop desktop/xted.nemo_action "$S/share/xted/desktop/"
 chmod 755 "$S/bin/xted"
-chmod 644 "$S"/share/xted/lang/* "$S"/share/man/man1/* "$S"/share/man/it/man1/*
+chmod 644 "$S"/share/xted/lang/* "$S"/share/man/man1/* "$S"/share/man/it/man1/* \
+          "$S"/share/applications/* "$S"/share/icons/hicolor/scalable/apps/* "$S"/share/xted/desktop/*
 tar -C "$R/stage" --owner=0 --group=0 -czf "$R/xted-$V-linux-x86_64.tar.gz" "xted-$V"
 rm -rf "$R/stage"
 

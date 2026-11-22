@@ -4,6 +4,7 @@
 #include "i18n.h"
 #include "files.h"
 #include "ipc.h"
+#include "launch.h"
 #include "sys.h"
 #include "term.h"
 
@@ -70,39 +71,90 @@ static char *split_spec(const char *arg, size_t *line, size_t *col)
     }
 }
 
-/* xted --remote: the files of the command line (absolute, with their line and column) to the
- * xted that listens. 1 when it took them; 0 when there is none, or no file is given. */
-static int send_remote(int argc, char **argv)
+/* The files of the command line for another xted: absolute, with their line and column (the
+ * options and "-" left out). */
+static IpcFile *arg_files(int argc, char **argv, size_t *n)
 {
     IpcFile *f = xmalloc((size_t)argc * sizeof *f);
     char cwd[PATH_MAX];
-    size_t n = 0, k;
-    int i, r = 0;
+    int i;
 
+    *n = 0;
     if (!sys_getcwd(cwd, sizeof cwd))
         cwd[0] = '\0';
     for (i = 1; i < argc; i++) {
         char *name;
 
         if (argv[i][0] == '-')
-            continue;                       /* the options, and "-" (stdin is this xted's) */
+            continue;
         sys_path_fix(argv[i]);
-        name = split_spec(argv[i], &f[n].line, &f[n].col);
+        name = split_spec(argv[i], &f[*n].line, &f[*n].col);
         if (sys_is_abs(name) || !cwd[0]) {
-            f[n].path = name;
+            f[*n].path = name;
         } else {
-            f[n].path = files_join(cwd, name);
+            f[*n].path = files_join(cwd, name);
             free(name);
         }
-        n++;
+        (*n)++;
     }
-    if (n > 0)
-        r = ipc_send(f, n);
+    return f;
+}
+
+static void free_files(IpcFile *f, size_t n)
+{
+    size_t k;
+
     for (k = 0; k < n; k++)
         free(f[k].path);
     free(f);
+}
+
+/* xted --remote: the files to the xted that listens. 1 when it took them; 0 when there is none,
+ * or no file is given. */
+static int send_remote(int argc, char **argv)
+{
+    size_t n;
+    IpcFile *f = arg_files(argc, argv, &n);
+    int r = n > 0 && ipc_send(f, n);
+
+    free_files(f, n);
     return r;
 }
+
+#ifndef _WIN32
+/* xted --desktop (the icon, "Open with"): with no terminal of its own, the files go to the xted
+ * that listens, else a terminal emulator is started with xted in it. From a terminal it is as
+ * --remote. Returns the exit status, or -1 to start here as usual. */
+static int desktop(int argc, char **argv)
+{
+    size_t n;
+    IpcFile *f;
+    char *cd, file[PATH_MAX];
+    Config c;
+    int r;
+
+    if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO))
+        return send_remote(argc, argv) ? 0 : -1;
+    f = arg_files(argc, argv, &n);
+    if (n > 0 && ipc_send(f, n)) {
+        free_files(f, n);
+        return 0;
+    }
+    config_init(&c);
+    cd = config_dir();
+    if (cd) {
+        snprintf(file, sizeof file, "%s/config", cd);
+        config_load_file(&c, file);
+        free(cd);
+    }
+    r = launch_in_terminal(f, n, c.terminal);
+    fputs(tr("xted: no terminal emulator found: set one with \"terminal =\" in the configuration\n"),
+          stderr);
+    config_free(&c);
+    free_files(f, n);
+    return r < 0 ? 1 : 0;
+}
+#endif
 
 static int is_dir(const char *p)
 {
@@ -142,6 +194,10 @@ int main(int argc, char **argv)
             remote = 1;
             continue;
         }
+        if (strcmp(argv[i], "--desktop") == 0) {
+            remote = 2;
+            continue;
+        }
         if (argv[i][0] == '-' && argv[i][1] != '\0') {
             fprintf(stderr, tr("xted: unknown option: %s\n"), argv[i]);
             usage(stderr);
@@ -149,6 +205,14 @@ int main(int argc, char **argv)
         }
     }
     /* --remote: the files to the xted that listens, if there is one; else as without it */
+#ifndef _WIN32
+    if (remote == 2) {
+        int r = desktop(argc, argv);
+
+        if (r >= 0)
+            return r;
+    } else
+#endif
     if (remote && send_remote(argc, argv))
         return 0;
 
@@ -159,7 +223,7 @@ int main(int argc, char **argv)
         size_t line, col;
 
         sys_path_fix(argv[i]);              /* C:\dir\a.c as C:/dir/a.c on Windows */
-        if (strcmp(argv[i], "--remote") == 0)
+        if (strcmp(argv[i], "--remote") == 0 || strcmp(argv[i], "--desktop") == 0)
             continue;
         if (strcmp(argv[i], "-") == 0) {
             if (stdin_used || isatty(STDIN_FILENO)) {

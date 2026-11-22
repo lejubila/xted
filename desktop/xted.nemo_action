@@ -1,0 +1,9 @@
+[Nemo Action]
+Name=Open with xted
+Name[it]=Apri con xted
+Comment=Open in xted
+Comment[it]=Apri in xted
+Icon-Name=xted
+Exec=xted --desktop %F
+Selection=notnone
+Extensions=any;
