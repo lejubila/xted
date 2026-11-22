@@ -198,6 +198,9 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
 - **Protezioni**: conferma prima di chiudere file non salvati, avviso se il file è cambiato
   su disco, file in sola lettura gestiti, avviso sui file binari.
 - **Fine riga**: rileva e conserva LF o CRLF, e l'assenza del newline finale.
+- **Codifica**: il testo è UTF-8; i file UTF-16 (LE e BE) e UTF-8 con BOM, riconosciuti dal BOM
+  (su Windows: `desktop.ini`, i file `.reg`, il Blocco note), si aprono come testo e si salvano
+  nella loro codifica, con il BOM; la barra di stato la mostra. Un UTF-16 non valido resta com'è.
 - **UTF-8 completo**, con larghezza corretta dei caratteri larghi (CJK, emoji).
 - **Sessione** per cartella (file aperti e cursore), in `$XDG_STATE_HOME/xted/sessions/`.
 

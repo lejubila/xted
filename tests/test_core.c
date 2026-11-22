@@ -240,6 +240,74 @@ static int buf_is(const Buffer *b, const char *text)
     return ok;
 }
 
+static char *make_dir(char *buf, size_t n);
+static void rm_rf(const char *dir);
+
+/* The folder the tests started in (on Windows they move to %TEMP%): the files of the project
+ * that they read, as lang/it, are there. */
+static char start_dir[4096];
+
+static const char *start_file(const char *rel)
+{
+    static char p[4200];
+
+    snprintf(p, sizeof p, "%s/%s", start_dir[0] ? start_dir : ".", rel);
+    return p;
+}
+
+/* UTF-16 and UTF-8 with a BOM: UTF-8 in the buffer, back in the file's encoding when saved. */
+static void test_encodings(void)
+{
+    char dir[64], path[128], err[128], *out;
+    Buffer b;
+    size_t n;
+    /* desktop.ini as Windows writes it: UTF-16 LE, BOM, CRLF */
+    static const char ini[] = "\xFF\xFE" "[\0.\0S\0\r\0\n\0\xE0\0=\0\x3D\xD8\x42\xDE\r\0\n\0";
+    static const char be[] = "\xFE\xFF" "\0a\0\n";
+    static const char bom8[] = "\xEF\xBB\xBF" "ciao\n";
+    static const char bad[] = "\xFF\xFE" "a\0\x00\xD8" "b\0";             /* half a surrogate pair */
+
+    CHECK(make_dir(dir, sizeof dir) != NULL);
+    snprintf(path, sizeof path, "%s/e", dir);
+
+    /* opened as text, saved back identical */
+    roundtrip(path, ini, sizeof ini - 1, 1, 1);
+    write_file(path, ini, sizeof ini - 1);
+    buf_init(&b);
+    CHECK(buf_load(&b, path, err, sizeof err) == 0 && b.enc == ENC_UTF16LE && !b.has_nul);
+    CHECK(b.nlines == 2 && b.crlf && line_is(&b, 0, "[.S") && line_is(&b, 1, "\xc3\xa0=\xf0\x9f\x99\x82"));
+    /* an edit keeps the encoding */
+    buf_insert(&b, 0, 3, "x", 1);
+    CHECK(buf_save(&b, NULL, err, sizeof err) == (long)(sizeof ini - 1) + 2);
+    out = read_file(path, &n);
+    CHECK(n == sizeof ini + 1 && memcmp(out, "\xFF\xFE[\0.\0S\0x\0\r\0", 12) == 0);
+    free(out);
+    buf_free(&b);
+
+    roundtrip(path, be, sizeof be - 1, 0, 1);
+    write_file(path, be, sizeof be - 1);
+    buf_init(&b);
+    CHECK(buf_load(&b, path, err, sizeof err) == 0 && b.enc == ENC_UTF16BE && line_is(&b, 0, "a"));
+    buf_free(&b);
+
+    roundtrip(path, bom8, sizeof bom8 - 1, 0, 1);
+    write_file(path, bom8, sizeof bom8 - 1);
+    buf_init(&b);
+    CHECK(buf_load(&b, path, err, sizeof err) == 0 && b.enc == ENC_UTF8_BOM && line_is(&b, 0, "ciao"));
+    buf_free(&b);
+
+    roundtrip(path, "\xFF\xFE", 2, 0, 1);                     /* the BOM alone stays */
+
+    /* not valid UTF-16: as it is (bytes), and back as it was */
+    roundtrip(path, bad, sizeof bad - 1, 0, 0);
+    write_file(path, bad, sizeof bad - 1);
+    buf_init(&b);
+    CHECK(buf_load(&b, path, err, sizeof err) == 0 && b.enc == ENC_UTF8 && b.has_nul);
+    buf_free(&b);
+    CHECK(strcmp(buf_enc_name(ENC_UTF16LE), "UTF-16 LE") == 0 && strcmp(buf_enc_name(ENC_UTF8), "UTF-8") == 0);
+    rm_rf(dir);
+}
+
 static void test_undo(void)
 {
     Buffer b;
@@ -4505,7 +4573,7 @@ static void test_i18n(void)
     CHECK(i18n_set("auto") == 0 && strcmp(i18n_code(), "en") == 0);
 
     /* the catalog that is shipped: every line keeps its conversions, and the palette reads it */
-    f = fopen("lang/it", "r");
+    f = fopen(start_file("lang/it"), "r");
     CHECK(f != NULL);
     while (f && fgets(line, sizeof line, f)) {
         char *tab = strchr(line, '\t');
@@ -4522,7 +4590,7 @@ static void test_i18n(void)
         char *txt;
         long sz;
 
-        f = fopen("lang/it", "r");
+        f = fopen(start_file("lang/it"), "r");
         CHECK(f != NULL);
         fseek(f, 0, SEEK_END);
         sz = ftell(f);
@@ -7102,13 +7170,24 @@ static void test_symbols(void)
 int main(void)
 {
     sys_init();
+    if (!sys_getcwd(start_dir, sizeof start_dir))
+        start_dir[0] = '\0';
 #ifdef _WIN32
-    _mkdir("/tmp");                 /* the folders of the tests: \tmp on the current drive */
+    /* the folders of the tests are \tmp on the current drive: the drive of %TEMP%, a local one
+     * (from a network drive the read-only attribute and the time limits of the scans fail) */
+    {
+        const char *t = getenv("TEMP");
+
+        if (t && t[0])
+            _chdir(t);
+    }
+    _mkdir("/tmp");
 #endif
     setenv("LC_ALL", "C", 1);     /* the texts are checked in English whatever the environment says */
     test_utf8();
     test_edit();
     test_files();
+    test_encodings();
     test_undo();
     test_undo_saved();
     test_ranges();

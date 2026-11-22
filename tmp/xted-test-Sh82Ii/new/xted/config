@@ -1,0 +1,4 @@
+theme = Chiaro
+[Python]
+expand_tab = true
+indent_width = 4

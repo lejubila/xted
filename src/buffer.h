@@ -15,6 +15,11 @@ typedef struct {
     uint32_t fold;      /* lines hidden right after this one (0: not folded); see fold.c */
 } Line;
 
+/* The encoding of a file: the text is UTF-8 in the buffer whatever it is, and goes back to the
+ * file in it. UTF-16 and the UTF-8 with a BOM are known by their BOM (Windows writes them:
+ * desktop.ini, .reg files, the Notepad). */
+enum { ENC_UTF8 = 0, ENC_UTF8_BOM, ENC_UTF16LE, ENC_UTF16BE };
+
 /* Text of one file. There is always at least one (possibly empty) line.
  * All edits go through buf_insert/delete/split/join (directly or through the
  * helpers below, which are built on them): that is where undo records, and
@@ -25,6 +30,7 @@ typedef struct {
     char *path;
     int modified;
     int crlf;           /* write CRLF line endings */
+    int enc;            /* ENC_*: the encoding of the file */
     int final_newline;  /* file ends with a newline */
     int has_nul;        /* loaded data contained NUL bytes */
     int is_new;         /* path named a file that does not exist yet */
@@ -36,6 +42,8 @@ typedef struct {
 } Buffer;
 
 void buf_init(Buffer *b);
+/* The name of an encoding, as the status bar shows it. */
+const char *buf_enc_name(int enc);
 void buf_free(Buffer *b);
 
 /* Returns 0 on success (also for a nonexistent path: the buffer is then

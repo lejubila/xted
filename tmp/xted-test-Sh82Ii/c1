@@ -1,0 +1,15 @@
+# my settings
+mouse = off
+theme = Chiaro
+
+[Python]
+# four
+indent_width = 4
+weird line
+expand_tab = true
+
+[keys]
+ctrl+s = save
+
+[PHP]
+expand_tab = true

@@ -758,6 +758,24 @@ def single_instance():
 
 
 @scenario
+def utf16_file():
+    b = Box()
+    text = "[.ShellClassInfo]\r\nLocalizedResourceName=Città\r\n"
+    with open(b.path("desktop.ini"), "wb") as f:
+        f.write(b"\xff\xfe" + text.encode("utf-16-le"))
+    r = b.run(["desktop.ini"], cols=100)
+    t = r.screen().text()
+    check("a UTF-16 file is shown as text", "LocalizedResourceName=Città" in t and "^@" not in t, t[:300])
+    check("the status bar says its encoding", "UTF-16 LE" in t and "CRLF" in t, t[-300:])
+    r.type(END, "!", ctrl("s"), 0.3)
+    data = open(b.path("desktop.ini"), "rb").read()
+    check("saved back in UTF-16 with its BOM", data == b"\xff\xfe" + "[.ShellClassInfo]!\r\nLocalizedResourceName=Città\r\n".encode("utf-16-le"),
+          data[:60])
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

@@ -793,8 +793,8 @@ static void status_row(SBuf *o, const Win *w, int active, int scan, const Editor
         if (cols >= 62)
             snprintf(style, sizeof style, d->expand_tab ? tr("  Spaces %d") : "  Tab %d",
                      d->expand_tab ? d->indent_w : d->tabw);
-        sbuf_addf(&right, " %s  %s  UTF-8%s  Ln %zu, Col %zu ", syn_name(d->syn),
-                  d->buf.crlf ? "CRLF" : "LF", style, w->view.cy + 1,
+        sbuf_addf(&right, " %s  %s  %s%s  Ln %zu, Col %zu ", syn_name(d->syn),
+                  d->buf.crlf ? "CRLF" : "LF", buf_enc_name(d->buf.enc), style, w->view.cy + 1,
                   editor_view_col(&d->buf, &w->view, d->tabw) + 1);
     }
     else if (cols >= 20)    /* also while a call is shown: the room goes to its signature */

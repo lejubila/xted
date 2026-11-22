@@ -1,6 +1,7 @@
 #include "sys.h"
 #include "buffer.h"
 #include "i18n.h"
+#include "utf8.h"
 #include "util.h"
 
 #include <errno.h>
@@ -77,6 +78,87 @@ void buf_init(Buffer *b)
     b->empty_origin = 1;
 }
 
+const char *buf_enc_name(int enc)
+{
+    return enc == ENC_UTF8_BOM ? "UTF-8 BOM" : enc == ENC_UTF16LE ? "UTF-16 LE"
+         : enc == ENC_UTF16BE ? "UTF-16 BE" : "UTF-8";
+}
+
+/* The text of a file with a BOM, as UTF-8 without it: *data and *len replaced, the encoding
+ * returned. A UTF-16 that is not valid (an odd length, half a surrogate pair) is left as it is,
+ * as UTF-8: shown and saved back byte for byte. */
+static int decode_bom(char **data, size_t *len)
+{
+    const unsigned char *s = (const unsigned char *)*data;
+    size_t n = *len, i;
+    int be;
+    SBuf o = SBUF_INIT;
+
+    if (n >= 3 && s[0] == 0xEF && s[1] == 0xBB && s[2] == 0xBF) {
+        memmove(*data, *data + 3, n - 3);
+        *len = n - 3;
+        return ENC_UTF8_BOM;
+    }
+    if (n < 2 || !((s[0] == 0xFF && s[1] == 0xFE) || (s[0] == 0xFE && s[1] == 0xFF)) || n % 2)
+        return ENC_UTF8;
+    be = s[0] == 0xFE;
+    for (i = 2; i < n; i += 2) {
+        uint32_t c = be ? (uint32_t)(s[i] << 8 | s[i + 1]) : (uint32_t)(s[i + 1] << 8 | s[i]);
+        char u[4];
+
+        if (c >= 0xD800 && c <= 0xDBFF && i + 3 < n) {
+            uint32_t lo = be ? (uint32_t)(s[i + 2] << 8 | s[i + 3]) : (uint32_t)(s[i + 3] << 8 | s[i + 2]);
+
+            if (lo < 0xDC00 || lo > 0xDFFF)
+                goto bad;
+            c = 0x10000 + ((c - 0xD800) << 10) + (lo - 0xDC00);
+            i += 2;
+        } else if (c >= 0xD800 && c <= 0xDFFF) {
+            goto bad;
+        }
+        sbuf_add(&o, u, (size_t)utf8_encode(c, u));
+    }
+    free(*data);
+    *len = o.len;
+    *data = o.p ? o.p : xstrdup("");
+    return be ? ENC_UTF16BE : ENC_UTF16LE;
+bad:
+    sbuf_free(&o);
+    return ENC_UTF8;
+}
+
+/* What buf_save writes, in the encoding of the file: s[0, n) (whole lines) appended to out. */
+static void encode(int enc, const char *s, size_t n, SBuf *out)
+{
+    size_t i = 0;
+
+    if (enc != ENC_UTF16LE && enc != ENC_UTF16BE) {
+        sbuf_add(out, s, n);
+        return;
+    }
+    while (i < n) {
+        uint32_t c;
+        unsigned w[2];
+        int k, nw = 1;
+
+        i += (size_t)utf8_decode(s + i, n - i, &c);
+        if (c >= 0x10000) {
+            w[0] = 0xD800 + ((c - 0x10000) >> 10);
+            w[1] = 0xDC00 + ((c - 0x10000) & 0x3FF);
+            nw = 2;
+        } else {
+            w[0] = c;
+        }
+        for (k = 0; k < nw; k++) {
+            char b[2];
+
+            b[enc == ENC_UTF16BE ? 0 : 1] = (char)(w[k] >> 8);
+            b[enc == ENC_UTF16BE ? 1 : 0] = (char)(w[k] & 0xFF);
+            sbuf_add(out, b, 2);
+        }
+    }
+}
+
 void buf_free(Buffer *b)
 {
     lines_clear(b);
@@ -133,6 +215,7 @@ int buf_load_fd(Buffer *b, int fd, char *err, size_t errlen)
 
     lines_clear(b);
     undo_free(&b->undo);
+    b->enc = decode_bom(&data, &len);
     b->has_nul = len > 0 && memchr(data, 0, len) != NULL;
     first_nl = memchr(data, '\n', len);
     b->crlf = first_nl && first_nl > data && first_nl[-1] == '\r';
@@ -229,7 +312,7 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
     struct stat st;
     mode_t mode;
     int fd = -1, existed;
-    SBuf out = SBUF_INIT;
+    SBuf out = SBUF_INIT, enc_out = SBUF_INIT;
     const char *eol = b->crlf ? "\r\n" : "\n";
     size_t eollen = b->crlf ? 2 : 1;
     long total = 0;
@@ -269,6 +352,17 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
         goto fail;
     }
 
+    /* the BOM of the file's encoding first */
+    if (b->enc != ENC_UTF8) {
+        static const char *const bom[] = { "", "\xEF\xBB\xBF", "\xFF\xFE", "\xFE\xFF" };
+        size_t bl = b->enc == ENC_UTF8_BOM ? 3 : 2;
+
+        if (write_all(fd, bom[b->enc], bl) < 0) {
+            snprintf(err, errlen, "%s", strerror(errno));
+            goto fail;
+        }
+        total += (long)bl;
+    }
     for (i = 0; i < b->nlines; i++) {
         int last = i + 1 == b->nlines;
 
@@ -278,11 +372,20 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
                                             b->lines[0].len == 0)))
             sbuf_add(&out, eol, eollen);
         if (out.len >= FLUSH_AT || last) {
-            if (write_all(fd, out.p, out.len) < 0) {
+            const char *w = out.p;
+            size_t wl = out.len;
+
+            if (b->enc == ENC_UTF16LE || b->enc == ENC_UTF16BE) {
+                enc_out.len = 0;
+                encode(b->enc, out.p, out.len, &enc_out);
+                w = enc_out.p;
+                wl = enc_out.len;
+            }
+            if (wl > 0 && write_all(fd, w, wl) < 0) {
                 snprintf(err, errlen, "%s", strerror(errno));
                 goto fail;
             }
-            total += (long)out.len;
+            total += (long)wl;
             out.len = 0;
         }
     }
@@ -315,6 +418,7 @@ long buf_save(Buffer *b, const char *path, char *err, size_t errlen)
     undo_close(&b->undo);
     b->undo.saved_at = b->undo.cur;
     sbuf_free(&out);
+    sbuf_free(&enc_out);
     free(tmp);
     free(real);
     return total;
@@ -327,6 +431,7 @@ fail:
         free(tmp);
     }
     sbuf_free(&out);
+    sbuf_free(&enc_out);
     free(real);
     return -1;
 }
