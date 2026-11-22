@@ -137,6 +137,7 @@ xted [file[:riga[:colonna]] ...]
 xted -                    legge il testo da stdin
 xted cartella             apre il browser dei file su quella cartella
 xted --version            mostra la versione e i crediti (anche -V)
+xted --remote file ...    apre i file nello xted già aperto, se ce n'è uno
 ```
 
 - `xted app.c:120` apre il file e porta il cursore alla riga 120 (`:120:5` anche la colonna).
@@ -146,6 +147,14 @@ xted --version            mostra la versione e i crediti (anche -V)
 - Per uscire: `Ctrl+Q` (chiede conferma se ci sono file non salvati).
 - Se non c'è nulla da riaprire compare una schermata iniziale con nome, versione, crediti e i
   primi tasti da usare, che scompare al primo tasto.
+- **Istanza unica**: il primo xted avviato resta in ascolto (un socket in `$XDG_RUNTIME_DIR`, o
+  in `/tmp/xted-<uid>`, cartella solo dell'utente; su Windows una named pipe dell'utente e della
+  sessione). `xted --remote file…` gli passa i file, che si aprono lì come nuovi buffer (anche
+  `file:riga`, e una cartella apre il browser), e termina subito; se non c'è nessuno, si apre
+  come al solito. È quello che usano l'icona e l'«Apri con» del desktop. I file arrivati mentre
+  si risponde a un prompt o a una domanda si aprono appena finito. Senza `--remote` ogni xted è
+  indipendente come sempre; `single_instance = off` nel `config` fa sì che non si metta in
+  ascolto.
 - La riga in fondo mostra i tasti utili in quel momento, con le scorciatoie attuali anche se
   cambiate nella configurazione, e col mouse sono pulsanti: un clic fa come il tasto. Scrivendo:
   salva (più chiaro se ci sono modifiche), esci, comandi, guida, cerca, apri, annulla, buffer, file,
@@ -579,6 +588,7 @@ maiuscole) le cambia per quel linguaggio; `[keys]` contiene le scorciatoie.
 theme = light             # dark (predefinito) o light, o un tema tuo (anche scuro/chiaro)
 language = auto           # auto (da LC_ALL, LC_MESSAGES, LANG), en, it, o un codice con catalogo
 mouse = on
+single_instance = on      # il primo xted riceve i file di xted --remote (icona, «Apri con»)
 git = on
 clipboard = on            # copie anche negli appunti di sistema (OSC 52)
 colors = auto             # auto | truecolor | 256 | 16 | none

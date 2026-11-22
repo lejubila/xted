@@ -6,6 +6,7 @@ Every scenario runs in its own temporary folder, with its own configuration and 
 so the user's files and sessions are never touched."""
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -59,7 +60,9 @@ class Box:
             return f.read()
 
     def run(self, args, rows=24, cols=80, env=None):
-        e = {"XDG_CONFIG_HOME": self.cfg, "XDG_STATE_HOME": self.state}
+        # the channel of the single instance is the box's: never the one of a real xted
+        e = {"XDG_CONFIG_HOME": self.cfg, "XDG_STATE_HOME": self.state,
+             "XTED_IPC": os.path.join(self.dir, ".ipc.sock")}
         if env:
             e.update(env)
         return Run(EXE, args, rows, cols, e, cwd=self.dir)
@@ -710,6 +713,47 @@ def new_file():
           text()[:500])
     r.type(ESC, ctrl("q"), 0.3, "n", 0.3)
     r.finish()
+    b.close()
+
+
+@scenario
+def single_instance():
+    b = Box()
+    b.write("a.txt", "uno\n")
+    b.write("b.txt", "due\nseconda riga\n")
+    b.write("sub/c.txt", "tre\n")
+    r = b.run(["a.txt"], cols=100)
+    env = {"XDG_CONFIG_HOME": b.cfg, "XDG_STATE_HOME": b.state, "XTED_IPC": b.path(".ipc.sock")}
+    out = subprocess.run([EXE, "--remote", "b.txt:2", "sub/c.txt"], cwd=b.dir, env=dict(os.environ, **env),
+                         capture_output=True, timeout=10)
+    check("xted --remote hands the files to the open xted and ends at once", out.returncode == 0, out)
+    r.type("", 0.5)
+    t = r.screen().text()
+    check("they are opened there as buffers", "b.txt" in t and "c.txt" in t and
+          "2 files opened from the desktop" in t, t[-300:])
+    r.type(ctrl("e"), 0.3)
+    check("all of them in the list of buffers", "a.txt" in r.screen().text() and
+          "b.txt" in r.screen().text(), r.screen().text()[-400:])
+    r.type(ESC, 0.2)
+    # with a prompt open the files wait for it to be answered
+    r.type(ctrl("o"), 0.2)
+    subprocess.run([EXE, "--remote", "a.txt"], cwd=b.dir, env=dict(os.environ, **env), timeout=10)
+    r.type("", 0.4)
+    check("not while a prompt waits", "Open file:" in r.screen().lines()[-1], r.screen().lines()[-1])
+    r.type(ESC, 0.4)
+    check("then they open", "a.txt» opened from the desktop" in r.screen().lines()[-1], r.screen().lines()[-1])
+    quit_(r)
+    # none listening: --remote opens its own xted
+    r = b.run(["--remote", "b.txt"], cols=100)
+    check("with no xted open, --remote starts as usual", "due" in r.screen().text(), r.screen().text()[:200])
+    quit_(r)
+    # single_instance = off: it does not listen
+    b.write(".cfg/xted/config", "single_instance = off\n")
+    r = b.run(["a.txt"], cols=100)
+    out = subprocess.run([EXE, "--remote", "b.txt"], cwd=b.dir, env=dict(os.environ, **env), capture_output=True,
+                         timeout=10, input=b"")
+    check("single_instance = off: no one takes them", "b.txt" not in r.screen().text(), r.screen().text()[:200])
+    quit_(r)
     b.close()
 
 

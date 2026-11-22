@@ -27,6 +27,7 @@ void config_init(Config *c)
     c->clipboard = -1;
     c->git = -1;
     c->mouse = -1;
+    c->single_instance = -1;
     c->colors = -1;
     c->glyphs = -1;
     c->keybar = -1;
@@ -326,7 +327,7 @@ int config_parse(Config *c, const char *text, size_t n)
                     if (r != -2)
                         r = 0;
                 } else if (!strcmp(key, "clipboard") || !strcmp(key, "git") ||
-                           !strcmp(key, "mouse")) {
+                           !strcmp(key, "mouse") || !strcmp(key, "single_instance")) {
                     int b = parse_bool(lv);
 
                     if (b < 0) {
@@ -336,6 +337,8 @@ int config_parse(Config *c, const char *text, size_t n)
                             c->clipboard = b;
                         else if (key[0] == 'g')
                             c->git = b;
+                        else if (key[0] == 's')
+                            c->single_instance = b;
                         else
                             c->mouse = b;
                         r = 0;

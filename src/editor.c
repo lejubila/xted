@@ -7,6 +7,7 @@
 #include "imports.h"
 #include "cfgsave.h"
 #include "commands.h"
+#include "ipc.h"
 #include "config.h"
 #include "editorconfig.h"
 #include "indent.h"
@@ -706,9 +707,46 @@ static void resize(Editor *e)
 static void files_scan_stop(Editor *e);
 static void files_scan_pump(Editor *e);
 
+/* The files another xted handed over (xted --remote): opened as buffers, the last one shown;
+ * not while a prompt or a question waits for its answer (they wait in the queue). */
+static void open_remote(Editor *e)
+{
+    IpcFile *f;
+    size_t n, i, ok = 0;
+    char err[256];
+    struct stat st;
+
+    if (e->prompt_on || e->asking || !(f = ipc_take(&n)))
+        return;
+    buf_undo_close(e->buf);
+    for (i = 0; i < n; i++) {
+        if (stat(f[i].path, &st) == 0 && S_ISDIR(st.st_mode)) {
+            editor_show_tree(e, f[i].path);
+            ok++;
+        } else if (editor_open_doc(e, f[i].path, err, sizeof err)) {
+            if (f[i].line > 0) {
+                editor_goto(e, f[i].line, f[i].col);
+                editor_store_view(e);
+            }
+            e->sidebar_focus = 0;
+            ok++;
+        } else {
+            editor_set_msg(e, MSG_TTL_MS, "%s: %s", f[i].path, err);
+        }
+        free(f[i].path);
+    }
+    free(f);
+    e->intro = 0;
+    if (ok == 1 && e->doc->buf.path)
+        editor_set_msg(e, MSG_TTL_MS, tr("«%s» opened from the desktop"), doc_base_name(e->doc));
+    else if (ok > 1)
+        editor_set_msg(e, MSG_TTL_MS, tr("%zu files opened from the desktop"), ok);
+}
+
 static int next_key(Editor *e, Key *k)
 {
     for (;;) {
+        open_remote(e);
         if (!term_has_input()) {
             int ev, timeout = -1;
 
@@ -734,6 +772,8 @@ static int next_key(Editor *e, Key *k)
             if (run_timeout(e) >= 0 && (timeout < 0 || run_timeout(e) < timeout))
                 timeout = run_timeout(e);
             ev = term_wait(timeout);
+            if (ev & TERM_EV_SERVER)
+                ipc_serve();
             if (ev & TERM_EV_RESIZE)
                 resize(e);
             if ((ev & TERM_EV_FD) || (!ev && run_timeout(e) >= 0))

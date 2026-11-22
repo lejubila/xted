@@ -1,6 +1,7 @@
 #include "buffer.h"
 #include "clip.h"
 #include "commands.h"
+#include "ipc.h"
 #include "config.h"
 #include "cursors.h"
 #include "cfgsave.h"
@@ -35,6 +36,10 @@
 #include "util.h"
 #include "utf8.h"
 
+#ifndef _WIN32
+#include <poll.h>
+#include <sys/wait.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1937,6 +1942,90 @@ static void test_files_tree(void)
     }
     tree_free(&t);
     rm_rf(dir);
+}
+
+#ifdef _WIN32
+static DWORD WINAPI ipc_sender(LPVOID arg)
+{
+    return ipc_send((const IpcFile *)arg, 2) ? 0 : 1;
+}
+#endif
+
+/* The single instance: the request, the queue, and a real channel between two of us. */
+static void test_ipc(void)
+{
+    IpcFile f[2], *got;
+    SBuf b = SBUF_INIT;
+    size_t n, k;
+    intptr_t h;
+    char addr[64];
+    int sent_ok = 0;
+
+    f[0].path = "/a b/x.c";
+    f[0].line = 3;
+    f[0].col = 4;
+    f[1].path = "C:/y.md";
+    f[1].line = f[1].col = 0;
+    ipc_request(&b, f, 2);
+    CHECK(ipc_complete(b.p, b.len) && !ipc_complete(b.p, b.len - 1));
+    CHECK(ipc_queue(b.p, b.len) == 2);
+    got = ipc_take(&n);
+    CHECK(n == 2 && got && strcmp(got[0].path, "/a b/x.c") == 0 && got[0].line == 3 && got[0].col == 4 &&
+          strcmp(got[1].path, "C:/y.md") == 0 && got[1].line == 0);
+    for (k = 0; k < n; k++)
+        free(got[k].path);
+    free(got);
+    CHECK(ipc_take(&n) == NULL && n == 0);
+    CHECK(ipc_queue("garbage\n\n", 9) == 0);                  /* not a request */
+    sbuf_free(&b);
+
+    /* the channel, at an address of the tests' own */
+#ifdef _WIN32
+    snprintf(addr, sizeof addr, "xted-test-%lu", (unsigned long)GetCurrentProcessId());
+#else
+    snprintf(addr, sizeof addr, "/tmp/xted-test-%ld.sock", (long)getpid());
+#endif
+    setenv("XTED_IPC", addr, 1);
+    CHECK(ipc_send(f, 2) == 0);                                 /* no one listens yet */
+    h = ipc_listen();
+    CHECK(h != -1);
+#ifdef _WIN32
+    {
+        HANDLE t = CreateThread(NULL, 0, ipc_sender, f, 0, NULL);
+        DWORD code = 1;
+
+        CHECK(t != NULL && WaitForSingleObject((HANDLE)h, 3000) == WAIT_OBJECT_0);
+        ipc_serve();
+        WaitForSingleObject(t, 5000);
+        GetExitCodeThread(t, &code);
+        CloseHandle(t);
+        sent_ok = code == 0;
+    }
+#else
+    {
+        pid_t pid = fork();
+        struct pollfd p;
+        int st = 1;
+
+        if (pid == 0)
+            _exit(ipc_send(f, 2) ? 0 : 1);
+        p.fd = (int)h;
+        p.events = POLLIN;
+        CHECK(pid > 0 && poll(&p, 1, 3000) == 1);
+        ipc_serve();
+        waitpid(pid, &st, 0);
+        sent_ok = WIFEXITED(st) && WEXITSTATUS(st) == 0;
+    }
+#endif
+    CHECK(sent_ok);
+    got = ipc_take(&n);
+    CHECK(n == 2 && got && strcmp(got[1].path, "C:/y.md") == 0);
+    for (k = 0; k < n; k++)
+        free(got[k].path);
+    free(got);
+    ipc_close();
+    CHECK(ipc_send(f, 2) == 0);                                 /* closed: no one takes them */
+    unsetenv("XTED_IPC");
 }
 
 static void test_session(void)
@@ -7114,6 +7203,7 @@ int main(void)
     (void)test_git;
 #endif
     test_errors_parse();
+    test_ipc();
 #ifndef _WIN32
     test_run();
     test_filter();

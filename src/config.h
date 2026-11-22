@@ -41,6 +41,7 @@ typedef struct {
     int clipboard;              /* copies also go to the system clipboard (OSC 52) */
     int git;                    /* Git indicators in the margin */
     int mouse;                  /* the terminal reports clicks and the wheel */
+    int single_instance;        /* the first xted gets the files of xted --remote; -1 not set (on) */
     int colors;                 /* COLOR_* forced by "colors =", -1 for auto (from the terminal) */
     int glyphs;                 /* "glyphs =": 0 unicode, 1 windows, 2 ascii, -1 when not set */
     int keybar;                 /* "keybar =": 0 message, 1 line, 2 off, -1 when not set */

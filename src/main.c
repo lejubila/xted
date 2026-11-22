@@ -2,10 +2,14 @@
 #include "editor.h"
 #include "version.h"
 #include "i18n.h"
+#include "files.h"
+#include "ipc.h"
 #include "sys.h"
 #include "term.h"
 
 #include <ctype.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,11 +22,13 @@ static void usage(FILE *f)
     fputs(tr("usage: xted [file[:line[:column]] ...]\n"
              "     xted -       reads the text from stdin\n"
              "     xted -V      shows the version (also --version)\n"
+             "     xted --remote file...  opens the files in the xted already open, if there is one\n"
              "configuration: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n"), f);
 #else
     fputs(tr("usage: xted [file[:line[:column]] ...]\n"
              "     xted -       reads the text from stdin\n"
              "     xted -V      shows the version (also --version)\n"
+             "     xted --remote file...  opens the files in the xted already open, if there is one\n"
              "configuration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n"), f);
 #endif
 }
@@ -64,6 +70,40 @@ static char *split_spec(const char *arg, size_t *line, size_t *col)
     }
 }
 
+/* xted --remote: the files of the command line (absolute, with their line and column) to the
+ * xted that listens. 1 when it took them; 0 when there is none, or no file is given. */
+static int send_remote(int argc, char **argv)
+{
+    IpcFile *f = xmalloc((size_t)argc * sizeof *f);
+    char cwd[PATH_MAX];
+    size_t n = 0, k;
+    int i, r = 0;
+
+    if (!sys_getcwd(cwd, sizeof cwd))
+        cwd[0] = '\0';
+    for (i = 1; i < argc; i++) {
+        char *name;
+
+        if (argv[i][0] == '-')
+            continue;                       /* the options, and "-" (stdin is this xted's) */
+        sys_path_fix(argv[i]);
+        name = split_spec(argv[i], &f[n].line, &f[n].col);
+        if (sys_is_abs(name) || !cwd[0]) {
+            f[n].path = name;
+        } else {
+            f[n].path = files_join(cwd, name);
+            free(name);
+        }
+        n++;
+    }
+    if (n > 0)
+        r = ipc_send(f, n);
+    for (k = 0; k < n; k++)
+        free(f[k].path);
+    free(f);
+    return r;
+}
+
 static int is_dir(const char *p)
 {
     struct stat st;
@@ -76,7 +116,7 @@ int main(int argc, char **argv)
     char err[256];
     Editor e;
     Doc *first = NULL;
-    int i, stdin_used = 0;
+    int i, stdin_used = 0, remote = 0;
     char *cd;
 
     sys_init();
@@ -98,12 +138,19 @@ int main(int argc, char **argv)
                    XTED_LICENSE);
             return 0;
         }
+        if (strcmp(argv[i], "--remote") == 0) {
+            remote = 1;
+            continue;
+        }
         if (argv[i][0] == '-' && argv[i][1] != '\0') {
             fprintf(stderr, tr("xted: unknown option: %s\n"), argv[i]);
             usage(stderr);
             return 2;
         }
     }
+    /* --remote: the files to the xted that listens, if there is one; else as without it */
+    if (remote && send_remote(argc, argv))
+        return 0;
 
     editor_init(&e);
     editor_load_config(&e);
@@ -112,6 +159,8 @@ int main(int argc, char **argv)
         size_t line, col;
 
         sys_path_fix(argv[i]);              /* C:\dir\a.c as C:/dir/a.c on Windows */
+        if (strcmp(argv[i], "--remote") == 0)
+            continue;
         if (strcmp(argv[i], "-") == 0) {
             if (stdin_used || isatty(STDIN_FILENO)) {
                 fputs(tr("xted: '-' needs the text on stdin (only once)\n"), stderr);
@@ -155,6 +204,15 @@ int main(int argc, char **argv)
     if (term_init() < 0) {
         fputs(tr("xted: an interactive terminal is needed\n"), stderr);
         return 1;
+    }
+    /* the first xted gets the files opened from the desktop (xted --remote) */
+    if (e.cfg.single_instance != 0) {
+        intptr_t h = ipc_listen();
+
+        if (h != -1) {
+            term_watch_server(h);
+            atexit(ipc_close);
+        }
     }
     editor_run(&e);
     term_restore();

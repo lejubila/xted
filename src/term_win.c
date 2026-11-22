@@ -51,6 +51,7 @@ static int resized;             /* a size record came while reading keys: report
 static WCHAR high_surrogate;    /* the first half of a character outside the BMP */
 static DWORD mouse_buttons;     /* the buttons held at the last mouse record */
 static int watch_fd = -1;
+static HANDLE server_ev;        /* set when a client of ipc_win.c connects */
 
 void term_restore(void)
 {
@@ -171,6 +172,11 @@ void term_write(const char *s, size_t n)
 void term_watch(int fd)
 {
     watch_fd = fd;
+}
+
+void term_watch_server(intptr_t h)
+{
+    server_ev = h == -1 ? NULL : (HANDLE)h;
 }
 
 /* The watched pipe (the output of Alt+R) has something to read, or is closed. */
@@ -306,6 +312,18 @@ static int wait_records(int ms)
     return WaitForSingleObject(h_in, ms < 0 ? INFINITE : (DWORD)ms) == WAIT_OBJECT_0;
 }
 
+/* As wait_records, also for a client of ipc_win.c: 2 when one has come. */
+static int wait_any(int ms)
+{
+    HANDLE h[2];
+    DWORD r;
+
+    h[0] = h_in;
+    h[1] = server_ev;
+    r = WaitForMultipleObjects(server_ev ? 2 : 1, h, FALSE, ms < 0 ? INFINITE : (DWORD)ms);
+    return r == WAIT_OBJECT_0 ? 1 : r == WAIT_OBJECT_0 + 1 ? 2 : 0;
+}
+
 int term_fill(int timeout_ms)
 {
     ULONGLONG end = GetTickCount64() + (ULONGLONG)(timeout_ms > 0 ? timeout_ms : 0);
@@ -328,7 +346,7 @@ int term_fill(int timeout_ms)
 int term_wait(int timeout_ms)
 {
     ULONGLONG end = GetTickCount64() + (ULONGLONG)(timeout_ms > 0 ? timeout_ms : 0);
-    int ev = 0;
+    int ev = 0, w;
 
     if (term_inpos < term_inlen || term_in_eof)
         return TERM_EV_KEY;
@@ -346,7 +364,10 @@ int term_wait(int timeout_ms)
          * waited on together with the console */
         if (watch_fd >= 0 && (left < 0 || left > 20))
             left = 20;
-        if (wait_records(left)) {
+        w = wait_any(left);
+        if (w == 2)
+            return ev | TERM_EV_SERVER;
+        if (w == 1) {
             term_inpos = term_inlen = 0;
             read_records();
             if (term_inlen > 0)

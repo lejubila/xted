@@ -295,7 +295,7 @@ unknown key «%s»%s	chiave sconosciuta «%s»%s
 unknown modifier «%s» (ctrl, alt, shift)	modificatore «%s» sconosciuto (ctrl, alt, shift)
 unknown theme «%s»	tema «%s» sconosciuto
 unknown theme «%s» in .xted	tema «%s» sconosciuto nel .xted
-usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\nconfiguration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\nconfigurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/, lang/\n
+usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\n     xted --remote file...  opens the files in the xted already open, if there is one\nconfiguration: $XDG_CONFIG_HOME/xted (or ~/.config/xted): config, syntax/, themes/, lang/\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\n     xted --remote file...  apre i file nello xted già aperto, se ce n\'è uno\nconfigurazione: $XDG_CONFIG_HOME/xted (o ~/.config/xted): config, syntax/, themes/, lang/\n
 xted: '-' needs the text on stdin (only once)\n	xted: '-' richiede il testo su stdin (una volta sola)\n
 xted: an interactive terminal is needed\n	xted: serve un terminale interattivo\n
 \nF1 shows this page, Ctrl+W closes it, Ctrl+F searches in it. Every key can be\nchanged in the [keys] section of the configuration (see Files below).\n	\nF1 mostra questa pagina, Ctrl+W la chiude, Ctrl+F cerca al suo interno. Ogni tasto si\npuò cambiare nella sezione [keys] della configurazione (vedi File, in fondo).\n
@@ -387,7 +387,7 @@ check	controlla
 definition	definizione
 Key bar	Barra dei tasti
 Key bar: %s	Barra dei tasti: %s
-usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\nconfiguration: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\nconfigurazione: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n
+usage: xted [file[:line[:column]] ...]\n     xted -       reads the text from stdin\n     xted -V      shows the version (also --version)\n     xted --remote file...  opens the files in the xted already open, if there is one\nconfiguration: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n	uso: xted [file[:riga[:colonna]] ...]\n     xted -       legge il testo da stdin\n     xted -V      mostra la versione (anche --version)\n     xted --remote file...  apre i file nello xted già aperto, se ce n\'è uno\nconfigurazione: %APPDATA%\\xted: config, syntax\\, themes\\, lang\\\n
   Alt+C  match case          Alt+W  whole words\n  Up, Down  previous and next match     Enter  keep it     Esc  go back\n  Replacing: y replaces, n skips, a replaces all the others, Esc stops.\n	  Alt+C  maiuscole e minuscole   Alt+W  parole intere\n  Su, Giù  occorrenza precedente e successiva     Invio  la tiene     Esc  torna indietro\n  Sostituendo: s sostituisce, n salta, t sostituisce tutte le altre, Esc si ferma.\n
 New file: 	Nuovo file: 
 The folder «%s» does not exist	La cartella «%s» non esiste
@@ -412,3 +412,5 @@ new file	nuovo file
 new folder	nuova cartella
 rename	rinomina
 delete	elimina
+«%s» opened from the desktop	«%s» aperto dal desktop
+%zu files opened from the desktop	%zu file aperti dal desktop

@@ -19,7 +19,7 @@
 static struct termios orig_tio;
 static volatile sig_atomic_t raw_active;
 static int wake_pipe[2] = { -1, -1 };
-static int watch_fd = -1;
+static int watch_fd = -1, server_fd = -1;
 
 static int in_fd = STDIN_FILENO;    /* the terminal: /dev/tty when stdin is a pipe */
 
@@ -194,10 +194,15 @@ void term_watch(int fd)
     watch_fd = fd;
 }
 
+void term_watch_server(intptr_t h)
+{
+    server_fd = (int)h;
+}
+
 int term_wait(int timeout_ms)
 {
-    struct pollfd fds[3];
-    int r, ev = 0, nfds = 2;
+    struct pollfd fds[4];
+    int r, ev = 0, nfds = 2, i_watch = -1, i_server = -1;
 
     if (term_inpos < term_inlen || term_in_eof)
         return TERM_EV_KEY;
@@ -207,10 +212,16 @@ int term_wait(int timeout_ms)
     fds[1].fd = wake_pipe[0];
     fds[1].events = POLLIN;
     if (watch_fd >= 0) {
-        fds[2].fd = watch_fd;
-        fds[2].events = POLLIN;
-        fds[2].revents = 0;
-        nfds = 3;
+        i_watch = nfds++;
+        fds[i_watch].fd = watch_fd;
+        fds[i_watch].events = POLLIN;
+        fds[i_watch].revents = 0;
+    }
+    if (server_fd >= 0) {
+        i_server = nfds++;
+        fds[i_server].fd = server_fd;
+        fds[i_server].events = POLLIN;
+        fds[i_server].revents = 0;
     }
     do
         r = poll(fds, (nfds_t)nfds, timeout_ms);
@@ -229,7 +240,9 @@ int term_wait(int timeout_ms)
         fill_input();
         ev |= TERM_EV_KEY;
     }
-    if (nfds == 3 && (fds[2].revents & (POLLIN | POLLHUP | POLLERR)))
+    if (i_watch >= 0 && (fds[i_watch].revents & (POLLIN | POLLHUP | POLLERR)))
         ev |= TERM_EV_FD;
+    if (i_server >= 0 && (fds[i_server].revents & POLLIN))
+        ev |= TERM_EV_SERVER;
     return ev;
 }
