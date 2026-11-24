@@ -605,6 +605,19 @@ Solo nei file Markdown (fuori lo dicono e non fanno nulla); con una selezione la
 | `Alt+0` | Toglie il titolo |
 | `Alt+H` | Elenco puntato `- ` sulle righe, o lo toglie |
 
+Nei file Markdown il popup dei suggerimenti propone anche la sintassi, dal primo carattere:
+
+- a inizio riga: `#` … `######` (titoli), `-`, `*`, `- [ ]`, `1.` (elenchi), `>` (citazione),
+  ` ``` ` (blocco di codice), `|` (una tabella con i campi da riempire con Tab), `---`, `[` (link),
+  `![` (immagine), ciascuno con quello che è;
+- dopo ` ``` ` i nomi dei linguaggi (`python`, `bash`, `json`…);
+- in un link, dopo `](`, i file sotto la cartella del documento; dopo `](#` le àncore dei titoli
+  del documento, come le fa GitHub (`#installazione-rapida`).
+
+`Invio` su una voce di un elenco (`- `, `* `, `+ `, `1. `, `1) `, `- [ ] `) o su una citazione (`> `)
+continua con il segno nella riga nuova (il numero cresce, una casella spuntata torna vuota); su
+una voce vuota chiude l'elenco.
+
 Nelle liste (palette, buffer, simboli, apertura rapida): `Su`/`Giù`/`PgSu`/`PgGiù` per
 muoversi, `Invio` per scegliere, `Esc` per chiudere, e digitando si filtra.
 

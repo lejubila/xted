@@ -1004,6 +1004,31 @@ def markdown_keys():
 
 
 @scenario
+def markdown_suggestions():
+    b = Box()
+    b.write("n.md", "# Prima parte\n\n")
+    b.write("img/logo.png", "")
+    r = b.run(["n.md"], cols=100)
+    last = lambda: r.screen().lines()[-1]
+    r.type(ctrl("e"), ESC, "\x1b[1;5F", "##", 0.4)
+    check("## at the start of a line: the headings, with what they are",
+          "Heading 2" in r.screen().text() and "Tab accept" in last(), r.screen().text()[-500:])
+    r.type("\t", "Seconda", 0.2, ENTER, "- uno", ENTER, "due", ENTER, ENTER, 0.2, ctrl("s"), 0.3)
+    check("Tab takes it; Enter goes on with the list, and ends it on an empty item",
+          b.read("n.md") == "# Prima parte\n## Seconda\n- uno\n- due\n\n", repr(b.read("n.md")))
+    r.type("![logo](im", 0.4)
+    check("in a link: the files of the folder", "img/logo.png" in r.screen().text(), r.screen().text()[-400:])
+    r.type("\t", ") e [su](#", 0.4)
+    check("after #: the anchors of the headings", "#prima-parte" in r.screen().text() and
+          "#seconda" in r.screen().text(), r.screen().text()[-400:])
+    r.type("\t", ")", ctrl("s"), 0.3)
+    check("accepted into the text", b.read("n.md").endswith("![logo](img/logo.png) e [su](#prima-parte)\n") or
+          b.read("n.md").endswith("![logo](img/logo.png) e [su](#seconda)\n"), repr(b.read("n.md")))
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

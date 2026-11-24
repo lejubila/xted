@@ -3099,9 +3099,12 @@ static void update_complete(Editor *e, Key k)
                                                   /* env(' and $: the names of the .env variables */
                                                   k.code == '\'' || k.code == '"' || k.code == '`' ||
                                                   k.code == '$' || k.code == '{' || k.code == '[' || k.code == '(');
+    /* Markdown: what a line starts with, the folders of a link, from the first character */
+    int md = !(k.mods & (MOD_ALT | MOD_CTRL)) && k.code < 0x80 && k.code > ' ' && e->doc->syn &&
+             strcmp(syn_name(e->doc->syn), "Markdown") == 0 && strchr("#-*+>|!/.", (int)k.code);
 
     /* keys already waiting (fast typing, a paste without bracketing) are not worth a scan each */
-    if ((word || op || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&
+    if ((word || op || md || (bs && e->comp.on)) && !edit_sel_active(e) && !e->doc->readonly &&
         !cur_multi(e) && e->doc->autosuggest && !term_has_input()) {
         e->comp.min_prefix = (size_t)e->doc->suggest_min;
         complete_open(&e->comp, e->docs, e->ndocs, e->doc, e->cy, e->cx);

@@ -2089,6 +2089,52 @@ static void test_md_edit(void)
     edit_md_bold(&e);
     CHECK(buf_is(e.buf, "testo") && strstr(e.msg, "Markdown") != NULL);
     editor_free(&e);
+
+    /* Enter goes on with a list, a quote; an empty item ends it */
+    {
+        static const struct { const char *in, *out; } t[] = {
+            { "- uno", "- uno\n- " }, { "  * b", "  * b\n  * " }, { "9. a", "9. a\n10. " },
+            { "1) a", "1) a\n2) " }, { "- [x] fatto", "- [x] fatto\n- [ ] " }, { "> c", "> c\n> " },
+        };
+        size_t i;
+
+        for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+            md_doc_load(&e, t[i].in);
+            e.cx = e.buf->lines[0].len;
+            edit_newline(&e);
+            CHECK(buf_is(e.buf, t[i].out) && e.cy == 1 && e.cx == e.buf->lines[1].len);
+            if (i == 0) {
+                edit_newline(&e);                               /* the empty item: no more list */
+                CHECK(buf_is(e.buf, "- uno\n") && e.cy == 1 && e.cx == 0);
+            }
+            editor_free(&e);
+        }
+        ed_load(&e, "- uno");                                   /* not Markdown: a plain line */
+        e.cx = 5;
+        edit_newline(&e);
+        CHECK(buf_is(e.buf, "- uno\n"));
+        editor_free(&e);
+    }
+
+    /* the suggestions: the start of a line, the language of a block, the anchors of a link */
+    md_doc_load(&e, "##");
+    CHECK(complete_open(&e.comp, e.docs, e.ndocs, e.doc, 0, 2) && strcmp(e.comp.v[0].text, "##") == 0 &&
+          e.comp.v[0].kind == CAND_SNIPPET && e.comp.x == 0);
+    complete_close(&e.comp);
+    editor_free(&e);
+    md_doc_load(&e, "```pyt");
+    CHECK(complete_open(&e.comp, e.docs, e.ndocs, e.doc, 0, 6) && strcmp(e.comp.v[0].text, "python") == 0 &&
+          e.comp.x == 3);
+    complete_close(&e.comp);
+    editor_free(&e);
+    md_doc_load(&e, "# Uso e Città!\nvedi [qui](#u");
+    CHECK(complete_open(&e.comp, e.docs, e.ndocs, e.doc, 1, 13) &&
+          strcmp(e.comp.v[0].text, "#uso-e-citt\xc3\xa0") == 0);
+    complete_close(&e.comp);
+    editor_free(&e);
+    md_doc_load(&e, "una frase -");                             /* not at the start of a line */
+    CHECK(!complete_open(&e.comp, e.docs, e.ndocs, e.doc, 0, 11));
+    editor_free(&e);
 }
 
 #ifdef _WIN32
@@ -2796,7 +2842,8 @@ static void test_snippets(void)
     CHECK(st.n == 2 && st.stop[0].off == 2 && st.stop[1].off == t.len);
     sbuf_free(&t);
     CHECK(snip_lang("C", &n) != NULL && n > 5);
-    CHECK(snip_lang("Markdown", &n) == NULL && n == 0);
+    CHECK(snip_lang("Markdown", &n) != NULL && n > 10);         /* what a line starts with */
+    CHECK(snip_lang("Diff", &n) == NULL && n == 0);
     CHECK(snip_lang("PHP", &n) != NULL && n > 5);
     CHECK(snip_lang("TypeScript", &n) == snip_lang("JavaScript", &n) && n > 5);
 

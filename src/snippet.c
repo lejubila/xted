@@ -65,6 +65,26 @@ static const SnipDef snips_sh[] = {
 
 #define N(a) (sizeof a / sizeof a[0])
 
+/* Markdown: what a line starts with (the popup offers them from the first character typed). */
+static const SnipDef snips_md[] = {
+    { "#", "# $0" },
+    { "##", "## $0" },
+    { "###", "### $0" },
+    { "####", "#### $0" },
+    { "#####", "##### $0" },
+    { "######", "###### $0" },
+    { "-", "- $0" },
+    { "- [ ]", "- [ ] $0" },
+    { "*", "* $0" },
+    { "1.", "1. $0" },
+    { ">", "> $0" },
+    { "```", "```$1\n$0\n```" },
+    { "|", "| ${1:A} | ${2:B} |\n| --- | --- |\n| $3 | $4 |\n$0" },
+    { "---", "---\n$0" },
+    { "[", "[${1:text}](${2:url})$0" },
+    { "![", "![${1:text}](${2:image})$0" },
+};
+
 const SnipDef *snip_lang(const char *lang, size_t *n)
 {
     *n = 0;
@@ -89,6 +109,10 @@ const SnipDef *snip_lang(const char *lang, size_t *n)
     if (strcmp(lang, "Shell") == 0) {
         *n = N(snips_sh);
         return snips_sh;
+    }
+    if (strcmp(lang, "Markdown") == 0) {
+        *n = N(snips_md);
+        return snips_md;
     }
     return NULL;
 }

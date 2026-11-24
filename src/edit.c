@@ -398,17 +398,59 @@ int edit_backspace_pair(Editor *e)
     return 1;
 }
 
+/* The mark of a Markdown list item, or of a quote, that line l has after its indentation ind:
+ * its length (with the space after it), and in next the mark of the next item (a number one
+ * more, a task box empty); 0 for none. */
+static size_t md_mark(const Line *l, size_t ind, char *next, size_t cap)
+{
+    const char *s = l->s + ind;
+    size_t n = l->len - ind, k = 0;
+
+    if (n >= 2 && strchr("-*+", s[0]) && s[1] == ' ') {
+        if (n >= 6 && s[2] == '[' && (s[3] == ' ' || s[3] == 'x' || s[3] == 'X') && s[4] == ']' && s[5] == ' ') {
+            snprintf(next, cap, "%c [ ] ", s[0]);
+            return 6;
+        }
+        snprintf(next, cap, "%c ", s[0]);
+        return 2;
+    }
+    if (n >= 2 && s[0] == '>' && s[1] == ' ') {
+        snprintf(next, cap, "> ");
+        return 2;
+    }
+    while (k < n && k < 9 && s[k] >= '0' && s[k] <= '9')
+        k++;
+    if (k > 0 && k + 1 < n && (s[k] == '.' || s[k] == ')') && s[k + 1] == ' ') {
+        snprintf(next, cap, "%lu%c ", strtoul(s, NULL, 10) + 1, s[k]);
+        return k + 2;
+    }
+    return 0;
+}
+
 void edit_newline(Editor *e)
 {
-    size_t n = 0;
+    size_t n = 0, mk = 0;
     int between;
     const Line *l;
+    char next[24];
 
     begin(e);
     delete_selection(e);
     l = cur_line(e);
     while (n < l->len && n < e->cx && is_blank(l->s[n]))
         n++;
+    /* Markdown: Enter goes on with a list (or a quote); on an empty item it ends it */
+    if (e->doc->syn && strcmp(syn_name(e->doc->syn), "Markdown") == 0 && !cur_multi(e) &&
+        (mk = md_mark(l, n, next, sizeof next)) > 0 && e->cx >= n + mk) {
+        if (n + mk == l->len) {
+            buf_delete(e->buf, e->cy, n, mk);
+            e->cx = n;
+            finish(e);
+            return;
+        }
+    } else {
+        mk = 0;
+    }
     between = pairing_allowed(e) && e->cx > 0 && e->cx < l->len && e->doc->autopair &&
               ((l->s[e->cx - 1] == '{' && l->s[e->cx] == '}') ||
                (l->s[e->cx - 1] == '(' && l->s[e->cx] == ')') ||
@@ -422,6 +464,10 @@ void edit_newline(Editor *e)
 
         buf_insert(e->buf, e->cy, 0, prev->s, n);
         e->cx = n;
+    }
+    if (mk) {
+        buf_insert(e->buf, e->cy, e->cx, next, strlen(next));
+        e->cx += strlen(next);
     }
     if (between) {
         /* {|} becomes the brace on a line of its own and the cursor on an indented one */

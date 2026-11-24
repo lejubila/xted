@@ -1,4 +1,6 @@
 #include "complete.h"
+#include "i18n.h"
+#include "files.h"
 #include "fuzzy.h"
 #include "snippet.h"
 #include "utf8.h"
@@ -390,16 +392,151 @@ void complete_free(Complete *c)
     memset(c, 0, sizeof *c);
 }
 
+/* ---- Markdown ---------------------------------------------------------- */
+
+enum { MDC_NONE, MDC_LINE, MDC_FENCE, MDC_FILE, MDC_ANCHOR };
+
+static int md_doc(const Doc *d)
+{
+    return d->syn && strcmp(syn_name(d->syn), "Markdown") == 0;
+}
+
+/* What is completed at x in a Markdown line, and where it starts: in a link after "](" a file
+ * of the folder or (after #) a heading of the document; after ``` a language; at the start of
+ * the line (after its indentation) what a line of Markdown starts with. */
+static int md_context(const Line *l, size_t x, size_t *start)
+{
+    size_t i, ind = 0;
+
+    for (i = x; i > 0; i--) {
+        char c = l->s[i - 1];
+
+        if (c == ' ' || c == '\t' || c == ')')
+            break;
+        if (c == '(' && i >= 2 && l->s[i - 2] == ']') {
+            *start = i;
+            return i < x && l->s[i] == '#' ? MDC_ANCHOR : MDC_FILE;
+        }
+    }
+    while (ind < l->len && (l->s[ind] == ' ' || l->s[ind] == '\t'))
+        ind++;
+    if (x <= ind)
+        return MDC_NONE;
+    if (x >= ind + 3 && memcmp(l->s + ind, "```", 3) == 0) {
+        for (i = ind + 3; i < x; i++)
+            if (!isalnum((unsigned char)l->s[i]) && !strchr("+-_#.", l->s[i]))
+                return MDC_NONE;
+        *start = ind + 3;
+        return MDC_FENCE;
+    }
+    if (!strchr("#-*+>`|[!123456789", l->s[ind]))
+        return MDC_NONE;
+    /* a space only in "- [ ]" */
+    for (i = ind; i < x; i++)
+        if (l->s[i] == ' ' && !(x - ind >= 2 && l->s[ind] == '-' && l->s[ind + 1] == ' ' && i <= ind + 3))
+            return MDC_NONE;
+    *start = ind;
+    return MDC_LINE;
+}
+
+/* What each start of a line is, shown with it in the popup. */
+static const struct {
+    const char *name, *what;
+} md_starts[] = {
+    { "#", N_("Heading 1") }, { "##", N_("Heading 2") }, { "###", N_("Heading 3") },
+    { "####", N_("Heading 4") }, { "#####", N_("Heading 5") }, { "######", N_("Heading 6") },
+    { "-", N_("Bulleted list") }, { "- [ ]", N_("Task") }, { "*", N_("Bulleted list") },
+    { "1.", N_("Numbered list") }, { ">", N_("Quote") }, { "```", N_("Code block") },
+    { "|", N_("Table") }, { "---", N_("Horizontal rule") }, { "[", N_("Link") }, { "![", N_("Image") },
+};
+
+/* The languages of a fenced block. */
+static const char *const md_langs[] = {
+    "bash", "c", "cpp", "csharp", "css", "diff", "go", "html", "ini", "java", "javascript", "json",
+    "kotlin", "lua", "makefile", "markdown", "perl", "php", "python", "ruby", "rust", "sh", "sql",
+    "swift", "text", "toml", "typescript", "xml", "yaml",
+};
+
+static void md_file_cb(const char *rel, void *ctx)
+{
+    consider(ctx, rel, strlen(rel), CAND_WORD, 0);
+}
+
+/* The anchor of a heading, as GitHub makes it: lower case, spaces as -, no punctuation. */
+static void md_anchor(Gather *g, const char *s, size_t n)
+{
+    char a[200];
+    size_t i, k = 0;
+
+    a[k++] = '#';
+    for (i = 0; i < n && k + 1 < sizeof a; i++) {
+        unsigned char c = (unsigned char)s[i];
+
+        if (c == ' ')
+            a[k++] = '-';
+        else if (isalnum(c) || c >= 0x80 || c == '-' || c == '_')
+            a[k++] = (char)tolower(c);
+    }
+    if (k > 1)
+        consider(g, a, k, CAND_WORD, 0);
+}
+
+static void md_gather(Gather *g, const Doc *cur, int what)
+{
+    size_t i;
+
+    if (what == MDC_LINE) {
+        for (i = 0; i < sizeof md_starts / sizeof md_starts[0]; i++) {
+            char shown[96];
+
+            /* the popup shows this: what goes in the text, and what it is */
+            snprintf(shown, sizeof shown, "%-6s %s", md_starts[i].name, tr(md_starts[i].what));
+            consider_sig(g, md_starts[i].name, strlen(md_starts[i].name), CAND_SNIPPET, 0, shown);
+        }
+    } else if (what == MDC_FENCE) {
+        for (i = 0; i < sizeof md_langs / sizeof md_langs[0]; i++)
+            consider(g, md_langs[i], strlen(md_langs[i]), CAND_KEYWORD, 0);
+    } else if (what == MDC_ANCHOR) {
+        for (i = 0; i < cur->buf.nlines; i++) {
+            const Line *l = &cur->buf.lines[i];
+            size_t h = 0;
+
+            while (h < l->len && h < 6 && l->s[h] == '#')
+                h++;
+            if (h > 0 && h < l->len && l->s[h] == ' ')
+                md_anchor(g, l->s + h + 1, l->len - h - 1);
+        }
+    } else {
+        /* the files under the folder of the document, as a link to them is written */
+        char *dir = cur->buf.path ? xstrdup(cur->buf.path) : xstrdup(".");
+        char *slash = strrchr(dir, '/');
+
+        if (cur->buf.path && slash)
+            *(slash == dir ? slash + 1 : slash) = '\0';
+        else if (cur->buf.path) {
+            free(dir);
+            dir = xstrdup(".");
+        }
+        files_scan(dir, md_file_cb, g);
+        free(dir);
+    }
+}
+
 int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t y, size_t x)
 {
     Gather g;
     const Buffer *b = &cur->buf;
     size_t start, plen, i, budget = COMPLETE_SCAN_LINES, d, take, sep = (size_t)-1, qs = 0;
     int php = cur->syn && strncmp(syn_name(cur->syn), "PHP", 3) == 0, use_ctx = 0, env_ctx = 0;
+    int mdc = MDC_NONE;
+    size_t mstart = 0;
 
     complete_close(c);
     plen = complete_prefix(b, y, x, &start);
-    if (env_context(cur, &b->lines[y], start)) {
+    if (md_doc(cur) && (mdc = md_context(&b->lines[y], x, &mstart)) != MDC_NONE) {
+        start = mstart;                 /* from the first character (or none, in a link) */
+        plen = x - mstart;
+    } else if (env_context(cur, &b->lines[y], start)) {
         env_ctx = 1;                    /* only the .env variables make sense, from no letter on */
     } else if (php && use_context(b, y, start, &qs)) {
         use_ctx = 1;
@@ -409,7 +546,7 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
         sep = sym_member_at(cur->syn, b, y, start);
     }
     if (plen >= sizeof g.prefix ||
-        (!use_ctx && !env_ctx && sep == (size_t)-1 &&
+        (!use_ctx && !env_ctx && !mdc && sep == (size_t)-1 &&
          plen < (c->min_prefix ? c->min_prefix : COMPLETE_MIN_PREFIX)))
         return 0;
     memset(&g, 0, sizeof g);
@@ -422,7 +559,10 @@ int complete_open(Complete *c, Doc *const *docs, size_t ndocs, Doc *cur, size_t 
     g.set = xmalloc(g.setsize * sizeof *g.set);
     memset(g.set, 0, g.setsize * sizeof *g.set);
 
-    if (env_ctx) {
+    if (mdc) {
+        md_gather(&g, cur, mdc);
+        budget = 0;                     /* the words of the text would only be in the way */
+    } else if (env_ctx) {
         if (!c->sc)
             c->sc = sym_cache_new();
         sym_env_keys(c->sc, cur, env_cb, &g);
