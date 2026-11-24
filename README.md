@@ -848,7 +848,7 @@ salvataggio delle impostazioni, comandi e comportamento dell'editor senza termin
 
 ## Stato del progetto
 
-Versione 0.13.0 (`src/version.h`).
+Versione 0.14.0 (`src/version.h`).
 
 Le fasi 1–9 della roadmap di `SPEC.md` sono completate: nucleo, editing, sintassi,
 multifile, ricerca, produttività, strumenti, configurazione e rifiniture. Resta fuori il
@@ -860,5 +860,5 @@ xted è distribuito con licenza **MIT**: puoi usarlo, modificarlo e ridistribuir
 anche in programmi chiusi, mantenendo l'avviso di copyright. Il testo completo è nel file
 [`LICENSE`](LICENSE).
 
-Copyright (c) 2026 David Bigagli. La versione attuale è la **0.13.0** (`xted --version`, «Informazioni su
+Copyright (c) 2026 David Bigagli. La versione attuale è la **0.14.0** (`xted --version`, «Informazioni su
 xted» nella palette, l'intestazione della guida `F1`).
