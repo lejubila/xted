@@ -175,7 +175,8 @@ typedef struct Editor {
     int colors_mode;        /* COLOR_* chosen in the palette or the configuration, -1 for auto */
     int glyphs;             /* GLYPHS_*: the symbols of the file browser, the borders, the palette */
     int keybar;             /* KEYBAR_*: where the keys of the context are shown */
-    int man_numbers, man_invis; /* Alt+N, Alt+I for every document: 0 not used, 1 on, 2 off */
+    int man_numbers, man_invis; /* Alt+G, Alt+J for every document: 0 not used, 1 on, 2 off */
+    int overwrite;          /* Ins: typing goes over the characters (the cursor is underlined) */
     int intro;              /* the start screen (name, version, credits) until the first key */
     const char *asking;     /* the answers of the question on the message row (ask), or NULL */
     int match_on;           /* the bracket at/before the cursor has a partner */
@@ -302,6 +303,7 @@ void editor_cmd_toggle_mouse(Editor *e);
 void editor_cmd_toggle_autosuggest(Editor *e);
 void editor_cmd_toggle_autopair(Editor *e);
 void editor_cmd_toggle_numbers(Editor *e);
+void editor_cmd_toggle_overwrite(Editor *e);
 void editor_cmd_toggle_invisibles(Editor *e);
 void editor_cmd_toggle_git(Editor *e);
 void editor_cmd_toggle_clipboard(Editor *e);

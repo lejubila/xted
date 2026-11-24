@@ -229,6 +229,28 @@ void edit_insert_cp(Editor *e, uint32_t cp)
     done(e);
 }
 
+/* A character typed in overwrite mode (Ins): it takes the place of the one under the cursor; at
+ * the end of the line it is added. A selection is replaced as when inserting. */
+void edit_overtype_cp(Editor *e, uint32_t cp)
+{
+    char b[4];
+    int n = utf8_encode(cp, b);
+    const Line *l;
+
+    begin(e);
+    if (!delete_selection(e)) {
+        l = cur_line(e);
+        if (e->cx < l->len) {
+            uint32_t old;
+
+            buf_delete(e->buf, e->cy, e->cx, (size_t)utf8_decode(l->s + e->cx, l->len - e->cx, &old));
+        }
+    }
+    buf_insert(e->buf, e->cy, e->cx, b, (size_t)n);
+    e->cx += (size_t)n;
+    done(e);
+}
+
 /* ---- automatic pairs ---------------------------------------------------- */
 
 /* The closing character for an opening one that this document pairs, 0 if none. Quotes are for

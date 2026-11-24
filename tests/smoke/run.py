@@ -901,6 +901,28 @@ def numbers_and_invisibles():
 
 
 @scenario
+def overwrite_mode():
+    b = Box()
+    b.write("a.txt", "abcdef\nuno\n")
+    r = b.run(["a.txt"], cols=80)
+    r.type("\x1b[2~", 0.3)                                     # Ins
+    check("Ins: overwrite mode, said in the status bar and with an underlined cursor",
+          "OVR" in r.screen().lines()[-2] and b"\x1b[4 q" in r.out, r.screen().lines()[-2])
+    r.type("XY(", ctrl("s"), 0.3)
+    check("typing goes over the characters (and no automatic pair)", b.read("a.txt") == "XY(def\nuno\n",
+          repr(b.read("a.txt")))
+    r.type(DOWN, END, "!!", ctrl("s"), 0.3)
+    check("at the end of a line it adds", b.read("a.txt") == "XY(def\nuno!!\n", repr(b.read("a.txt")))
+    r.type(ctrl("z"), ctrl("z"), ctrl("s"), 0.3)
+    check("undo takes it back", b.read("a.txt") == "abcdef\nuno\n", repr(b.read("a.txt")))
+    r.type("\x1b[2~", 0.3, "Z", ctrl("s"), 0.3)
+    check("Ins again: insert mode, the terminal's cursor", "OVR" not in r.screen().lines()[-2] and
+          b"\x1b[0 q" in r.out and b.read("a.txt").startswith("Z"), repr(b.read("a.txt")))
+    quit_(r)
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

@@ -233,6 +233,10 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
 - **Protezioni**: conferma prima di chiudere file non salvati, avviso se il file è cambiato
   su disco, file in sola lettura gestiti, avviso sui file binari.
 - **Fine riga**: rileva e conserva LF o CRLF, e l'assenza del newline finale.
+- **Sovrascrittura** (`Ins`, «Modalità sovrascrittura» nella palette): i caratteri digitati
+  prendono il posto di quelli sotto il cursore (a fine riga si aggiungono), senza coppie
+  automatiche; incolla, Tab e completamento inseriscono sempre. La barra di stato mostra `SOV` e il
+  cursore diventa sottolineato. Vale per la sessione.
 - **Numeri di riga** (`Alt+G`, «Numeri di riga» nella palette, `line_numbers = on`): in un margine
   a sinistra, larghi quanto l'ultima riga (3 cifre almeno), con il numero della riga del cursore
   in evidenza; un clic su un numero seleziona la riga, trascinando si selezionano più righe
@@ -501,6 +505,7 @@ accanto ai comandi nella palette. Quelle predefinite:
 | `Alt+.` · `Ctrl+PgDn` | Buffer successivo |
 | `Alt+,` · `Ctrl+PgUp` | Buffer precedente |
 | `Ctrl+B` | Mostra/nascondi il browser dei file |
+| `Ins` | Alterna inserimento e sovrascrittura |
 | `Alt+G` | Mostra/nascondi i numeri di riga |
 | `Alt+I` | Mostra/nascondi i caratteri invisibili (fine riga, tab, spazi finali) |
 | `Ctrl+Q` | Esci |

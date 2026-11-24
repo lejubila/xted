@@ -27,6 +27,7 @@ struct Render {
     int need_clear;
     const Theme *cur_theme;     /* the theme the cursor colour was set for */
     int cur_depth;
+    int cur_shape;              /* 0: the terminal's own cursor, 1: underlined (overwrite mode) */
     SBuf frame, row;
 };
 
@@ -853,6 +854,8 @@ static void status_row(SBuf *o, const Win *w, int active, int scan, const Editor
         if (cols >= 62)
             snprintf(style, sizeof style, d->expand_tab ? tr("  Spaces %d") : "  Tab %d",
                      d->expand_tab ? d->indent_w : d->tabw);
+        if (e->overwrite && active)
+            sbuf_addf(&right, " %s ", tr("OVR"));
         sbuf_addf(&right, " %s  %s  %s%s  Ln %zu, Col %zu ", syn_name(d->syn),
                   d->buf.crlf ? "CRLF" : "LF", buf_enc_name(d->buf.enc), style, w->view.cy + 1,
                   editor_view_col(&d->buf, &w->view, d->tabw) + 1);
@@ -1859,6 +1862,11 @@ void render_frame(Render *r, const Editor *e)
         sbuf_addf(&r->frame, "\x1b[%d;%dH", cr, cc);
         r->cur_r = cr;
         r->cur_c = cc;
+    }
+    /* overwrite mode: an underlined cursor (the terminal's own in insert mode) */
+    if (r->cur_shape != e->overwrite) {
+        sbuf_adds(&r->frame, e->overwrite ? "\x1b[4 q" : "\x1b[0 q");
+        r->cur_shape = e->overwrite;
     }
     if (changed)
         sbuf_adds(&r->frame, "\x1b[?25h");

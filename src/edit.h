@@ -27,6 +27,8 @@ void edit_select_word(Editor *e);
 /* ---- typing; a selection is replaced ---- */
 
 void edit_insert_cp(Editor *e, uint32_t cp);
+/* As edit_insert_cp, over the character under the cursor (overwrite mode). */
+void edit_overtype_cp(Editor *e, uint32_t cp);
 /* A typed character with the automatic pairs (see autopair): an opening bracket or quote adds
  * the closing one, a closing one already there is stepped over, a selection is wrapped.
  * Returns 1 if it handled the character; otherwise the caller inserts it. */

@@ -2419,7 +2419,10 @@ static int handle_plain(Editor *e, Key k, int shift, int ctrl)
         break;
     }
     default:
-        if (is_printable(k.code) && !edit_type(e, k.code))
+        /* overwrite mode: over the character under the cursor, and no automatic pairs */
+        if (is_printable(k.code) && e->overwrite)
+            edit_overtype_cp(e, k.code);
+        else if (is_printable(k.code) && !edit_type(e, k.code))
             edit_insert_cp(e, k.code);
         break;
     }
@@ -2529,7 +2532,7 @@ static int handle_multi(Editor *e, Key k)
         int cut = id[1] == 'u';
 
         if (t) {
-            edit_store_clip(e, t, n, cut ? "Tagliato" : "Copiato");
+            edit_store_clip(e, t, n, cut ? tr("Cut") : tr("Copied"));
             if (cut) {
                 cur_each(e, cut_one, NULL);
                 buf_undo_close(e->buf);
@@ -3556,7 +3559,14 @@ void editor_cmd_toggle_autosuggest(Editor *e)
     editor_set_msg(e, MSG_TTL_MS, "%s", e->doc->autosuggest ? tr("Autosuggest on") : tr("Autosuggest off"));
 }
 
-/* Alt+N, Alt+I: for every document (the configuration may say it per language). */
+/* Ins: typed characters go over the ones under the cursor, or are inserted (for the session). */
+void editor_cmd_toggle_overwrite(Editor *e)
+{
+    e->overwrite = !e->overwrite;
+    editor_set_msg(e, MSG_TTL_MS, "%s", e->overwrite ? tr("Overwrite mode") : tr("Insert mode"));
+}
+
+/* Alt+G, Alt+J: for every document (the configuration may say it per language). */
 static void toggle_all(Editor *e, int *man, int on, int pend)
 {
     size_t i;
