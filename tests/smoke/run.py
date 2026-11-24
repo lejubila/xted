@@ -923,6 +923,66 @@ def overwrite_mode():
 
 
 @scenario
+def unsaved_buffers():
+    b = Box()
+    b.write("a.txt", "file vero\n")
+    store = os.path.join(b.state, "xted", "unsaved")
+    texts = lambda: sorted(f for f in os.listdir(store) if f.endswith(".txt")) if os.path.isdir(store) else []
+    r = b.run([], cols=100)
+    r.type("nota uno", 0.2, ctrl("n"), 0.2, "nota due", 0.2)
+    time.sleep(2.6)
+    r.type("", 0.2)
+    check("the buffers with no file are written a little after they change", texts() == ["1.txt", "2.txt"], texts())
+    r.type(ctrl("q"), 0.5)
+    r.finish()
+    check("quitting asks nothing for them", r.status == 0, r.status)
+    r = b.run(["a.txt"], cols=100)
+    t = r.screen().text()
+    check("the next time they are back, the file of the command line in front",
+          "file vero" in t and "2 unsaved buffers restored" in t, t[-300:])
+    check("as buffers with no file, to be saved", r.screen().lines()[0].count("[Untitled]*") == 2,
+          r.screen().lines()[0])
+    r.type(alt("."), 0.3)
+    check("with their text", "nota uno" in r.screen().text(), r.screen().text()[:200])
+    r.type(ctrl("w"), 0.3)
+    check("closing one asks, as before", "unsaved changes" in r.screen().lines()[-1], r.screen().lines()[-1])
+    r.type("n", 0.3)
+    time.sleep(2.6)
+    r.type("", 0.2)
+    check("closed with no: its copy goes", texts() == ["2.txt"], texts())
+    for _ in range(3):
+        if "nota due" in r.screen().text():
+            break
+        r.type(alt("."), 0.3)
+    r.type(ctrl("s"), 0.3, "salvato.txt", ENTER, 0.4)
+    time.sleep(2.6)
+    r.type("", 0.2)
+    check("saved with a name: no longer kept", texts() == [] and os.path.exists(b.path("salvato.txt")),
+          (texts(), os.listdir(b.dir)))
+    r.type(ctrl("n"), 0.2, "terza", 0.2)
+    time.sleep(2.6)
+    # a second xted: the first keeps the buffers, this one asks as before
+    r2 = b.run([], cols=100)
+    check("a second xted does not take them", "unsaved buffers restored" not in r2.screen().text(),
+          r2.screen().text()[-200:])
+    r2.type("altro", 0.2, ctrl("q"), 0.4)
+    check("and asks for its own", "unsaved changes" in r2.screen().lines()[-1], r2.screen().lines()[-1])
+    r2.type("n", 0.3)
+    r2.finish()
+    r.type(ctrl("q"), 0.5, "n", 0.3)
+    r.finish()
+    b.write(".cfg/xted/config", "keep_unsaved = off\n")
+    r = b.run([], cols=100)
+    check("keep_unsaved = off: nothing restored", "unsaved buffers restored" not in r.screen().text(),
+          r.screen().text()[-200:])
+    r.type("x", ctrl("q"), 0.4)
+    check("and quitting asks", "unsaved changes" in r.screen().lines()[-1], r.screen().lines()[-1])
+    r.type("n", 0.3)
+    r.finish()
+    b.close()
+
+
+@scenario
 def help_page():
     b = Box()
     b.write("a.txt", "text\n")

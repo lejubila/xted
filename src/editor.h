@@ -177,6 +177,9 @@ typedef struct Editor {
     int keybar;             /* KEYBAR_*: where the keys of the context are shown */
     int man_numbers, man_invis; /* Alt+G, Alt+J for every document: 0 not used, 1 on, 2 off */
     int overwrite;          /* Ins: typing goes over the characters (the cursor is underlined) */
+    int unsaved_owner;      /* this xted keeps the buffers with no file (unsaved.h) */
+    long unsaved_at;        /* when they are looked at again (ms) */
+    char *unsaved_idx;      /* the index last written, to write it only when it changes */
     int intro;              /* the start screen (name, version, credits) until the first key */
     const char *asking;     /* the answers of the question on the message row (ask), or NULL */
     int match_on;           /* the bracket at/before the cursor has a partner */
@@ -304,6 +307,10 @@ void editor_cmd_toggle_autosuggest(Editor *e);
 void editor_cmd_toggle_autopair(Editor *e);
 void editor_cmd_toggle_numbers(Editor *e);
 void editor_cmd_toggle_overwrite(Editor *e);
+/* The buffers with no file kept between sessions (keep_unsaved): takes them when no other xted
+ * does, and opens them; then writes what changed (force: now, as at exit). */
+void editor_unsaved_start(Editor *e);
+void editor_unsaved_sync(Editor *e, int force);
 void editor_cmd_toggle_invisibles(Editor *e);
 void editor_cmd_toggle_git(Editor *e);
 void editor_cmd_toggle_clipboard(Editor *e);

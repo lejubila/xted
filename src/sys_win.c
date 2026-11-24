@@ -246,6 +246,15 @@ char *sys_clip_get(size_t *n)
     return s;
 }
 
+/* Opened with no sharing, and kept open until xted ends. */
+int sys_lock_file(const char *path)
+{
+    HANDLE h = CreateFileA(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL, NULL);
+
+    return h == INVALID_HANDLE_VALUE ? -1 : 0;
+}
+
 int sys_is_abs(const char *p)
 {
     return p[0] == '/' || p[0] == '\\' ||

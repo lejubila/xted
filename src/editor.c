@@ -8,6 +8,7 @@
 #include "cfgsave.h"
 #include "commands.h"
 #include "ipc.h"
+#include "unsaved.h"
 #include "config.h"
 #include "editorconfig.h"
 #include "indent.h"
@@ -239,6 +240,7 @@ void editor_free(Editor *e)
     size_t i;
 
     layout_free(&e->layout);
+    free(e->unsaved_idx);
     for (i = 0; i < e->ndocs; i++)
         doc_free(e->docs[i]);
     free(e->docs);
@@ -776,6 +778,15 @@ static int next_key(Editor *e, Key *k)
                 timeout = COMPLETE_IDLE_MS;
             if (run_timeout(e) >= 0 && (timeout < 0 || run_timeout(e) < timeout))
                 timeout = run_timeout(e);
+            /* the buffers with no file: written a little after they change */
+            if (e->unsaved_owner) {
+                long left;
+
+                editor_unsaved_sync(e, 0);
+                left = e->unsaved_at - now_ms();
+                if (timeout < 0 || left < timeout)
+                    timeout = left > 0 ? (int)left : 0;
+            }
             ev = term_wait(timeout);
             if (ev & TERM_EV_SERVER)
                 ipc_serve();
@@ -1485,9 +1496,13 @@ static void cmd_quit(Editor *e)
     int all = 0;
 
     buf_undo_close(e->buf);
-    for (i = 0; i < e->ndocs; i++)
+    for (i = 0; i < e->ndocs; i++) {
+        /* a buffer with no file is kept as it is, for the next time: no question */
+        if (e->unsaved_owner && !e->docs[i]->buf.path && !e->docs[i]->scratch)
+            continue;
         if (!confirm_discard(e, e->docs[i], &all))
             return;
+    }
     e->quit = 1;
 }
 
@@ -3557,6 +3572,113 @@ void editor_cmd_toggle_autosuggest(Editor *e)
     e->doc->man_sug = e->doc->autosuggest ? 2 : 1;
     apply_cfg(e, e->doc);
     editor_set_msg(e, MSG_TTL_MS, "%s", e->doc->autosuggest ? tr("Autosuggest on") : tr("Autosuggest off"));
+}
+
+/* ---- the buffers with no file, kept between sessions (unsaved.h) ------------ */
+
+#define UNSAVED_MS 2000         /* how often what changed in them is written */
+
+/* A buffer kept: no file, not a page of xted's, something in it. */
+static int keeps_unsaved(const Doc *d)
+{
+    return !d->buf.path && !d->scratch && (d->buf.nlines > 1 || d->buf.lines[0].len > 0);
+}
+
+void editor_unsaved_start(Editor *e)
+{
+    UnsavedEntry *v;
+    size_t n, i, got = 0;
+    Doc *keep = e->doc;
+    int keep_ok = !is_blank_doc(keep);
+    char err[256];
+
+    if (e->cfg.keep_unsaved == 0 || !unsaved_lock())
+        return;                             /* another xted keeps them */
+    e->unsaved_owner = 1;
+    e->unsaved_at = now_ms() + UNSAVED_MS;
+    v = unsaved_read_index(&n);
+    for (i = 0; i < n; i++) {
+        char *p = unsaved_path(v[i].id);
+        Doc *d = doc_new();
+
+        if (!p || doc_load(d, p, err, sizeof err) < 0 || d->buf.is_new) {
+            doc_free(d);
+            free(p);
+            continue;
+        }
+        free(p);
+        free(d->buf.path);
+        d->buf.path = NULL;                 /* a buffer with no file again, to be saved */
+        d->buf.modified = 1;
+        d->unsaved_id = v[i].id;
+        d->unsaved_gen = d->buf.gen;
+        d->last.cy = v[i].y < d->buf.nlines ? v[i].y : d->buf.nlines - 1;
+        d->last.cx = v[i].x <= d->buf.lines[d->last.cy].len ? v[i].x : 0;
+        d->last.rowoff = v[i].rowoff <= d->last.cy ? v[i].rowoff : d->last.cy;
+        install_doc(e, d);
+        got++;
+    }
+    free(v);
+    /* the file of the command line (or of the session) stays the one shown */
+    if (got && keep_ok)
+        editor_activate(e, keep);
+    if (got)
+        editor_set_msg(e, MSG_TTL_MS, tr("%zu unsaved buffers restored"), got);
+}
+
+void editor_unsaved_sync(Editor *e, int force)
+{
+    UnsavedEntry *v;
+    SBuf idx = SBUF_INIT;
+    size_t n = 0, i, k;
+
+    if (!e->unsaved_owner || (!force && now_ms() < e->unsaved_at))
+        return;
+    e->unsaved_at = now_ms() + UNSAVED_MS;
+    editor_store_view(e);
+    v = xmalloc((e->ndocs + 1) * sizeof *v);
+    for (i = 0; i < e->ndocs; i++) {
+        Doc *d = e->docs[i];
+
+        if (!keeps_unsaved(d)) {
+            d->unsaved_id = 0;              /* saved with a name, or emptied: its file goes */
+            continue;
+        }
+        if (!d->unsaved_id) {
+            unsigned id = 1;
+
+            /* the smallest number no buffer has */
+            for (k = 0; k < e->ndocs; k++)
+                if (e->docs[k]->unsaved_id == id) {
+                    id++;
+                    k = (size_t)-1;
+                }
+            d->unsaved_id = id;
+            d->unsaved_gen = d->buf.gen + 1;
+        }
+        if (d->unsaved_gen != d->buf.gen) {
+            size_t tn, last = d->buf.nlines - 1;
+            char *t = buf_get_range(&d->buf, 0, 0, last, d->buf.lines[last].len, &tn);
+
+            if (unsaved_write(d->unsaved_id, t, tn) == 0)
+                d->unsaved_gen = d->buf.gen;
+            free(t);
+        }
+        v[n].id = d->unsaved_id;
+        v[n].y = d->last.cy;
+        v[n].x = d->last.cx;
+        v[n].rowoff = d->last.rowoff;
+        sbuf_addf(&idx, "%u %zu %zu %zu\n", v[n].id, v[n].y, v[n].x, v[n].rowoff);
+        n++;
+    }
+    sbuf_add(&idx, "", 1);
+    /* the index (and the files of the buffers that are no more) when something changed */
+    if ((!e->unsaved_idx || strcmp(e->unsaved_idx, idx.p) != 0) && unsaved_write_index(v, n) == 0) {
+        free(e->unsaved_idx);
+        e->unsaved_idx = sbuf_steal(&idx);
+    }
+    sbuf_free(&idx);
+    free(v);
 }
 
 /* Ins: typed characters go over the ones under the cursor, or are inserted (for the session). */

@@ -43,6 +43,8 @@ typedef struct Doc {
     int suggest_min;
     int man_sug, man_pair;  /* switched with a command: 0 not, 1 on, 2 off (wins over the files) */
     int numbers;            /* the line numbers in the margin (never in a scratch document) */
+    unsigned unsaved_id;    /* no file: its number in the folder of the unsaved buffers, 0 none */
+    unsigned long unsaved_gen;  /* Buffer.gen when its text was last written there */
     int invisibles;         /* line ends, tabs and trailing spaces drawn */
     char *title;            /* name shown instead of a file name (scratch documents) */
     int scratch;            /* not a file: never saved, kept out of sessions and exit checks */

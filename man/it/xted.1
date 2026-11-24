@@ -354,6 +354,12 @@ per i file senza linguaggio).
 Dove vanno i tasti del contesto (col mouse sono pulsanti):
 .BR message " (predefinito: nella riga dei messaggi), " line " (una riga a sé) oppure " off .
 .TP
+.B keep_unsaved
+.BR on " (predefinito) oppure " off :
+il testo dei buffer senza file viene conservato (scritto pochi secondi dopo ogni modifica) e
+tornano alla successiva apertura di xted, da qualsiasi cartella; uscendo non si chiede nulla per
+loro. Li tiene un solo xted: il primo avviato.
+.TP
 .B single_instance
 .BR on " (predefinito) oppure " off :
 se il primo xted resta in ascolto per i file di
@@ -469,6 +475,9 @@ Un file ctags, usato dal salto alla definizione.
 .TP
 .B ~/.local/state/xted/sessions/
 Un file per ogni cartella da cui è stato avviato l'editor, con i file aperti e i cursori.
+.TP
+.B ~/.local/state/xted/unsaved/
+Il testo dei buffer senza file, e il loro indice.
 .SH AMBIENTE
 .TP
 .B XDG_CONFIG_HOME

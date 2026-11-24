@@ -261,6 +261,8 @@ int main(int argc, char **argv)
         editor_activate(&e, first);
     else if (argc == 1)
         editor_restore_session(&e);
+    /* the buffers with no file of the last time (keep_unsaved) */
+    editor_unsaved_start(&e);
     /* nothing to show: the start screen, until the first key */
     e.intro = !e.doc->buf.path && !e.doc->scratch && e.doc->buf.nlines == 1 && e.doc->buf.lines[0].len == 0;
     editor_load_project(&e);
@@ -279,6 +281,7 @@ int main(int argc, char **argv)
         }
     }
     editor_run(&e);
+    editor_unsaved_sync(&e, 1);
     term_restore();
     editor_save_session(&e);
     editor_free(&e);

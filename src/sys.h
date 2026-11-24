@@ -48,6 +48,9 @@
  * 52 is tried in both); its text as UTF-8 with LF, malloc'd, or NULL. */
 int sys_clip_set(const char *s, size_t n);
 char *sys_clip_get(size_t *n);
+/* Locks the file at path (made when missing) for this program, until it ends (the system lets
+ * it go also after a crash): 0, or -1 when another program holds it. */
+int sys_lock_file(const char *path);
 
 #else
 
@@ -75,6 +78,9 @@ void sys_lang(char *out, size_t n);
 void sys_attention(void);
 int sys_clip_set(const char *s, size_t n);
 char *sys_clip_get(size_t *n);
+/* Locks the file at path (made when missing) for this program, until it ends (the system lets
+ * it go also after a crash): 0, or -1 when another program holds it. */
+int sys_lock_file(const char *path);
 /* the status of a command that ended (shell_capture, shell_reap) is its exit code */
 #define WIFEXITED(s) 1
 #define WEXITSTATUS(s) (s)

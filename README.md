@@ -182,6 +182,14 @@ xted --remote file ...    apre i file nello xted già aperto, se ce n'è uno
 - Per uscire: `Ctrl+Q` (chiede conferma se ci sono file non salvati).
 - Se non c'è nulla da riaprire compare una schermata iniziale con nome, versione, crediti e i
   primi tasti da usare, che scompare al primo tasto.
+- **Buffer senza nome conservati** (come Notepad++): il testo dei buffer che non hanno un file
+  (il documento vuoto di partenza, `Ctrl+N`) viene scritto pochi secondi dopo ogni modifica in
+  `~/.local/state/xted/unsaved/` (su Windows `%LOCALAPPDATA%\xted\unsaved\`); uscendo non si
+  chiede nulla per loro, e alla riapertura di xted, da qualsiasi cartella, tornano com'erano, con
+  il cursore al suo posto (davanti resta il file della riga di comando). Chiudere un buffer
+  senza nome con `Ctrl+W` chiede come prima («no» lo scarta davvero); salvarlo con un nome lo
+  rende un file normale. Se sono aperti più xted, li tiene il primo; gli altri chiedono come
+  sempre. `keep_unsaved = off` nel `config` torna al comportamento di prima.
 - **Istanza unica**: il primo xted avviato resta in ascolto (un socket in `$XDG_RUNTIME_DIR`, o
   in `/tmp/xted-<uid>`, cartella solo dell'utente; su Windows una named pipe dell'utente e della
   sessione). `xted --remote file…` gli passa i file, che si aprono lì come nuovi buffer (anche
@@ -655,6 +663,7 @@ theme = light             # dark (predefinito) o light, o un tema tuo (anche scu
 language = auto           # auto (da LC_ALL, LC_MESSAGES, LANG), en, it, o un codice con catalogo
 mouse = on
 single_instance = on      # il primo xted riceve i file di xted --remote (icona, «Apri con»)
+keep_unsaved = on         # i buffer senza nome conservati tra una sessione e l'altra
 terminal = kitty          # il terminale dell'icona e di «Apri con» (vuoto: lo sceglie xted)
 git = on
 clipboard = on            # copie anche negli appunti di sistema (OSC 52)

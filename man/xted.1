@@ -352,6 +352,12 @@ for the files of no language).
 Where the keys of the context go (they are buttons for the mouse):
 .BR message " (default: in the message row), " line " (a row of their own) or " off .
 .TP
+.B keep_unsaved
+.BR on " (default) or " off :
+the text of the buffers with no file is kept (written a few seconds after each change) and they
+come back the next time xted starts, from any folder; quitting asks nothing for them.
+One xted keeps them: the first one started.
+.TP
 .B single_instance
 .BR on " (default) or " off :
 whether the first xted listens for the files of
@@ -466,6 +472,9 @@ A ctags file, used by the jump to the definition.
 .TP
 .B ~/.local/state/xted/sessions/
 One file per folder from which the editor was started, with the open files and the cursors.
+.TP
+.B ~/.local/state/xted/unsaved/
+The text of the buffers with no file, and their index.
 .SH ENVIRONMENT
 .TP
 .B XDG_CONFIG_HOME
