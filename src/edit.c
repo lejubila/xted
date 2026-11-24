@@ -1266,3 +1266,280 @@ void edit_trim_trailing(Editor *e, Doc *d)
     if (any)
         buf_undo_close(b);
 }
+
+/* ---- Markdown ----------------------------------------------------------- */
+
+/* The commands of Markdown work in a Markdown document only. */
+static int md_doc(Editor *e)
+{
+    if (e->doc->syn && strcmp(syn_name(e->doc->syn), "Markdown") == 0)
+        return 1;
+    editor_set_msg(e, MSG_TTL_MS, "%s", tr("Only in Markdown documents"));
+    return 0;
+}
+
+static void md_select(Editor *e, size_t y0, size_t x0, size_t y1, size_t x1)
+{
+    e->sel_on = 1;
+    e->ay = y0;
+    e->ax = x0;
+    e->cy = y1;
+    e->cx = x1;
+}
+
+/* How many c are there in s from i going forward (dir 1) or back (dir -1, from i - 1). */
+static size_t run_of(const char *s, size_t len, size_t i, int dir, char c)
+{
+    size_t n = 0;
+
+    if (dir > 0)
+        while (i + n < len && s[i + n] == c)
+            n++;
+    else
+        while (i > n && s[i - n - 1] == c)
+            n++;
+    return n;
+}
+
+/* A run of stars, or of backticks, holds the mark: "*" in 1 or 3, "**" in 2 or 3, "`" in 1. */
+static int holds(size_t run, size_t ml, char c)
+{
+    if (c != '*')
+        return run >= ml;
+    return ml == 1 ? run == 1 || run == 3 : run >= 2;
+}
+
+/* Bold, italic, inline code: around the selection, off when it has them (inside or just
+ * around it); with no selection a pair with the cursor in it, or off when the pair is empty. */
+static void md_wrap(Editor *e, const char *mk)
+{
+    size_t ml = strlen(mk), y0, x0, y1, x1;
+    char c = mk[0];
+    const Line *a, *b;
+
+    if (!md_doc(e))
+        return;
+    begin(e);
+    if (!edit_sel_active(e)) {
+        const Line *l = cur_line(e);
+
+        if (e->cx >= ml && e->cx + ml <= l->len && memcmp(l->s + e->cx - ml, mk, ml) == 0 &&
+            memcmp(l->s + e->cx, mk, ml) == 0) {
+            buf_delete(e->buf, e->cy, e->cx - ml, 2 * ml);
+            e->cx -= ml;
+        } else {
+            buf_insert(e->buf, e->cy, e->cx, mk, ml);
+            buf_insert(e->buf, e->cy, e->cx, mk, ml);
+            e->cx += ml;
+        }
+        finish(e);
+        return;
+    }
+    edit_sel_range(e, &y0, &x0, &y1, &x1);
+    a = &e->buf->lines[y0];
+    b = &e->buf->lines[y1];
+    if ((y0 != y1 || x1 >= x0 + 2 * ml) && holds(run_of(a->s, a->len, x0, 1, c), ml, c) &&
+        holds(run_of(b->s, b->len, x1, -1, c), ml, c)) {
+        /* the marks are inside the selection */
+        buf_delete(e->buf, y1, x1 - ml, ml);
+        buf_delete(e->buf, y0, x0, ml);
+        x1 -= y0 == y1 ? 2 * ml : ml;
+    } else if (x0 >= ml && x1 + ml <= b->len && holds(run_of(a->s, a->len, x0, -1, c), ml, c) &&
+               holds(run_of(b->s, b->len, x1, 1, c), ml, c)) {
+        /* just around it */
+        buf_delete(e->buf, y1, x1, ml);
+        buf_delete(e->buf, y0, x0 - ml, ml);
+        x0 -= ml;
+        if (y0 == y1)
+            x1 -= ml;
+    } else {
+        buf_insert(e->buf, y1, x1, mk, ml);
+        buf_insert(e->buf, y0, x0, mk, ml);
+        x0 += ml;
+        if (y0 == y1)
+            x1 += ml;
+    }
+    md_select(e, y0, x0, y1, x1);
+    finish(e);
+}
+
+void edit_md_bold(Editor *e)
+{
+    md_wrap(e, "**");
+}
+
+void edit_md_italic(Editor *e)
+{
+    md_wrap(e, "*");
+}
+
+/* The lines of the selection, or the cursor's (a selection ending at a line's start leaves that
+ * line out). */
+static void md_lines(const Editor *e, size_t *lo, size_t *hi)
+{
+    size_t y0, x0, y1, x1;
+
+    if (!edit_sel_active(e)) {
+        *lo = *hi = e->cy;
+        return;
+    }
+    edit_sel_range(e, &y0, &x0, &y1, &x1);
+    *lo = y0;
+    *hi = y1 > y0 && x1 == 0 ? y1 - 1 : y1;
+}
+
+static int line_is(const Line *l, const char *s)
+{
+    return l->len == strlen(s) && memcmp(l->s, s, l->len) == 0;
+}
+
+/* Inline code; on several lines a fenced block (off when the lines are in one already). */
+void edit_md_code(Editor *e)
+{
+    size_t lo, hi;
+
+    if (!md_doc(e))
+        return;
+    md_lines(e, &lo, &hi);
+    if (!edit_sel_active(e) || lo == hi) {
+        md_wrap(e, "`");
+        return;
+    }
+    begin(e);
+    if (lo > 0 && hi + 1 < e->buf->nlines && e->buf->lines[lo - 1].len >= 3 &&
+        memcmp(e->buf->lines[lo - 1].s, "```", 3) == 0 && line_is(&e->buf->lines[hi + 1], "```")) {
+        /* the fences around the lines go */
+        buf_delete(e->buf, hi + 1, 0, 3);
+        buf_join(e->buf, hi);
+        buf_delete(e->buf, lo - 1, 0, e->buf->lines[lo - 1].len);
+        buf_join(e->buf, lo - 1);
+        lo--;
+        hi--;
+    } else {
+        buf_split(e->buf, hi, e->buf->lines[hi].len);
+        buf_insert(e->buf, hi + 1, 0, "```", 3);
+        buf_split(e->buf, lo, 0);
+        buf_insert(e->buf, lo, 0, "```", 3);
+        lo++;
+        hi++;
+    }
+    md_select(e, lo, 0, hi, e->buf->lines[hi].len);
+    finish(e);
+}
+
+/* The heading of level n (0: none) on the lines. */
+static void md_heading(Editor *e, int n)
+{
+    static const char hashes[] = "###### ";
+    size_t lo, hi, y;
+    int sel;
+
+    if (!md_doc(e))
+        return;
+    md_lines(e, &lo, &hi);
+    sel = edit_sel_active(e);
+    begin(e);
+    for (y = lo; y <= hi; y++) {
+        const Line *l = &e->buf->lines[y];
+        size_t old = 0, add = n > 0 ? (size_t)n + 1 : 0;
+
+        while (old < l->len && old < 6 && l->s[old] == '#')
+            old++;
+        if (old > 0 && (old == l->len || l->s[old] == ' '))
+            while (old < l->len && l->s[old] == ' ')
+                old++;
+        else
+            old = 0;
+        if (old)
+            buf_delete(e->buf, y, 0, old);
+        if (add)
+            buf_insert(e->buf, y, 0, hashes + 6 - (size_t)n, add);
+        if (y == e->cy)
+            e->cx = e->cx >= old ? e->cx - old + add : add;
+    }
+    if (sel)
+        md_select(e, lo, 0, hi, e->buf->lines[hi].len);
+    finish(e);
+}
+
+void edit_md_h0(Editor *e) { md_heading(e, 0); }
+void edit_md_h1(Editor *e) { md_heading(e, 1); }
+void edit_md_h2(Editor *e) { md_heading(e, 2); }
+void edit_md_h3(Editor *e) { md_heading(e, 3); }
+void edit_md_h4(Editor *e) { md_heading(e, 4); }
+void edit_md_h5(Editor *e) { md_heading(e, 5); }
+void edit_md_h6(Editor *e) { md_heading(e, 6); }
+
+/* A link: [selection](url) with url selected, to be typed over; an address selected goes in the
+ * parentheses, the cursor in the brackets; with nothing selected "[]()". */
+void edit_md_link(Editor *e)
+{
+    size_t y0, x0, y1, x1, n;
+    char *t;
+
+    if (!md_doc(e))
+        return;
+    begin(e);
+    if (!edit_sel_active(e)) {
+        buf_insert(e->buf, e->cy, e->cx, "[]()", 4);
+        e->cx++;
+        finish(e);
+        return;
+    }
+    edit_sel_range(e, &y0, &x0, &y1, &x1);
+    t = buf_get_range(e->buf, y0, x0, y1, x1, &n);
+    if (y0 == y1 && (strncmp(t, "http://", 7) == 0 || strncmp(t, "https://", 8) == 0 ||
+                     strncmp(t, "www.", 4) == 0)) {
+        buf_insert(e->buf, y1, x1, ")", 1);
+        buf_insert(e->buf, y0, x0, "[](", 3);
+        e->sel_on = 0;
+        e->cy = y0;
+        e->cx = x0 + 1;
+    } else {
+        buf_insert(e->buf, y1, x1, "](url)", 6);
+        buf_insert(e->buf, y0, x0, "[", 1);
+        if (y0 == y1)
+            x1++;
+        md_select(e, y1, x1 + 2, y1, x1 + 5);
+    }
+    free(t);
+    finish(e);
+}
+
+/* "- " on the lines (after their indentation), or off when they all have a mark of a list. */
+void edit_md_list(Editor *e)
+{
+    size_t lo, hi, y, ind;
+    int all = 1, sel;
+
+    if (!md_doc(e))
+        return;
+    md_lines(e, &lo, &hi);
+    sel = edit_sel_active(e);
+    for (y = lo; y <= hi; y++) {
+        const Line *l = &e->buf->lines[y];
+
+        for (ind = 0; ind < l->len && (l->s[ind] == ' ' || l->s[ind] == '\t'); ind++)
+            ;
+        if (ind < l->len && !(ind + 1 < l->len && strchr("-*+", l->s[ind]) && l->s[ind + 1] == ' '))
+            all = 0;
+    }
+    begin(e);
+    for (y = lo; y <= hi; y++) {
+        const Line *l = &e->buf->lines[y];
+
+        for (ind = 0; ind < l->len && (l->s[ind] == ' ' || l->s[ind] == '\t'); ind++)
+            ;
+        if (ind == l->len)
+            continue;                       /* an empty line stays empty */
+        if (all)
+            buf_delete(e->buf, y, ind, 2);
+        else
+            buf_insert(e->buf, y, ind, "- ", 2);
+        if (y == e->cy && e->cx >= ind)
+            e->cx = all ? (e->cx >= ind + 2 ? e->cx - 2 : ind) : e->cx + 2;
+    }
+    if (sel)
+        md_select(e, lo, 0, hi, e->buf->lines[hi].len);
+    finish(e);
+}

@@ -250,7 +250,7 @@ Ctrl+C è la scorciatoia per copiare, non interrompe il programma.
   in evidenza; un clic su un numero seleziona la riga, trascinando si selezionano più righe
   intere (Shift+clic estende la selezione). Spariscono nei pannelli troppo stretti e non ci sono
   nelle pagine come la guida o l'anteprima.
-- **Caratteri invisibili** (`Alt+I`, «Mostra caratteri invisibili», `show_invisibles = on`): il fine
+- **Caratteri invisibili** (`Alt+J`, «Mostra caratteri invisibili», `show_invisibles = on`): il fine
   riga come `↵` (LF) o `¶` (CRLF), nessun segno sull'ultima riga se il file non finisce con un
   a-capo; i tab come `→` e gli spazi in fondo alla riga come `·`. Con `glyphs = windows` il fine
   riga LF è `¬`, con `glyphs = ascii` i segni sono `$` `<` `>` `.`. Le due opzioni valgono per
@@ -515,7 +515,7 @@ accanto ai comandi nella palette. Quelle predefinite:
 | `Ctrl+B` | Mostra/nascondi il browser dei file |
 | `Ins` | Alterna inserimento e sovrascrittura |
 | `Alt+G` | Mostra/nascondi i numeri di riga |
-| `Alt+I` | Mostra/nascondi i caratteri invisibili (fine riga, tab, spazi finali) |
+| `Alt+J` | Mostra/nascondi i caratteri invisibili (fine riga, tab, spazi finali) |
 | `Ctrl+Q` | Esci |
 
 ### Pannelli
@@ -586,9 +586,24 @@ annulla, `Invio` conferma.
 |---|---|
 | `F1` | Guida: versione e crediti, tutti i comandi con le scorciatoie attuali, i tasti delle liste e della ricerca, i file usati |
 | `Alt+X` | Command palette |
-| `Alt+U` | Anteprima di un file Markdown, in un pannello accanto (di nuovo `Alt+U` per chiuderla) |
 | `Alt+T` | Cambia tema |
 | `Ctrl+L` | Ridisegna lo schermo |
+
+### Markdown
+
+Solo nei file Markdown (fuori lo dicono e non fanno nulla); con una selezione la racchiudono, e se
+è già racchiusa tolgono il markup; senza selezione inseriscono la coppia col cursore in mezzo.
+
+| Tasto | Comando |
+|---|---|
+| `Alt+U` | Anteprima, in un pannello accanto (di nuovo `Alt+U` per chiuderla) |
+| `Alt+B` | **Grassetto** `**…**` |
+| `Alt+I` | *Corsivo* `*…*` |
+| `Alt+C` | `Codice` in linea; su più righe un blocco ` ``` ` (tolto se c'è già) |
+| `Ctrl+U` | Link: `[selezione](url)` con `url` selezionato da sovrascrivere; un indirizzo selezionato va tra le parentesi |
+| `Alt+1` … `Alt+6` | Titolo di livello 1…6 sulle righe |
+| `Alt+0` | Toglie il titolo |
+| `Alt+H` | Elenco puntato `- ` sulle righe, o lo toglie |
 
 Nelle liste (palette, buffer, simboli, apertura rapida): `Su`/`Giù`/`PgSu`/`PgGiù` per
 muoversi, `Invio` per scegliere, `Esc` per chiudere, e digitando si filtra.
@@ -597,7 +612,7 @@ muoversi, `Invio` per scegliere, `Esc` per chiudere, e digitando si filtra.
 
 Elenca **tutti** i comandi e si filtra digitando una parte del nome. Con la ricerca vuota i
 comandi sono divisi in sezioni: prima le **azioni** (File, Buffer e pannelli, Cerca e vai,
-Modifica, Cursori e blocchi, Esegui, Altro), poi le **impostazioni** che cambiano il
+Modifica, Cursori e blocchi, Esegui, Altro, Markdown), poi le **impostazioni** che cambiano il
 comportamento dell'editor. Ogni riga ha il nome in grassetto, il valore corrente di
 un'impostazione (`●` attivo, `○` spento, in evidenza se attivo) e tutte le scorciatoie del
 comando, in colonne allineate.
@@ -671,7 +686,7 @@ colors = auto             # auto | truecolor | 256 | 16 | none
 glyphs = unicode          # unicode (▸ ▾ │) | windows (► ▼, in tutti i font di Windows) | ascii (+ - |)
 keybar = message          # i tasti del contesto: message (nella riga dei messaggi) | line (riga a sé) | off
 line_numbers = off        # i numeri di riga (Alt+G)
-show_invisibles = off     # fine riga, tab e spazi finali visibili (Alt+I)
+show_invisibles = off     # fine riga, tab e spazi finali visibili (Alt+J)
 
 # valori per tutti i linguaggi
 tab_width = 8

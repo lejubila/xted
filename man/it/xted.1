@@ -130,7 +130,7 @@ cursore; la barra di stato dice SOV e il cursore è sottolineato).
 Mostra o nasconde i numeri di riga, in un margine (un clic su un numero seleziona la riga, un
 trascinamento righe intere).
 .TP
-.B Alt+I
+.B Alt+J
 Mostra o nasconde i caratteri invisibili: i fine riga (LF e CR LF hanno ciascuno un segno; nessuno
 sull'ultima riga senza a-capo), i tab e gli spazi in fondo alla riga.
 .TP
@@ -250,6 +250,21 @@ Cambia il tema.
 .TP
 .B Ctrl+L
 Ridisegna lo schermo.
+.SS Markdown
+Solo in un documento Markdown. Con una selezione mettono il markup intorno (tolto se c'è già);
+senza, la coppia col cursore in mezzo.
+.TP
+.BR Alt+B ", " Alt+I ", " Alt+C
+Grassetto, corsivo, codice in linea; Alt+C su più righe fa un blocco di codice.
+.TP
+.B Ctrl+U
+Un link: [selezione](url), con url selezionato da sovrascrivere.
+.TP
+.BR Alt+1 " ... " Alt+6 ", " Alt+0
+Il titolo delle righe, o nessuno.
+.TP
+.B Alt+H
+Un elenco puntato sulle righe, o nessuno.
 .SH BARRA DI RICERCA
 Con la barra di ricerca aperta:
 .B Alt+C

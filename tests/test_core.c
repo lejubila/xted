@@ -2019,6 +2019,78 @@ static DWORD WINAPI ipc_sender(LPVOID arg)
 }
 #endif
 
+/* The Markdown commands: wrap and unwrap, fenced blocks, headings, links, lists; one undo each. */
+static void md_doc_load(Editor *e, const char *text)
+{
+    ed_load(e, text);
+    e->doc->syn = syn_by_name("Markdown");
+}
+
+static void test_md_edit(void)
+{
+    Editor e;
+
+    md_doc_load(&e, "uno due tre");
+    ed_sel(&e, 0, 4, 0, 7);                                     /* "due" */
+    edit_md_bold(&e);
+    CHECK(buf_is(e.buf, "uno **due** tre") && e.ax == 6 && e.cx == 9);
+    edit_md_bold(&e);                                           /* again: off (marks around) */
+    CHECK(buf_is(e.buf, "uno due tre") && e.ax == 4 && e.cx == 7);
+    edit_md_italic(&e);
+    CHECK(buf_is(e.buf, "uno *due* tre"));
+    edit_md_bold(&e);                                           /* both */
+    CHECK(buf_is(e.buf, "uno ***due*** tre"));
+    edit_md_italic(&e);                                         /* italic off, bold stays */
+    CHECK(buf_is(e.buf, "uno **due** tre"));
+    edit_undo(&e);
+    CHECK(buf_is(e.buf, "uno ***due*** tre"));                  /* one undo a command */
+    e.sel_on = 0;
+    e.cx = 0;
+    edit_md_code(&e);                                           /* no selection: a pair */
+    CHECK(buf_is(e.buf, "``uno ***due*** tre") && e.cx == 1);
+    edit_md_code(&e);                                           /* the empty pair: off */
+    CHECK(buf_is(e.buf, "uno ***due*** tre") && e.cx == 0);
+    editor_free(&e);
+
+    md_doc_load(&e, "a\nb\nc");
+    ed_sel(&e, 0, 0, 2, 0);                                     /* lines a, b */
+    edit_md_code(&e);
+    CHECK(buf_is(e.buf, "```\na\nb\n```\nc"));
+    edit_md_code(&e);                                           /* the fences go */
+    CHECK(buf_is(e.buf, "a\nb\nc"));
+    e.sel_on = 0;
+    e.cy = 1;
+    e.cx = 1;
+    edit_md_h2(&e);
+    CHECK(buf_is(e.buf, "a\n## b\nc") && e.cx == 4);
+    edit_md_h1(&e);
+    CHECK(buf_is(e.buf, "a\n# b\nc") && e.cx == 3);
+    edit_md_h0(&e);
+    CHECK(buf_is(e.buf, "a\nb\nc") && e.cx == 1);
+    ed_sel(&e, 0, 0, 2, 1);
+    edit_md_list(&e);
+    CHECK(buf_is(e.buf, "- a\n- b\n- c"));
+    edit_md_list(&e);
+    CHECK(buf_is(e.buf, "a\nb\nc"));
+    editor_free(&e);
+
+    md_doc_load(&e, "vedi qui");
+    ed_sel(&e, 0, 5, 0, 8);
+    edit_md_link(&e);                                           /* url selected, to be typed */
+    CHECK(buf_is(e.buf, "vedi [qui](url)") && e.sel_on && e.ax == 11 && e.cx == 14);
+    editor_free(&e);
+    md_doc_load(&e, "https://x.it");
+    ed_sel(&e, 0, 0, 0, 12);
+    edit_md_link(&e);                                           /* an address: in the parentheses */
+    CHECK(buf_is(e.buf, "[](https://x.it)") && !e.sel_on && e.cx == 1);
+    editor_free(&e);
+
+    ed_load(&e, "testo");                                       /* not Markdown: nothing */
+    edit_md_bold(&e);
+    CHECK(buf_is(e.buf, "testo") && strstr(e.msg, "Markdown") != NULL);
+    editor_free(&e);
+}
+
 #ifdef _WIN32
 /* The clipboard of Windows: text both ways, and Ctrl+V with a text copied in another program. */
 static void test_clipboard_win(void)
@@ -7316,6 +7388,7 @@ int main(void)
 #endif
     test_errors_parse();
     test_ipc();
+    test_md_edit();
 #ifdef _WIN32
     test_clipboard_win();
 #endif

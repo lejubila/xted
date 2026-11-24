@@ -878,15 +878,15 @@ def numbers_and_invisibles():
     check("a drag over the numbers selects whole lines", "\tif (a)\t{" in r.screen().text() or
           "if (a)" in r.screen().text(), r.screen().text()[:300])
     r.type(ctrl("w"), 0.2, "n", 0.3)
-    r.type(alt("i"), 0.3)
-    check("Alt+I: trailing spaces, tabs and line ends shown", lines()[0].startswith("  1 int x;\u00b7\u00b7\u00b7\u21b5") and
+    r.type(alt("j"), 0.3)
+    check("Alt+J: trailing spaces, tabs and line ends shown", lines()[0].startswith("  1 int x;\u00b7\u00b7\u00b7\u21b5") and
           lines()[1].startswith("  2 \u2192") and "\u2192 {\u21b5" in lines()[1] and lines()[3].startswith("  4 fine") and
           "\u21b5" not in lines()[3], repr(lines()[:4]))
     quit_(r)
     r = b.run(["w.txt"], rows=10, cols=60)
     check("a CR LF file: \u00b6 at the line ends (the settings stay off unless saved)",
           not lines()[0].startswith("  1"), repr(lines()[:2]))
-    r.type(alt("i"), 0.3)
+    r.type(alt("j"), 0.3)
     check("CR LF shown as \u00b6", lines()[0] == "uno\u00b6" or lines()[0].startswith("uno\u00b6"), repr(lines()[:2]))
     quit_(r)
     b.write(".cfg/xted/config", "line_numbers = on\n[Text]\nshow_invisibles = on\n")
@@ -979,6 +979,27 @@ def unsaved_buffers():
     check("and quitting asks", "unsaved changes" in r.screen().lines()[-1], r.screen().lines()[-1])
     r.type("n", 0.3)
     r.finish()
+    b.close()
+
+
+@scenario
+def markdown_keys():
+    b = Box()
+    b.write("n.md", "titolo\nuna parola\n")
+    b.write("a.txt", "parola\n")
+    r = b.run(["n.md"], cols=100)
+    r.type(alt("2"), 0.2, DOWN, "\x1b[H", "\x1b[1;2C" * 3, alt("b"), 0.2, ctrl("s"), 0.3)
+    check("Alt+2 a heading, Alt+B bold on the selection", b.read("n.md") == "## titolo\n**una** parola\n",
+          repr(b.read("n.md")))
+    r.type(alt("i"), 0.2, ctrl("u"), 0.2, "https://x.it", ctrl("s"), 0.3)
+    check("Alt+I italic, Ctrl+U a link with url to type over",
+          b.read("n.md") == "## titolo\n***[una](https://x.it)*** parola\n", repr(b.read("n.md")))
+    quit_(r)
+    r = b.run(["a.txt"], cols=100)
+    r.type(alt("b"), 0.3)
+    check("outside Markdown they do nothing, and say why", "Markdown" in r.screen().lines()[-1] and
+          b.read("a.txt") == "parola\n", r.screen().lines()[-1])
+    quit_(r)
     b.close()
 
 

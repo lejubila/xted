@@ -130,7 +130,7 @@ status bar says OVR and the cursor is underlined).
 Show or hide the line numbers, in a margin (a click on a number selects the line, a drag whole
 lines).
 .TP
-.B Alt+I
+.B Alt+J
 Show or hide the invisible characters: the line ends (LF and CR LF have each a mark; none on a last
 line with no newline), the tabs and the spaces at the end of a line.
 .TP
@@ -251,6 +251,21 @@ Change the theme.
 .TP
 .B Ctrl+L
 Redraw the screen.
+.SS Markdown
+Only in a Markdown document. With a selection they put the markup around it (taken off when it
+has it already); with none, the pair with the cursor in it.
+.TP
+.BR Alt+B ", " Alt+I ", " Alt+C
+Bold, italic, inline code; Alt+C on several lines makes a fenced block.
+.TP
+.B Ctrl+U
+A link: [selection](url), with url selected to be typed over.
+.TP
+.BR Alt+1 " ... " Alt+6 ", " Alt+0
+The heading of the lines, or none.
+.TP
+.B Alt+H
+A bulleted list on the lines, or none.
 .SH SEARCH BAR
 While the search bar is open:
 .B Alt+C

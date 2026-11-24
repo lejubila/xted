@@ -6,7 +6,8 @@
 /* Every user-visible command. The palette lists them by name; keymap.c binds keys to them
  * (the default shortcut here, then the user's [keys] configuration). */
 /* Palette sections: the actions first, then the settings that change how the editor behaves. */
-enum { G_FILE, G_BUFFERS, G_SEARCH, G_EDIT, G_BLOCKS, G_RUN, G_OTHER, G_SETTINGS, G_COUNT };
+enum { G_FILE, G_BUFFERS, G_SEARCH, G_EDIT, G_BLOCKS, G_RUN, G_OTHER, G_MARKDOWN, G_SETTINGS,
+       G_COUNT };
 
 /* What a setting command shows in the palette (see command_state). */
 enum { ST_NONE, ST_MOUSE, ST_SUGGEST, ST_PAIR, ST_GIT, ST_CLIP, ST_TABS, ST_SP2, ST_SP4, ST_SP8,

@@ -29,6 +29,22 @@ void edit_select_word(Editor *e);
 void edit_insert_cp(Editor *e, uint32_t cp);
 /* As edit_insert_cp, over the character under the cursor (overwrite mode). */
 void edit_overtype_cp(Editor *e, uint32_t cp);
+
+/* Markdown (only in a Markdown document): bold, italic and inline code around the selection
+ * (off when it has them), a fenced block on several lines, the heading of the lines (h0: none),
+ * a link, "- " on the lines. */
+void edit_md_bold(Editor *e);
+void edit_md_italic(Editor *e);
+void edit_md_code(Editor *e);
+void edit_md_h0(Editor *e);
+void edit_md_h1(Editor *e);
+void edit_md_h2(Editor *e);
+void edit_md_h3(Editor *e);
+void edit_md_h4(Editor *e);
+void edit_md_h5(Editor *e);
+void edit_md_h6(Editor *e);
+void edit_md_link(Editor *e);
+void edit_md_list(Editor *e);
 /* A typed character with the automatic pairs (see autopair): an opening bracket or quote adds
  * the closing one, a closing one already there is stepped over, a selection is wrapped.
  * Returns 1 if it handled the character; otherwise the caller inserts it. */
